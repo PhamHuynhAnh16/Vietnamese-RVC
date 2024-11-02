@@ -1,0 +1,76 @@
+# Phần yêu cầu dành riêng cho nền tảng
+pip==23.3
+wheel
+onnxruntime
+onnxruntime-gpu
+
+# Phần phụ thuộc cốt lõi
+PyYAML
+torch==2.5.0
+tqdm
+torchvision==0.20.0
+torchaudio==2.5.0
+faiss-cpu==1.7.3
+
+# Phần máy học, NLP và học sâu
+omegaconf>=2.0.5
+fairseq==0.12.2
+transformers==4.44.2
+scikit-learn
+einops
+
+# Phần xử lý cao độ và âm thanh
+pyworld==0.3.4
+librosa==0.9.2
+pydub>=0.25.1
+noisereduce
+praat-parselmouth
+soundfile==0.12.1
+pedalboard
+torchcrepe==0.0.23
+versatile-audio-upscaler==0.0.2
+edge-tts
+
+# Phần xử lý dữ liệu và tính toán
+numpy==1.23.5
+scipy
+pandas
+matplotlib==3.7.2
+julius>=0.2
+diffq>=0.2
+
+# Phần triển khai và khung web 
+gradio==4.43.0
+fastapi==0.112.0
+starlette==0.37.2
+requests
+tenacity==5.1.5
+pydantic==2.8.2
+
+# Phần tiện ích
+yt-dlp==2023.09.24
+ffmpy==0.3.1
+ffmpeg-python>=0.2.0
+beautifulsoup4
+wget
+
+# Phần sổ tay Jupyter và giao diện Colab
+ipywidgets
+jupyter-client
+ipython-genutils
+
+# Phần TensorFlow và ONNX
+tensorboard
+tensorboardX
+onnx>=1.14
+onnx2torch>=1.5
+
+# Phần mật mã học
+pycryptodome==3.9.6
+
+# Phần phụ thuộc bổ sung
+local-attention
+numba==0.57.0
+
+# Công cụ của Google Colab
+git+https://github.com/googlecolab/colabtools.git
