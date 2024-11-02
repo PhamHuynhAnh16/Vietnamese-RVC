@@ -148,7 +148,7 @@ class Separator:
         self.torch_device = torch.device("cuda")
 
         if "CUDAExecutionProvider" in ort_providers:
-            self.logger.info("ONNXruntime has CUDAExecutionProvider available, enabling acceleration")
+            self.logger.info("ONNXruntime có sẵn CUDAExecutionProvider, cho phép tăng tốc")
             self.onnx_execution_provider = ["CUDAExecutionProvider"]
         else: self.logger.warning("CUDAExecutionProvider không có sẵn trong ONNXruntime, do đó khả năng tăng tốc sẽ KHÔNG được bật")
 
