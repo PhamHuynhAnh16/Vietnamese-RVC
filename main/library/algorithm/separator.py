@@ -120,10 +120,8 @@ class Separator:
         onnxruntime_gpu_package = self.get_package_distribution("onnxruntime-gpu")
         onnxruntime_cpu_package = self.get_package_distribution("onnxruntime")
 
-        if onnxruntime_gpu_package is not None:
-            self.logger.info(f"ONNX Runtime GPU package installed with version: {onnxruntime_gpu_package.version}")
-        if onnxruntime_cpu_package is not None:
-            self.logger.info(f"ONNX Runtime CPU package installed with version: {onnxruntime_cpu_package.version}")
+        if onnxruntime_gpu_package is not None: self.logger.info(f"Gói GPU ONNX Runtime được cài đặt cùng với phiên bản: {onnxruntime_gpu_package.version}")
+        if onnxruntime_cpu_package is not None: self.logger.info(f"Gói CPU ONNX Runtime được cài đặt cùng với phiên bản: {onnxruntime_cpu_package.version}")
 
     def setup_torch_device(self, system_info):
         hardware_acceleration_enabled = False
