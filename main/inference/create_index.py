@@ -31,14 +31,15 @@ def main():
     logger = logging.getLogger(__name__)
 
 
-    if not logger.hasHandlers():  
+    if logger.hasHandlers(): logger.handlers.clear()
+    else:  
         console_handler = logging.StreamHandler()
         console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
 
-        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
+        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
         file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         file_handler.setFormatter(file_formatter)
@@ -46,13 +47,12 @@ def main():
 
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
     logger.debug(f"Tên mô hình: {args.model_name}")
     logger.debug(f"Đường dẫn mô hình: {exp_dir}")
     logger.debug(f"Phiên bản mô hình: {version}")
     logger.debug(f"Tùy chọn chỉ mục: {index_algorithm}")
-
 
     try:
         feature_dir = os.path.join(exp_dir, f"{version}_extracted")

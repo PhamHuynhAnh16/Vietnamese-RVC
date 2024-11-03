@@ -47,7 +47,6 @@ def decrypt_attr(attr, key):
 @retry(retry=retry_if_exception_type(RuntimeError), wait=wait_exponential(multiplier=2, min=2, max=60))
 def _api_request(data):
     sequence_num = random.randint(0, 0xFFFFFFFF)
-
     params = {'id': sequence_num}
     sequence_num += 1
 
@@ -103,7 +102,6 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
     if 'g' not in file_data: raise Exception('Tập tin không thể truy cập được nữa')
     
     file_size = file_data['s']
-
     attribs = base64_url_decode(file_data['at'])
     attribs = decrypt_attr(attribs, k)
 
@@ -145,7 +143,6 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
         else: i = 0
 
         block = chunk[i:i + 16]
-
         if len(block) % 16: block += b'\0' * (16 - (len(block) % 16))
 
         mac_str = mac_encryptor.encrypt(encryptor.encrypt(block))
@@ -153,9 +150,12 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
     file_mac = str_to_a32(mac_str)
     temp_output_file.close()
 
-    if (file_mac[0] ^ file_mac[1], file_mac[2] ^ file_mac[3]) != meta_mac: raise ValueError('Mismatched mac')
+    if (file_mac[0] ^ file_mac[1], file_mac[2] ^ file_mac[3]) != meta_mac: raise ValueError('Mac không khớp')
+    
+    file_path = os.path.join(dest_path, file_name)
+    if os.path.exists(file_path): os.remove(file_path)
 
-    shutil.copy(temp_output_file.name, os.path.join(dest_path, file_name))
+    shutil.move(temp_output_file.name, file_path)
 
 
 def mega_download_url(url, dest_path=None, dest_filename=None):

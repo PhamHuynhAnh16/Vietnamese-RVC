@@ -23,6 +23,8 @@ sys.path.append(now_directory)
 
 from main.configs.config import Config
 
+logger = logging.getLogger(__name__)
+
 
 logging.getLogger("numba.core.byteflow").setLevel(logging.WARNING)
 logging.getLogger("numba.core.ssa").setLevel(logging.WARNING)
@@ -320,17 +322,16 @@ if __name__ == "__main__":
     if len([f for f in os.listdir(os.path.join(dataset)) if os.path.isfile(os.path.join(dataset, f)) and f.lower().endswith((".wav", ".mp3", ".flac", ".ogg"))]) < 1: raise FileNotFoundError("Không tìm thấy dữ liệu")
 
     log_file = os.path.join(experiment_directory, "preprocess.log")
-    logger = logging.getLogger(__name__)
 
-
-    if not logger.hasHandlers():  
+    if logger.hasHandlers(): logger.handlers.clear()
+    else:
         console_handler = logging.StreamHandler()
         console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
 
-        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
+        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
         file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         file_handler.setFormatter(file_formatter)
@@ -338,8 +339,7 @@ if __name__ == "__main__":
 
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)
-        logger.setLevel(logging.INFO)
-
+        logger.setLevel(logging.DEBUG)
 
     logger.debug(f"Tên mô hình: {args.model_name}")
     logger.debug(f"Đường dẫn xử lý của mô hình: {experiment_directory}")

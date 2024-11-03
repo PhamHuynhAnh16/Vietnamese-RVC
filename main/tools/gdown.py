@@ -94,7 +94,7 @@ def _get_session(proxy, use_cookies, return_cookies_file=False):
     return (sess, cookies_file) if return_cookies_file else sess
 
 
-def gdown_download(url=None, output=None, quiet=False, proxy=None, speed=None, use_cookies=True, verify=True, id=None, fuzzy=True, resume=False, format=None):
+def gdown_download(url=None, output=None, output_dir=None, quiet=False, proxy=None, speed=None, use_cookies=True, verify=True, id=None, fuzzy=True, resume=False, format=None):
     if not (id is None) ^ (url is None): raise ValueError("Phải chỉ định url hoặc id")
     if id is not None: url = f"https://drive.google.com/uc?id={id}"
 
@@ -103,6 +103,7 @@ def gdown_download(url=None, output=None, quiet=False, proxy=None, speed=None, u
     sess, cookies_file = _get_session(proxy=proxy, use_cookies=use_cookies, return_cookies_file=True)
 
     gdrive_file_id, is_gdrive_download_link = parse_url(url, warning=not fuzzy)
+
 
     if fuzzy and gdrive_file_id:
         url = f"https://drive.google.com/uc?id={gdrive_file_id}"
@@ -195,6 +196,7 @@ def gdown_download(url=None, output=None, quiet=False, proxy=None, speed=None, u
         tmp_file = None
         f = output
 
+
     if tmp_file is not None and f.tell() != 0: res = sess.get(url, headers={"Range": f"bytes={f.tell()}-"}, stream=True, verify=verify)
 
     if not quiet:
@@ -220,10 +222,18 @@ def gdown_download(url=None, output=None, quiet=False, proxy=None, speed=None, u
 
         if not quiet: pbar.close()
 
-
         if tmp_file:
             f.close()
-            shutil.copy(tmp_file, output)
+            
+            if output_dir is not None: 
+                output_file = os.path.join(output_dir, output)
+                if os.path.exists(output_file): os.remove(output_file)
+
+                shutil.move(tmp_file, output_file)
+            else: 
+                if os.path.exists(output): os.remove(output)
+
+                shutil.move(tmp_file, output)
     finally:
         sess.close()
 

@@ -34,6 +34,8 @@ from main.library.predictors.FCPE import FCPE
 from main.library.predictors.RMVPE import RMVPE
 
 
+logger = logging.getLogger(__name__)
+
 config = Config()
 
 
@@ -45,7 +47,7 @@ def parse_arguments() -> tuple:
     parser.add_argument("--pitch_guidance", type=lambda x: bool(strtobool(x)), default=True)
     parser.add_argument("--hop_length", type=int, default=128)
     parser.add_argument("--cpu_cores", type=int, default=2)
-    parser.add_argument("--gpu", type=str, default="0")
+    parser.add_argument("--gpu", type=str, default="-")
     parser.add_argument("--sample_rate", type=int, required=True)
     parser.add_argument("--embedder_model", type=str, default="contentvec_base")
 
@@ -79,7 +81,7 @@ def check_hubert(hubert):
 def generate_config(rvc_version, sample_rate, model_path):
     config_path = os.path.join("main", "configs", rvc_version, f"{sample_rate}.json")
     config_save_path = os.path.join(model_path, "config.json")
-    if not os.path.exists(config_save_path): shutil.copyfile(config_path, config_save_path)
+    if not os.path.exists(config_save_path): shutil.copy(config_path, config_save_path)
 
 
 def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate):
@@ -403,20 +405,19 @@ if __name__ == "__main__":
     check_rmvpe_fcpe(f0_method)
     check_hubert(embedder_model)
 
-    if len([f for f in os.listdir(os.path.join(exp_dir, "sliced_audios")) if os.path.isfile(os.path.join(exp_dir, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join(exp_dir, "sliced_audios_16k")) if os.path.isfile(os.path.join(exp_dir, "sliced_audios_16k", f))]) < 1: raise FileNotFoundError("Không tìm thấy dữ liệu được xử  lý, vui lòng xử  lý lại âm thanh")
+    if len([f for f in os.listdir(os.path.join(exp_dir, "sliced_audios")) if os.path.isfile(os.path.join(exp_dir, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join(exp_dir, "sliced_audios_16k")) if os.path.isfile(os.path.join(exp_dir, "sliced_audios_16k", f))]) < 1: raise FileNotFoundError("Không tìm thấy dữ liệu được xử lý, vui lòng xử lý lại âm thanh")
 
     log_file = os.path.join(exp_dir, "extract.log")
-    logger = logging.getLogger(__name__)
 
-
-    if not logger.hasHandlers():  
+    if logger.hasHandlers(): logger.handlers.clear()
+    else:
         console_handler = logging.StreamHandler()
         console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
 
-        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
+        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
         file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         file_handler.setFormatter(file_formatter)
@@ -424,7 +425,7 @@ if __name__ == "__main__":
 
         logger.addHandler(console_handler)
         logger.addHandler(file_handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
     logger.debug(f"Tên mô hình: {args.model_name}")
     logger.debug(f"Đường dẫn trích xuất của mô hình: {exp_dir}")
@@ -436,7 +437,6 @@ if __name__ == "__main__":
     logger.debug(f"Phiên bản của mô hình: {version}")
     logger.debug(f"Trích xuất cao độ: {pitch_guidance}")
     logger.debug(f"Mô hình học cách nói: {embedder_model}")
-
 
     try:
         run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus)

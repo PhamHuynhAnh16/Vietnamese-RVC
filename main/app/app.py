@@ -460,10 +460,16 @@ def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
             if file.endswith(".index"):
                 model_log_dir = os.path.join(dest_logs, model_name)
                 os.makedirs(model_log_dir, exist_ok=True)
+                
+                filepath = os.path.join(model_log_dir, file.replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '').strip())
+                if os.path.exists(filepath): os.remove(filepath)
 
-                shutil.copy(file_path, os.path.join(model_log_dir, file.replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '').strip()))
+                shutil.move(file_path, filepath)
             elif file.endswith(".pth") and "G_" not in file and "D_" not in file:
-                shutil.copy(file_path, os.path.join(dest_weights, model_name + ".pth"))
+                pth_path = os.path.join(dest_weights, model_name + ".pth")
+                if os.path.exists(pth_path): os.remove(pth_path)
+
+                shutil.move(file_path, pth_path)
 
 
 def download_url(url):
@@ -535,7 +541,7 @@ def download_model(url=None, model=None):
                     file_id = url.split('open?id=')[1].split('/')[0]
                 
                 if file_id:
-                    file = gdown_download(id=file_id, output=download_dir)
+                    file = gdown_download(id=file_id, output_dir=download_dir)
 
                     if file.endswith('.zip'): shutil.unpack_archive(os.path.join(download_dir, file), download_dir)
 
@@ -584,7 +590,7 @@ def save_drop_model(dropbox):
 
     if not os.path.exists(save_model_temp): os.makedirs(save_model_temp, exist_ok=True)
 
-    shutil.copy(dropbox, save_model_temp)
+    shutil.move(dropbox, save_model_temp)
 
     try:
         file_name = os.path.basename(dropbox)
@@ -594,12 +600,16 @@ def save_drop_model(dropbox):
             if file_name.endswith(".zip"):
                 shutil.unpack_archive(os.path.join(save_model_temp, file_name), save_model_temp)
                 move_files_from_directory(save_model_temp, weight_folder, logs_folder, file_name.replace(".zip", ""))
-            elif file_name.endswith(".pth"): shutil.copy(os.path.join(save_model_temp, file_name), os.path.join(weight_folder, file_name))
+            elif file_name.endswith(".pth"): 
+                output_file = os.path.join(weight_folder, file_name)
+                if os.path.exists(output_file): os.remove(output_file)
+
+                shutil.move(os.path.join(save_model_temp, file_name), output_file)
             elif file_name.endswith(".index"):
                 model_logs = os.path.join(logs_folder, extract_name_model(file_name))
 
                 if not os.path.exists(model_logs): os.makedirs(model_logs, exist_ok=True)
-                shutil.copy(os.path.join(save_model_temp, file_name), model_logs)
+                shutil.move(os.path.join(save_model_temp, file_name), model_logs)
             else: 
                 gr.Warning("Không phân tích được mô hình!")
                 
@@ -1047,6 +1057,8 @@ def create_dataset(input_audio, output_dataset, resample, resample_sr, clean_dat
 
     cmd = f'{python} main/inference/create_dataset.py --input_audio "{input_audio}" --output_dataset {output_dataset} --resample {resample} --resample_sr {resample_sr} --clean_dataset {clean_dataset} --clean_strength {clean_strength} --separator_music {separator_music} --separator_reverb {separator_reverb} --kim_vocal_version {version} --overlap {overlap} --segments_size {segments_size} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --denoise_mdx {denoise_mdx} --skip {skip} --skip_start_audios "{skip_start}" --skip_end_audios "{skip_end}"'
 
+    gr.Info("Bắt đầu tạo...")
+
     p = Popen(cmd, shell=True)
     done = [False]
 
@@ -1109,7 +1121,7 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
 
     if model_name == "": return gr.Warning("Vui lòng cung cấp tên")
 
-    if len([f for f in os.listdir(os.path.join("assets", "logs", model_name, "sliced_audios")) if os.path.isfile(os.path.join("assets", "logs", model_name, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join("assets", "logs", model_name, "sliced_audios_16k")) if os.path.isfile(os.path.join("assets", "logs", model_name, "sliced_audios_16k", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được xử  lý, vui lòng xử  lý lại âm thanh")
+    if len([f for f in os.listdir(os.path.join("assets", "logs", model_name, "sliced_audios")) if os.path.isfile(os.path.join("assets", "logs", model_name, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join("assets", "logs", model_name, "sliced_audios_16k")) if os.path.isfile(os.path.join("assets", "logs", model_name, "sliced_audios_16k", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được xử lý, vui lòng xử lý lại âm thanh")
 
     cmd = f'{python} main/inference/extract.py --model_name {model_name} --rvc_version {version} --f0_method {method} --pitch_guidance {pitch_guidance} --hop_length {hop_length} --cpu_cores {cpu_cores} --gpu {gpu} --sample_rate {sr} --embedder_model {embedder_model}'
 
@@ -1329,7 +1341,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
             with gr.Row():
                 input_audio.change(fn=lambda audio: audio, inputs=[input_audio], outputs=[audio_input])
                 cleaner.change(fn=visible_1, inputs=[cleaner], outputs=[clean_strength])
-                input.upload(fn=lambda audio_in: shutil.copy(audio_in.name, os.path.join("audios")), inputs=[input], outputs=[input_audio])
+                input.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input], outputs=[input_audio])
                 refesh_separator.click(fn=refesh_audio, inputs=[], outputs=[input_audio])
             with gr.Row():
                 download_button.click(
@@ -1464,7 +1476,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 refesh.click(fn=change_choices, inputs=[], outputs=[model_pth, model_index])
                 model_pth.change(fn=get_index, inputs=[model_pth], outputs=[model_index])
             with gr.Row():
-                input0.upload(fn=lambda audio_in: shutil.copy(audio_in.name, os.path.join("audios")), inputs=[input0], outputs=[input_audio0])
+                input0.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input0], outputs=[input_audio0])
                 input_audio0.change(fn=lambda audio: audio, inputs=[input_audio0], outputs=[play_audio])
             with gr.Row():
                 embedders.change(fn=lambda embedders: visible_1(True if embedders == "custom" else False), inputs=[embedders], outputs=[custom_embedders])
@@ -1751,7 +1763,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 clipping_checkbox.change(fn=visible_1, inputs=[clipping_checkbox], outputs=[clipping_threashold_db])
                 bitcrush_checkbox.change(fn=visible_1, inputs=[bitcrush_checkbox], outputs=[bitcrush_bit_depth])
             with gr.Row():
-                upload_audio.upload(fn=lambda audio_in: shutil.copy(audio_in.name, os.path.join("audios")), inputs=[upload_audio], outputs=[audio_in_path])
+                upload_audio.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[upload_audio], outputs=[audio_in_path])
                 audio_in_path.change(fn=lambda audio: audio, inputs=[audio_in_path], outputs=[audio_play_input])
                 audio_effects_refesh.click(fn=lambda: refesh_audio, inputs=[], outputs=[audio_in_path])
             with gr.Row():
@@ -2008,7 +2020,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
             with gr.Row():
                 custom_dataset.change(fn=lambda custom_dataset: [visible_1(custom_dataset), "dataset"],inputs=[custom_dataset], outputs=[dataset_path, dataset_path])
                 upload_dataset.upload(
-                    fn=lambda files, folder: [shutil.copy(f.name, os.path.join(folder, os.path.split(f.name)[1])) for f in files] if folder != "" else gr.Warning('Vui lòng nhập tên thư mục dữ liệu'),
+                    fn=lambda files, folder: [shutil.move(f.name, os.path.join(folder, os.path.split(f.name)[1])) for f in files] if folder != "" else gr.Warning('Vui lòng nhập tên thư mục dữ liệu'),
                     inputs=[upload_dataset, dataset_path], 
                     outputs=[], 
                     api_name="upload_dataset"
@@ -2113,8 +2125,8 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
             with gr.Row():
                 output_model = gr.File(label="Đầu ra mô hình", visible=False)
             with gr.Row():
-                model_a.upload(fn=lambda model: shutil.copy(model.name, os.path.join("assets", "weights")), inputs=[model_a], outputs=[model_path_a])
-                model_b.upload(fn=lambda model: shutil.copy(model.name, os.path.join("assets", "weights")), inputs=[model_b], outputs=[model_path_b])
+                model_a.upload(fn=lambda model: shutil.move(model.name, os.path.join("assets", "weights")), inputs=[model_a], outputs=[model_path_a])
+                model_b.upload(fn=lambda model: shutil.move(model.name, os.path.join("assets", "weights")), inputs=[model_b], outputs=[model_path_b])
             with gr.Row():
                 fushion_button.click(
                     fn=fushion_model,
@@ -2142,7 +2154,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 model_path = gr.Textbox(label="Đường dẫn mô hình", value="", info="Nhập đường dẫn đến tệp mô hình", interactive=True)
                 output_info = gr.Textbox(label="Thông Tin Mô Hình", value="", interactive=False, scale=6)
             with gr.Row():
-                model.upload(fn=lambda model: shutil.copy(model.name, os.path.join("assets", "weights")), inputs=[model], outputs=[model_path])
+                model.upload(fn=lambda model: shutil.move(model.name, os.path.join("assets", "weights")), inputs=[model], outputs=[model_path])
                 read_button.click(
                     fn=model_info,
                     inputs=[model_path],
@@ -2251,13 +2263,13 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                     api_name="download_pretrain_choices"
                 )
                 pretrain_upload_g.upload(
-                    fn=lambda pretrain_upload_g: shutil.copy(pretrain_upload_g.name, os.path.join("assets", "model", "pretrained_custom")), 
+                    fn=lambda pretrain_upload_g: shutil.move(pretrain_upload_g.name, os.path.join("assets", "model", "pretrained_custom")), 
                     inputs=[pretrain_upload_g], 
                     outputs=[],
                     api_name="upload_pretrain_g"
                 )
                 pretrain_upload_d.upload(
-                    fn=lambda pretrain_upload_d: shutil.copy(pretrain_upload_d.name, os.path.join("assets", "model", "pretrained_custom")), 
+                    fn=lambda pretrain_upload_d: shutil.move(pretrain_upload_d.name, os.path.join("assets", "model", "pretrained_custom")), 
                     inputs=[pretrain_upload_d], 
                     outputs=[],
                     api_name="upload_pretrain_d"
@@ -2270,7 +2282,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                     api_name="hubert_download"
                 )
                 hubert_input.upload(
-                    fn=lambda hubert: shutil.copy(hubert.name, os.path.join("assets", "model", "embedders")), 
+                    fn=lambda hubert: shutil.move(hubert.name, os.path.join("assets", "model", "embedders")), 
                     inputs=[hubert_input], 
                     outputs=[],
                     api_name="upload_hubert"

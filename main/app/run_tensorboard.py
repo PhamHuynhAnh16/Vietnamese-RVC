@@ -9,7 +9,7 @@ def launch_tensorboard_pipeline():
     logging.getLogger("tensorboard").setLevel(logging.WARNING)
 
     tb = program.TensorBoard()
-    tb.configure(argv=[None, "--logdir", "assets/logs", f"--port=7861"])
+    tb.configure(argv=[None, "--logdir", "assets/logs", f"--port=6870"])
     url = tb.launch()
 
     print(f"Đường dẫn biểu đồ: {url}")

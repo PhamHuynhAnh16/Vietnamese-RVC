@@ -6,14 +6,14 @@ from bs4 import BeautifulSoup
 
 
 def Mediafire_Download(url, output=None, filename=None):
-    if not(filename): filename = url.split('/')[-2]
+    if not filename: filename = url.split('/')[-2]
     
     sess = requests.session()
     sess.headers.update({"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6)"})
 
     url = BeautifulSoup(sess.get(url).content, "html.parser").find(id="downloadButton").get("href")
     
-    if not(output): output = os.path.dirname(os.path.realpath(__file__))
+    if not output: output = os.path.dirname(os.path.realpath(__file__))
 
 
     try:

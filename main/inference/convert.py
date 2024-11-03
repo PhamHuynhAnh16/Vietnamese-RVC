@@ -11,6 +11,7 @@ import pyworld
 import librosa
 import logging
 import argparse
+import warnings
 import traceback
 import torchcrepe
 import subprocess
@@ -40,6 +41,8 @@ from main.library.predictors.FCPE import FCPE
 from main.library.predictors.RMVPE import RMVPE
 from main.library.algorithm.synthesizers import Synthesizer
 
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 logging.getLogger("torch").setLevel(logging.ERROR)
 logging.getLogger("fairseq").setLevel(logging.ERROR)
@@ -47,7 +50,6 @@ logging.getLogger("faiss").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("faiss.loader").setLevel(logging.WARNING)
-
 
 FILTER_ORDER = 5
 CUTOFF_FREQUENCY = 48  
@@ -59,14 +61,15 @@ input_audio_path2wav = {}
 log_file = os.path.join("assets", "logs", "convert.log")
 logger = logging.getLogger(__name__)
 
-if not logger.hasHandlers():  
+if logger.hasHandlers(): logger.handlers.clear()
+else:
     console_handler = logging.StreamHandler()
     console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.INFO)
 
-    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
+    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
     file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     file_handler.setFormatter(file_formatter)
@@ -74,8 +77,7 @@ if not logger.hasHandlers():
 
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
-
+    logger.setLevel(logging.DEBUG)
 
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
@@ -104,7 +106,6 @@ def parse_arguments() -> tuple:
 
     args = parser.parse_args()
     return args
-
 
 def main():
     args = parse_arguments()
@@ -171,13 +172,13 @@ def check_rmvpe_fcpe(method):
         methods_str = re.search("hybrid\[(.+)\]", method)
         if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
 
-        if methods[0] == "rmvpe" or methods[1] == "rmvpe": download_rmvpe()
-        elif methods[0] == "fcpe" or methods[1] == "fcpe": download_fcpe()
+        for method in methods:
+            if method == "rmvpe": download_rmvpe()
+            elif method == "fcpe": download_fcpe()
 
 def check_hubert(hubert):
     if hubert == "contentvec_base" or hubert == "hubert_base" or hubert == "japanese_hubert_base" or hubert == "korean_hubert_base" or hubert == "chinese_hubert_base":
         model_path = os.path.join(now_dir, "assets", "model", "embedders", hubert + '.pt')
-
         if not os.path.exists(model_path): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + f"{hubert}.pt", "-P", os.path.join("assets", "model", "embedders")], check=True)
 
 def load_audio_infer(file, sample_rate):
@@ -199,7 +200,6 @@ def load_audio_infer(file, sample_rate):
 def process_audio(file_path, output_path):
     try:
         song = AudioSegment.from_file(file_path)
-
         nonsilent_parts = silence.detect_nonsilent(song, min_silence_len=750, silence_thresh=-70)
 
         cut_files = []

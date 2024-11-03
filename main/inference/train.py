@@ -42,6 +42,46 @@ from main.library.algorithm.commons import get_padding, slice_segments, clip_gra
 logging.getLogger("torch").setLevel(logging.ERROR)
 
 
+MATPLOTLIB_FLAG = False
+
+
+class HParams:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            self[k] = HParams(**v) if isinstance(v, dict) else v
+
+
+    def keys(self):
+        return self.__dict__.keys()
+    
+
+    def items(self):
+        return self.__dict__.items()
+    
+
+    def values(self):
+        return self.__dict__.values()
+    
+
+    def __len__(self):
+        return len(self.__dict__)
+    
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+    
+
+    def __setitem__(self, key, value):
+        self.__dict__[key] = value
+
+
+    def __contains__(self, key):
+        return key in self.__dict__
+    
+
+    def __repr__(self):
+        return repr(self.__dict__)
+
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, required=True)
@@ -64,6 +104,90 @@ def parse_arguments() -> tuple:
     args = parser.parse_args()
     return args
 
+
+args = parse_arguments()
+
+model_name = args.model_name
+save_every_epoch = args.save_every_epoch
+total_epoch = args.total_epoch
+pretrainG = args.g_pretrained_path
+pretrainD = args.d_pretrained_path
+version = args.rvc_version
+gpus = args.gpu
+batch_size = args.batch_size
+sample_rate = args.sample_rate
+pitch_guidance = args.pitch_guidance
+save_only_latest = args.save_only_latest
+save_every_weights = args.save_every_weights
+cache_data_in_gpu = args.cache_data_in_gpu
+overtraining_detector = args.overtraining_detector
+overtraining_threshold = args.overtraining_threshold
+sync_graph = args.sync_graph
+
+experiment_dir = os.path.join(current_dir, "assets", "logs", model_name)
+config_save_path = os.path.join(experiment_dir, "config.json")
+
+os.environ["CUDA_VISIBLE_DEVICES"] = gpus.replace("-", ",")
+n_gpus = len(gpus.split("-"))
+
+torch.backends.cudnn.deterministic = False
+torch.backends.cudnn.benchmark = False
+
+global_step = 0
+last_loss_gen_all = 0
+overtrain_save_epoch = 0
+
+loss_gen_history = []
+smoothed_loss_gen_history = []
+loss_disc_history = []
+smoothed_loss_disc_history = []
+
+lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
+training_file_path = os.path.join(experiment_dir, "training_data.json")
+
+with open(config_save_path, "r") as f:
+    config = json.load(f)
+
+config = HParams(**config)
+config.data.training_files = os.path.join(experiment_dir, "filelist.txt")
+
+log_file = os.path.join(experiment_dir, "train.log")
+
+logger = logging.getLogger(__name__)
+
+if logger.hasHandlers(): logger.handlers.clear()
+else:  
+    console_handler = logging.StreamHandler()
+    console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+    console_handler.setFormatter(console_formatter)
+    console_handler.setLevel(logging.INFO)
+
+    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+    file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+    file_handler.setFormatter(file_formatter)
+    file_handler.setLevel(logging.DEBUG)
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+    logger.setLevel(logging.DEBUG)
+
+logger.debug(f"Tên mô hình: {model_name}")
+logger.debug(f"Lưu mô hình sau: {save_every_epoch} kỷ nguyên")
+logger.debug(f"Tổng số kỷ nguyên huấn luyện: {total_epoch} kỷ nguyên")
+logger.debug(f"Pretrain G: {pretrainG} | Pretrain D: {pretrainD}")
+logger.debug(f"Phiên bản mô hình: {version}")
+logger.debug(f"Gpu: {gpus}")
+logger.debug(f"Kích thước lô: {batch_size}")
+logger.debug(f"Tốc độ lấy mẫu: {sample_rate}")
+logger.debug(f"Huấn luyện cao độ: {pitch_guidance}")
+logger.debug(f"Chỉ lưu mô hình cuối: {save_only_latest}")
+logger.debug(f"Lưu mọi mô hình: {save_every_weights}")
+logger.debug(f"Lưu lên bộ nhớ Gpu: {cache_data_in_gpu}")
+logger.debug(f"Kiểm tra huấn luyện quá sức: {overtraining_detector}")
+logger.debug(f"Ngưỡng huấn luyện quá sức: {overtraining_threshold}")
+logger.debug(f"Đồng bộ hóa biểu đồ: {sync_graph}")
 
 def main():
     global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch
@@ -187,44 +311,6 @@ def main():
 
         continue_overtrain_detector(training_file_path)
         start()
-
-
-class HParams:
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            self[k] = HParams(**v) if isinstance(v, dict) else v
-
-
-    def keys(self):
-        return self.__dict__.keys()
-    
-
-    def items(self):
-        return self.__dict__.items()
-    
-
-    def values(self):
-        return self.__dict__.values()
-    
-
-    def __len__(self):
-        return len(self.__dict__)
-    
-
-    def __getitem__(self, key):
-        return self.__dict__[key]
-    
-
-    def __setitem__(self, key, value):
-        self.__dict__[key] = value
-
-
-    def __contains__(self, key):
-        return key in self.__dict__
-    
-
-    def __repr__(self):
-        return repr(self.__dict__)
 
 
 def plot_spectrogram_to_numpy(spectrogram):
@@ -1009,9 +1095,6 @@ def mel_spectrogram_torch(y, n_fft, num_mels, sample_rate, hop_size, win_size, f
     return melspec
 
 
-MATPLOTLIB_FLAG = False
-
-
 def replace_keys_in_dict(d, old_key_part, new_key_part):
     updated_dict = OrderedDict() if isinstance(d, OrderedDict) else {}
 
@@ -1419,6 +1502,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
     model_del = []
     done = False
     
+
     if rank == 0:
         if epoch % save_every_epoch == False:
             checkpoint_suffix = f"{2333333 if save_only_latest else global_step}.pth"
@@ -1490,6 +1574,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
         for m in model_del:
             os.remove(m)
 
+
         lowest_value_rounded = float(lowest_value["value"])
         lowest_value_rounded = round(lowest_value_rounded, 3)
 
@@ -1506,92 +1591,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
 
         if done: os._exit(2333333)
 
-
 if __name__ == "__main__":
-    args = parse_arguments()
-
-    model_name = args.model_name
-    save_every_epoch = args.save_every_epoch
-    total_epoch = args.total_epoch
-    pretrainG = args.g_pretrained_path
-    pretrainD = args.d_pretrained_path
-    version = args.rvc_version
-    gpus = args.gpu
-    batch_size = args.batch_size
-    sample_rate = args.sample_rate
-    pitch_guidance = args.pitch_guidance
-    save_only_latest = args.save_only_latest
-    save_every_weights = args.save_every_weights
-    cache_data_in_gpu = args.cache_data_in_gpu
-    overtraining_detector = args.overtraining_detector
-    overtraining_threshold = args.overtraining_threshold
-    sync_graph = args.sync_graph
-
-    experiment_dir = os.path.join(current_dir, "assets", "logs", model_name)
-    config_save_path = os.path.join(experiment_dir, "config.json")
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = gpus.replace("-", ",")
-    n_gpus = len(gpus.split("-"))
-
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = False
-
-    global_step = 0
-    last_loss_gen_all = 0
-    overtrain_save_epoch = 0
-
-    loss_gen_history = []
-    smoothed_loss_gen_history = []
-    loss_disc_history = []
-    smoothed_loss_disc_history = []
-
-    lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
-    training_file_path = os.path.join(experiment_dir, "training_data.json")
-
-    with open(config_save_path, "r") as f:
-        config = json.load(f)
-
-    config = HParams(**config)
-    config.data.training_files = os.path.join(experiment_dir, "filelist.txt")
-
-    log_file = os.path.join(experiment_dir, "train.log")
-
-    logger = logging.getLogger(__name__)
-
-
-    if not logger.hasHandlers():  
-        console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-
-        console_handler.setFormatter(console_formatter)
-        console_handler.setLevel(logging.INFO)
-
-        file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
-        file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(logging.DEBUG)
-
-        logger.addHandler(console_handler)
-        logger.addHandler(file_handler)
-        logger.setLevel(logging.INFO)
-
-    logger.debug(f"Tên mô hình: {model_name}")
-    logger.debug(f"Lưu mô hình sau: {save_every_epoch} kỷ nguyên")
-    logger.debug(f"Tổng số kỷ nguyên huấn luyện: {total_epoch} kỷ nguyên")
-    logger.debug(f"Pretrain G: {pretrainG} | Pretrain D: {pretrainD}")
-    logger.debug(f"Phiên bản mô hình: {version}")
-    logger.debug(f"Gpu: {gpus}")
-    logger.debug(f"Kích thước lô: {batch_size}")
-    logger.debug(f"Tốc độ lấy mẫu: {sample_rate}")
-    logger.debug(f"Huấn luyện cao độ: {pitch_guidance}")
-    logger.debug(f"Chỉ lưu mô hình cuối: {save_only_latest}")
-    logger.debug(f"Lưu mọi mô hình: {save_every_weights}")
-    logger.debug(f"Lưu lên bộ nhớ Gpu: {cache_data_in_gpu}")
-    logger.debug(f"Kiểm tra huấn luyện quá sức: {overtraining_detector}")
-    logger.debug(f"Ngưỡng huấn luyện quá sức: {overtraining_threshold}")
-    logger.debug(f"Đồng bộ hóa biểu đồ: {sync_graph}")
-
     torch.multiprocessing.set_start_method("spawn")
 
     try:

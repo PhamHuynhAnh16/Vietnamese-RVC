@@ -26,15 +26,15 @@ from main.library.algorithm.separator import Separator
 log_file = os.path.join("assets", "logs", "create_dataset.log")
 logger = logging.getLogger(__name__)
 
-
-if not logger.hasHandlers():  
+if logger.hasHandlers(): logger.handlers.clear()
+else: 
     console_handler = logging.StreamHandler()
     console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.INFO)
 
-    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3)
+    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
     file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     file_handler.setFormatter(file_formatter)
@@ -42,7 +42,7 @@ if not logger.hasHandlers():
 
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
 
 def parse_arguments() -> tuple:
@@ -172,7 +172,7 @@ def main():
         raise RuntimeError(f"Đã xảy ra lỗi khi tạo dữ liệu huấn luyện: {e}")
     finally:
         for audio in paths:
-            shutil.copy(audio, output_dataset)
+            shutil.move(audio, output_dataset)
 
         if os.path.exists(dataset_temp): shutil.rmtree(dataset_temp, ignore_errors=True)
 
