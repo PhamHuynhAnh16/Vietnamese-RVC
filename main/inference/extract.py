@@ -35,9 +35,9 @@ from main.library.predictors.RMVPE import RMVPE
 
 
 logger = logging.getLogger(__name__)
+logger.propagate = False
 
 config = Config()
-
 
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
@@ -412,13 +412,13 @@ if __name__ == "__main__":
     if logger.hasHandlers(): logger.handlers.clear()
     else:
         console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
 
         file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-        file_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(logging.DEBUG)
