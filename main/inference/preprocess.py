@@ -40,7 +40,7 @@ SAMPLE_RATE_16K = 16000
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, required=True)
-    parser.add_argument("--dataset_path", type=str, required=True)
+    parser.add_argument("--dataset_path", type=str, default="./dataset")
     parser.add_argument("--sample_rate", type=int, required=True)
     parser.add_argument("--cpu_cores", type=int, default=2)
     parser.add_argument("--cut_preprocess", type=lambda x: bool(strtobool(x)), default=True)

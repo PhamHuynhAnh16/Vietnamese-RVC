@@ -83,7 +83,7 @@ kara_models = {
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--output_path", type=str, required=True)
+    parser.add_argument("--output_path", type=str, default="./audios")
     parser.add_argument("--format", type=str, default="wav")
     parser.add_argument("--shifts", type=int, default=10)
     parser.add_argument("--segments_size", type=int, default=256)

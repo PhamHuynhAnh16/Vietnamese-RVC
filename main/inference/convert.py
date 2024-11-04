@@ -89,7 +89,7 @@ def parse_arguments() -> tuple:
     parser.add_argument("--hop_length", type=int, default=64)
     parser.add_argument( "--f0_method", type=str, default="rmvpe")
     parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--output_path", type=str, required=True)
+    parser.add_argument("--output_path", type=str, default="./audios/output.wav")
     parser.add_argument("--pth_path",  type=str,  required=True)
     parser.add_argument("--index_path", type=str, required=True)
     parser.add_argument("--f0_autotune", type=lambda x: bool(strtobool(x)), default=False)

@@ -48,7 +48,7 @@ else:
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_audio", type=str, required=True)
-    parser.add_argument("--output_dataset", type=str, required=True)
+    parser.add_argument("--output_dataset", type=str, default="./dataset")
     parser.add_argument("--resample", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--resample_sr", type=int, default=44100)
     parser.add_argument("--clean_dataset", type=lambda x: bool(strtobool(x)), default=False)

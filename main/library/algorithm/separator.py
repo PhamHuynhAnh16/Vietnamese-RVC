@@ -17,8 +17,10 @@ import onnxruntime as ort
 from tqdm import tqdm
 from importlib import metadata, import_module
 
+
 now_dir = os.getcwd()
 sys.path.append(now_dir)
+
 
 class Separator:
     def __init__(self, log_level=logging.INFO, log_formatter=None, model_file_dir="assets/model/uvr5", output_dir=None, output_format="wav", output_bitrate=None, normalization_threshold=0.9, output_single_stem=None, invert_using_spec=False, sample_rate=44100, mdx_params={"hop_length": 1024, "segment_size": 256, "overlap": 0.25, "batch_size": 1, "enable_denoise": False}, demucs_params={"segment_size": "Default", "shifts": 2, "overlap": 0.25, "segments_enabled": True}):
@@ -201,7 +203,7 @@ class Separator:
 
     def print_uvr_vip_message(self):
         if self.model_is_uvr_vip:
-            self.logger.warning(f"Mô hình: '{self.model_friend_name}' là mô hình cao cấp, được Anjok07 dự định chỉ dành cho những người đăng ký trả phí truy cập.")
+            self.logger.warning(f"Mô hình: '{self.model_friendly_name}' là mô hình cao cấp, được Anjok07 dự định chỉ dành cho những người đăng ký trả phí truy cập.")
             self.logger.warning("Này bạn, nếu bạn chưa đăng ký, vui lòng cân nhắc việc hỗ trợ cho nhà phát triển của UVR, Anjok07 bằng cách đăng ký tại đây: https://patreon.com/uvr")
 
     def list_supported_model_files(self):

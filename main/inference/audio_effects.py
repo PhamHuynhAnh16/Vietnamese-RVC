@@ -13,7 +13,7 @@ from pedalboard import Pedalboard, Chorus, Distortion, Reverb, PitchShift, Delay
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True)
-    parser.add_argument("--output_path", type=str, required=True)
+    parser.add_argument("--output_path", type=str, default="./audios/apply_effects.wav")
     parser.add_argument("--resample", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--resample_sr", type=int, default=0)
     parser.add_argument("--chorus_depth", type=float, default=0.5)

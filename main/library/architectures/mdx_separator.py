@@ -39,12 +39,14 @@ class MDXSeparator(CommonSeparator):
 
         self.n_bins = 0
         self.trim = 0
+        
         self.chunk_size = 0
         self.gen_size = 0
-        self.stft = None
 
+        self.stft = None
         self.primary_source = None
         self.secondary_source = None
+
         self.audio_file_path = None
         self.audio_file_base = None
 
@@ -88,7 +90,6 @@ class MDXSeparator(CommonSeparator):
         if not isinstance(self.primary_source, np.ndarray):
             self.logger.debug("Bình thường hóa nguồn chính...")
             self.primary_source = spec_utils.normalize(wave=source, max_peak=self.normalization_threshold).T
-
         if not isinstance(self.secondary_source, np.ndarray):
             self.logger.debug("Sản xuất nguồn thứ cấp: Trộn ở chế độ trộn phù hợp")
             raw_mix = self.demix(mix, is_match_mix=True)
@@ -102,7 +103,6 @@ class MDXSeparator(CommonSeparator):
 
         if not self.output_single_stem or self.output_single_stem.lower() == self.secondary_stem_name.lower():
             self.secondary_stem_output_path = os.path.join(f"{self.audio_file_base}_({self.secondary_stem_name})_{self.model_name}.{self.output_format.lower()}")
-
             self.logger.info(f"Đang lưu phần gốc {self.secondary_stem_name} vào {self.secondary_stem_output_path}...")
             self.final_process(self.secondary_stem_output_path, self.secondary_source, self.secondary_stem_name)
             output_files.append(self.secondary_stem_output_path)
