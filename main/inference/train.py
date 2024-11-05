@@ -8,6 +8,7 @@ import logging
 import hashlib
 import argparse
 import datetime
+import warnings
 import logging.handlers
 
 import numpy as np
@@ -38,12 +39,11 @@ from main.library.algorithm.residuals import LRELU_SLOPE
 from main.library.algorithm.synthesizers import Synthesizer
 from main.library.algorithm.commons import get_padding, slice_segments, clip_grad_value
 
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 logging.getLogger("torch").setLevel(logging.ERROR)
-
-
 MATPLOTLIB_FLAG = False
-
 
 class HParams:
     def __init__(self, **kwargs):

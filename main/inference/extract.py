@@ -10,6 +10,7 @@ import pyworld
 import librosa
 import logging
 import argparse
+import warnings
 import subprocess
 import torchcrepe
 import parselmouth
@@ -33,6 +34,8 @@ from main.configs.config import Config
 from main.library.predictors.FCPE import FCPE
 from main.library.predictors.RMVPE import RMVPE
 
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
@@ -54,7 +57,6 @@ def parse_arguments() -> tuple:
     args = parser.parse_args()
     return args
 
-
 def load_audio(file, sample_rate):
     try:
         file = file.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
@@ -66,7 +68,6 @@ def load_audio(file, sample_rate):
         raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {error}")
 
     return audio.flatten()
-
 
 def check_rmvpe_fcpe(method):
     if method == "rmvpe" and not os.path.exists(os.path.join("assets", "model", "predictors", "rmvpe.pt")): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "rmvpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
@@ -124,7 +125,6 @@ def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate):
 
     with open(os.path.join(model_path, "filelist.txt"), "w") as f:
         f.write("\n".join(options))
-
 
 def setup_paths(exp_dir, version = None):
     wav_path = os.path.join(exp_dir, "sliced_audios_16k")
