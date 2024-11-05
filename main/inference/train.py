@@ -263,7 +263,7 @@ def main():
 
         pattern = rf"{os.path.basename(model_name)}_(\d+)e_(\d+)s\.pth"
 
-        for filename in os.listdir(experiment_dir):
+        for filename in os.listdir(os.path.join("assets", "weights")):
             match = re.match(pattern, filename)
 
             if match: steps = int(match.group(2))
