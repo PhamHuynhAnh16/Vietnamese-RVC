@@ -43,6 +43,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 logging.getLogger("torch").setLevel(logging.ERROR)
+
 MATPLOTLIB_FLAG = False
 
 class HParams:
@@ -280,7 +281,7 @@ def main():
         edit_config(rvc_config_file)
 
 
-        for root, dirs, files in os.walk(os.path.join(current_dir, "assets", "logs", model_name), topdown=False):
+        for root, dirs, files in os.walk(experiment_dir, topdown=False):
             for name in files:
                 file_path = os.path.join(root, name)
                 file_name, file_extension = os.path.splitext(name)
@@ -1109,8 +1110,7 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, versio
     try:
         logger.info(f"Đã lưu mô hình '{model_dir}' (kỷ nguyên {epoch} và bước {step})")
 
-        model_dir_path = os.path.dirname(model_dir)
-        os.makedirs(model_dir_path, exist_ok=True)
+        model_dir_path = os.path.join("assets", "weights")
 
         if "best_epoch" in model_dir: pth_file = f"{name}_{epoch}e_{step}s_best_epoch.pth"
         else: pth_file = f"{name}_{epoch}e_{step}s.pth"
@@ -1510,7 +1510,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
             save_checkpoint(net_g, optim_g, config.train.learning_rate, epoch, os.path.join(experiment_dir, "G_" + checkpoint_suffix))
             save_checkpoint(net_d, optim_d, config.train.learning_rate, epoch, os.path.join(experiment_dir, "D_" + checkpoint_suffix))
 
-            if custom_save_every_weights: model_add.append(os.path.join(experiment_dir, f"{model_name}_{epoch}e_{global_step}s.pth"))
+            if custom_save_every_weights: model_add.append(os.path.join("assets", "weights", f"{model_name}_{epoch}e_{global_step}s.pth"))
 
         if overtraining_detector and epoch > 1:
             current_loss_disc = float(loss_disc)
@@ -1545,7 +1545,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                 for file in old_model_files:
                     model_del.append(file)
 
-                model_add.append(os.path.join(experiment_dir, f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth"))
+                model_add.append(os.path.join("assets", "weights", f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth"))
         
         if epoch >= custom_total_epoch:
             lowest_value_rounded = float(lowest_value["value"])
@@ -1562,7 +1562,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                 pid_data.pop("process_pids", None)
                 json.dump(pid_data, pid_file, indent=4)
 
-            model_add.append(os.path.join(experiment_dir, f"{model_name}_{epoch}e_{global_step}s.pth"))
+            model_add.append(os.path.join("assets", "weights", f"{model_name}_{epoch}e_{global_step}s.pth"))
             done = True
             
         if model_add:
