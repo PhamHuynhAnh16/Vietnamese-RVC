@@ -34,6 +34,8 @@ from main.configs.config import Config
 from main.library.predictors.FCPE import FCPE
 from main.library.predictors.RMVPE import RMVPE
 
+logging.getLogger("wget").setLevel(logging.WARNING)
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -199,14 +201,12 @@ class FeatureInput:
 
         return f0
     
-
     def get_dio(self, x):
         f0, t = pyworld.dio(x.astype(np.double), fs=self.fs, f0_ceil=self.f0_max, f0_floor=self.f0_min, frame_period=1000 * self.hop / self.fs)
         f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.fs)
         
         return f0
     
-
     def get_crepe(self, x, hop_length, model="full"):
         audio = torch.from_numpy(x.astype(np.float32)).to(self.device)
         audio /= torch.quantile(torch.abs(audio), 0.999)

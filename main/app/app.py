@@ -29,11 +29,13 @@ from main.tools.gdown import gdown_download
 from main.tools.meganz import mega_download_url
 from main.tools.mediafire import Mediafire_Download
 
-
+logging.getLogger("wget").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("uvicorn").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 python = sys.executable 
 

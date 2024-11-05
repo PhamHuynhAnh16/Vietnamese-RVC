@@ -46,6 +46,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 logging.getLogger("torch").setLevel(logging.ERROR)
 logging.getLogger("fairseq").setLevel(logging.ERROR)
+
+logging.getLogger("wget").setLevel(logging.WARNING)
 logging.getLogger("faiss").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -227,7 +229,6 @@ def process_audio(file_path, output_path):
     except Exception as error:
         raise RuntimeError(f"Đã xảy ra lỗi khi cắt âm thanh: {error}")
 
-
 def merge_audio(files_list, time_stamps, original_file_path, output_path, format):
     try:
         def extract_number(filename):
@@ -255,7 +256,6 @@ def merge_audio(files_list, time_stamps, original_file_path, output_path, format
         return output_path
     except Exception as error:
         raise RuntimeError(f"Đã xảy ra lỗi khi ghép âm thanh: {error}")
-
 
 def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, upscale_audio, embedder_model, resample_sr, use_threads, max_threads, split_audio):
     cvt = VoiceConverter()
