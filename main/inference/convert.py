@@ -61,6 +61,7 @@ bh, ah = signal.butter(N=FILTER_ORDER, Wn=CUTOFF_FREQUENCY, btype="high", fs=SAM
 input_audio_path2wav = {}
 
 log_file = os.path.join("assets", "logs", "convert.log")
+
 logger = logging.getLogger(__name__)
 logger.propagate = False
 
@@ -81,6 +82,7 @@ else:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logger.setLevel(logging.DEBUG)
+
 
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
@@ -110,6 +112,7 @@ def parse_arguments() -> tuple:
     args = parser.parse_args()
     return args
 
+
 def main():
     args = parse_arguments()
     pitch = args.pitch
@@ -134,6 +137,7 @@ def main():
     use_threads = args.use_threads 
     max_threads = args.max_threads 
     split_audio = args.split_audio
+
 
     logger.debug(f"Cao độ giọng nói: {pitch}")
     logger.debug(f"Lọc trung vị: {filter_radius}")
@@ -163,11 +167,14 @@ def main():
 
     run_convert_script(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, input_path=input_path, output_path=output_path, pth_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, embedder_model=embedder_model, upscale_audio=upscale_audio, resample_sr=resample_sr, use_threads=use_threads, max_threads=max_threads, split_audio=split_audio)
 
+
 def check_rmvpe_fcpe(method):
     def download_rmvpe():
-        if not os.path.exists(os.path.join("assets", "model", "predictors", "rmvpe.pt")): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "rmvpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+        if not os.path.exists(os.path.join("assets", "model", "predictors", "rmvpe.pt")): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "rmvpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+
     def download_fcpe():
-        if not os.path.exists(os.path.join("assets", "model", "predictors", "fcpe.pt")): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "fcpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+        if not os.path.exists(os.path.join("assets", "model", "predictors", "fcpe.pt")): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "fcpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+
 
     if method == "rmvpe": download_rmvpe()
     elif method == "fcpe": download_fcpe()
@@ -179,10 +186,13 @@ def check_rmvpe_fcpe(method):
             if method == "rmvpe": download_rmvpe()
             elif method == "fcpe": download_fcpe()
 
+
 def check_hubert(hubert):
     if hubert == "contentvec_base" or hubert == "hubert_base" or hubert == "japanese_hubert_base" or hubert == "korean_hubert_base" or hubert == "chinese_hubert_base":
         model_path = os.path.join(now_dir, "assets", "model", "embedders", hubert + '.pt')
-        if not os.path.exists(model_path): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + f"{hubert}.pt", "-P", os.path.join("assets", "model", "embedders")], check=True)
+
+        if not os.path.exists(model_path): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + f"{hubert}.pt", "-P", os.path.join("assets", "model", "embedders")], check=True)
+
 
 def load_audio_infer(file, sample_rate):
     try:
@@ -199,6 +209,7 @@ def load_audio_infer(file, sample_rate):
         raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {error}") 
      
     return audio.flatten()
+
 
 def process_audio(file_path, output_path):
     try:
@@ -229,6 +240,7 @@ def process_audio(file_path, output_path):
     except Exception as error:
         raise RuntimeError(f"Đã xảy ra lỗi khi cắt âm thanh: {error}")
 
+
 def merge_audio(files_list, time_stamps, original_file_path, output_path, format):
     try:
         def extract_number(filename):
@@ -240,6 +252,7 @@ def merge_audio(files_list, time_stamps, original_file_path, output_path, format
 
         combined = AudioSegment.empty() 
         current_position = 0 
+
 
         for file, (start_i, end_i) in zip(files_list, time_stamps):
             if start_i > current_position:
@@ -257,10 +270,15 @@ def merge_audio(files_list, time_stamps, original_file_path, output_path, format
     except Exception as error:
         raise RuntimeError(f"Đã xảy ra lỗi khi ghép âm thanh: {error}")
 
+
 def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, upscale_audio, embedder_model, resample_sr, use_threads, max_threads, split_audio):
     cvt = VoiceConverter()
 
     start_time = time.time()
+
+    output_dir = os.path.dirname(output_path)
+    if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
+
 
     if split_audio:
         try:
@@ -279,6 +297,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
                 if os.path.exists(segment_output_path): processed_segments.append(segment_output_path)
                 else: raise FileNotFoundError(f"Không tìm thấy tệp đã xử lý: {segment_output_path}")
+
 
             if use_threads:
                 num_threads = min(max_threads, len(cut_files))
@@ -309,9 +328,9 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
         except Exception as e:
             logger.error(f"Đã xảy ra lỗi khi chuyển đổi âm thanh: {e}")
 
-
     elapsed_time = time.time() - start_time
     logger.info(f"Tệp {input_path} được chuyển đổi thành công sau {elapsed_time:.2f} giây. {output_path.replace('.wav', f'.{export_format}')}")
+
 
 def change_rms(source_audio: np.ndarray, source_rate: int, target_audio: np.ndarray, target_rate: int, rate: float) -> np.ndarray:
     rms1 = librosa.feature.rms(
@@ -439,14 +458,6 @@ class VC:
         self.autotune = Autotune(self.ref_freqs)
         self.note_dict = self.autotune.note_dict
 
-    def get_f0_harvest(self, x, fs, f0max, f0min, frame_period):
-        x = x.astype(np.double)
-
-        f0, t = pyworld.harvest(x, fs=fs, f0_ceil=f0max, f0_floor=f0min, frame_period=frame_period)
-        f0 = pyworld.stonemask(x, f0, t, fs)
-
-        return f0
-
     def get_f0_crepe(self, x, f0_min, f0_max, p_len, hop_length, model="full"):
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
@@ -483,32 +494,37 @@ class VC:
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
 
+
         for method in methods:
             f0 = None
 
             if method == "pm":
                 f0 = (parselmouth.Sound(x, self.sample_rate).to_pitch_ac(time_step=self.window / self.sample_rate * 1000 / 1000, voicing_threshold=0.6, pitch_floor=self.f0_min, pitch_ceiling=self.f0_max).selected_array["frequency"])
                 pad_size = (p_len - len(f0) + 1) // 2
+
                 if pad_size > 0 or p_len - len(f0) - pad_size > 0: f0 = np.pad(f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant")
             elif method == 'dio':
                 f0, t = pyworld.dio(x.astype(np.double), fs=self.sample_rate, f0_ceil=self.f0_max, f0_floor=self.f0_min, frame_period=10)
                 f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sample_rate)
+
                 f0 = signal.medfilt(f0, 3)
             elif method == "crepe-tiny":
                 f0 = self.get_f0_crepe(x, self.f0_min, self.f0_max, p_len, int(hop_length), "tiny")
             elif method == "crepe": 
                 f0 = self.get_f0_crepe(x, f0_min, f0_max, p_len, int(hop_length))
             elif method == "fcpe":
-                self.model_fcpe = FCPE(os.path.join("assets", "model", "predictors", "fcpe.pt"), f0_min=int(f0_min), f0_max=int(f0_max), dtype=torch.float32, device=self.device, sample_rate=self.sample_rate, threshold=0.03)
+                self.model_fcpe = FCPE(os.path.join("assets", "model", "predictors", "fcpe.pt"), hop_length=int(hop_length), f0_min=int(f0_min), f0_max=int(f0_max), dtype=torch.float32, device=self.device, sample_rate=self.sample_rate, threshold=0.03)
                 f0 = self.model_fcpe.compute_f0(x, p_len=p_len)
+
                 del self.model_fcpe
                 gc.collect() 
             elif method == "rmvpe":
-                self.model_rmvpe = RMVPE(os.path.join("assets", "model", "predictors", "rmvpe.pt"), is_half=self.is_half, device=self.device)
-                f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
+                f0 = RMVPE(os.path.join("assets", "model", "predictors", "rmvpe.pt"), is_half=self.is_half, device=self.device).infer_from_audio(x, thred=0.03)
                 f0 = f0[1:]
             elif method == "harvest":
-                f0 = self.get_f0_harvest(x, self.sample_rate, self.f0_max, self.f0_min, 10)
+                f0, t = pyworld.harvest(x.astype(np.double), fs=self.sample_rate, f0_ceil=self.f0_max, f0_floor=self.f0_min, frame_period=10)
+                f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sample_rate)
+
                 if filter_radius > 2: f0 = signal.medfilt(f0, 3)
             else: raise ValueError("Phương pháp không hợp lệ")
    
@@ -520,36 +536,40 @@ class VC:
             resampled_f0 = np.interp(np.linspace(0, len(f0), p_len), np.arange(len(f0)), f0)
             resampled_stack.append(resampled_f0)
 
-        if len(resampled_stack) == 1: f0_median_hybrid = resampled_stack[0]
-        else: f0_median_hybrid = np.nanmedian(np.vstack(resampled_stack), axis=0)
+        f0_median_hybrid = resampled_stack[0] if len(resampled_stack) == 1 else np.nanmedian(np.vstack(resampled_stack), axis=0)
 
         return f0_median_hybrid
 
     def get_f0(self, input_audio_path, x, p_len, pitch, f0_method, filter_radius, hop_length, f0_autotune, f0_autotune_strength):
         global input_audio_path2wav
         
+
         if f0_method == "pm":
             f0 = (parselmouth.Sound(x, self.sample_rate).to_pitch_ac(time_step=self.window / self.sample_rate * 1000 / 1000, voicing_threshold=0.6, pitch_floor=self.f0_min, pitch_ceiling=self.f0_max).selected_array["frequency"])
             pad_size = (p_len - len(f0) + 1) // 2
+
             if pad_size > 0 or p_len - len(f0) - pad_size > 0: f0 = np.pad(f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant")
         elif f0_method == "dio":
             f0, t = pyworld.dio(x.astype(np.double), fs=self.sample_rate, f0_ceil=self.f0_max, f0_floor=self.f0_min, frame_period=10)
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sample_rate)
+
             f0 = signal.medfilt(f0, 3)
         elif f0_method == "crepe-tiny":
             f0 = self.get_f0_crepe(x, self.f0_min, self.f0_max, p_len, int(hop_length), "tiny")
         elif f0_method == "crepe":
             f0 = self.get_f0_crepe(x, self.f0_min, self.f0_max, p_len, int(hop_length))
         elif f0_method == "fcpe":
-            self.model_fcpe = FCPE(os.path.join("assets", "model", "predictors", "fcpe.pt"), f0_min=int(self.f0_min), f0_max=int(self.f0_max), dtype=torch.float32, device=self.device, sample_rate=self.sample_rate, threshold=0.03)
+            self.model_fcpe = FCPE(os.path.join("assets", "model", "predictors", "fcpe.pt"), hop_length=int(hop_length), f0_min=int(self.f0_min), f0_max=int(self.f0_max), dtype=torch.float32, device=self.device, sample_rate=self.sample_rate, threshold=0.03)
             f0 = self.model_fcpe.compute_f0(x, p_len=p_len)
+
             del self.model_fcpe
             gc.collect()
         elif f0_method == "rmvpe":
-            self.model_rmvpe = RMVPE(os.path.join("assets", "model", "predictors", "rmvpe.pt"), is_half=self.is_half, device=self.device)
-            f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
+            f0 = RMVPE(os.path.join("assets", "model", "predictors", "rmvpe.pt"), is_half=self.is_half, device=self.device).infer_from_audio(x, thred=0.03)
         elif f0_method == "harvest":
-            f0 = self.get_f0_harvest(x, self.sample_rate, self.f0_max, self.f0_min, 10)
+            f0, t = pyworld.harvest(x.astype(np.double), fs=self.sample_rate, f0_ceil=self.f0_max, f0_floor=self.f0_min, frame_period=10)
+            f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sample_rate)
+
             if filter_radius > 2: f0 = signal.medfilt(f0, 3)
         elif "hybrid" in f0_method:
             input_audio_path2wav[input_audio_path] = x.astype(np.double)
@@ -561,6 +581,7 @@ class VC:
         f0 *= pow(2, pitch / 12)
 
         f0bak = f0.copy()
+
 
         f0_mel = 1127 * np.log(1 + f0 / 700)
         f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - self.f0_mel_min) * 254 / (self.f0_mel_max - self.f0_mel_min) + 1
@@ -589,11 +610,13 @@ class VC:
             "output_layer": 9 if version == "v1" else 12,
         }
 
+
         with torch.no_grad():
             logits = model.extract_features(**inputs)
             feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
 
         if protect < 0.5 and pitch_guidance: feats0 = feats.clone()
+
 
         if (not isinstance(index, type(None)) and not isinstance(big_npy, type(None)) and index_rate != 0):
             npy = feats[0].cpu().numpy()
@@ -616,6 +639,7 @@ class VC:
         if protect < 0.5 and pitch_guidance: feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
 
         p_len = audio0.shape[0] // self.window
+
 
         if feats.shape[1] < p_len:
             p_len = feats.shape[1]
@@ -643,6 +667,7 @@ class VC:
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         return audio1
     
+
     def pipeline(self, model, net_g, sid, audio, input_audio_path, pitch, f0_method, file_index, index_rate, pitch_guidance, filter_radius, tgt_sr, resample_sr, volume_envelope, version, protect, hop_length, f0_autotune, f0_autotune_strength):
         if file_index != "" and os.path.exists(file_index) and index_rate != 0:
             try:
@@ -652,6 +677,7 @@ class VC:
                 logger.error(f"Đã xảy ra lỗi khi đọc chỉ mục FAISS: {error}")
                 index = big_npy = None
         else: index = big_npy = None
+
 
         audio = signal.filtfilt(bh, ah, audio)
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
@@ -665,6 +691,7 @@ class VC:
 
             for t in range(self.t_center, audio.shape[0], self.t_center):
                 opt_ts.append(t - self.t_query + np.where(np.abs(audio_sum[t - self.t_query : t + self.t_query]) == np.abs(audio_sum[t - self.t_query : t + self.t_query]).min())[0][0])
+
         s = 0
         audio_opt = []
         t = None
@@ -673,6 +700,7 @@ class VC:
         p_len = audio_pad.shape[0] // self.window
 
         sid = torch.tensor(sid, device=self.device).unsqueeze(0).long()
+
 
         if pitch_guidance:
             pitch, pitchf = self.get_f0(input_audio_path, audio_pad, p_len, pitch, f0_method, filter_radius, hop_length, f0_autotune, f0_autotune_strength)
@@ -683,6 +711,7 @@ class VC:
 
             pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
             pitchf = torch.tensor(pitchf, device=self.device).unsqueeze(0).float()
+
 
         for t in opt_ts:
             t = t // self.window * self.window
@@ -699,6 +728,7 @@ class VC:
 
         if volume_envelope != 1: audio_opt = change_rms(audio, self.sample_rate, audio_opt, tgt_sr, volume_envelope)
         if resample_sr >= self.sample_rate and tgt_sr != resample_sr: audio_opt = librosa.resample(audio_opt, orig_sr=tgt_sr, target_sr=resample_sr)
+
 
         audio_max = np.abs(audio_opt).max() / 0.99
         max_int16 = 32768

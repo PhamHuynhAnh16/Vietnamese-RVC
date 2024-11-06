@@ -72,14 +72,14 @@ def load_audio(file, sample_rate):
     return audio.flatten()
 
 def check_rmvpe_fcpe(method):
-    if method == "rmvpe" and not os.path.exists(os.path.join("assets", "model", "predictors", "rmvpe.pt")): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "rmvpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
-    elif method == "fcpe" and not os.path.exists(os.path.join("assets", "model", "predictors", "fcpe.pt")): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "fcpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+    if method == "rmvpe" and not os.path.exists(os.path.join("assets", "model", "predictors", "rmvpe.pt")): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "rmvpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+    elif method == "fcpe" and not os.path.exists(os.path.join("assets", "model", "predictors", "fcpe.pt")): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "fcpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
 
 def check_hubert(hubert):
     if hubert == "contentvec_base" or hubert == "hubert_base" or hubert == "japanese_hubert_base" or hubert == "korean_hubert_base" or hubert == "chinese_hubert_base":
         model_path = os.path.join(now_dir, "assets", "model", "embedders", hubert + '.pt')
 
-        if not os.path.exists(model_path): subprocess.run(["wget", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + f"{hubert}.pt", "-P", os.path.join("assets", "model", "embedders")], check=True)
+        if not os.path.exists(model_path): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + f"{hubert}.pt", "-P", os.path.join("assets", "model", "embedders")], check=True)
 
 def generate_config(rvc_version, sample_rate, model_path):
     config_path = os.path.join("main", "configs", rvc_version, f"{sample_rate}.json")
@@ -185,9 +185,9 @@ class FeatureInput:
     def compute_f0(self, np_arr, f0_method, hop_length):
         if f0_method == "pm": return self.get_pm(np_arr)
         elif f0_method == 'dio': return self.get_dio(np_arr)
-        elif f0_method == "crepe": return self.get_crepe(np_arr, hop_length)
-        elif f0_method == "crepe-tiny": return self.get_crepe(np_arr, hop_length, "tiny")
-        elif f0_method == "fcpe": return self.get_fcpe(np_arr)
+        elif f0_method == "crepe": return self.get_crepe(np_arr, int(hop_length))
+        elif f0_method == "crepe-tiny": return self.get_crepe(np_arr, int(hop_length), "tiny")
+        elif f0_method == "fcpe": return self.get_fcpe(np_arr, int(hop_length))
         elif f0_method == "rmvpe": return self.get_rmvpe(np_arr)
         elif f0_method == "harvest": return self.get_harvest(np_arr)
         else: raise ValueError(f"Phương pháp trích xuất F0 không xác định: {f0_method}")
@@ -221,8 +221,8 @@ class FeatureInput:
         return np.nan_to_num(target)
     
 
-    def get_fcpe(self, x):
-        self.model_fcpe = FCPE(os.path.join("assets", "model", "predictors", "fcpe.pt"), f0_min=self.f0_min, f0_max=self.f0_max, dtype=torch.float32, device=self.device, sample_rate=self.fs, threshold=0.03)
+    def get_fcpe(self, x, hop_length):
+        self.model_fcpe = FCPE(os.path.join("assets", "model", "predictors", "fcpe.pt"), hop_length=int(hop_length), f0_min=self.f0_min, f0_max=self.f0_max, dtype=torch.float32, device=self.device, sample_rate=self.fs, threshold=0.03)
         f0 = self.model_fcpe.compute_f0(x, p_len=(x.size // self.hop))
         del self.model_fcpe
         gc.collect()

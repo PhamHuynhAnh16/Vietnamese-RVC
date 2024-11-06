@@ -25,19 +25,19 @@ from multiprocessing import cpu_count
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
-from main.tools.gdown import gdown_download
-from main.tools.meganz import mega_download_url
-from main.tools.mediafire import Mediafire_Download
+from main.tools import gdown, meganz, mediafire
+
 
 logging.getLogger("wget").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("uvicorn").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("gradio").setLevel(logging.ERROR)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-python = sys.executable 
+python = sys.executable = "python"
 
 model_name = []
 index_path = []
@@ -47,6 +47,7 @@ pretrainedG = []
 
 models = {}
 model_options = {}
+
 
 miku_image = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/zvxh.cat", "rot13")
 
@@ -59,7 +60,8 @@ hugging_face_codecs = codecs.decode("uggcf://uhttvatsnpr.pb", "rot13")
 pretrained_v1_link = codecs.decode("uggcf://uhttvatsnpr.pb/VNUvfcnab/Nccyvb/erfbyir/znva/Erfbheprf/cergenvarq_i1/", "rot13")
 pretrained_v2_link = codecs.decode("uggcf://uhttvatsnpr.pb/yw1995/IbvprPbairefvbaJroHV/erfbyir/znva/cergenvarq_i2/", "rot13")
 
-if not os.path.exists(os.path.join("assets", "miku.png")): run(["wget", "--no-check-certificate", miku_image, "-P", os.path.join("assets")], check=True)
+
+if not os.path.exists(os.path.join("assets", "miku.png")): run(["wget", "-q", "--show-progress", "--no-check-certificate", miku_image, "-P", os.path.join("assets")], check=True)
 
 
 tts_voice = [
@@ -176,9 +178,9 @@ for model in os.listdir(os.path.join("assets", "weights")):
     if model.endswith(".pth") and not model.startswith("G_") and not model.startswith("D_"): model_name.append(model)
 
 
-for root, dirs, files in os.walk(os.path.join("assets", "logs"), topdown=False):
+for root, _, files in os.walk(os.path.join("assets", "logs"), topdown=False):
     for name in files:
-        if name.endswith(".index"): index_path.append(f"{root}/{name}")
+        if name.endswith(".index"): index_path.append(os.path.join(root, name))
 
 
 for model in os.listdir(os.path.join("assets", "model", "pretrained_custom")):
@@ -204,13 +206,8 @@ for _, row in cached_data.iterrows():
     if url: models[filename] = url
 
 
-
 def get_number_of_gpus():
-    if torch.cuda.is_available():
-        num_gpus = torch.cuda.device_count()
-        
-        return "-".join(map(str, range(num_gpus)))
-    else: return "-"
+    return "-".join(map(str, range(torch.cuda.device_count()))) if torch.cuda.is_available() else "-"
 
 
 def get_gpu_info():
@@ -236,7 +233,7 @@ def change_choices_pretrained():
     for model in os.listdir(os.path.join("assets", "model", "pretrained_custom")):
         if model.endswith(".pth") and "G" in model: pretrainedG.append(model)
 
-    return {"choices": sorted(pretrainedD), "__type__": "update"}, {"choices": sorted(pretrainedG), "__type__": "update"}
+    return [{"choices": sorted(pretrainedD), "__type__": "update"}, {"choices": sorted(pretrainedG), "__type__": "update"}]
 
 
 def change_choices():
@@ -250,7 +247,7 @@ def change_choices():
         for name in files:
             if name.endswith(".index"): index_path.append(f"{root}/{name}")
 
-    return {"choices": sorted(model_name), "__type__": "update"}, {"choices": sorted(index_path), "__type__": "update"}
+    return [{"choices": sorted(model_name), "__type__": "update"}, {"choices": sorted(index_path), "__type__": "update"}]
 
 
 def get_index(model):
@@ -267,7 +264,6 @@ def interactive_1(value):
 
 def valueFalse_interactive1(inp): 
     return {"value": False, "interactive": inp, "__type__": "update"}
-
 
 def valueFalse_interactive2(inp1, inp2): 
     return {"value": False, "interactive": inp1 and inp2, "__type__": "update"}
@@ -293,24 +289,19 @@ def backing_change(backing, merge):
 
 
 def model_separator_change(mdx):
-    if not mdx:
-        value = "HT-Normal"
-        choices = ["HT-Normal", "HT-Tuned", "HD_MMI", "HT_6S"]
-    else:
-        value = "Main_340"
-        choices = ["Main_340", "Main_390", "Main_406", "Main_427", "Main_438", "Inst_full_292", "Inst_HQ_1", "Inst_HQ_2", "Inst_HQ_3", "Inst_HQ_4", "Kim_Vocal_1", "Kim_Vocal_2", "Kim_Inst", "Inst_187_beta", "Inst_82_beta", "Inst_90_beta", "Voc_FT", "Crowd_HQ", "Inst_1", "Inst_2", "Inst_3", "MDXNET_1_9703", "MDXNET_2_9682", "MDXNET_3_9662", "Inst_Main", "MDXNET_Main", "MDXNET_9482"]
+    if not mdx: choices = ["HT-Normal", "HT-Tuned", "HD_MMI", "HT_6S"]
+    else: choices = ["Main_340", "Main_390", "Main_406", "Main_427", "Main_438", "Inst_full_292", "Inst_HQ_1", "Inst_HQ_2", "Inst_HQ_3", "Inst_HQ_4", "Kim_Vocal_1", "Kim_Vocal_2", "Kim_Inst", "Inst_187_beta", "Inst_82_beta", "Inst_90_beta", "Voc_FT", "Crowd_HQ", "Inst_1", "Inst_2", "Inst_3", "MDXNET_1_9703", "MDXNET_2_9682", "MDXNET_3_9662", "Inst_Main", "MDXNET_Main", "MDXNET_9482"]
 
-    return {"value": value, "choices": choices, "__type__": "update"}
+    return {"value": choices[0], "choices": choices, "__type__": "update"}
 
 
 def hoplength_show(method, hybrid_method=None):
-    if method == "crepe-tiny" or method == "crepe": visible = True
+    if method in ["crepe-tiny", "crepe", "fcpe"]: visible = True
     elif method == "hybrid":
         methods_str = re.search("hybrid\[(.+)\]", hybrid_method)
         if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
 
-        if methods[0] == "crepe-tiny" or methods[0] == "crepe" or methods[1] == "crepe-tiny" or methods[1] == "crepe": visible = True 
-        else: visible = False
+        visible = methods[0] in ["crepe-tiny", "crepe", "fcpe"] or methods[1] in ["crepe-tiny", "crepe", "fcpe"]
     else: visible = False
     
     return {"visible": visible, "__type__": "update"}
@@ -326,25 +317,15 @@ def process_input(file_path):
 
 
 def download_change(select):
-    if select == "Tải từ đường dẫn liên kết":
-        one = True; two = True; three = True; four = False; five = False
-        six = False; seven = False; eight = False; nine = False; ten = False
-    elif select == "Tải từ kho mô hình csv":
-        one = False; two = False; three = False; four = True; five = True
-        six = False; seven = False; eight = False; nine = False; ten = False
-    elif select == "Tải mô hình từ Applio":
-        one = False; two = False; three = False; four = False; five = False
-        six = True; seven = True; eight = False; nine = False; ten = False
-    elif select == "Tải lên":
-        one = False; two = False; three = False; four = False; five = False
-        six = False; seven = False; eight = False; nine = False; ten = True
-    else:
-        gr.Warning("Tùy chọn không hợp lệ")
+    selects = [False]*10
 
-        one = False; two = False; three = False; four = False; five = False
-        six = False; seven = False; eight = False; nine = False; ten = False
+    if select == "Tải từ đường dẫn liên kết": selects[0] = selects[1] = selects[2] = True
+    elif select == "Tải từ kho mô hình csv":  selects[3] = selects[4] = True
+    elif select == "Tải mô hình từ Applio": selects[5] = selects[6] = True
+    elif select == "Tải lên": selects[9] = True
+    else: gr.Warning("Tùy chọn không hợp lệ")
     
-    return [{"visible": one, "__type__": "update"}, {"visible": two, "__type__": "update"}, {"visible": three, "__type__": "update"}, {"visible": four, "__type__": "update"}, {"visible": five, "__type__": "update"}, {"visible": six, "__type__": "update"}, {"visible": seven, "__type__": "update"}, {"visible": eight, "__type__": "update"}, {"visible": nine, "__type__": "update"}, {"visible": ten, "__type__": "update"}]
+    return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
 
 
 def fetch_pretrained_data():
@@ -355,15 +336,14 @@ def fetch_pretrained_data():
 
 
 def download_pretrained_change(select):
-    if select == "Link mô hình": one = True; two = True; three = True; four = False; five = False; six = False; seven = False; eight = False
-    elif select == "Danh sách mô hình": one = False; two = False; three = False; four = True; five = True; six = True; seven = False; eight = False
-    elif select == "Tải lên": one = False; two = False; three = False; four = False; five = False; six = False; seven = True; eight = True
-    else:
-        gr.Warning("Tùy chọn không hợp lệ")
+    selects = [False]*8
 
-        one = False; two = False; three = False; four = False; five = False; six = False; seven = False; eight = False
+    if select == "Đường dẫn mô hình": selects[0] = selects[1] = selects[2] = True
+    elif select == "Danh sách mô hình": selects[3] = selects[4] = selects[5] = True
+    elif select == "Tải lên": selects[6] = selects[7] = True
+    else: gr.Warning("Tùy chọn không hợp lệ")
 
-    return [{"visible": one, "__type__": "update"}, {"visible": two, "__type__": "update"}, {"visible": three, "__type__": "update"}, {"visible": four, "__type__": "update"}, {"visible": five, "__type__": "update"}, {"visible": six, "__type__": "update"}, {"visible": seven, "__type__": "update"}, {"visible": eight, "__type__": "update"}]
+    return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
 
 
 def update_sample_rate_dropdown(model):
@@ -411,26 +391,24 @@ def pretrained_selector(pitch_guidance):
                 "D48k.pth",
             ),
         }
-    
+
 
 def zip_file(name, pth, index):
-    if pth == "" or not os.path.exists(os.path.join("assets", "weights", pth)): return gr.Warning("Vui lòng cung cấp tệp mô hình")
-    if index == "" or not os.path.exists(index): return gr.Warning("Vui lòng cung cấp tệp chỉ mục")
-
-
     pth_path = os.path.join("assets", "weights", pth)
-    index_path = os.path.join(index)
 
+    if not pth or not os.path.exists(pth_path): return gr.Warning("Vui lòng cung cấp tệp mô hình hợp lệ!")
+    if not index or not os.path.exists(index): return gr.Warning("Vui lòng cung cấp tệp chỉ mục hợp lệ")
+    
     zip_file_path = os.path.join("assets", name + ".zip")
 
     gr.Info("Bắt đầu nén tệp...")
     
     with zipfile.ZipFile(zip_file_path, 'w') as zipf:
         zipf.write(pth_path, os.path.basename(pth_path))
-        zipf.write(index_path, os.path.basename(index_path))
+        zipf.write(index, os.path.basename(index))
+
 
     gr.Info("Hoàn thành")
-
     return zip_file_path    
 
 
@@ -441,16 +419,16 @@ def search_models(name):
     response = requests.get(url, headers={"apikey": model_search_api})
     data = response.json()
 
+
     if len(data) == 0:
         gr.Info(f"Không tìm thấy {name}")
 
-        return None, None
+        return [None, None]
     else:
         model_options.clear()
         model_options.update({item["name"] + " " + item["epochs"] + "e": item["link"] for item in data})
 
         gr.Info(f"Đã tìm thấy {len(model_options)} kết quả")
-
         return [{"value": "", "choices": model_options, "interactive": True, "visible": True, "__type__": "update"}, {"value": "Tải xuống", "visible": True, "__type__": "update"}]
 
 
@@ -475,10 +453,12 @@ def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
 
 
 def download_url(url):
-    if url is None: return gr.Warning("Vui lòng nhập đường dẫn liên kết")
+    if not url: return gr.Warning("Vui lòng nhập đường dẫn liên kết")
+    if not os.path.exists("audios"): os.makedirs("audios", exist_ok=True)
 
-    if os.path.exists(os.path.join("audios", "audio.wav")): os.remove(os.path.join("audios", "audio.wav"))
-    
+    audio_output = os.path.join("audios", "audio.wav")
+
+    if os.path.exists(audio_output): os.remove(audio_output)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -501,14 +481,12 @@ def download_url(url):
             ydl.download([url])
 
         gr.Info("Hoàn thành!")
-
-        return [os.path.join("audios", "audio.wav"), os.path.join("audios", "audio.wav"), "Hoàn thành"]
+        return [audio_output, audio_output, "Hoàn thành"]
 
 
 def download_model(url=None, model=None):
     if not url: return gr.Warning("Vui lòng cung cấp đường dẫn liên kết mô hình")
     if not model: return gr.Warning("Vui lòng nhập tên mô hình để lưu")
-    
 
     model = model.replace('.pth', '').replace('.index', '').replace('.zip', '').replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '').strip()
     url = url.replace('/blob/', '/resolve/').replace('?download=true', '').strip()
@@ -518,56 +496,53 @@ def download_model(url=None, model=None):
     logs_dir = os.path.join("assets", "logs")
 
     if not os.path.exists(download_dir): os.makedirs(download_dir, exist_ok=True)
+    if not os.path.exists(weights_dir): os.makedirs(weights_dir, exist_ok=True)
+    if not os.path.exists(logs_dir): os.makedirs(logs_dir, exist_ok=True)
     
     try:
         gr.Info("Bắt đầu tải xuống...")
 
         if url.endswith('.pth'):
-            run(["wget", "--no-check-certificate", url, "-O", os.path.join(weights_dir, f"{model}.pth")], check=True)
+            run(["wget", "-q", "--show-progress", "--no-check-certificate", url, "-O", os.path.join(weights_dir, f"{model}.pth")], check=True)
         elif url.endswith('.index'):
             model_log_dir = os.path.join(logs_dir, model)
             os.makedirs(model_log_dir, exist_ok=True)
-            run(["wget", "--no-check-certificate", url, "-O", os.path.join(model_log_dir, f"{model}.index")], check=True)
+            run(["wget", "-q", "--show-progress", "--no-check-certificate", url, "-O", os.path.join(model_log_dir, f"{model}.index")], check=True)
         elif url.endswith('.zip'):
             dest_path = os.path.join(download_dir, model + ".zip")
-            run(["wget", "--no-check-certificate", url, "-O", dest_path], check=True)
+            run(["wget", "-q", "--show-progress", "--no-check-certificate", url, "-O", dest_path], check=True)
             shutil.unpack_archive(dest_path, download_dir)
 
             move_files_from_directory(download_dir, weights_dir, logs_dir, model)
         else:
             if 'drive.google.com' in url:
                 file_id = None
-                if '/file/d/' in url:
-                    file_id = url.split('/d/')[1].split('/')[0]
-                elif 'open?id=' in url:
-                    file_id = url.split('open?id=')[1].split('/')[0]
+
+                if '/file/d/' in url: file_id = url.split('/d/')[1].split('/')[0]
+                elif 'open?id=' in url: file_id = url.split('open?id=')[1].split('/')[0]
                 
                 if file_id:
-                    file = gdown_download(id=file_id, output_dir=download_dir)
-
+                    file = gdown.gdown_download(id=file_id, output_dir=download_dir)
                     if file.endswith('.zip'): shutil.unpack_archive(os.path.join(download_dir, file), download_dir)
 
                     move_files_from_directory(download_dir, weights_dir, logs_dir, model)
             elif 'mega.nz' in url:
-                mega_download_url(url, download_dir)
+                meganz.mega_download_url(url, download_dir)
 
                 file_download = next((f for f in os.listdir(download_dir)), None)
-
                 if file_download.endswith(".zip"): shutil.unpack_archive(os.path.join(download_dir, file_download), download_dir)
 
                 move_files_from_directory(download_dir, weights_dir, logs_dir, model)
             elif 'mediafire.com' in url:
-                file = Mediafire_Download(url, download_dir)
+                file = mediafire.Mediafire_Download(url, download_dir)
                 if file.endswith('.zip'): shutil.unpack_archive(file, download_dir)
 
                 move_files_from_directory(download_dir, weights_dir, logs_dir, model)
             else:
                 gr.Warning("Liên kết mô hình của bạn không được hỗ trợ")
-
                 return "Liên kết mô hình của bạn không được hỗ trợ"
         
         gr.Info("Hoàn thành")
-
         return "Hoàn thành"
     except Exception as e:
         gr.Warning(f"Đã xảy ra lỗi: {e}")
@@ -580,9 +555,7 @@ def download_model(url=None, model=None):
 
 def extract_name_model(filename):
     match = re.search(r"([A-Za-z]+)(?=_v|\.|$)", filename)
-
-    if match: return match.group(1)
-    else: return None
+    return match.group(1) if match else None
 
 
 def save_drop_model(dropbox):
@@ -590,6 +563,8 @@ def save_drop_model(dropbox):
     logs_folder = os.path.join("assets", "logs")
     save_model_temp = os.path.join("save_model_temp")
 
+    if not os.path.exists(weight_folder): os.makedirs(weight_folder, exist_ok=True)
+    if not os.path.exists(logs_folder): os.makedirs(logs_folder, exist_ok=True)
     if not os.path.exists(save_model_temp): os.makedirs(save_model_temp, exist_ok=True)
 
     shutil.move(dropbox, save_model_temp)
@@ -614,11 +589,9 @@ def save_drop_model(dropbox):
                 shutil.move(os.path.join(save_model_temp, file_name), model_logs)
             else: 
                 gr.Warning("Không phân tích được mô hình!")
-                
                 return None
         
         gr.Info(f"Đã tải lên thành công {file_name}")
-
         return None
     except Exception as e:
         gr.Warning(f"Đã xảy ra lỗi {e}")
@@ -636,55 +609,52 @@ def download_pretrained_model(choices, model, sample_rate):
 
         pretraineds_custom_path = os.path.join("assets", "model", "pretrained_custom")
 
-        os.makedirs(pretraineds_custom_path, exist_ok=True)
+        if not os.path.exists(pretraineds_custom_path): os.makedirs(pretraineds_custom_path, exist_ok=True)
 
         d_url = hugging_face_codecs + f"/{paths['D']}"
         g_url = hugging_face_codecs + f"/{paths['G']}"
 
         gr.Info("Tải xuống huấn luyện trước...")
 
-        run(["wget", "--no-check-certificate", d_url.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join(pretraineds_custom_path)], check=True)
-        run(["wget", "--no-check-certificate", g_url.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join(pretraineds_custom_path)], check=True)
+        run(["wget", "-q", "--show-progress", "--no-check-certificate", d_url.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join(pretraineds_custom_path)], check=True)
+        run(["wget", "-q", "--show-progress", "--no-check-certificate", g_url.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join(pretraineds_custom_path)], check=True)
 
         gr.Info("Hoàn thành")
-
         return "Hoàn thành"
-    else:
-        if model == "": return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước D")
-        if sample_rate == "": return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước G")
+    elif choices == "Đường dẫn mô hình":
+        if not model: return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước D")
+        if not sample_rate: return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước G")
 
         gr.Info("Tải xuống huấn luyện trước...")
 
-        run(["wget", "--no-check-certificate", model, "-P", os.path.join(pretraineds_custom_path)], check=True)
-        run(["wget", "--no-check-certificate", sample_rate, "-P", os.path.join(pretraineds_custom_path)], check=True)
+        run(["wget", "-q", "--show-progress", "--no-check-certificate", model, "-P", os.path.join(pretraineds_custom_path)], check=True)
+        run(["wget", "-q", "--show-progress", "--no-check-certificate", sample_rate, "-P", os.path.join(pretraineds_custom_path)], check=True)
 
         gr.Info("Hoàn thành")
-
         return "Hoàn thành"
     
 
 def hubert_download(hubert):
-    if hubert == "": 
+    if not hubert: 
         gr.Warning("Vui lòng đưa đường dẫn liên kết đến mô hình học cách nói")
         return "Vui lòng đưa đường dẫn liên kết đến mô hình học cách nói"
     
-    run(["wget", "--no-check-certificate", hubert.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join("assets", "model", "embedders")], check=True)
+    run(["wget", "-q", "--show-progress", "--no-check-certificate", hubert.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join("assets", "model", "embedders")], check=True)
 
     gr.Info("Hoàn Thành!")
-
     return "Hoàn Thành!"
 
 
 def fushion_model(name, pth_1, pth_2, ratio):
-    if name == "":
+    if not name:
         gr.Warning("Vui lòng cung cấp tên") 
         return ["Vui lòng cung cấp tên", None]
     
-    if pth_1 is None:
+    if not pth_1 or not os.path.exists(pth_1):
         gr.Warning("Vui lòng cung cấp mô hình 1")
         return ["Vui lòng cung cấp mô hình 1", None]
     
-    if pth_2 is None:
+    if not pth_2 or not os.path.exists(pth_2):
         gr.Warning("Vui lòng cung cấp mô hình 2")
         return ["Vui lòng cung cấp mô hình 2", None]
     
@@ -706,7 +676,6 @@ def fushion_model(name, pth_1, pth_2, ratio):
 
         if ckpt1["sr"] != ckpt2["sr"]: 
             gr.Warning("Tốc độ lấy mẫu của hai mô hình không giống nhau")
-
             return ["Tốc độ lấy mẫu của hai mô hình không giống nhau", None]
 
         cfg = ckpt1["config"]
@@ -715,12 +684,10 @@ def fushion_model(name, pth_1, pth_2, ratio):
         cfg_sr = ckpt1["sr"]
 
         ckpt1 = extract(ckpt1) if "model" in ckpt1 else ckpt1["weight"]
-
         ckpt2 = extract(ckpt2) if "model" in ckpt2 else ckpt2["weight"]
 
         if sorted(list(ckpt1.keys())) != sorted(list(ckpt2.keys())): 
             gr.Warning("Không thể hợp nhất các mô hình. Các kiến ​​trúc mô hình không giống nhau")
-
             return ["Không thể hợp nhất các mô hình. Các kiến ​​trúc mô hình không giống nhau", None]
          
         gr.Info("Bắt đầu dung hợp mô hình...")
@@ -740,11 +707,14 @@ def fushion_model(name, pth_1, pth_2, ratio):
         opt["version"] = cfg_version
         opt["infos"] = f"Mô hình được {name} được dung hợp từ {pth_1} và {pth_2} với ratio {ratio}"
 
-        torch.save(opt, os.path.join("assets", "weights", f"{name}.pth"))
+        output_model = os.path.join("assets", "weights")
+
+        if not os.path.exists(output_model): os.makedirs(output_model, exist_ok=True)
+
+        torch.save(opt, os.path.join(output_model, f"{name}.pth"))
 
         gr.Info("Hoàn thành")
-
-        return ["Hoàn thành", os.path.join("assets", "weights", f"{name}.pth")]
+        return ["Hoàn thành", output_model]
     except Exception as error:
         gr.Warning(f"Đã xảy ra lỗi khi hợp nhất các mô hình: {error}")
 
@@ -753,15 +723,13 @@ def fushion_model(name, pth_1, pth_2, ratio):
 
 
 def model_info(path):
-    if not os.path.exists(path): gr.Warning("Không tìm thấy mô hình!")
+    if not path or not os.path.exists(path): gr.Warning("Không tìm thấy mô hình!")
     
     def prettify_date(date_str):
         if date_str == "Không tìm thấy thời gian tạo": return None
 
         try:
-            date_time_obj = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f")
-
-            return date_time_obj.strftime("%Y-%m-%d %H:%M:%S")
+            return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
         except ValueError:
             return "Định dạng không hợp lệ"
         
@@ -804,19 +772,22 @@ def model_info(path):
 
 
 def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out):
-    if not os.path.exists(input_path) or input_path == "": 
+    if not input_path or not os.path.exists(input_path): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return None
         
-    if output_path == "":
+    if not output_path:
         gr.Warning("Vui lòng nhập đầu ra!")
         return None
+    
+    output_dir = os.path.dirname(output_path)
+    if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     
     if os.path.exists(output_path): os.remove(output_path)
     
     gr.Info("Bắt đầu áp dụng hiệu ứng...")
 
-    pitchshift = True if pitch_shift != 0 else False
+    pitchshift = pitch_shift != 0
 
     cmd = f"{python} main/inference/audio_effects.py --input_path {input_path} --output_path {output_path} --resample {resample} --resample_sr {resample_sr} --chorus_depth {chorus_depth} --chorus_rate {chorus_rate} --chorus_mix {chorus_mix} --chorus_delay {chorus_delay} --chorus_feedback {chorus_feedback} --drive_db {distortion_drive} --reverb_room_size {reverb_room_size} --reverb_damping {reverb_damping} --reverb_wet_level {reverb_wet_level} --reverb_dry_level {reverb_dry_level} --reverb_width {reverb_width} --reverb_freeze_mode {reverb_freeze_mode} --pitch_shift {pitch_shift} --delay_seconds {delay_seconds} --delay_feedback {delay_feedback} --delay_mix {delay_mix} --compressor_threshold {compressor_threshold} --compressor_ratio {compressor_ratio} --compressor_attack_ms {compressor_attack_ms} --compressor_release_ms {compressor_release_ms} --limiter_threshold {limiter_threshold} --limiter_release {limiter_release} --gain_db {gain_db} --bitcrush_bit_depth {bitcrush_bit_depth} --clipping_threshold {clipping_threshold} --phaser_rate_hz {phaser_rate_hz} --phaser_depth {phaser_depth} --phaser_centre_frequency_hz {phaser_centre_frequency_hz} --phaser_feedback {phaser_feedback} --phaser_mix {phaser_mix} --bass_boost_db {bass_boost_db} --bass_boost_frequency {bass_boost_frequency} --treble_boost_db {treble_boost_db} --treble_boost_frequency {treble_boost_frequency} --fade_in_duration {fade_in_duration} --fade_out_duration {fade_out_duration} --export_format {export_format} --chorus {chorus} --distortion {distortion} --reverb {reverb} --pitchshift {pitchshift} --delay {delay} --compressor {compressor} --limiter {limiter} --gain {gain} --bitcrush {bitcrush} --clipping {clipping} --phaser {phaser} --treble_bass_boost {treble_bass_boost} --fade_in_out {fade_in_out}"
     os.system(cmd)
@@ -827,19 +798,24 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
 
 
 async def TTS(prompt, voice, speed, output):
-    if prompt == "":
-        gr.Warning("Vui lòng nhập văn bản để đọc")
+    if not prompt:
+        gr.Warning("Vui lòng nhập văn bản để đọc!")
         return None
     
-    if voice == "":
-        gr.Warning("Vui lòng chọn giọng")
+    if not voice:
+        gr.Warning("Vui lòng chọn giọng!")
         return None
     
-    rates = f"+{speed}%" if speed >= 0 else f"{speed}%"
+    if not output: 
+        gr.Warning("Vui lòng cung cấp đầu ra!")
+        return None
 
     gr.Info("Chuyển đổi văn bản...")
 
-    await edge_tts.Communicate(text=prompt, voice=voice, rate=rates).save(output)
+    output_dir = os.path.dirname(output)
+    if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
+
+    await edge_tts.Communicate(text=prompt, voice=voice, rate=f"+{speed}%" if speed >= 0 else f"{speed}%").save(output)
 
     gr.Info("Hoàn thành")
 
@@ -847,7 +823,9 @@ async def TTS(prompt, voice, speed, output):
 
 
 def separator_music(input, output, format, shifts, segments_size, overlap, clean_audio, clean_strength, backing_denoise, separator_model, kara_model, backing, mdx, mdx_denoise, reverb, reverb_denoise, backing_reverb, hop_length, batch_size):
-    if not os.path.exists(input) or input == "": 
+    output = os.path.dirname(output)
+    
+    if not input or not os.path.exists(input): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return [None, None, None, None]
     
@@ -865,6 +843,8 @@ def separator_music(input, output, format, shifts, segments_size, overlap, clean
     os.system(cmd)
     
     gr.Info("Hoàn thành")
+
+    if not os.path.exists(output): os.makedirs(output)
 
     original_output = os.path.join(output, f"Original_Vocals_No_Reverb.{format}") if reverb else os.path.join(output, f"Original_Vocals.{format}")
     instrument_output = os.path.join(output, f"Instruments.{format}")
@@ -885,11 +865,9 @@ def convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_leng
 def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, use_threads, max_threads, split_audio, f0_autotune_strength):
     def get_audio_file(label):
         matching_files = [f for f in os.listdir("audios") if label in f]
-        
         if not matching_files: return "Không tìm thấy"
         
         return os.path.join("audios", matching_files[0])
-
 
     model_path = os.path.join("assets", "weights", model)
 
@@ -999,14 +977,17 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
 
         return [(None if use_original else output_path), output_backing, (None if not_merge_backing and use_original else output_merge_backup), (output_path if use_original else None), (output_merge_instrument if merge_instrument else None)]
     else:
-        if not os.path.exists(input) or input == "": 
+        if not input or not os.path.exists(input): 
             gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
             return [None, None, None, None, None]
         
-        if output == "":
+        if not output:
             gr.Warning("Vui lòng nhập đầu ra!")
             return [None, None, None, None, None]
         
+        output_dir = os.path.dirname(output)
+        if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
+
         if os.path.exists(output): os.remove(output)
 
         gr.Info("Đang chuyển đổi giọng nói...")
@@ -1016,27 +997,29 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
         gr.Info("Kết hợp Hoàn thành")
 
         return [output, None, None, None, None]
-    
+
 
 def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, use_threads, max_threads, split_audio, f0_autotune_strength):
     model_path = os.path.join("assets", "weights", model)
 
-    if not os.path.exists(model_path) or model == "":
+    if not model_path or not os.path.exists(model_path):
         gr.Warning("Không tìm thấy mô hình")
         return None
     
-    if not os.path.exists(index) or index == "":
+    if not model_path or not os.path.exists(index):
         gr.Warning("Không tìm thấy chỉ mục")
         return None
 
-    if not os.path.exists(input) or input == "": 
+    if not input or not os.path.exists(input): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return None
         
-    if output == "":
+    if not output:
         gr.Warning("Vui lòng nhập đầu ra!")
         return None
     
+    output_dir = os.path.dirname(output)
+    if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     
     if os.path.exists(output): os.remove(output)
 
@@ -1049,13 +1032,11 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
     convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, use_threads, max_threads, split_audio, f0_autotune_strength)
 
     gr.Info("Đã Hoàn thành chuyển đổi giọng nói")
-
     return output
 
 
 def create_dataset(input_audio, output_dataset, resample, resample_sr, clean_dataset, clean_strength, separator_music, separator_reverb, kim_vocals_version, overlap, segments_size, denoise_mdx, skip, skip_start, skip_end, hop_length, batch_size):
-    if kim_vocals_version == "Version-1": version = 1
-    else: version = 2
+    version = 1 if kim_vocals_version == "Version-1" else 2
 
     cmd = f'{python} main/inference/create_dataset.py --input_audio "{input_audio}" --output_dataset {output_dataset} --resample {resample} --resample_sr {resample_sr} --clean_dataset {clean_dataset} --clean_strength {clean_strength} --separator_music {separator_music} --separator_reverb {separator_reverb} --kim_vocal_version {version} --overlap {overlap} --segments_size {segments_size} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --denoise_mdx {denoise_mdx} --skip {skip} --skip_start_audios "{skip_start}" --skip_end_audios "{skip_end}"'
 
@@ -1066,18 +1047,19 @@ def create_dataset(input_audio, output_dataset, resample, resample_sr, clean_dat
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    f = open(os.path.join("assets", "logs", "create_dataset.log"), "w", encoding="utf-8")
+    create_dataset_log = os.path.join("assets", "logs", "create_dataset.log")
+
+    f = open(create_dataset_log, "w", encoding="utf-8")
     f.close()
 
-
     while 1:
-        with open(os.path.join("assets", "logs", "create_dataset.log"), "r", encoding='utf-8') as f:
+        with open(create_dataset_log, "r", encoding='utf-8') as f:
             yield (f.read())
 
         sleep(1)
         if done[0]: break
 
-    with open(os.path.join("assets", "logs", "create_dataset.log"), "r", encoding='utf-8') as f:
+    with open(create_dataset_log, "r", encoding='utf-8') as f:
         log = f.read()
 
     yield log
@@ -1087,7 +1069,7 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
     dataset = os.path.join(path)
     sr = int(sample_rate.rstrip("k")) * 1000
 
-    if model_name == "": return gr.Warning("Vui lòng cung cấp tên")
+    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
     if len([f for f in os.listdir(os.path.join(dataset)) if os.path.isfile(os.path.join(dataset, f)) and f.lower().endswith((".wav", ".mp3", ".flac", ".ogg"))]) < 1: return gr.Warning("Không tìm thấy dữ liệu")
 
     cmd = f'{python} main/inference/preprocess.py --model_name {model_name} --dataset_path {dataset} --sample_rate {sr} --cpu_cores {cpu_core} --cut_preprocess {cut_preprocess} --process_effects {process_effects} --clean_dataset {clean_dataset} --clean_strength {clean_strength}'
@@ -1097,20 +1079,22 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    os.makedirs(os.path.join("assets", "logs", model_name), exist_ok=True)
+    model_dir = os.path.join("assets", "logs", model_name)
+    preprocess_log = os.path.join(model_dir, model_name, "preprocess.log")
 
-    f = open(os.path.join("assets", "logs", model_name, "preprocess.log"), "w", encoding="utf-8")
+    os.makedirs(model_dir, exist_ok=True)
+
+    f = open(preprocess_log, "w", encoding="utf-8")
     f.close()
 
-
     while 1:
-        with open(os.path.join("assets", "logs", model_name, "preprocess.log"), "r", encoding='utf-8') as f:
+        with open(preprocess_log, "r", encoding='utf-8') as f:
             yield (f.read())
 
         sleep(1)
         if done[0]: break
 
-    with open(os.path.join("assets", "logs", model_name, "preprocess.log"), "r", encoding='utf-8') as f:
+    with open(preprocess_log, "r", encoding='utf-8') as f:
         log = f.read()
 
     yield log
@@ -1118,12 +1102,13 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
 
 def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, gpu, sample_rate, embedders, custom_embedders):
     embedder_model = embedders if embedders != "custom" else custom_embedders
+    model_dir = os.path.join("assets", "logs", model_name)
 
     sr = int(sample_rate.rstrip("k")) * 1000
 
-    if model_name == "": return gr.Warning("Vui lòng cung cấp tên")
+    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
 
-    if len([f for f in os.listdir(os.path.join("assets", "logs", model_name, "sliced_audios")) if os.path.isfile(os.path.join("assets", "logs", model_name, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join("assets", "logs", model_name, "sliced_audios_16k")) if os.path.isfile(os.path.join("assets", "logs", model_name, "sliced_audios_16k", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được xử lý, vui lòng xử lý lại âm thanh")
+    if len([f for f in os.listdir(os.path.join(model_dir, "sliced_audios")) if os.path.isfile(os.path.join(model_dir, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k")) if os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được xử lý, vui lòng xử lý lại âm thanh")
 
     cmd = f'{python} main/inference/extract.py --model_name {model_name} --rvc_version {version} --f0_method {method} --pitch_guidance {pitch_guidance} --hop_length {hop_length} --cpu_cores {cpu_cores} --gpu {gpu} --sample_rate {sr} --embedder_model {embedder_model}'
 
@@ -1132,29 +1117,31 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    os.makedirs(os.path.join("assets", "logs", model_name), exist_ok=True)
+    extract_log = os.path.join(model_dir, model_name, "extract.log")
 
-    f = open(os.path.join("assets", "logs", model_name, "extract.log"), "w", encoding="utf-8")
+    os.makedirs(model_dir, exist_ok=True)
+
+    f = open(extract_log, "w", encoding="utf-8")
     f.close()
 
-
     while 1:
-        with open(os.path.join("assets", "logs", model_name, "extract.log"), "r", encoding='utf-8') as f:
+        with open(extract_log, "r", encoding='utf-8') as f:
             yield (f.read())
 
         sleep(1)
         if done[0]: break
 
-    with open(os.path.join("assets", "logs", model_name, "extract.log"), "r", encoding='utf-8') as f:
+    with open(extract_log, "r", encoding='utf-8') as f:
         log = f.read()
 
     yield log
 
 
 def create_index(model_name, rvc_version, index_algorithm):
-    if model_name == "": return gr.Warning("Vui lòng cung cấp tên")
+    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
+    model_dir = os.path.join("assets", "logs", model_name)
 
-    if len([f for f in os.listdir(os.path.join("assets", "logs", model_name, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join("assets", "logs", model_name, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
+    if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
 
     cmd = f'{python} main/inference/create_index.py --model_name {model_name} --rvc_version {rvc_version} --index_algorithm {index_algorithm}'
 
@@ -1163,20 +1150,21 @@ def create_index(model_name, rvc_version, index_algorithm):
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    os.makedirs(os.path.join("assets", "logs", model_name), exist_ok=True)
+    create_index_log = os.path.join(model_dir, model_name, "create_index.log")
 
-    f = open(os.path.join("assets", "logs", model_name, "create_index.log"), "w", encoding="utf-8")
+    os.makedirs(model_dir, exist_ok=True)
+
+    f = open(create_index_log, "w", encoding="utf-8")
     f.close()
 
-
     while 1:
-        with open(os.path.join("assets", "logs", model_name, "create_index.log"), "r", encoding='utf-8') as f:
+        with open(create_index_log, "r", encoding='utf-8') as f:
             yield (f.read())
 
         sleep(1)
         if done[0]: break
 
-    with open(os.path.join("assets", "logs", model_name, "create_index.log"), "r", encoding='utf-8') as f:
+    with open(create_index_log, "r", encoding='utf-8') as f:
         log = f.read()
 
     yield log
@@ -1184,22 +1172,21 @@ def create_index(model_name, rvc_version, index_algorithm):
 
 def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_every_weights, total_epoch, sample_rate, batch_size, gpu, pitch_guidance, not_pretrain, custom_pretrained, pretrain_g, pretrain_d, detector, threshold, sync_graph, cache):
     sr = int(sample_rate.rstrip("k")) * 1000
+    model_dir = os.path.join("assets", "logs", model_name)
 
-    if model_name == "": return gr.Warning("Vui lòng cung cấp tên")
-    if len([f for f in os.listdir(os.path.join("assets", "logs", model_name, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join("assets", "logs", model_name, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
+    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
+    if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
 
     cmd = f'{python} main/inference/train.py --model_name {model_name} --rvc_version {rvc_version} --save_every_epoch {save_every_epoch} --save_only_latest {save_only_latest} --save_every_weights {save_every_weights} --total_epoch {total_epoch} --sample_rate {sr} --batch_size {batch_size} --gpu {gpu} --pitch_guidance {pitch_guidance} --overtraining_detector {detector} --overtraining_threshold {threshold} --sync_graph {sync_graph} --cache_data_in_gpu {cache}'
 
     if not not_pretrain:
-        if not custom_pretrained:
-            pg, pd = pretrained_selector(pitch_guidance)[sr]
+        if not custom_pretrained: pg, pd = pretrained_selector(pitch_guidance)[sr]
         else:
             if pretrain_g == "": return gr.Warning("Vui lòng nhập huấn luyện G")
             if pretrain_d == "": return gr.Warning("Vui lòng nhập huấn luyện D")
             
             pg = pretrain_g
             pd = pretrain_d
-
 
         if not custom_pretrained:
             pretrained_G = os.path.join("assets", "model", f"pretrained_{rvc_version}", pg)
@@ -1214,11 +1201,11 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
         if not custom_pretrained:
             if not os.path.exists(pretrained_G):
                 gr.Info(f"Tải xuống huấn luyện trước G{rvc_version} gốc")
-                run(["wget", "--no-check-certificate", f"{download_version}{pg}", "-P", os.path.join("assets", "model", f"pretrained_{rvc_version}")], check=True)
+                run(["wget", "-q", "--show-progress", "-q", "--show-progress", "--no-check-certificate", f"{download_version}{pg}", "-P", os.path.join("assets", "model", f"pretrained_{rvc_version}")], check=True)
                 
             if not os.path.exists(pretrained_D):
                 gr.Info(f"Tải xuống huấn luyện trước D{rvc_version} gốc")
-                run(["wget", "--no-check-certificate", f"{download_version}{pd}", "-P", os.path.join("assets", "model", f"pretrained_{rvc_version}")], check=True)
+                run(["wget", "-q", "--show-progress", "-q", "--show-progress", "--no-check-certificate", f"{download_version}{pd}", "-P", os.path.join("assets", "model", f"pretrained_{rvc_version}")], check=True)
         else:
             if not os.path.exists(pretrained_G): return gr.Warning("Không tìm thấy huấn luyện trước G")
             if not os.path.exists(pretrained_D): return gr.Warning("Không tìm thấy huấn luyện trước D")
@@ -1233,20 +1220,21 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    os.makedirs(os.path.join("assets", "logs", model_name), exist_ok=True)
+    if not os.path.exists(model_dir): os.makedirs(model_dir, exist_ok=True)
 
-    f = open(os.path.join("assets", "logs", model_name, "train.log"), "w", encoding="utf-8")
+    train_log = os.path.join(model_dir, "train.log")
+
+    f = open(train_log, "w", encoding="utf-8")
     f.close()
 
-
     while 1:
-        with open(os.path.join("assets", "logs", model_name, "train.log"), "r", encoding='utf-8') as f:
+        with open(train_log, "r", encoding='utf-8') as f:
             yield (f.read())
 
         sleep(1)
         if done[0]: break
 
-    with open(os.path.join("assets", "logs", model_name, "train.log"), "r", encoding='utf-8') as f:
+    with open(train_log, "r", encoding='utf-8') as f:
         log = f.read()
 
     yield log
@@ -2193,7 +2181,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
             with gr.Row():
                 with gr.Accordion("Tải xuống mô hình huấn luyện trước", open=False):
                     with gr.Row():
-                        pretrain_download_choices = gr.Radio(label="Chọn cách tải mô hình", choices=["Link mô hình", "Danh sách mô hình", "Tải lên"], value="Link mô hình", interactive=True)  
+                        pretrain_download_choices = gr.Radio(label="Chọn cách tải mô hình", choices=["Đường dẫn mô hình", "Danh sách mô hình", "Tải lên"], value="Link mô hình", interactive=True)  
                     with gr.Row():
                         gr.Markdown("___")
                     with gr.Row():
