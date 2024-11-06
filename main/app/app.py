@@ -884,11 +884,11 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             gr.Warning("Tắt không kết hợp giọng bè để có thể sử dụng giọng gốc")
             return [None, None, None, None, None]
 
-    if not os.path.exists(model_path) or model == "":
+    if not model or not os.path.exists(model_path):
         gr.Warning("Không tìm thấy mô hình")
         return [None, None, None, None, None]
     
-    if not os.path.exists(index) or index == "":
+    if not model or not os.path.exists(index):
         gr.Warning("Không tìm thấy chỉ mục")
         return [None, None, None, None, None]
 
