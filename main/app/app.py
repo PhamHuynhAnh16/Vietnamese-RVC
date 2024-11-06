@@ -1182,8 +1182,8 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
     if not not_pretrain:
         if not custom_pretrained: pg, pd = pretrained_selector(pitch_guidance)[sr]
         else:
-            if pretrain_g == "": return gr.Warning("Vui lòng nhập huấn luyện G")
-            if pretrain_d == "": return gr.Warning("Vui lòng nhập huấn luyện D")
+            if not pretrain_g: return gr.Warning("Vui lòng nhập huấn luyện G")
+            if not pretrain_d: return gr.Warning("Vui lòng nhập huấn luyện D")
             
             pg = pretrain_g
             pd = pretrain_d
