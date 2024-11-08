@@ -297,6 +297,8 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
     start_time = time.time()
 
     output_dir = os.path.dirname(output_path)
+    output_dir = output_path if not output_dir else output_dir
+
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
     mp.set_start_method("spawn", force=True)

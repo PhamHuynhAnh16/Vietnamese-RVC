@@ -22,6 +22,7 @@ from subprocess import Popen, run
 from collections import OrderedDict
 from multiprocessing import cpu_count
 
+
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
@@ -37,7 +38,8 @@ logging.getLogger("gradio").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-python = sys.executable = "python"
+
+python = sys.executable
 
 model_name = []
 index_path = []
@@ -47,6 +49,7 @@ pretrainedG = []
 
 models = {}
 model_options = {}
+
 
 miku_image = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/zvxh.cat", "rot13")
 
@@ -59,7 +62,9 @@ hugging_face_codecs = codecs.decode("uggcf://uhttvatsnpr.pb", "rot13")
 pretrained_v1_link = codecs.decode("uggcf://uhttvatsnpr.pb/VNUvfcnab/Nccyvb/erfbyir/znva/Erfbheprf/cergenvarq_i1/", "rot13")
 pretrained_v2_link = codecs.decode("uggcf://uhttvatsnpr.pb/yw1995/IbvprPbairefvbaJroHV/erfbyir/znva/cergenvarq_i2/", "rot13")
 
+
 if not os.path.exists(os.path.join("assets", "miku.png")): run(["wget", "-q", "--show-progress", "--no-check-certificate", miku_image, "-P", os.path.join("assets")], check=True)
+
 
 tts_voice = [
     'af-ZA-AdriNeural', 'af-ZA-WillemNeural', 'sq-AL-AnilaNeural', 
@@ -170,6 +175,7 @@ tts_voice = [
     'cy-GB-NiaNeural', 'zu-ZA-ThandoNeural', 'zu-ZA-ThembaNeural'
 ]
 
+
 for model in os.listdir(os.path.join("assets", "weights")):
     if model.endswith(".pth") and not model.startswith("G_") and not model.startswith("D_"): model_name.append(model)
 
@@ -202,6 +208,7 @@ for _, row in cached_data.iterrows():
     if url: models[filename] = url
 
 
+
 def get_number_of_gpus():
     return "-".join(map(str, range(torch.cuda.device_count()))) if torch.cuda.is_available() else "-"
 
@@ -209,6 +216,7 @@ def get_number_of_gpus():
 def get_gpu_info():
     ngpu = torch.cuda.device_count()
     gpu_infos = []
+
 
     if torch.cuda.is_available() or ngpu != 0:
         for i in range(ngpu):
@@ -223,6 +231,7 @@ def change_choices_pretrained():
     pretrainedD = []
     pretrainedG = []
 
+
     for model in os.listdir(os.path.join("assets", "model", "pretrained_custom")):
         if model.endswith(".pth") and "D" in model: pretrainedD.append(model)
 
@@ -235,6 +244,7 @@ def change_choices_pretrained():
 def change_choices():
     model_name = []
     index_path = []
+
 
     for name in os.listdir(os.path.join("assets", "weights")):
         if name.endswith(".pth"): model_name.append(name)
@@ -315,6 +325,7 @@ def process_input(file_path):
 def download_change(select):
     selects = [False]*10
 
+
     if select == "Tải từ đường dẫn liên kết": selects[0] = selects[1] = selects[2] = True
     elif select == "Tải từ kho mô hình csv":  selects[3] = selects[4] = True
     elif select == "Tải mô hình từ Applio": selects[5] = selects[6] = True
@@ -334,6 +345,7 @@ def fetch_pretrained_data():
 def download_pretrained_change(select):
     selects = [False]*8
 
+
     if select == "Đường dẫn mô hình": selects[0] = selects[1] = selects[2] = True
     elif select == "Danh sách mô hình": selects[3] = selects[4] = selects[5] = True
     elif select == "Tải lên": selects[6] = selects[7] = True
@@ -352,6 +364,7 @@ def if_done(done, p):
     while 1:
         if p.poll() is None: sleep(0.5)
         else: break
+
 
     done[0] = True
 
@@ -395,6 +408,7 @@ def zip_file(name, pth, index):
     if not pth or not os.path.exists(pth_path): return gr.Warning("Vui lòng cung cấp tệp mô hình hợp lệ!")
     if not index or not os.path.exists(index): return gr.Warning("Vui lòng cung cấp tệp chỉ mục hợp lệ")
     
+
     zip_file_path = os.path.join("assets", name + ".zip")
 
     gr.Info("Bắt đầu nén tệp...")
@@ -433,6 +447,7 @@ def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
         for file in files:
             file_path = os.path.join(root, file)
 
+
             if file.endswith(".index"):
                 model_log_dir = os.path.join(dest_logs, model_name)
                 os.makedirs(model_log_dir, exist_ok=True)
@@ -452,9 +467,11 @@ def download_url(url):
     if not url: return gr.Warning("Vui lòng nhập đường dẫn liên kết")
     if not os.path.exists("audios"): os.makedirs("audios", exist_ok=True)
 
+
     audio_output = os.path.join("audios", "audio.wav")
 
     if os.path.exists(audio_output): os.remove(audio_output)
+
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -476,6 +493,7 @@ def download_url(url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
+
         gr.Info("Hoàn thành!")
         return [audio_output, audio_output, "Hoàn thành"]
 
@@ -483,6 +501,7 @@ def download_url(url):
 def download_model(url=None, model=None):
     if not url: return gr.Warning("Vui lòng cung cấp đường dẫn liên kết mô hình")
     if not model: return gr.Warning("Vui lòng nhập tên mô hình để lưu")
+
 
     model = model.replace('.pth', '').replace('.index', '').replace('.zip', '').replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '').strip()
     url = url.replace('/blob/', '/resolve/').replace('?download=true', '').strip()
@@ -495,6 +514,7 @@ def download_model(url=None, model=None):
     if not os.path.exists(weights_dir): os.makedirs(weights_dir, exist_ok=True)
     if not os.path.exists(logs_dir): os.makedirs(logs_dir, exist_ok=True)
     
+
     try:
         gr.Info("Bắt đầu tải xuống...")
 
@@ -559,9 +579,11 @@ def save_drop_model(dropbox):
     logs_folder = os.path.join("assets", "logs")
     save_model_temp = os.path.join("save_model_temp")
 
+
     if not os.path.exists(weight_folder): os.makedirs(weight_folder, exist_ok=True)
     if not os.path.exists(logs_folder): os.makedirs(logs_folder, exist_ok=True)
     if not os.path.exists(save_model_temp): os.makedirs(save_model_temp, exist_ok=True)
+
 
     shutil.move(dropbox, save_model_temp)
 
@@ -603,6 +625,7 @@ def download_pretrained_model(choices, model, sample_rate):
         data = fetch_pretrained_data()
         paths = data[model][sample_rate]
 
+
         pretraineds_custom_path = os.path.join("assets", "model", "pretrained_custom")
 
         if not os.path.exists(pretraineds_custom_path): os.makedirs(pretraineds_custom_path, exist_ok=True)
@@ -621,6 +644,7 @@ def download_pretrained_model(choices, model, sample_rate):
         if not model: return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước D")
         if not sample_rate: return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước G")
 
+
         gr.Info("Tải xuống huấn luyện trước...")
 
         run(["wget", "-q", "--show-progress", "--no-check-certificate", model, "-P", os.path.join(pretraineds_custom_path)], check=True)
@@ -635,6 +659,7 @@ def hubert_download(hubert):
         gr.Warning("Vui lòng đưa đường dẫn liên kết đến mô hình học cách nói")
         return "Vui lòng đưa đường dẫn liên kết đến mô hình học cách nói"
     
+
     run(["wget", "-q", "--show-progress", "--no-check-certificate", hubert.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join("assets", "model", "embedders")], check=True)
 
     gr.Info("Hoàn Thành!")
@@ -654,6 +679,7 @@ def fushion_model(name, pth_1, pth_2, ratio):
         gr.Warning("Vui lòng cung cấp mô hình 2")
         return ["Vui lòng cung cấp mô hình 2", None]
     
+
     def extract(ckpt):
         a = ckpt["model"]
         opt = OrderedDict()
@@ -666,6 +692,7 @@ def fushion_model(name, pth_1, pth_2, ratio):
 
         return opt
     
+
     try:
         ckpt1 = torch.load(pth_1, map_location="cpu")
         ckpt2 = torch.load(pth_2, map_location="cpu")
@@ -709,6 +736,7 @@ def fushion_model(name, pth_1, pth_2, ratio):
 
         torch.save(opt, os.path.join(output_model, f"{name}.pth"))
 
+
         gr.Info("Hoàn thành")
         return ["Hoàn thành", output_model]
     except Exception as error:
@@ -721,6 +749,7 @@ def fushion_model(name, pth_1, pth_2, ratio):
 def model_info(path):
     if not path or not os.path.exists(path): gr.Warning("Không tìm thấy mô hình!")
     
+
     def prettify_date(date_str):
         if date_str == "Không tìm thấy thời gian tạo": return None
 
@@ -754,6 +783,7 @@ def model_info(path):
 
     creation_date_str = prettify_date(creation_date) if creation_date else "Không tìm thấy thời gian tạo"
 
+
     gr.Info("Hoàn thành")
 
     return (
@@ -778,7 +808,10 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
     
     if os.path.isdir(output_path): output_path = os.path.join(output_path, f"audio_effects.{export_format}")
     
+
     output_dir = os.path.dirname(output_path)
+    output_dir = output_path if not output_dir else output_dir
+
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     
     if os.path.exists(output_path): os.remove(output_path)
@@ -789,6 +822,7 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
 
     cmd = f"{python} main/inference/audio_effects.py --input_path {input_path} --output_path {output_path} --resample {resample} --resample_sr {resample_sr} --chorus_depth {chorus_depth} --chorus_rate {chorus_rate} --chorus_mix {chorus_mix} --chorus_delay {chorus_delay} --chorus_feedback {chorus_feedback} --drive_db {distortion_drive} --reverb_room_size {reverb_room_size} --reverb_damping {reverb_damping} --reverb_wet_level {reverb_wet_level} --reverb_dry_level {reverb_dry_level} --reverb_width {reverb_width} --reverb_freeze_mode {reverb_freeze_mode} --pitch_shift {pitch_shift} --delay_seconds {delay_seconds} --delay_feedback {delay_feedback} --delay_mix {delay_mix} --compressor_threshold {compressor_threshold} --compressor_ratio {compressor_ratio} --compressor_attack_ms {compressor_attack_ms} --compressor_release_ms {compressor_release_ms} --limiter_threshold {limiter_threshold} --limiter_release {limiter_release} --gain_db {gain_db} --bitcrush_bit_depth {bitcrush_bit_depth} --clipping_threshold {clipping_threshold} --phaser_rate_hz {phaser_rate_hz} --phaser_depth {phaser_depth} --phaser_centre_frequency_hz {phaser_centre_frequency_hz} --phaser_feedback {phaser_feedback} --phaser_mix {phaser_mix} --bass_boost_db {bass_boost_db} --bass_boost_frequency {bass_boost_frequency} --treble_boost_db {treble_boost_db} --treble_boost_frequency {treble_boost_frequency} --fade_in_duration {fade_in_duration} --fade_out_duration {fade_out_duration} --export_format {export_format} --chorus {chorus} --distortion {distortion} --reverb {reverb} --pitchshift {pitchshift} --delay {delay} --compressor {compressor} --limiter {limiter} --gain {gain} --bitcrush {bitcrush} --clipping {clipping} --phaser {phaser} --treble_bass_boost {treble_bass_boost} --fade_in_out {fade_in_out}"
     os.system(cmd)
+
 
     gr.Info("Hoàn thành")
 
@@ -810,21 +844,27 @@ async def TTS(prompt, voice, speed, output):
     
     if os.path.isdir(output): output = os.path.join(output, f"output_tts.wav")
 
+
     gr.Info("Chuyển đổi văn bản...")
 
     output_dir = os.path.dirname(output)
+    output_dir = output if not output_dir else output_dir
+
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
     await edge_tts.Communicate(text=prompt, voice=voice, rate=f"+{speed}%" if speed >= 0 else f"{speed}%").save(output)
+
 
     gr.Info("Hoàn thành")
 
     return output
 
 
-def separator_music(input, output, format, shifts, segments_size, overlap, clean_audio, clean_strength, backing_denoise, separator_model, kara_model, backing, mdx, mdx_denoise, reverb, reverb_denoise, backing_reverb, hop_length, batch_size):
-    output = os.path.dirname(output)
+def separator_music(input, output_audio, format, shifts, segments_size, overlap, clean_audio, clean_strength, backing_denoise, separator_model, kara_model, backing, mdx, mdx_denoise, reverb, reverb_denoise, backing_reverb, hop_length, batch_size):
+    output = os.path.dirname(output_audio)
+    output = output_audio if not output else output
     
+
     if not input or not os.path.exists(input) or os.path.isdir(input): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return [None]*4
@@ -833,9 +873,11 @@ def separator_music(input, output, format, shifts, segments_size, overlap, clean
         gr.Warning("Không tìm thấy thư mục đầu ra!")
         return [None]*4
 
+
     gr.Info("Bắt đầu tách nhạc...")
 
     cmd = f'{python} main/inference/separator_music.py --input_path {input} --output_path {output} --format {format} --shifts {shifts} --segments_size {segments_size} --overlap {overlap} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --clean_audio {clean_audio} --clean_strength {clean_strength} --backing_denoise {backing_denoise} --kara_model {kara_model} --backing {backing} --mdx {mdx} --mdx_denoise {mdx_denoise} --reverb {reverb} --reverb_denoise {reverb_denoise} --backing_reverb {backing_reverb}'
+
 
     if separator_model == "HT-Normal" or separator_model == "HT-Tuned" or separator_model == "HD_MMI" or separator_model == "HT_6S": cmd += f' --demucs_model {separator_model}'
     else: cmd += f' --mdx_model {separator_model}'
@@ -851,14 +893,14 @@ def separator_music(input, output, format, shifts, segments_size, overlap, clean
     main_output = os.path.join(output, f"Main_Vocals_No_Reverb.{format}") if reverb else os.path.join(output, f"Main_Vocals.{format}")
     backing_output = os.path.join(output, f"Backing_Vocals_No_Reverb.{format}") if backing_reverb else os.path.join(output, f"Backing_Vocals.{format}")
 
+
     if backing: return [original_output, instrument_output, main_output, backing_output]
     else: return [original_output, instrument_output, None, None]
 
 
 def convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, clean_audio, clean_strength, export_format, embedder_model, upscale_audio, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength):
-    if os.path.exists(output_path): os.remove(output_path)
-
     cmd = f"{python} main/inference/convert.py --pitch {pitch} --filter_radius {filter_radius} --index_rate {index_rate} --volume_envelope {volume_envelope} --protect {protect} --hop_length {hop_length} --f0_method {f0_method} --input_path {input_path} --output_path {output_path} --pth_path {pth_path} --index_path {index_path} --f0_autotune {f0_autotune} --clean_audio {clean_audio} --clean_strength {clean_strength} --export_format {export_format} --embedder_model {embedder_model} --upscale_audio {upscale_audio} --resample_sr {resample_sr} --batch_process {batch_process} --batch_size {batch_size} --split_audio {split_audio} --f0_autotune_strength {f0_autotune_strength}"
+
     os.system(cmd)
 
 
@@ -868,6 +910,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
         if not matching_files: return "Không tìm thấy"
         
         return os.path.join("audios", matching_files[0])
+
 
     model_path = os.path.join("assets", "weights", model)
 
@@ -892,18 +935,22 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
         gr.Warning("Không tìm thấy chỉ mục")
         return [None]*5
 
+
     f0method = method if method != "hybrid" else hybrid_method
     
     embedder_model = embedders if embedders != "custom" else custom_embedders
+
 
     output_path = os.path.join("audios", f"Convert_Vocals.{format}")
     output_backing = os.path.join("audios", f"Convert_Backing.{format}")
     output_merge_backup = os.path.join("audios", f"Vocals+Backing.{format}")
     output_merge_instrument = os.path.join("audios", f"Vocals+Instruments.{format}")
 
+
     if use_audio:
         if os.path.exists("audios"): os.makedirs("audios", exist_ok=True)
         if os.path.exists(output_path): os.remove(output_path)
+
 
         if use_original:
             original_vocal = get_audio_file('Original_Vocals_No_Reverb.')
@@ -933,6 +980,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             input_path = main_vocal
             backing_path = backing_vocal
 
+
         gr.Info("Đang chuyển đổi giọng nói...")
 
         convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input_path, output_path, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
@@ -952,6 +1000,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             backing_source = output_backing if convert_backing else backing_vocal
 
             if os.path.exists(output_merge_backup): os.remove(output_merge_backup)
+
 
             gr.Info("Kết hợp giọng với giọng bè...")
 
@@ -985,6 +1034,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             gr.Warning("Vui lòng nhập đầu ra!")
             return [None]*5
         
+
         if os.path.isdir(input):
             gr.Info("Đầu vào là một thư mục: Chuyển đổi tất cả tệp âm thanh trong thư mục...")
 
@@ -994,18 +1044,22 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             
             gr.Info("Đang chuyển đổi hàng loạt...")
 
-            output = os.path.dirname(output)
+            output_dir = os.path.dirname(output)
+            output_dir = output if not output_dir else output_dir
 
-            convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
+            convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output_dir, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
             gr.Info("Chuyển đổi hàng loạt thành công!")
 
             return [None]*5
         else:
             output_dir = os.path.dirname(output)
+            output_dir = output if not output_dir else output_dir
+
             if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
             if os.path.exists(output): os.remove(output)
+
 
             gr.Info("Đang chuyển đổi giọng nói...")
 
@@ -1046,6 +1100,7 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
     
     if os.path.isdir(output): output = os.path.join(output, f"output_tts-convert.{format}")
     
+
     output_dir = os.path.dirname(output)
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     
@@ -1059,6 +1114,7 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
 
     convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
+
     gr.Info("Đã Hoàn thành chuyển đổi giọng nói")
     return output
 
@@ -1070,6 +1126,7 @@ def create_dataset(input_audio, output_dataset, resample, resample_sr, clean_dat
 
     gr.Info("Bắt đầu tạo...")
 
+
     p = Popen(cmd, shell=True)
     done = [False]
 
@@ -1079,6 +1136,7 @@ def create_dataset(input_audio, output_dataset, resample, resample_sr, clean_dat
 
     f = open(create_dataset_log, "w", encoding="utf-8")
     f.close()
+
 
     while 1:
         with open(create_dataset_log, "r", encoding='utf-8') as f:
@@ -1102,6 +1160,7 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
 
     cmd = f'{python} main/inference/preprocess.py --model_name {model_name} --dataset_path {dataset} --sample_rate {sr} --cpu_cores {cpu_core} --cut_preprocess {cut_preprocess} --process_effects {process_effects} --clean_dataset {clean_dataset} --clean_strength {clean_strength}'
 
+
     p = Popen(cmd, shell=True)
     done = [False]
 
@@ -1114,6 +1173,7 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
 
     f = open(preprocess_log, "w", encoding="utf-8")
     f.close()
+
 
     while 1:
         with open(preprocess_log, "r", encoding='utf-8') as f:
@@ -1140,6 +1200,7 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
 
     cmd = f'{python} main/inference/extract.py --model_name {model_name} --rvc_version {version} --f0_method {method} --pitch_guidance {pitch_guidance} --hop_length {hop_length} --cpu_cores {cpu_cores} --gpu {gpu} --sample_rate {sr} --embedder_model {embedder_model}'
 
+
     p = Popen(cmd, shell=True)
     done = [False]
 
@@ -1151,6 +1212,7 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
 
     f = open(extract_log, "w", encoding="utf-8")
     f.close()
+
 
     while 1:
         with open(extract_log, "r", encoding='utf-8') as f:
@@ -1173,6 +1235,7 @@ def create_index(model_name, rvc_version, index_algorithm):
 
     cmd = f'{python} main/inference/create_index.py --model_name {model_name} --rvc_version {rvc_version} --index_algorithm {index_algorithm}'
 
+
     p = Popen(cmd, shell=True)
     done = [False]
 
@@ -1184,6 +1247,7 @@ def create_index(model_name, rvc_version, index_algorithm):
 
     f = open(create_index_log, "w", encoding="utf-8")
     f.close()
+
 
     while 1:
         with open(create_index_log, "r", encoding='utf-8') as f:
@@ -1206,6 +1270,7 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
     if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
 
     cmd = f'{python} main/inference/train.py --model_name {model_name} --rvc_version {rvc_version} --save_every_epoch {save_every_epoch} --save_only_latest {save_only_latest} --save_every_weights {save_every_weights} --total_epoch {total_epoch} --sample_rate {sr} --batch_size {batch_size} --gpu {gpu} --pitch_guidance {pitch_guidance} --overtraining_detector {detector} --overtraining_threshold {threshold} --sync_graph {sync_graph} --cache_data_in_gpu {cache}'
+
 
     if not not_pretrain:
         if not custom_pretrained: pg, pd = pretrained_selector(pitch_guidance)[sr]
@@ -1241,7 +1306,9 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
         cmd += f" --g_pretrained_path {pretrained_G} --d_pretrained_path {pretrained_D}"
     else: gr.Warning("Sẽ không có huấn luyện trước được sử dụng")
 
+
     gr.Info("Bắt đầu huấn luyện...")
+
 
     p = Popen(cmd, shell=True)
     done = [False]
@@ -1254,6 +1321,7 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
 
     f = open(train_log, "w", encoding="utf-8")
     f.close()
+
 
     while 1:
         with open(train_log, "r", encoding='utf-8') as f:
@@ -1497,7 +1565,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 model_pth.change(fn=get_index, inputs=[model_pth], outputs=[model_index])
             with gr.Row():
                 input0.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input0], outputs=[input_audio0])
-                input_audio0.change(fn=lambda audio: audio, inputs=[input_audio0], outputs=[play_audio])
+                input_audio0.change(fn=lambda audio: [audio if not os.path.isdir(audio) else None], inputs=[input_audio0], outputs=[play_audio])
             with gr.Row():
                 embedders.change(fn=lambda embedders: visible_1(True if embedders == "custom" else False), inputs=[embedders], outputs=[custom_embedders])
                 refesh0.click(fn=lambda: refesh_audio, inputs=[], outputs=[input_audio0])
@@ -1786,7 +1854,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 bitcrush_checkbox.change(fn=visible_1, inputs=[bitcrush_checkbox], outputs=[bitcrush_bit_depth])
             with gr.Row():
                 upload_audio.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[upload_audio], outputs=[audio_in_path])
-                audio_in_path.change(fn=lambda audio: audio, inputs=[audio_in_path], outputs=[audio_play_input])
+                audio_in_path.change(fn=lambda audio: [audio if not os.path.isdir(audio) else None], inputs=[audio_in_path], outputs=[audio_play_input])
                 audio_effects_refesh.click(fn=lambda: refesh_audio, inputs=[], outputs=[audio_in_path])
             with gr.Row():
                 more_options.change(fn=lambda: [False, False, False, False], inputs=[], outputs=[fade, bass_or_treble, limiter, resample_checkbox])
