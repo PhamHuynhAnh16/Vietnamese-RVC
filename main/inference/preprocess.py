@@ -277,7 +277,7 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
         except ValueError:
             raise ValueError(f'Thư mục ID giọng nói phải là số nguyên, thay vào đó có "{os.path.basename(root)}".')
 
-    with tqdm(total=len(files), desc="Xử lý dữ liệu") as pbar:
+    with tqdm(total=len(files), desc="Xử lý dữ liệu", unit="iB", unit_scale=True) as pbar:
         with ProcessPoolExecutor(max_workers=num_processes) as executor:
             futures = [
                 executor.submit(

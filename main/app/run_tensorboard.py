@@ -5,8 +5,8 @@ from tensorboard import program
 
 
 def launch_tensorboard_pipeline():
-    logging.getLogger("root").setLevel(logging.WARNING)
-    logging.getLogger("tensorboard").setLevel(logging.WARNING)
+    logging.getLogger("root").setLevel(logging.ERROR)
+    logging.getLogger("tensorboard").setLevel(logging.ERROR)
 
     tb = program.TensorBoard()
     tb.configure(argv=[None, "--logdir", "assets/logs", f"--port=6870"])

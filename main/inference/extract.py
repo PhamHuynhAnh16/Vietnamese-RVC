@@ -34,7 +34,7 @@ from main.configs.config import Config
 from main.library.predictors.FCPE import FCPE
 from main.library.predictors.RMVPE import RMVPE
 
-logging.getLogger("wget").setLevel(logging.WARNING)
+logging.getLogger("wget").setLevel(logging.ERROR)
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -293,7 +293,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
 
         process_partials = []
 
-        pbar = tqdm.tqdm(total=len(paths), desc="Trích Xuất Cao Độ")
+        pbar = tqdm.tqdm(total=len(paths), desc="Trích Xuất Cao Độ", unit="iB", unit_scale=True)
 
         for idx, gpu in enumerate(gpus):
             device = get_device(gpu)
@@ -313,7 +313,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
     else:
         feature_input = FeatureInput(device="cpu")
         
-        with tqdm.tqdm(total=len(paths), desc="Trích Xuất Cao Độ") as pbar:
+        with tqdm.tqdm(total=len(paths), desc="Trích Xuất Cao Độ", unit="iB", unit_scale=True) as pbar:
             with Pool(processes=num_processes) as pool:
                 process_file_partial = partial(feature_input.process_file, f0_method=f0_method, hop_length=hop_length)
 
@@ -372,7 +372,7 @@ def run_embedding_extraction(exp_dir, version, gpus, embedder_model):
         logger.warning("Không tìm thấy tập tin âm thanh. Hãy chắc chắn rằng bạn đã cung cấp âm thanh chính xác.")
         sys.exit(1)
 
-    pbar = tqdm.tqdm(total=len(paths) * len(devices), desc="Trích xuất nhúng")
+    pbar = tqdm.tqdm(total=len(paths) * len(devices), desc="Trích xuất nhúng", unit="iB", unit_scale=True)
 
     tasks = [(file, wav_path, out_path, model, device, version, saved_cfg) for file in paths for device in devices]
 

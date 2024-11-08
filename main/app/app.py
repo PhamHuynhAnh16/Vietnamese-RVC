@@ -48,7 +48,6 @@ pretrainedG = []
 models = {}
 model_options = {}
 
-
 miku_image = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/zvxh.cat", "rot13")
 
 model_search_csv = codecs.decode("uggcf://qbpf.tbbtyr.pbz/fcernqfurrgf/q/1gNHnDeRULtEfz1Yieaw14USUQjWJy0Oq9k0DrCrjApb/rkcbeg?sbezng=pfi&tvq=1977693859", "rot13")
@@ -60,9 +59,7 @@ hugging_face_codecs = codecs.decode("uggcf://uhttvatsnpr.pb", "rot13")
 pretrained_v1_link = codecs.decode("uggcf://uhttvatsnpr.pb/VNUvfcnab/Nccyvb/erfbyir/znva/Erfbheprf/cergenvarq_i1/", "rot13")
 pretrained_v2_link = codecs.decode("uggcf://uhttvatsnpr.pb/yw1995/IbvprPbairefvbaJroHV/erfbyir/znva/cergenvarq_i2/", "rot13")
 
-
 if not os.path.exists(os.path.join("assets", "miku.png")): run(["wget", "-q", "--show-progress", "--no-check-certificate", miku_image, "-P", os.path.join("assets")], check=True)
-
 
 tts_voice = [
     'af-ZA-AdriNeural', 'af-ZA-WillemNeural', 'sq-AL-AnilaNeural', 
@@ -172,7 +169,6 @@ tts_voice = [
     'vi-VN-HoaiMyNeural', 'vi-VN-NamMinhNeural', 'cy-GB-AledNeural', 
     'cy-GB-NiaNeural', 'zu-ZA-ThandoNeural', 'zu-ZA-ThembaNeural'
 ]
-
 
 for model in os.listdir(os.path.join("assets", "weights")):
     if model.endswith(".pth") and not model.startswith("G_") and not model.startswith("D_"): model_name.append(model)
@@ -772,13 +768,15 @@ def model_info(path):
 
 
 def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out):
-    if not input_path or not os.path.exists(input_path): 
+    if not input_path or not os.path.exists(input_path) or os.path.isdir(index_path): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return None
         
     if not output_path:
         gr.Warning("Vui lòng nhập đầu ra!")
         return None
+    
+    if os.path.isdir(output_path): output_path = os.path.join(output_path, f"audio_effects.{export_format}")
     
     output_dir = os.path.dirname(output_path)
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
@@ -809,6 +807,8 @@ async def TTS(prompt, voice, speed, output):
     if not output: 
         gr.Warning("Vui lòng cung cấp đầu ra!")
         return None
+    
+    if os.path.isdir(output): output = os.path.join(output, f"output_tts.wav")
 
     gr.Info("Chuyển đổi văn bản...")
 
@@ -825,13 +825,13 @@ async def TTS(prompt, voice, speed, output):
 def separator_music(input, output, format, shifts, segments_size, overlap, clean_audio, clean_strength, backing_denoise, separator_model, kara_model, backing, mdx, mdx_denoise, reverb, reverb_denoise, backing_reverb, hop_length, batch_size):
     output = os.path.dirname(output)
     
-    if not input or not os.path.exists(input): 
+    if not input or not os.path.exists(input) or os.path.isdir(input): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
-        return [None, None, None, None]
+        return [None]*4
     
     if not os.path.exists(output): 
         gr.Warning("Không tìm thấy thư mục đầu ra!")
-        return [None, None, None, None]
+        return [None]*4
 
     gr.Info("Bắt đầu tách nhạc...")
 
@@ -855,14 +855,14 @@ def separator_music(input, output, format, shifts, segments_size, overlap, clean
     else: return [original_output, instrument_output, None, None]
 
 
-def convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, clean_audio, clean_strength, export_format, embedder_model, upscale_audio, resample_sr, use_threads, max_threads, split_audio, f0_autotune_strength):
+def convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, clean_audio, clean_strength, export_format, embedder_model, upscale_audio, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength):
     if os.path.exists(output_path): os.remove(output_path)
 
-    cmd = f"{python} main/inference/convert.py --pitch {pitch} --filter_radius {filter_radius} --index_rate {index_rate} --volume_envelope {volume_envelope} --protect {protect} --hop_length {hop_length} --f0_method {f0_method} --input_path {input_path} --output_path {output_path} --pth_path {pth_path} --index_path {index_path} --f0_autotune {f0_autotune} --clean_audio {clean_audio} --clean_strength {clean_strength} --export_format {export_format} --embedder_model {embedder_model} --upscale_audio {upscale_audio} --resample_sr {resample_sr} --use_threads {use_threads} --max_threads {max_threads} --split_audio {split_audio} --f0_autotune_strength {f0_autotune_strength}"
+    cmd = f"{python} main/inference/convert.py --pitch {pitch} --filter_radius {filter_radius} --index_rate {index_rate} --volume_envelope {volume_envelope} --protect {protect} --hop_length {hop_length} --f0_method {f0_method} --input_path {input_path} --output_path {output_path} --pth_path {pth_path} --index_path {index_path} --f0_autotune {f0_autotune} --clean_audio {clean_audio} --clean_strength {clean_strength} --export_format {export_format} --embedder_model {embedder_model} --upscale_audio {upscale_audio} --resample_sr {resample_sr} --batch_process {batch_process} --batch_size {batch_size} --split_audio {split_audio} --f0_autotune_strength {f0_autotune_strength}"
     os.system(cmd)
 
 
-def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, use_threads, max_threads, split_audio, f0_autotune_strength):
+def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, batch_process, batch_size, split_audio, f0_autotune_strength):
     def get_audio_file(label):
         matching_files = [f for f in os.listdir("audios") if label in f]
         if not matching_files: return "Không tìm thấy"
@@ -874,23 +874,23 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
     if not use_audio:
         if merge_instrument or not_merge_backing or convert_backing or use_original:
             gr.Warning("Vui lòng bật sử dụng âm thanh vừa tách để sử dụng")
-            return [None, None, None, None, None]
+            return [None]*5
 
     if use_original:
         if convert_backing:
             gr.Warning("Tắt chuyển đổi giọng bè để có thể sử dụng giọng gốc")
-            return [None, None, None, None, None]
+            return [None]*5
         elif not_merge_backing:
             gr.Warning("Tắt không kết hợp giọng bè để có thể sử dụng giọng gốc")
-            return [None, None, None, None, None]
+            return [None]*5
 
     if not model or not os.path.exists(model_path):
         gr.Warning("Không tìm thấy mô hình")
-        return [None, None, None, None, None]
+        return [None]*5
     
     if not model or not os.path.exists(index):
         gr.Warning("Không tìm thấy chỉ mục")
-        return [None, None, None, None, None]
+        return [None]*5
 
     f0method = method if method != "hybrid" else hybrid_method
     
@@ -912,7 +912,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
 
             if original_vocal == "Không tìm thấy": 
                 gr.Warning("Không tìm thấy giọng gốc!")
-                return [None, None, None, None, None]
+                return [None]*5
             
             input_path = original_vocal
         else:
@@ -924,18 +924,18 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
 
             if main_vocal == "Không tìm thấy": 
                 gr.Warning("Không tìm thấy giọng chính!")
-                return [None, None, None, None, None]
+                return [None]*5
             
             if not not_merge_backing and backing_vocal == "Không tìm thấy": 
                 gr.Warning("Không tìm thấy giọng bè!")
-                return [None, None, None, None, None]
+                return [None]*5
             
             input_path = main_vocal
             backing_path = backing_vocal
 
         gr.Info("Đang chuyển đổi giọng nói...")
 
-        convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input_path, output_path, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, use_threads, max_threads, split_audio, f0_autotune_strength)
+        convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input_path, output_path, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
         gr.Info("Đã Hoàn thành chuyển đổi giọng nói!")
 
@@ -944,7 +944,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
 
             gr.Info("Đang chuyển đổi giọng bè...")
 
-            convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, backing_path, output_backing, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, use_threads, max_threads, split_audio, f0_autotune_strength)
+            convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, backing_path, output_backing, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
             gr.Info("Đã Hoàn thành chuyển đổi giọng bè!")
 
@@ -979,27 +979,44 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
     else:
         if not input or not os.path.exists(input): 
             gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
-            return [None, None, None, None, None]
+            return [None]*5
         
         if not output:
             gr.Warning("Vui lòng nhập đầu ra!")
-            return [None, None, None, None, None]
+            return [None]*5
         
-        output_dir = os.path.dirname(output)
-        if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
+        if os.path.isdir(input):
+            gr.Info("Đầu vào là một thư mục: Chuyển đổi tất cả tệp âm thanh trong thư mục...")
 
-        if os.path.exists(output): os.remove(output)
+            if not [f for f in os.listdir(input) if f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]:
+                gr.Warning("Không tìm thấy tệp âm thanh trong thư mục!")
+                return [None]*5
+            
+            gr.Info("Đang chuyển đổi hàng loạt...")
 
-        gr.Info("Đang chuyển đổi giọng nói...")
+            output = os.path.dirname(output)
 
-        convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, use_threads, max_threads, split_audio, f0_autotune_strength)
+            convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
-        gr.Info("Kết hợp Hoàn thành")
+            gr.Info("Chuyển đổi hàng loạt thành công!")
 
-        return [output, None, None, None, None]
+            return [None]*5
+        else:
+            output_dir = os.path.dirname(output)
+            if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
+
+            if os.path.exists(output): os.remove(output)
+
+            gr.Info("Đang chuyển đổi giọng nói...")
+
+            convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
+
+            gr.Info("Chuyển đổi thành công!")
+
+            return [output, None, None, None, None]
 
 
-def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, use_threads, max_threads, split_audio, f0_autotune_strength):
+def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, batch_process, batch_size, split_audio, f0_autotune_strength):
     model_path = os.path.join("assets", "weights", model)
 
     if not model_path or not os.path.exists(model_path):
@@ -1013,10 +1030,21 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
     if not input or not os.path.exists(input): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return None
+    
+    if os.path.isdir(input): 
+        input_audio = [f for f in os.listdir(input) if "output_tts" in f and f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]
         
+        if not input_audio:
+            gr.Warning("Không tìm thấy đầu vào!")
+            return None
+        
+        input = os.path.join(input, input_audio[0])
+    
     if not output:
         gr.Warning("Vui lòng nhập đầu ra!")
         return None
+    
+    if os.path.isdir(output): output = os.path.join(output, f"output_tts-convert.{format}")
     
     output_dir = os.path.dirname(output)
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
@@ -1029,7 +1057,7 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
 
     gr.Info("Đang chuyển đổi giọng nói...")
 
-    convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, use_threads, max_threads, split_audio, f0_autotune_strength)
+    convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
     gr.Info("Đã Hoàn thành chuyển đổi giọng nói")
     return output
@@ -1417,10 +1445,12 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                             embedders = gr.Radio(label="Mô hình học cách nói", info="Mô hình được huấn luyện trước để giúp cho mô hình học cách nói cách ngắt hơi", choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
                             custom_embedders = gr.Textbox(label="Tên của mô hình", info="Nếu bạn có msô hình riêng chỉ cần tải và nhập tên của mô hình vào đây", value="", placeholder="hubert_base", interactive=True, visible=False)
                         with gr.Column():
-                            with gr.Row():
-                                split_audio = gr.Checkbox(label="Cắt âm thanh", info="Cắt âm thanh ra các phần nhỏ để chuyển đổi có thể giúp tăng tốc độ", value=False, interactive=True)
-                                use_threads = gr.Checkbox(label="Xử lý đa luồng", info="Xử lý đa luồng có thể giảm thời gian huấn luyện nhưng có thể bị quá tải", value=False, interactive=True, visible=False)
-                            max_threads = gr.Slider(minimum=1, maximum=10, label="Số lượng Xử lý tối đa", info="Số lượng Xử lý tối đa cùng lúc", value=1, step=1, interactive=True, visible=False)
+                            with gr.Group():
+                                with gr.Row():
+                                    split_audio = gr.Checkbox(label="Cắt âm thanh", info="Cắt âm thanh ra các phần nhỏ để chuyển đổi có thể giúp tăng tốc độ", value=False, interactive=True)
+                                    batch_process = gr.Checkbox(label="Xử lý lô", info="Xử lý lô có thể giảm thời gian huấn luyện nhưng có thể bị quá tải", value=False, interactive=True, visible=False)
+                                with gr.Row():
+                                    batch_size = gr.Slider(minimum=1, maximum=10, label="Số lượng lô", info="Số lượng lô xử lý cùng lúc", value=1, step=1, interactive=True, visible=False)
                             f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label="Mức độ điều chỉnh", info="Mức độ điều chỉnh của điều chỉnh tự động", value=1, step=0.1, interactive=True, visible=False)
                             resample_sr = gr.Slider(minimum=0, maximum=48000, label="Lấy mẫu lại", info="Lấy mẫu lại sau xử lý đến tốc độ lấy mẫu cuối cùng, 0 có nghĩa là không lấy mẫu lại", value=0, step=1, interactive=True)
                             filter_radius = gr.Slider(minimum=0, maximum=7, label="Lọc trung vị", info="Nếu giá trị lớn hơn ba sẽ áp dụng tính năng lọc trung vị. Giá trị đại diện cho bán kính bộ lọc và có thể làm giảm hơi thở hoặc tắt thở.", value=3, step=1, interactive=True)
@@ -1436,8 +1466,8 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 original_convert = gr.Audio(show_download_button=True, interactive=False, label="Chuyển đổi giọng gốc", visible=False)
                 vocal_instrument = gr.Audio(show_download_button=True, interactive=False, label="Giọng + Nhạc nền", visible=False)  
             with gr.Row():
-                split_audio.change(fn=valueFalse_visible1, inputs=[split_audio], outputs=[use_threads])
-                use_threads.change(fn=visible_1, inputs=[use_threads], outputs=[max_threads])
+                split_audio.change(fn=valueFalse_visible1, inputs=[split_audio], outputs=[batch_process])
+                batch_process.change(fn=visible_1, inputs=[batch_process], outputs=[batch_size])
                 autotune.change(fn=visible_1, inputs=[autotune], outputs=[f0_autotune_strength])
             with gr.Row():
                 use_audio.change(fn=visible_1, inputs=[use_audio], outputs=[main_backing])
@@ -1500,8 +1530,8 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                         filter_radius,
                         volume_envelope,
                         protect,
-                        use_threads,
-                        max_threads,
+                        batch_process,
+                        batch_size,
                         split_audio,
                         f0_autotune_strength
                     ],
@@ -1553,15 +1583,17 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                         with gr.Accordion("Mô hình học cách nói", open=False):
                             embedders0 = gr.Radio(label="Mô hình học cách nói", info="Mô hình được huấn luyện trước để giúp cho mô hình học cách nói cách ngắt hơi", choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
                             custom_embedders0 = gr.Textbox(label="Tên của mô hình", info="Nếu bạn có mô hình riêng chỉ cần tải và nhập tên của mô hình vào đây", value="", placeholder="hubert_base", interactive=True, visible=False)
-                        with gr.Row():
-                            split_audio0 = gr.Checkbox(label="Cắt âm thanh", info="Cắt âm thanh ra các phần nhỏ để chuyển đổi có thể giúp tăng tốc độ", value=False, interactive=True)
-                            use_threads0 = gr.Checkbox(label="Xử lý đa luồng", info="Xử lý đa luồng có thể giảm thời gian huấn luyện", value=False, interactive=True, visible=False)
+                        with gr.Group():
+                            with gr.Row():
+                                split_audio0 = gr.Checkbox(label="Cắt âm thanh", info="Cắt âm thanh ra các phần nhỏ để chuyển đổi có thể giúp tăng tốc độ", value=False, interactive=True)
+                                batch_process0 = gr.Checkbox(label="Xử lý lô", info="Xử lý lô có thể giảm thời gian huấn luyện", value=False, interactive=True, visible=False)
+                            with gr.Row():
+                                    batch_size0 = gr.Slider(minimum=1, maximum=10, label="Số lượng lô", info="Số lượng lô xử lý cùng lúc", value=1, step=1, interactive=True, visible=False)
                         with gr.Row():
                             cleaner1 = gr.Checkbox(label="Làm sạch âm thanh", value=False, interactive=True)
                             upscale2 = gr.Checkbox(label="Tăng chất lượng", value=False, interactive=True)
-                            autotune3 = gr.Checkbox(label="Tự động điều chỉnh", value=False, interactive=True)
+                            autotune3 = gr.Checkbox(label="Tự động điều chỉnh", value=False, interactive=True)          
                         with gr.Column():
-                            max_threads0 = gr.Slider(minimum=1, maximum=10, label="Số lượng Xử lý tối đa", info="Số lượng Xử lý tối đa cùng lúc", value=1, step=1, interactive=True, visible=False)
                             f0_autotune_strength0 = gr.Slider(minimum=0, maximum=1, label="Mức độ điều chỉnh", info="Mức độ điều chỉnh của điều chỉnh tự động", value=1, step=0.1, interactive=True, visible=False)
                             clean_strength1 = gr.Slider(label="Sức mạnh làm sạch âm thanh", info="Sức mạnh của bộ làm sạch âm thanh để lọc giọng hát khi xuất", minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
                             resample_sr0 = gr.Slider(minimum=0, maximum=48000, label="Lấy mẫu lại", info="Lấy mẫu lại sau xử lý đến tốc độ lấy mẫu cuối cùng, 0 có nghĩa là không lấy mẫu lại", value=0, step=1, interactive=True)
@@ -1574,8 +1606,8 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 tts_voice_audio = gr.Audio(show_download_button=True, interactive=False, label="Giọng được tạo bởi chuyển đổi văn bản thành giọng nói")
                 tts_voice_convert = gr.Audio(show_download_button=True, interactive=False, label="Giọng được chuyển đổi bởi mô hình")
             with gr.Row():
-                use_threads0.change(fn=visible_1, inputs=[use_threads0], outputs=[max_threads0])
-                split_audio0.change(fn=valueFalse_visible1, inputs=[split_audio0], outputs=[use_threads0])
+                batch_process0.change(fn=visible_1, inputs=[batch_process0], outputs=[batch_size0])
+                split_audio0.change(fn=valueFalse_visible1, inputs=[split_audio0], outputs=[batch_process0])
                 autotune3.change(fn=visible_1, inputs=[autotune3], outputs=[f0_autotune_strength0])
             with gr.Row():
                 cleaner1.change(fn=visible_1, inputs=[cleaner1], outputs=[clean_strength1])
@@ -1624,8 +1656,8 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                         filter_radius0, 
                         volume_envelope0, 
                         protect0,
-                        use_threads0,
-                        max_threads0,
+                        batch_process0,
+                        batch_size0,
                         split_audio0,
                         f0_autotune_strength0
                     ],
@@ -1967,7 +1999,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                                         gpu_number = gr.Textbox(label="Số gpu được sử dụng", value=str(get_number_of_gpus()), info="Số của GPU được sử dụng trong huấn luyện", interactive=True)
                                         gpu_info = gr.Textbox(label="Thông tin của GPU", value=get_gpu_info(), info="Thông tin của GPU được sử dụng trong huấn luyện", interactive=False)
                                         cpu_core = gr.Slider(label="Số lõi xử lý có thể sử dụng", info="Số lõi cpu được sử dụng trong việc huấn luyện", minimum=0, maximum=cpu_count(), value=cpu_count(), step=1, interactive=True)
-                                        batch_size = gr.Slider(label="Kích thước lô", info="Số lượng mẫu xử lý đồng thời trong một lần huấn luyện. Cao có thể gây tràn bộ nhợ", minimum=1, maximum=64, value=8, step=1, interactive=True)
+                                        train_batch_size = gr.Slider(label="Kích thước lô", info="Số lượng mẫu xử lý đồng thời trong một lần huấn luyện. Cao có thể gây tràn bộ nhợ", minimum=1, maximum=64, value=8, step=1, interactive=True)
                             with gr.Row():
                                 with gr.Row():
                                     save_only_latest = gr.Checkbox(label="Chỉ lưu mới nhất", info="Chỉ lưu mô hình D và G mới nhất", value=True, interactive=True)
@@ -2078,7 +2110,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                         save_every_weights, 
                         total_epochs, 
                         training_sr,
-                        batch_size, 
+                        train_batch_size, 
                         gpu_number,
                         training_f0,
                         not_use_pretrain,
