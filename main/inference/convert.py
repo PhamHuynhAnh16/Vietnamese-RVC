@@ -224,7 +224,7 @@ def process_audio(file_path, output_path):
                 time_stamps.append((start_i, end_i))
             else: logger.debug(f"Phần {i} được bỏ qua vì quá ngắn: {len(chunk)}ms")
 
-        logger.debug(f"Tổng số phần đã cắt: {len(cut_files)}")
+        logger.info(f"Tổng số phần đã cắt: {len(cut_files)}")
         return cut_files, time_stamps
     except Exception as error:
         raise RuntimeError(f"Đã xảy ra lỗi khi cắt âm thanh: {error}")
