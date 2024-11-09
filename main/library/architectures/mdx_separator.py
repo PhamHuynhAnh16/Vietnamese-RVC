@@ -250,10 +250,10 @@ class MDXSeparator(CommonSeparator):
                     if window is not None:
                         tar_waves[..., :chunk_size_actual] *= window
                         divider[..., start:end] += window
-                    else:
-                        divider[..., start:end] += 1
+                    else: divider[..., start:end] += 1
 
                     result[..., start:end] += tar_waves[..., : end - start]
+
 
         self.logger.debug("Chuẩn hóa kết quả bằng cách chia kết quả cho số chia.")
         tar_waves = result / divider

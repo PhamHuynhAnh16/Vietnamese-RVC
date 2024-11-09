@@ -274,8 +274,8 @@ def process_audio(file_path):
         combined.export(output_path, format="wav")
 
         return output_path
-    except Exception as error:
-        raise RuntimeError(f"Đã xảy ra lỗi khi xử lý và ghép âm thanh: {error}")
+    except Exception as e:
+        raise RuntimeError(f"Đã xảy ra lỗi khi xử lý và ghép âm thanh: {e}")
 
 
 def separatormusic(input, output, segments_size, overlap, denoise, version, hop_length, batch_size):
@@ -295,7 +295,7 @@ def separatormusic(input, output, segments_size, overlap, denoise, version, hop_
     for f in output_separator:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {f}")
+        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
 
         if '_(Instrumental)_' in f: os.rename(path, os.path.splitext(path)[0].replace("(", "").replace(")", "") + ".wav")
         elif '_(Vocals)_' in f:
@@ -323,7 +323,7 @@ def separator_reverb_audio(input, output, segments_size, overlap, denoise, hop_l
     for f in output_dereverb:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {f}")
+        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
 
         if '_(Reverb)_' in f: os.rename(path, os.path.splitext(path)[0].replace("(", "").replace(")", "") + ".wav")
         elif '_(No Reverb)_' in f:

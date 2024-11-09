@@ -66,8 +66,8 @@ def load_audio(file, sample_rate):
 
         if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
         if sr != sample_rate: audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
-    except Exception as error:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {error}")
+    except Exception as e:
+        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {e}")
 
     return audio.flatten()
 
@@ -256,8 +256,8 @@ class FeatureInput:
             np.save(opt_path2, feature_pit, allow_pickle=False)
             coarse_pit = self.coarse_f0(feature_pit)
             np.save(opt_path1, coarse_pit, allow_pickle=False)
-        except Exception as error:
-            raise RuntimeError(f"Đã xảy ra lỗi khi giải nén tập tin {inp_path}: {error}")
+        except Exception as e:
+            raise RuntimeError(f"Đã xảy ra lỗi khi giải nén tập tin {inp_path}: {e}")
 
 
     def process_files(self, files, f0_method, hop_length, pbar):
@@ -379,8 +379,8 @@ def run_embedding_extraction(exp_dir, version, gpus, embedder_model):
     for task in tasks:
         try:
             process_file_embedding(*task)
-        except Exception as error:
-            raise RuntimeError(f"Đã xảy ra lỗi khi xử lý {task[0]}: {error}")
+        except Exception as e:
+            raise RuntimeError(f"Đã xảy ra lỗi khi xử lý {task[0]}: {e}")
 
         pbar.update(1)
 

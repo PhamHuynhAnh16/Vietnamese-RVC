@@ -561,7 +561,7 @@ def download_model(url=None, model=None):
         gr.Info("Hoàn thành")
         return "Hoàn thành"
     except Exception as e:
-        gr.Warning(f"Đã xảy ra lỗi: {e}")
+        gr.Error(message=f"Đã xảy ra lỗi: {e}")
 
         print(f"Đã xảy ra lỗi: {e}")
         return f"Đã xảy ra lỗi: {e}"
@@ -612,7 +612,7 @@ def save_drop_model(dropbox):
         gr.Info(f"Đã tải lên thành công {file_name}")
         return None
     except Exception as e:
-        gr.Warning(f"Đã xảy ra lỗi {e}")
+        gr.Error(message=f"Đã xảy ra lỗi {e}")
 
         print(f"Đã xảy ra lỗi {e}")
         return None
@@ -671,11 +671,13 @@ def fushion_model(name, pth_1, pth_2, ratio):
         gr.Warning("Vui lòng cung cấp tên") 
         return ["Vui lòng cung cấp tên", None]
     
-    if not pth_1 or not os.path.exists(pth_1):
+    if not name.endswith(".pth"): name = name + ".pth"
+    
+    if not pth_1 or not os.path.exists(pth_1) or not pth_1.endswith(".pth"):
         gr.Warning("Vui lòng cung cấp mô hình 1")
         return ["Vui lòng cung cấp mô hình 1", None]
     
-    if not pth_2 or not os.path.exists(pth_2):
+    if not pth_2 or not os.path.exists(pth_2) or not pth_1.endswith(".pth"):
         gr.Warning("Vui lòng cung cấp mô hình 2")
         return ["Vui lòng cung cấp mô hình 2", None]
     
@@ -739,15 +741,15 @@ def fushion_model(name, pth_1, pth_2, ratio):
 
         gr.Info("Hoàn thành")
         return ["Hoàn thành", output_model]
-    except Exception as error:
-        gr.Warning(f"Đã xảy ra lỗi khi hợp nhất các mô hình: {error}")
+    except Exception as e:
+        gr.Error(message=f"Đã xảy ra lỗi khi hợp nhất các mô hình: {e}")
 
-        print(f"Đã xảy ra lỗi khi hợp nhất các mô hình: {error}")
-        return [error, None]
+        print(f"Đã xảy ra lỗi khi hợp nhất các mô hình: {e}")
+        return [e, None]
 
 
 def model_info(path):
-    if not path or not os.path.exists(path): gr.Warning("Không tìm thấy mô hình!")
+    if not path or not os.path.exists(path) or os.path.isdir(path) or not path.endswith(".pth"): return gr.Warning("Mô hình không hợp lệ!!")
     
 
     def prettify_date(date_str):
@@ -798,7 +800,7 @@ def model_info(path):
 
 
 def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out):
-    if not input_path or not os.path.exists(input_path) or os.path.isdir(index_path): 
+    if not input_path or not os.path.exists(input_path) or os.path.isdir(input_path): 
         gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
         return None
         
@@ -927,12 +929,12 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             gr.Warning("Tắt không kết hợp giọng bè để có thể sử dụng giọng gốc")
             return [None]*5
 
-    if not model or not os.path.exists(model_path):
-        gr.Warning("Không tìm thấy mô hình")
+    if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith(".pth"):
+        gr.Warning("Mô hình không hợp lệ!")
         return [None]*5
     
-    if not model or not os.path.exists(index):
-        gr.Warning("Không tìm thấy chỉ mục")
+    if not index or not os.path.exists(index) or os.path.isdir(index) or not index.endswith(".index"):
+        gr.Warning("Chỉ mục không hợp lệ!")
         return [None]*5
 
 
@@ -1009,7 +1011,7 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             gr.Info("Kết hợp Hoàn thành")
 
         if merge_instrument:    
-            vocals = output_path if not_merge_backing and use_original else output_merge_backup   
+            vocals = output_merge_backup if not not_merge_backing and not use_original else output_path
 
             if os.path.exists(output_merge_instrument): os.remove(output_merge_instrument)
 
@@ -1073,12 +1075,12 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
 def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, batch_process, batch_size, split_audio, f0_autotune_strength):
     model_path = os.path.join("assets", "weights", model)
 
-    if not model_path or not os.path.exists(model_path):
-        gr.Warning("Không tìm thấy mô hình")
+    if not model_path or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith(".pth"):
+        gr.Warning("Mô hình không hợp lệ!")
         return None
     
-    if not model_path or not os.path.exists(index):
-        gr.Warning("Không tìm thấy chỉ mục")
+    if not index or not os.path.exists(index) or os.path.isdir(index) or not index.endswith(".index"):
+        gr.Warning("Chỉ mục không hợp lệ!")
         return None
 
     if not input or not os.path.exists(input): 
@@ -1337,9 +1339,7 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
 
 
 
-
-
-with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
+with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
     gr.HTML("<h1> 🎵 Giao diện chuyển đổi và huấn luyện mô hình giọng nói được tạo bởi Anh 🎵 <h1>")
     with gr.Row(): 
         gr.Markdown(f"Bấm vào đây nếu bạn muốn bị Rick Roll:) ---> [RickRoll]({codecs.decode('uggcf://jjj.lbhghor.pbz/jngpu?i=qDj4j9JtKpD', 'rot13')})")
@@ -1565,7 +1565,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 model_pth.change(fn=get_index, inputs=[model_pth], outputs=[model_index])
             with gr.Row():
                 input0.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input0], outputs=[input_audio0])
-                input_audio0.change(fn=lambda audio: [audio if not os.path.isdir(audio) else None], inputs=[input_audio0], outputs=[play_audio])
+                input_audio0.change(fn=lambda audio: audio if not os.path.isdir(audio) else None, inputs=[input_audio0], outputs=[play_audio])
             with gr.Row():
                 embedders.change(fn=lambda embedders: visible_1(True if embedders == "custom" else False), inputs=[embedders], outputs=[custom_embedders])
                 refesh0.click(fn=lambda: refesh_audio, inputs=[], outputs=[input_audio0])
@@ -1854,7 +1854,7 @@ with gr.Blocks(title = "📱 RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
                 bitcrush_checkbox.change(fn=visible_1, inputs=[bitcrush_checkbox], outputs=[bitcrush_bit_depth])
             with gr.Row():
                 upload_audio.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[upload_audio], outputs=[audio_in_path])
-                audio_in_path.change(fn=lambda audio: [audio if not os.path.isdir(audio) else None], inputs=[audio_in_path], outputs=[audio_play_input])
+                audio_in_path.change(fn=lambda audio: audio if not os.path.isdir(audio) else None, inputs=[audio_in_path], outputs=[audio_play_input])
                 audio_effects_refesh.click(fn=lambda: refesh_audio, inputs=[], outputs=[audio_in_path])
             with gr.Row():
                 more_options.change(fn=lambda: [False, False, False, False], inputs=[], outputs=[fade, bass_or_treble, limiter, resample_checkbox])

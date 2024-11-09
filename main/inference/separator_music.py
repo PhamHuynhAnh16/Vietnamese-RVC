@@ -220,7 +220,7 @@ def separator_music_demucs(input, output, format, shifts, overlap, segments_size
     for f in demucs_output:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {f}")
+        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
 
         if '_(Drums)_' in f: drums = path
         elif '_(Bass)_' in f: bass = path
@@ -250,15 +250,15 @@ def separator_backing(input, output, format, segments_size, overlap, denoise, ka
     model_2 = kara_models.get(kara_model)
 
     logger.info(f"Đang xử lý tách giọng bè...")
-    backing_output = separator_main(audio_file=input, model_filename=model_2, output_format=format, output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=batch_size, mdx_hop_length=hop_length, mdx_enable_denoise=denoise)
+    backing_outputs = separator_main(audio_file=input, model_filename=model_2, output_format=format, output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=batch_size, mdx_hop_length=hop_length, mdx_enable_denoise=denoise)
 
     main_output = os.path.join(output, f"Main_Vocals.{format}")
     backing_output = os.path.join(output, f"Backing_Vocals.{format}")
 
-    for f in backing_output:
+    for f in backing_outputs:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {f}")
+        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
 
         if '_(Instrumental)_' in f: os.rename(path, backing_output)
         elif '_(Vocals)_' in f: os.rename(path, main_output)
@@ -289,7 +289,7 @@ def separator_music_mdx(input, output, format, segments_size, overlap, denoise, 
     for f in output_music:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {f}")
+        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
 
         if '_(Instrumental)_' in f: os.rename(path, instruments_output)
         elif '_(Vocals)_' in f: os.rename(path, original_output)
@@ -359,7 +359,7 @@ def separator_reverb(output, format, segments_size, overlap, denoise, original, 
         for f in output_dereveb:
             path = os.path.join(output, f)
 
-            if not os.path.exists(path): logger.error(f"Không tìm thấy: {f}")
+            if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
 
             if '_(Reverb)_' in f: os.rename(path, reverb_path)
             elif '_(No Reverb)_' in f: os.rename(path, no_reverb_path)

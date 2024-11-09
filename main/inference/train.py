@@ -499,8 +499,8 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
     def get_sid(self, sid):
         try:
             sid = torch.LongTensor([int(sid)])
-        except ValueError as error:
-            logger.error(f"Lỗi chuyển đổi ID người nói '{sid}' thành số nguyên. Ngoại lệ: {error}")
+        except ValueError as e:
+            logger.error(f"Lỗi chuyển đổi ID người nói '{sid}' thành số nguyên. Ngoại lệ: {e}")
             sid = torch.LongTensor([0])
 
         return sid
@@ -563,8 +563,8 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         if os.path.exists(spec_filename):
             try:
                 spec = torch.load(spec_filename)
-            except Exception as error:
-                logger.error(f"Đã xảy ra lỗi khi nhận thông số kỹ thuật từ {spec_filename}: {error}")
+            except Exception as e:
+                logger.error(f"Đã xảy ra lỗi khi nhận thông số kỹ thuật từ {spec_filename}: {e}")
                 spec = spectrogram_torch(
                     audio_norm,
                     self.filter_length,
@@ -691,8 +691,8 @@ class TextAudioLoader(torch.utils.data.Dataset):
     def get_sid(self, sid):
         try:
             sid = torch.LongTensor([int(sid)])
-        except ValueError as error:
-            logger.error(f"Lỗi chuyển đổi ID người nói '{sid}' thành số nguyên. Ngoại lệ: {error}")
+        except ValueError as e:
+            logger.error(f"Lỗi chuyển đổi ID người nói '{sid}' thành số nguyên. Ngoại lệ: {e}")
             sid = torch.LongTensor([0])
 
         return sid
@@ -739,8 +739,8 @@ class TextAudioLoader(torch.utils.data.Dataset):
         if os.path.exists(spec_filename):
             try:
                 spec = torch.load(spec_filename)
-            except Exception as error:
-                logger.error(f"Đã xảy ra lỗi khi nhận thông số kỹ thuật từ {spec_filename}: {error}")
+            except Exception as e:
+                logger.error(f"Đã xảy ra lỗi khi nhận thông số kỹ thuật từ {spec_filename}: {e}")
                 spec = spectrogram_torch(
                     audio_norm,
                     self.filter_length,
@@ -1160,8 +1160,8 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, versio
         os.remove(model_dir)
         os.rename(pth_file_old_version_path, model_dir)
 
-    except Exception as error:
-        logger.error(f"Đã xảy ra lỗi khi trích xuất mô hình: {error}")
+    except Exception as e:
+        logger.error(f"Đã xảy ra lỗi khi trích xuất mô hình: {e}")
 
 
 def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device):

@@ -271,8 +271,8 @@ class Demucs(nn.Module):
 
         channels = in_channels
 
-        if lstm_layers: self.lstm = BLSTM(channels, lstm_layers)
-        else: self.lstm = None
+        self.lstm = BLSTM(channels, lstm_layers) if lstm_layers else None
+
 
         if rescale: rescale_module(self, reference=rescale)
 

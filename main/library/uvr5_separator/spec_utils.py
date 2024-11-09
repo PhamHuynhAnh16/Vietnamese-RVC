@@ -94,18 +94,18 @@ def write_array_to_mem(audio_data, subtype):
         sf.write(audio_buffer, audio_data, 44100, subtype=subtype, format="WAV")
 
         audio_buffer.seek(0)
+        
         return audio_buffer
     else: return audio_data
 
 def spectrogram_to_image(spec, mode="magnitude"):
     if mode == "magnitude":
-        if np.iscomplexobj(spec): y = np.abs(spec)
-        else: y = spec
+        y = np.abs(spec) if np.iscomplexobj(spec) else spec
 
         y = np.log10(y**2 + 1e-8)
     elif mode == "phase":
-        if np.iscomplexobj(spec): y = np.angle(spec)
-        else: y = spec
+        y = np.angle(spec) if np.iscomplexobj(spec) else spec
+
 
     y -= y.min()
     y *= 255 / y.max()

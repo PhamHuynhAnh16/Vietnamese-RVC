@@ -41,6 +41,7 @@ from main.library.predictors.FCPE import FCPE
 from main.library.predictors.RMVPE import RMVPE
 from main.library.algorithm.synthesizers import Synthesizer
 
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -51,6 +52,7 @@ logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("fairseq").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 logging.getLogger("faiss.loader").setLevel(logging.ERROR)
+
 
 FILTER_ORDER = 5
 CUTOFF_FREQUENCY = 48  
@@ -63,6 +65,7 @@ log_file = os.path.join("assets", "logs", "convert.log")
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
+
 
 if logger.hasHandlers(): logger.handlers.clear()
 else:
@@ -81,6 +84,7 @@ else:
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logger.setLevel(logging.DEBUG)
+
 
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
@@ -109,6 +113,7 @@ def parse_arguments() -> tuple:
 
     args = parser.parse_args()
     return args
+
 
 def main():
     args = parse_arguments()
@@ -158,10 +163,12 @@ def main():
     logger.debug(f"Cắt nhỏ âm thanh: {split_audio}")
     if f0_autotune: logger.debug(f"Mức độ điều chỉnh trích xuất: {f0_autotune_strength}")
 
+
     check_rmvpe_fcpe(f0_method)
     check_hubert(embedder_model)
 
     run_convert_script(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, input_path=input_path, output_path=output_path, pth_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, embedder_model=embedder_model, upscale_audio=upscale_audio, resample_sr=resample_sr, batch_process=batch_process, batch_size=batch_size, split_audio=split_audio)
+
 
 def check_rmvpe_fcpe(method):
     def download_rmvpe():
@@ -180,11 +187,13 @@ def check_rmvpe_fcpe(method):
             if method == "rmvpe": download_rmvpe()
             elif method == "fcpe": download_fcpe()
 
+
 def check_hubert(hubert):
     if hubert == "contentvec_base" or hubert == "hubert_base" or hubert == "japanese_hubert_base" or hubert == "korean_hubert_base" or hubert == "chinese_hubert_base":
         model_path = os.path.join(now_dir, "assets", "model", "embedders", hubert + '.pt')
 
         if not os.path.exists(model_path): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + f"{hubert}.pt", "-P", os.path.join("assets", "model", "embedders")], check=True)
+
 
 def load_audio_infer(file, sample_rate):
     try:
@@ -196,10 +205,11 @@ def load_audio_infer(file, sample_rate):
         if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
         if sr != sample_rate: audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
 
-    except Exception as error:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {error}") 
+    except Exception as e:
+        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {e}") 
      
     return audio.flatten()
+
 
 def process_audio(file_path, output_path):
     try:
@@ -226,8 +236,9 @@ def process_audio(file_path, output_path):
 
         logger.info(f"Tổng số phần đã cắt: {len(cut_files)}")
         return cut_files, time_stamps
-    except Exception as error:
-        raise RuntimeError(f"Đã xảy ra lỗi khi cắt âm thanh: {error}")
+    except Exception as e:
+        raise RuntimeError(f"Đã xảy ra lỗi khi cắt âm thanh: {e}")
+
 
 def merge_audio(files_list, time_stamps, original_file_path, output_path, format):
     try:
@@ -253,8 +264,9 @@ def merge_audio(files_list, time_stamps, original_file_path, output_path, format
 
         combined.export(output_path, format=format)
         return output_path
-    except Exception as error:
-        raise RuntimeError(f"Đã xảy ra lỗi khi ghép âm thanh: {error}")
+    except Exception as e:
+        raise RuntimeError(f"Đã xảy ra lỗi khi ghép âm thanh: {e}")
+
 
 def run_batch_convert(params):
     cvt = VoiceConverter()
@@ -292,16 +304,30 @@ def run_batch_convert(params):
         logger.warning(f"Không tìm thấy tệp đã xử lý: {segment_output_path}")
         sys.exit(1)
  
+
 def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, upscale_audio, embedder_model, resample_sr, batch_process, batch_size, split_audio):
     cvt = VoiceConverter()
     start_time = time.time()
 
+    if not pth_path or not os.path.exists(pth_path) or os.path.isdir(pth_path) or not pth_path.endswith(".pth"):
+        logger.warning("Mô hình không hợp lệ!")
+        sys.exit(1)
+    
+    if not index_path or not os.path.exists(index_path) or os.path.isdir(index_path) or not index_path.endswith(".index"):
+        logger.warning("Chỉ mục không hợp lệ!")
+        sys.exit(1)
+
     output_dir = os.path.dirname(output_path)
     output_dir = output_path if not output_dir else output_dir
+
+    if output_dir is None: output_dir = "audios"
 
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
     mp.set_start_method("spawn", force=True)
+
+    audio_temp = os.path.join("audios_temp")
+    if not os.path.exists(audio_temp) and split_audio: os.makedirs(audio_temp, exist_ok=True)
     
     if os.path.isdir(input_path):
         try:
@@ -320,9 +346,6 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
                 if split_audio:
                     try:
-                        audio_temp = os.path.join("audios_temp")
-                        if not os.path.exists(audio_temp): os.makedirs(audio_temp, exist_ok=True)
-                        
                         cut_files, time_stamps = process_audio(audio_path, audio_temp)
                         processed_segments = []
 
@@ -352,6 +375,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                             }
                             for path in cut_files
                         ]
+
 
                         if batch_process:
                             num_threads = min(batch_size, len(cut_files))
@@ -388,11 +412,12 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
     else:
         logger.info(f"Chuyển đổi âm thanh '{input_path}'...")
 
+        if os.path.exists(input_path):
+            logger.warning("Không tìm thấy tệp âm thanh!")
+            sys.exit(1)
+
         if split_audio:
-            try:
-                audio_temp = os.path.join("audios_temp")
-                if not os.path.exists(audio_temp): os.makedirs(audio_temp, exist_ok=True)
-                
+            try:              
                 cut_files, time_stamps = process_audio(input_path, audio_temp)
                 processed_segments = []
 
@@ -452,6 +477,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
         elapsed_time = time.time() - start_time
         logger.info(f"Tệp {input_path} được chuyển đổi thành công sau {elapsed_time:.2f} giây. {output_path.replace('.wav', f'.{export_format}')}")
 
+
 def change_rms(source_audio: np.ndarray, source_rate: int, target_audio: np.ndarray, target_rate: int, rate: float) -> np.ndarray:
     rms1 = librosa.feature.rms(
         y=source_audio,
@@ -482,10 +508,12 @@ def change_rms(source_audio: np.ndarray, source_rate: int, target_audio: np.ndar
     adjusted_audio = (target_audio * (torch.pow(rms1, 1 - rate) * torch.pow(rms2, rate - 1)).numpy())
     return adjusted_audio
 
+
 class Autotune:
     def __init__(self, ref_freqs):
         self.ref_freqs = ref_freqs
         self.note_dict = self.ref_freqs
+
 
     def autotune_f0(self, f0, f0_autotune_strength):
         autotuned_f0 = np.zeros_like(f0)
@@ -495,6 +523,7 @@ class Autotune:
             autotuned_f0[i] = freq + (closest_note - freq) * f0_autotune_strength
 
         return autotuned_f0
+
 
 class VC:
     def __init__(self, tgt_sr, config):
@@ -576,6 +605,7 @@ class VC:
         self.autotune = Autotune(self.ref_freqs)
         self.note_dict = self.autotune.note_dict
 
+
     def get_f0_crepe(self, x, f0_min, f0_max, p_len, hop_length, model="full"):
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
@@ -601,6 +631,7 @@ class VC:
         f0 = np.nan_to_num(target)
         return f0
 
+
     def get_f0_hybrid(self, methods_str, x, f0_min, f0_max, p_len, hop_length, filter_radius):
         methods_str = re.search("hybrid\[(.+)\]", methods_str)
         if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
@@ -610,6 +641,7 @@ class VC:
 
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
+
 
         for method in methods:
             f0 = None
@@ -653,8 +685,8 @@ class VC:
             resampled_stack.append(resampled_f0)
 
         f0_median_hybrid = resampled_stack[0] if len(resampled_stack) == 1 else np.nanmedian(np.vstack(resampled_stack), axis=0)
-
         return f0_median_hybrid
+
 
     def get_f0(self, input_audio_path, x, p_len, pitch, f0_method, filter_radius, hop_length, f0_autotune, f0_autotune_strength):
         global input_audio_path2wav
@@ -704,8 +736,8 @@ class VC:
         f0_mel[f0_mel > 255] = 255
 
         f0_coarse = np.rint(f0_mel).astype(np.int32)
-
         return f0_coarse, f0bak
+
 
     def voice_conversion(self, model, net_g, sid, audio0, pitch, pitchf, index, big_npy, index_rate, version, protect):
         pitch_guidance = pitch != None and pitchf != None
@@ -779,13 +811,14 @@ class VC:
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         return audio1
     
+
     def pipeline(self, model, net_g, sid, audio, input_audio_path, pitch, f0_method, file_index, index_rate, pitch_guidance, filter_radius, tgt_sr, resample_sr, volume_envelope, version, protect, hop_length, f0_autotune, f0_autotune_strength):
         if file_index != "" and os.path.exists(file_index) and index_rate != 0:
             try:
                 index = faiss.read_index(file_index)
                 big_npy = index.reconstruct_n(0, index.ntotal)
-            except Exception as error:
-                logger.error(f"Đã xảy ra lỗi khi đọc chỉ mục FAISS: {error}")
+            except Exception as e:
+                logger.error(f"Đã xảy ra lỗi khi đọc chỉ mục FAISS: {e}")
                 index = big_npy = None
         else: index = big_npy = None
 
@@ -850,6 +883,7 @@ class VC:
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         return audio_opt
 
+
 class VoiceConverter:
     def __init__(self):
         self.config = Config()  
@@ -863,6 +897,7 @@ class VoiceConverter:
         self.use_f0 = None  
         self.loaded_model = None
     
+
     def load_hubert(self, embedder_model):
         try:
             models, _, _ = checkpoint_utils.load_model_ensemble_and_task([os.path.join(now_dir, "assets", "model", "embedders", embedder_model + '.pt')], suffix="")
@@ -873,6 +908,7 @@ class VoiceConverter:
         self.hubert_model = (self.hubert_model.half() if self.config.is_half else self.hubert_model.float())
         self.hubert_model.eval()
 
+
     @staticmethod
     def remove_audio_noise(input_audio_path, reduction_strength=0.7):
         try:
@@ -880,9 +916,10 @@ class VoiceConverter:
             reduced_noise = nr.reduce_noise(y=data, sr=rate, prop_decrease=reduction_strength)
 
             return reduced_noise
-        except Exception as error:
-            logger.error(f"Đã xảy ra lỗi khi loại bỏ tiếng ồn: {error}")
+        except Exception as e:
+            logger.error(f"Đã xảy ra lỗi khi loại bỏ tiếng ồn: {e}")
             return None
+
 
     @staticmethod
     def convert_audio_format(input_path, output_path, output_format):
@@ -909,8 +946,9 @@ class VoiceConverter:
                 sf.write(output_path, audio, target_sr, format=output_format)
 
             return output_path
-        except Exception as error:
-            raise RuntimeError(f"Đã xảy ra lỗi khi chuyển đổi định dạng âm thanh: {error}")
+        except Exception as e:
+            raise RuntimeError(f"Đã xảy ra lỗi khi chuyển đổi định dạng âm thanh: {e}")
+
 
     def convert_audio(self, audio_input_path, audio_output_path, model_path, index_path, embedder_model, pitch, f0_method, index_rate, volume_envelope, protect, hop_length, f0_autotune, f0_autotune_strength, filter_radius, clean_audio, clean_strength, export_format, upscale_audio, resample_sr = 0, sid = 0):
         self.get_vc(model_path, sid)
@@ -943,9 +981,10 @@ class VoiceConverter:
 
             output_path_format = audio_output_path.replace(".wav", f".{export_format}")
             audio_output_path = self.convert_audio_format(audio_output_path, output_path_format, export_format)
-        except Exception as error:
-            logger.error(f"Đã xảy ra lỗi trong quá trình chuyển đổi âm thanh: {error}")
+        except Exception as e:
+            logger.error(f"Đã xảy ra lỗi trong quá trình chuyển đổi âm thanh: {e}")
             logger.error(traceback.format_exc())
+
 
     def get_vc(self, weight_root, sid):
         if sid == "" or sid == []:
@@ -961,6 +1000,7 @@ class VoiceConverter:
 
           self.loaded_model = weight_root
 
+
     def cleanup_model(self):
         if self.hubert_model is not None:
             del self.net_g, self.n_spk, self.vc, self.hubert_model, self.tgt_sr
@@ -974,8 +1014,10 @@ class VoiceConverter:
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         self.cpt = None
 
+
     def load_model(self, weight_root):
         self.cpt = (torch.load(weight_root, map_location="cpu") if os.path.isfile(weight_root) else None)
+
 
     def setup_network(self):
         if self.cpt is not None:
@@ -993,6 +1035,7 @@ class VoiceConverter:
             self.net_g.load_state_dict(self.cpt["weight"], strict=False)
             self.net_g.eval().to(self.config.device)
             self.net_g = (self.net_g.half() if self.config.is_half else self.net_g.float())
+
 
     def setup_vc_instance(self):
         if self.cpt is not None:

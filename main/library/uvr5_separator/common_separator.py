@@ -156,8 +156,8 @@ class CommonSeparator:
                 error_msg = f"Tệp âm thanh {audio_path} trống hoặc không hợp lệ"
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
-            else:
-                self.logger.debug("Tệp âm thanh hợp lệ và chứa dữ liệu.")
+            else: self.logger.debug("Tệp âm thanh hợp lệ và chứa dữ liệu.")
+
 
         if mix.ndim == 1:
             self.logger.debug("Hỗn hợp là đơn sắc. Chuyển đổi sang âm thanh nổi.")

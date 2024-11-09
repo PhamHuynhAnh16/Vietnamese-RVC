@@ -63,8 +63,8 @@ def load_audio(file, sample_rate):
 
         if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
         if sr != sample_rate: audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
-    except Exception as error:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {error}")
+    except Exception as e:
+        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {e}")
 
     return audio.flatten()
 
@@ -249,8 +249,8 @@ class PreProcess:
                             break
                         
             else: self.process_audio_segment(audio, sid, idx0, idx1)
-        except Exception as error:
-            raise RuntimeError(f"Đã xảy ra lỗi khi xử lý âm thanh: {error}")
+        except Exception as e:
+            raise RuntimeError(f"Đã xảy ra lỗi khi xử lý âm thanh: {e}")
 
 def process_file(args):
     pp, file, cut_preprocess, process_effects, clean_dataset, clean_strength = (args)

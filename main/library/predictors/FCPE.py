@@ -22,8 +22,8 @@ os.environ["LRU_CACHE_CAPACITY"] = "3"
 def load_wav_to_torch(full_path, target_sr=None, return_empty_on_exception=False):
     try:
         data, sample_rate = sf.read(full_path, always_2d=True)
-    except Exception as error:
-        print(f"Đã xảy ra lỗi khi tải {full_path}: {error}")
+    except Exception as e:
+        print(f"Đã xảy ra lỗi khi tải {full_path}: {e}")
         if return_empty_on_exception: return [], sample_rate or target_sr or 48000
         else: raise
 
@@ -508,8 +508,8 @@ class Wav2Mel:
 
     def extract_mel(self, audio, sample_rate, keyshift=0, train=False):
         audio = audio.to(self.dtype).to(self.device)
-        if sample_rate == self.sample_rate:
-            audio_res = audio
+
+        if sample_rate == self.sample_rate: audio_res = audio
         else:
             key_str = str(sample_rate)
 

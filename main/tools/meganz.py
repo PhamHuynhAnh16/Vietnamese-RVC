@@ -54,6 +54,7 @@ def _api_request(data):
 
     json_resp = json.loads(requests.post(f'https://g.api.mega.co.nz/cs', params=params, data=json.dumps(data), timeout=160).text)
 
+
     try:
         if isinstance(json_resp, list): int_resp = json_resp[0] if isinstance(json_resp[0], int) else None
         elif isinstance(json_resp, int): int_resp = json_resp
@@ -105,8 +106,7 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
     attribs = base64_url_decode(file_data['at'])
     attribs = decrypt_attr(attribs, k)
 
-    if dest_filename is not None: file_name = dest_filename
-    else: file_name = attribs['n']
+    file_name = dest_filename if dest_filename is not None else attribs['n']
 
     input_file = requests.get(file_data['g'], stream=True).raw
 
