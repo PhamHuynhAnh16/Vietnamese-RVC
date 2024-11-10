@@ -2377,6 +2377,13 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     outputs=[],
                     api_name="upload_hubert"
                 )
+
+        with gr.TabItem("Tùy Chỉnh"):
+            gr.Markdown("## Tùy Chỉnh Thêm")
+            with gr.Row():
+                gr.Markdown("Tùy chỉnh thêm một số tính năng của dự án")
+            with gr.Row():
+                toggle_button = gr.Button("Đổi Chế Độ").click(None, js="""() => {document.body.classList.toggle('dark')}""")
                 
         with gr.TabItem("Nguồn Gốc"):
             gr.Markdown("## Nguồn Gốc Và Tác Giả Của Dự án")
@@ -2397,4 +2404,4 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
 
                 """)
 
-    app.queue().launch(favicon_path=os.path.join("assets", "miku.png"), server_port=7860, show_error=True, inbrowser=True, share=True)
+    app.queue().launch(favicon_path=os.path.join("assets", "miku.png"), server_name="localhost", server_port=7860, show_error=True, inbrowser=True, share=True)

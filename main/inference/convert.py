@@ -412,7 +412,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
     else:
         logger.info(f"Chuyển đổi âm thanh '{input_path}'...")
 
-        if os.path.exists(input_path):
+        if not os.path.exists(input_path):
             logger.warning("Không tìm thấy tệp âm thanh!")
             sys.exit(1)
 
