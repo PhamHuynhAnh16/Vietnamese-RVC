@@ -213,7 +213,7 @@
     "tensorboard_port": 6870,
 
     "num_of_restart": 5,
-    "server_name": "localhost",
+    "server_name": "0.0.0.0",
 
     "app_show_error": true,
     "share": true
