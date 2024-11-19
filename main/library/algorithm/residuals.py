@@ -129,7 +129,7 @@ class ResidualCouplingBlock(torch.nn.Module):
 
 class ResidualCouplingLayer(torch.nn.Module):
     def __init__(self, channels, hidden_channels, kernel_size, dilation_rate, n_layers, p_dropout=0, gin_channels=0, mean_only=False):
-        assert channels % 2 == 0, "kênh phải chia cho 2"
+        assert channels % 2 == 0, "Channels/2"
         super().__init__()
         self.channels = channels
         self.hidden_channels = hidden_channels

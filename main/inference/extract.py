@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 logger.propagate = False
 
 config = Config()
+translations = config.translations
 
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
@@ -67,7 +68,7 @@ def load_audio(file, sample_rate):
         if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
         if sr != sample_rate: audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {e}")
+        raise RuntimeError(f"{translations['errors_loading_audio']}: {e}")
 
     return audio.flatten()
 
@@ -146,7 +147,7 @@ def setup_paths(exp_dir, version = None):
 
 def read_wave(wav_path, normalize = False):
     wav, sr = sf.read(wav_path)
-    assert sr == 16000, "Tỉ lệ mẫu phải là 16000"
+    assert sr == 16000, translations["sr_not_16000"]
 
     feats = torch.from_numpy(wav).float()
 
@@ -165,9 +166,9 @@ def get_device(gpu_index):
     try:
         index = int(gpu_index)
         if index < torch.cuda.device_count(): return f"cuda:{index}"
-        else: logger.warning("Chỉ số GPU không hợp lệ. Chuyển sang CPU.")
+        else: logger.warning(translations["gpu_not_valid"])
     except ValueError:
-        logger.warning("Định dạng chỉ mục GPU không hợp lệ. Chuyển sang CPU.")
+        logger.warning(translations["gpu_not_valid"])
 
     return "cpu"
 
@@ -190,8 +191,7 @@ class FeatureInput:
         elif f0_method == "fcpe": return self.get_fcpe(np_arr, int(hop_length))
         elif f0_method == "rmvpe": return self.get_rmvpe(np_arr)
         elif f0_method == "harvest": return self.get_harvest(np_arr)
-        else: raise ValueError(f"Phương pháp trích xuất F0 không xác định: {f0_method}")
-
+        else: raise ValueError(translations["method_not_valid"])
 
     def get_pm(self, x):
         time_step = 160 / 16000 * 1000
@@ -257,7 +257,7 @@ class FeatureInput:
             coarse_pit = self.coarse_f0(feature_pit)
             np.save(opt_path1, coarse_pit, allow_pickle=False)
         except Exception as e:
-            raise RuntimeError(f"Đã xảy ra lỗi khi giải nén tập tin {inp_path}: {e}")
+            raise RuntimeError(f"{translations['extract_file_error']} {inp_path}: {e}")
 
 
     def process_files(self, files, f0_method, hop_length, pbar):
@@ -284,7 +284,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
         if "spec" not in name
     ]
 
-    logger.info(f"Bắt đầu trích xuất cao độ với {num_processes} lõi với phương pháp trích xuất {f0_method}...")
+    logger.info(translations["extract_f0_method"].format(num_processes=num_processes, f0_method=f0_method))
     start_time = time.time()
 
     if gpus != "-":
@@ -293,7 +293,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
 
         process_partials = []
 
-        pbar = tqdm.tqdm(total=len(paths), desc="Trích Xuất Cao Độ", unit="iB", unit_scale=True)
+        pbar = tqdm.tqdm(total=len(paths), desc=translations["extract_f0"], unit="iB", unit_scale=True)
 
         for idx, gpu in enumerate(gpus):
             device = get_device(gpu)
@@ -313,7 +313,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
     else:
         feature_input = FeatureInput(device="cpu")
         
-        with tqdm.tqdm(total=len(paths), desc="Trích Xuất Cao Độ", unit="iB", unit_scale=True) as pbar:
+        with tqdm.tqdm(total=len(paths), desc=translations["extract_f0"], unit="iB", unit_scale=True) as pbar:
             with Pool(processes=num_processes) as pool:
                 process_file_partial = partial(feature_input.process_file, f0_method=f0_method, hop_length=hop_length)
 
@@ -322,7 +322,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
 
 
     elapsed_time = time.time() - start_time
-    logger.info(f"Quá trình trích xuất cao độ đã hoàn tất vào {elapsed_time:.2f} giây.")
+    logger.info(translations["extract_f0_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
 
 def process_file_embedding(file, wav_path, out_path, model, device, version, saved_cfg):
     wav_file_path = os.path.join(wav_path, file)
@@ -350,18 +350,18 @@ def process_file_embedding(file, wav_path, out_path, model, device, version, sav
     feats = feats.squeeze(0).float().cpu().numpy()
 
     if not np.isnan(feats).any(): np.save(out_file_path, feats, allow_pickle=False)
-    else: logger.warning(f"{file} chứa giá trị NaN và sẽ bị bỏ qua.")
+    else: logger.warning(f"{file} {translations['NaN']}")
 
 def run_embedding_extraction(exp_dir, version, gpus, embedder_model):
     wav_path, out_path = setup_paths(exp_dir, version)
 
-    logger.info("Đang bắt đầu nhúng trích xuất...")
+    logger.info(translations["start_extract_hubert"])
     start_time = time.time()
 
     try:
         models, saved_cfg, _ = checkpoint_utils.load_model_ensemble_and_task([os.path.join(now_dir, "assets", "model", "embedders", embedder_model + '.pt')], suffix="")
     except Exception as e:
-        raise ImportError(f"Thất bại khi tải mô hình: {e}")
+        raise ImportError(translations["read_model_error"].format(e=e))
 
     model = models[0]
     devices = [get_device(gpu) for gpu in (gpus.split("-") if gpus != "-" else ["cpu"])]
@@ -369,10 +369,10 @@ def run_embedding_extraction(exp_dir, version, gpus, embedder_model):
     paths = sorted([file for file in os.listdir(wav_path) if file.endswith(".wav")])
 
     if not paths:
-        logger.warning("Không tìm thấy tập tin âm thanh. Hãy chắc chắn rằng bạn đã cung cấp âm thanh chính xác.")
+        logger.warning(translations["not_found_audio_file"])
         sys.exit(1)
 
-    pbar = tqdm.tqdm(total=len(paths) * len(devices), desc="Trích xuất nhúng", unit="iB", unit_scale=True)
+    pbar = tqdm.tqdm(total=len(paths) * len(devices), desc=translations["extract_hubert"], unit="iB", unit_scale=True)
 
     tasks = [(file, wav_path, out_path, model, device, version, saved_cfg) for file in paths for device in devices]
 
@@ -380,14 +380,14 @@ def run_embedding_extraction(exp_dir, version, gpus, embedder_model):
         try:
             process_file_embedding(*task)
         except Exception as e:
-            raise RuntimeError(f"Đã xảy ra lỗi khi xử lý {task[0]}: {e}")
+            raise RuntimeError(f"{translations['process_error']} {task[0]}: {e}")
 
         pbar.update(1)
 
     pbar.close()
 
     elapsed_time = time.time() - start_time
-    logger.info(f"Quá trình trích xuất nhúng đã hoàn tất trong {elapsed_time:.2f} giây.")
+    logger.info(translations["extract_hubert_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -427,16 +427,16 @@ if __name__ == "__main__":
         logger.addHandler(file_handler)
         logger.setLevel(logging.DEBUG)
 
-    logger.debug(f"Tên mô hình: {args.model_name}")
-    logger.debug(f"Đường dẫn trích xuất của mô hình: {exp_dir}")
-    logger.debug(f"Phương pháp trích xuất {f0_method}")
-    logger.debug(f"Tốc độ lấy mẫu của mô hình: {sample_rate}")
-    logger.debug(f"Số lượng lõi trích xuất: {num_processes}")
+    logger.debug(f"{translations['modelname']}: {args.model_name}")
+    logger.debug(f"{translations['export_process']}: {exp_dir}")
+    logger.debug(f"{translations['f0_method']}: {f0_method}")
+    logger.debug(f"{translations['pretrain_sr']}: {sample_rate}")
+    logger.debug(f"{translations['cpu_core']}: {num_processes}")
     logger.debug(f"Gpu: {gpus}")
-    if f0_method == "crepe" or f0_method == "crepe-tiny": logger.debug(f"Hop length: {hop_length}")
-    logger.debug(f"Phiên bản của mô hình: {version}")
-    logger.debug(f"Trích xuất cao độ: {pitch_guidance}")
-    logger.debug(f"Mô hình học cách nói: {embedder_model}")
+    if f0_method == "crepe" or f0_method == "crepe-tiny" or f0_method == "fcpe": logger.debug(f"Hop length: {hop_length}")
+    logger.debug(f"{translations['training_version']}: {version}")
+    logger.debug(f"{translations['extract_f0']}: {pitch_guidance}")
+    logger.debug(f"{translations['hubert_model']}: {embedder_model}")
 
     try:
         run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus)
@@ -445,6 +445,6 @@ if __name__ == "__main__":
         generate_config(version, sample_rate, exp_dir)
         generate_filelist(pitch_guidance, exp_dir, version, sample_rate)
     except Exception as e:
-        logger.error(f"Đã xảy ra lỗi khi trích xuất dữ liệu: {e}")
+        logger.error(f"{translations['extract_error']}: {e}")
 
-    logger.info(f"Đã trích xuất thành công mô hình {args.model_name}.")
+    logger.info(f"{translations['extract_success']} {args.model_name}.")

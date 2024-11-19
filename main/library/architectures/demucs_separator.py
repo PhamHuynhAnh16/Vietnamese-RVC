@@ -9,6 +9,10 @@ import typing as tp
 from pathlib import Path
 from hashlib import sha256
 
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
 from main.library.uvr5_separator import spec_utils
 from main.library.uvr5_separator.demucs.hdemucs import HDemucs
 from main.library.uvr5_separator.demucs.states import load_model
@@ -16,6 +20,8 @@ from main.library.uvr5_separator.demucs.apply import BagOfModels, Model
 from main.library.uvr5_separator.common_separator import CommonSeparator
 from main.library.uvr5_separator.demucs.apply import apply_model, demucs_segments
 
+
+translations = Config().translations
 
 DEMUCS_4_SOURCE = ["drums", "bass", "other", "vocals"]
 
@@ -68,8 +74,8 @@ class DemucsSeparator(CommonSeparator):
         self.overlap = arch_config.get("overlap", 0.25)
         self.segments_enabled = arch_config.get("segments_enabled", True)
 
-        self.logger.debug(f"Thông số Demucs: Kích thước phân đoạn = {self.segment_size}, Kích hoạt kích thước phân đoạn = {self.segments_enabled}")
-        self.logger.debug(f"Thông số Demucs: Số lượng dự đoán = {self.shifts}, Chồng chéo = {self.overlap}")
+        self.logger.debug(translations["demucs_info"].format(segment_size=self.segment_size, segments_enabled=self.segments_enabled))
+        self.logger.debug(translations["demucs_info_2"].format(shifts=self.shifts, overlap=self.overlap))
 
         self.demucs_source_map = DEMUCS_4_SOURCE_MAPPER
 
@@ -77,10 +83,10 @@ class DemucsSeparator(CommonSeparator):
         self.audio_file_base = None
         self.demucs_model_instance = None
 
-        self.logger.info("Khởi tạo hoàn tất Demucs Separator")
+        self.logger.info(translations["start_demucs"])
 
     def separate(self, audio_file_path):
-        self.logger.debug("Bắt đầu quá trình tách...")
+        self.logger.debug(translations["start_separator"])
         
         source = None
         stem_source = None
@@ -90,12 +96,12 @@ class DemucsSeparator(CommonSeparator):
         self.audio_file_path = audio_file_path
         self.audio_file_base = os.path.splitext(os.path.basename(audio_file_path))[0]
 
-        self.logger.debug("Chuẩn bị hỗn hợp...")
+        self.logger.debug(translations["prepare_mix"])
         mix = self.prepare_mix(self.audio_file_path)
 
-        self.logger.debug(f"Hỗn hợp đã chuẩn bị để khử trộn. Hình dạng: {mix.shape}")
+        self.logger.debug(translations["demix"].format(shape=mix.shape))
 
-        self.logger.debug("Đang tải mô hình để hủy trộn...")
+        self.logger.debug(translations["cancel_mix"])
 
         self.demucs_model_instance = HDemucs(sources=DEMUCS_4_SOURCE)
         self.demucs_model_instance = get_demucs_model(name=os.path.splitext(os.path.basename(self.model_path))[0], repo=Path(os.path.dirname(self.model_path)))
@@ -103,44 +109,44 @@ class DemucsSeparator(CommonSeparator):
         self.demucs_model_instance.to(self.torch_device)
         self.demucs_model_instance.eval()
 
-        self.logger.debug("Mô hình được tải và đặt ở chế độ đánh giá.")
+        self.logger.debug(translations["model_review"])
 
         source = self.demix_demucs(mix)
 
         del self.demucs_model_instance
         self.clear_gpu_cache()
-        self.logger.debug("Đã xóa bộ nhớ đệm mô hình và GPU sau khi hủy trộn.")
+        self.logger.debug(translations["del_gpu_cache_after_demix"])
 
         output_files = []
-        self.logger.debug("Đang xử lý tập tin đầu ra...")
+        self.logger.debug(translations["process_output_file"])
 
         if isinstance(inst_source, np.ndarray):
-            self.logger.debug("Đang xử lý nguồn phiên bản...")
+            self.logger.debug(translations["process_ver"])
             source_reshape = spec_utils.reshape_sources(inst_source[self.demucs_source_map[CommonSeparator.VOCAL_STEM]], source[self.demucs_source_map[CommonSeparator.VOCAL_STEM]])
             inst_source[self.demucs_source_map[CommonSeparator.VOCAL_STEM]] = source_reshape
             source = inst_source
 
         if isinstance(source, np.ndarray):
             source_length = len(source)
-            self.logger.debug(f"Đang xử lý mảng nguồn, độ dài nguồn là {source_length}")
+            self.logger.debug(translations["source_length"].format(source_length=source_length))
 
             match source_length:
                 case 2:
-                    self.logger.debug("Đặt bản đồ nguồn thành 2 phần gốc...")
+                    self.logger.debug(translations["set_map"].format(part="2"))
                     self.demucs_source_map = DEMUCS_2_SOURCE_MAPPER
                 case 6:
-                    self.logger.debug("Đặt bản đồ nguồn thành 6 phần gốc...")
+                    self.logger.debug(translations["set_map"].format(part="6"))
                     self.demucs_source_map = DEMUCS_6_SOURCE_MAPPER
                 case _:
-                    self.logger.debug("Đặt bản đồ nguồn thành 4 phần gốc...")
+                    self.logger.debug(translations["set_map"].format(part="2"))
                     self.demucs_source_map = DEMUCS_4_SOURCE_MAPPER
 
-        self.logger.debug("Xử lý cho tất cả các phần gốc...")
+        self.logger.debug(translations["process_all_part"])
 
         for stem_name, stem_value in self.demucs_source_map.items():
             if self.output_single_stem is not None:
                 if stem_name.lower() != self.output_single_stem.lower():
-                    self.logger.debug(f"Bỏ qua phần viết gốc {stem_name} vì out_single_stem được đặt thành {self.output_single_stem}...")
+                    self.logger.debug(translations["skip_part"].format(stem_name=stem_name, output_single_stem=self.output_single_stem))
                     continue
 
             stem_path = os.path.join(f"{self.audio_file_base}_({stem_name})_{self.model_name}.{self.output_format.lower()}")
@@ -152,7 +158,7 @@ class DemucsSeparator(CommonSeparator):
         return output_files
 
     def demix_demucs(self, mix):
-        self.logger.debug("Đang bắt đầu quá trình trộn trong demix_demucs...")
+        self.logger.debug(translations["starting_demix_demucs"])
 
         processed = {}
         mix = torch.tensor(mix, dtype=torch.float32)
@@ -161,7 +167,7 @@ class DemucsSeparator(CommonSeparator):
         mix_infer = mix
 
         with torch.no_grad():
-            self.logger.debug("Chạy mô hình suy luận...")
+            self.logger.debug(translations["model_infer"])
             sources = apply_model(model=self.demucs_model_instance, mix=mix_infer[None], shifts=self.shifts, split=self.segments_enabled, overlap=self.overlap, static_shifts=1 if self.shifts == 0 else self.shifts, set_progress_bar=None, device=self.torch_device, progress=True)[0]
 
         sources = (sources * ref.std() + ref.mean()).cpu().numpy()
@@ -172,8 +178,8 @@ class DemucsSeparator(CommonSeparator):
         sources = list(processed.values())
         sources = [s[:, :, 0:None] for s in sources]
         sources = np.concatenate(sources, axis=-1)
-
         return sources
+
 
 class ModelOnlyRepo:
     def has_model(self, sig: str) -> bool:
@@ -181,6 +187,7 @@ class ModelOnlyRepo:
 
     def get_model(self, sig: str) -> Model:
         raise NotImplementedError()
+
 
 class RemoteRepo(ModelOnlyRepo):
     def __init__(self, models: tp.Dict[str, str]):
@@ -193,10 +200,11 @@ class RemoteRepo(ModelOnlyRepo):
         try:
             url = self._models[sig]
         except KeyError:
-            raise RuntimeError(f"Không thể tìm thấy mô hình được đào tạo trước có chữ ký {sig}.")
+            raise RuntimeError(translations["not_found_model_signature"].format(sig=sig))
         
         pkg = torch.hub.load_state_dict_from_url(url, map_location="cpu", check_hash=True)
         return load_model(pkg)
+
 
 class LocalRepo(ModelOnlyRepo):
     def __init__(self, root: Path):
@@ -214,9 +222,7 @@ class LocalRepo(ModelOnlyRepo):
                     self._checksums[xp_sig] = checksum
                 else: xp_sig = file.stem
 
-                if xp_sig in self._models:
-                    print("xp là gì? ", xp_sig)
-                    raise RuntimeError(f"Có mô hình được đào tạo trước trùng lặp cho chữ ký {xp_sig}. " "Xin vui lòng xóa tất cả trừ một.")
+                if xp_sig in self._models: raise RuntimeError(translations["del_all_but_one"].format(xp_sig=xp_sig))
                 
                 self._models[xp_sig] = file
 
@@ -227,11 +233,12 @@ class LocalRepo(ModelOnlyRepo):
         try:
             file = self._models[sig]
         except KeyError:
-            raise RuntimeError(f"Không thể tìm thấy mô hình được đào tạo trước có chữ ký {sig}.")
+            raise RuntimeError(translations["not_found_model_signature"].format(sig=sig))
         
         if sig in self._checksums: check_checksum(file, self._checksums[sig])
 
         return load_model(file)
+
 
 class BagOnlyRepo:
     def __init__(self, root: Path, model_repo: ModelOnlyRepo):
@@ -252,7 +259,7 @@ class BagOnlyRepo:
         try:
             yaml_file = self._bags[name]
         except KeyError:
-            raise RuntimeError(f"{name} không phải là một mô hình được đào tạo trước hay một túi mô hình.")
+            raise RuntimeError(translations["name_not_pretrained"].format(name=name))
         
         bag = yaml.safe_load(open(yaml_file))
         signatures = bag["models"]
@@ -262,6 +269,7 @@ class BagOnlyRepo:
         segment = bag.get("segment")
 
         return BagOfModels(models, weights, segment)
+
 
 class AnyModelRepo:
     def __init__(self, model_repo: ModelOnlyRepo, bag_repo: BagOnlyRepo):
@@ -288,7 +296,8 @@ def check_checksum(path: Path, checksum: str):
 
     actual_checksum = sha.hexdigest()[: len(checksum)]
 
-    if actual_checksum != checksum: raise RuntimeError(f"Tổng kiểm tra không hợp lệ cho tệp {path}, " f"dự kiến {checksum} nhưng lại nhận được {actual_checksum}")
+    if actual_checksum != checksum: raise RuntimeError(translations["invalid_checksum"].format(path=path, checksum=checksum, actual_checksum=actual_checksum))
+
 
 def _parse_remote_files(remote_file_list) -> tp.Dict[str, str]:
     root: str = ""
@@ -307,6 +316,7 @@ def _parse_remote_files(remote_file_list) -> tp.Dict[str, str]:
 
     return models
 
+
 def get_demucs_model(name: str, repo: tp.Optional[Path] = None):
     if name == "demucs_unittest": return HDemucs(channels=4, sources=DEMUCS_4_SOURCE)
 
@@ -317,7 +327,7 @@ def get_demucs_model(name: str, repo: tp.Optional[Path] = None):
         model_repo = RemoteRepo(models)
         bag_repo = BagOnlyRepo(REMOTE_ROOT, model_repo)
     else:
-        if not repo.is_dir(): print(f"{repo} phải tồn tại và là một thư mục.")
+        if not repo.is_dir(): print(translations["repo_must_be_folder"].format(repo=repo))
 
         model_repo = LocalRepo(repo)
         bag_repo = BagOnlyRepo(repo, model_repo)

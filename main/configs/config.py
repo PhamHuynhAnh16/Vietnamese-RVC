@@ -30,22 +30,44 @@ class Config:
         self.is_half = self.device != "cpu"
         self.gpu_name = (torch.cuda.get_device_name(int(self.device.split(":")[-1])) if self.device.startswith("cuda") else None)
         self.json_config = self.load_config_json()
+        self.translations = self.multi_language()
         self.gpu_mem = None
         self.x_pad, self.x_query, self.x_center, self.x_max = self.device_config()
+
 
     def load_config_json(self) -> dict:
         configs = {}
         
         for config_file in version_config_paths:
             config_path = os.path.join("main", "configs", config_file)
+
             with open(config_path, "r") as f:
                 configs[config_file] = json.load(f)
 
         return configs
+    
+    def multi_language(self):
+        with open(os.path.join("main", "configs", "config.json"), "r") as f:
+            configs = json.load(f)
 
+        lang = configs["language"]
+        
+        if len([l for l in os.listdir(os.path.join("assets", "languages")) if l.endswith(".json")]) < 1: raise FileNotFoundError("Không tìm thấy bất cứ gói ngôn ngữ nào(No package languages found)")
+        
+        if not lang: lang = "vi-VN"
+        if lang not in configs["support_language"]: raise ValueError("Ngôn ngữ không được hỗ trợ(Language not supported)")
+
+        lang_path = os.path.join("assets", "languages", f"{lang}.json")
+        if not os.path.exists(lang_path): lang_path = os.path.join("assets", "languages", f"vi-VN.json")
+
+        with open(lang_path, encoding="utf-8") as f:
+            translations = json.load(f)
+        
+        print(translations["set_lang"].format(lang=lang))
+        return translations
 
     def set_precision(self, precision):
-        if precision not in ["fp32", "fp16"]: raise ValueError("Loại chính xác không hợp lệ. Phải là 'fp32' hoặc 'fp16'.")
+        if precision not in ["fp32", "fp16"]: raise ValueError("Loại chính xác không hợp lệ. Phải là 'fp32' hoặc 'fp16'(Invalid precision type. Must be 'fp32' or 'fp16').")
 
         fp16_run_value = precision == "fp16"
 
@@ -60,12 +82,10 @@ class Config:
 
                 with open(full_config_path, "w") as f:
                     json.dump(config, f, indent=4)
-
             except FileNotFoundError:
-                print(f"Không tìm thấy tập tin: {full_config_path}")
+                print(self.translations["not_found"].format(name=full_config_path))
 
-        return f"Ghi đè tiền xử lý và config.json để sử dụng {precision}."
-
+        return self.translations["set_precision"].format(precision=precision)
 
     def device_config(self) -> tuple:
         if self.device.startswith("cuda"):

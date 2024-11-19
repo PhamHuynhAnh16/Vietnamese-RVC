@@ -35,6 +35,7 @@ from torch.nn.utils.parametrizations import spectral_norm, weight_norm
 current_dir = os.getcwd()
 sys.path.append(current_dir)
 
+from main.configs.config import Config
 from main.library.algorithm.residuals import LRELU_SLOPE
 from main.library.algorithm.synthesizers import Synthesizer
 from main.library.algorithm.commons import get_padding, slice_segments, clip_grad_value
@@ -45,6 +46,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 logging.getLogger("torch").setLevel(logging.ERROR)
 
 MATPLOTLIB_FLAG = False
+
+translations = Config().translations
 
 class HParams:
     def __init__(self, **kwargs):
@@ -101,6 +104,7 @@ def parse_arguments() -> tuple:
     parser.add_argument("--overtraining_threshold", type=int, default=50)
     parser.add_argument("--sync_graph", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--cache_data_in_gpu", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--model_author", type=str)
 
     args = parser.parse_args()
     return args
@@ -124,6 +128,7 @@ cache_data_in_gpu = args.cache_data_in_gpu
 overtraining_detector = args.overtraining_detector
 overtraining_threshold = args.overtraining_threshold
 sync_graph = args.sync_graph
+model_author = args.model_author
 
 experiment_dir = os.path.join(current_dir, "assets", "logs", model_name)
 config_save_path = os.path.join(experiment_dir, "config.json")
@@ -174,24 +179,25 @@ else:
     logger.addHandler(file_handler)
     logger.setLevel(logging.DEBUG)
 
-logger.debug(f"Tên mô hình: {model_name}")
-logger.debug(f"Lưu mô hình sau: {save_every_epoch} kỷ nguyên")
-logger.debug(f"Tổng số kỷ nguyên huấn luyện: {total_epoch} kỷ nguyên")
-logger.debug(f"Pretrain G: {pretrainG} | Pretrain D: {pretrainD}")
-logger.debug(f"Phiên bản mô hình: {version}")
+logger.debug(f"{translations['modelname']}: {model_name}")
+logger.debug(translations["save_every_epoch"].format(save_every_epoch=save_every_epoch))
+logger.debug(translations["total_e"].format(total_epoch=total_epoch))
+logger.debug(translations["dorg"].format(pretrainG=pretrainG, pretrainD=pretrainD))
+logger.debug(f"{translations['training_version']}: {version}")
 logger.debug(f"Gpu: {gpus}")
-logger.debug(f"Kích thước lô: {batch_size}")
-logger.debug(f"Tốc độ lấy mẫu: {sample_rate}")
-logger.debug(f"Huấn luyện cao độ: {pitch_guidance}")
-logger.debug(f"Chỉ lưu mô hình cuối: {save_only_latest}")
-logger.debug(f"Lưu mọi mô hình: {save_every_weights}")
-logger.debug(f"Lưu lên bộ nhớ Gpu: {cache_data_in_gpu}")
-logger.debug(f"Kiểm tra huấn luyện quá sức: {overtraining_detector}")
-logger.debug(f"Ngưỡng huấn luyện quá sức: {overtraining_threshold}")
-logger.debug(f"Đồng bộ hóa biểu đồ: {sync_graph}")
+logger.debug(f"{translations['batch_size']}: {batch_size}")
+logger.debug(f"{translations['pretrain_sr']}: {sample_rate}")
+logger.debug(f"{translations['training_f0']}: {pitch_guidance}")
+logger.debug(f"{translations['save_only_latest']}: {save_only_latest}")
+logger.debug(f"{translations['save_every_weights']}: {save_every_weights}")
+logger.debug(f"{translations['cache_in_gpu']}: {cache_data_in_gpu}")
+logger.debug(f"{translations['overtraining_detector']}: {overtraining_detector}")
+logger.debug(f"{translations['threshold']}: {overtraining_threshold}")
+logger.debug(f"{translations['sync_graph']}: {sync_graph}")
+if not model_author: logger.debug(translations["model_author"].format(model_author=model_author))
 
 def main():
-    global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch
+    global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch, model_author
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(randint(20000, 55555))
 
@@ -209,7 +215,7 @@ def main():
         children = []
 
         for i in range(n_gpus):
-            subproc = mp.Process(target=run, args=(i, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device))
+            subproc = mp.Process(target=run, args=(i, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, model_author))
             children.append(subproc)
             subproc.start()
 
@@ -246,11 +252,11 @@ def main():
     if not torch.cuda.is_available() and torch.backends.mps.is_available(): n_gpus = 1
 
     if n_gpus < 1:
-        logger.warning("Không phát hiện thấy GPU, hoàn nguyên về CPU (không khuyến nghị)")
+        logger.warning(translations["not_gpu"])
         n_gpus = 1
 
     if sync_graph:
-        logger.debug("Biểu đồ đồng bộ hiện đã được kích hoạt! Khi bật biểu đồ đồng bộ, mô hình sẽ trải qua một giai đoạn huấn luyện duy nhất. Sau khi các biểu đồ được đồng bộ hóa, quá trình huấn luyện sẽ tiếp tục với số kỷ nguyên được chỉ định trước đó.")
+        logger.debug(translations["sync"])
         custom_total_epoch = 1
         custom_save_every_weights = True
 
@@ -280,11 +286,10 @@ def main():
         edit_config(model_config_file)
         edit_config(rvc_config_file)
 
-
         for root, dirs, files in os.walk(experiment_dir, topdown=False):
             for name in files:
                 file_path = os.path.join(root, name)
-                file_name, file_extension = os.path.splitext(name)
+                _, file_extension = os.path.splitext(name)
 
                 if file_extension == ".0": os.remove(file_path)
                 elif ("D" in name or "G" in name) and file_extension == ".pth": os.remove(file_path)
@@ -300,7 +305,7 @@ def main():
 
                     os.rmdir(folder_path)
 
-        logger.info("Đồ thị đã được đồng bộ hóa thành công!")
+        logger.info(translations["sync_success"])
         custom_total_epoch = total_epoch
         custom_save_every_weights = save_every_weights
 
@@ -319,7 +324,6 @@ def plot_spectrogram_to_numpy(spectrogram):
 
     if not MATPLOTLIB_FLAG:
         plt.switch_backend("Agg")
-
         MATPLOTLIB_FLAG = True
 
     fig, ax = plt.subplots(figsize=(10, 2))
@@ -352,7 +356,7 @@ def summarize(writer, global_step, scalars={}, histograms={}, images={}, audios=
 
 
 def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
-    assert os.path.isfile(checkpoint_path), f"Không tìm thấy tệp điểm đã lưu: {checkpoint_path}"
+    assert os.path.isfile(checkpoint_path), translations["not_found_checkpoint"].format(checkpoint_path=checkpoint_path)
 
     checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
     checkpoint_dict = replace_keys_in_dict(replace_keys_in_dict(checkpoint_dict, ".weight_v", ".parametrizations.weight.original1"), ".weight_g", ".parametrizations.weight.original0")
@@ -365,7 +369,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
 
     if optimizer and load_opt == 1: optimizer.load_state_dict(checkpoint_dict.get("optimizer", {}))
 
-    logger.debug(f"Đã tải lại điểm đã lưu '{checkpoint_path}' (kỷ nguyên {checkpoint_dict['iteration']})")
+    logger.debug(translations["save_checkpoint"].format(checkpoint_path=checkpoint_path, checkpoint_dict=checkpoint_dict['iteration']))
 
     return (
         model,
@@ -388,13 +392,12 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
     torch.save(checkpoint_data, checkpoint_path)
 
     old_version_path = checkpoint_path.replace(".pth", "_old_version.pth")
-
     checkpoint_data = replace_keys_in_dict(replace_keys_in_dict(checkpoint_data, ".parametrizations.weight.original1", ".weight_v"), ".parametrizations.weight.original0", ".weight_g")
 
     torch.save(checkpoint_data, old_version_path)
 
     os.replace(old_version_path, checkpoint_path)
-    logger.info(f"Đã lưu mô hình '{checkpoint_path}' (kỷ nguyên {iteration})")
+    logger.info(translations["save_model"].format(checkpoint_path=checkpoint_path, iteration=iteration))
 
 
 def latest_checkpoint_path(dir_path, regex="G_*.pth"):
@@ -500,7 +503,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
         try:
             sid = torch.LongTensor([int(sid)])
         except ValueError as e:
-            logger.error(f"Lỗi chuyển đổi ID người nói '{sid}' thành số nguyên. Ngoại lệ: {e}")
+            logger.error(translations["sid_error"].format(sid=sid, e=e))
             sid = torch.LongTensor([0])
 
         return sid
@@ -554,7 +557,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
     def get_audio(self, filename):
         audio, sample_rate = load_wav_to_torch(filename)
 
-        if sample_rate != self.sample_rate: raise ValueError(f"{sample_rate} Tỉ lệ mẫu không khớp với mục tiêu {self.sample_rate} Tỉ lệ mẫu")
+        if sample_rate != self.sample_rate: raise ValueError(translations["sr_does_not_match"].format(sample_rate=sample_rate, sample_rate2=self.sample_rate))
 
         audio_norm = audio
         audio_norm = audio_norm.unsqueeze(0)
@@ -564,7 +567,7 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
             try:
                 spec = torch.load(spec_filename)
             except Exception as e:
-                logger.error(f"Đã xảy ra lỗi khi nhận thông số kỹ thuật từ {spec_filename}: {e}")
+                logger.error(translations["spec_error"].format(spec_filename=spec_filename, e=e))
                 spec = spectrogram_torch(
                     audio_norm,
                     self.filter_length,
@@ -692,7 +695,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
         try:
             sid = torch.LongTensor([int(sid)])
         except ValueError as e:
-            logger.error(f"Lỗi chuyển đổi ID người nói '{sid}' thành số nguyên. Ngoại lệ: {e}")
+            logger.error(translations["sid_error"].format(sid=sid, e=e))
             sid = torch.LongTensor([0])
 
         return sid
@@ -729,7 +732,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
     def get_audio(self, filename):
         audio, sample_rate = load_wav_to_torch(filename)
 
-        if sample_rate != self.sample_rate: raise ValueError(f"{sample_rate} Tỉ lệ mẫu không phù hợp với mục tiêu {self.sample_rate} Tỉ lệ mẫu")
+        if sample_rate != self.sample_rate: raise ValueError(translations["sr_does_not_match"].format(sample_rate=sample_rate, sample_rate2=self.sample_rate))
 
         audio_norm = audio
         audio_norm = audio_norm.unsqueeze(0)
@@ -740,7 +743,7 @@ class TextAudioLoader(torch.utils.data.Dataset):
             try:
                 spec = torch.load(spec_filename)
             except Exception as e:
-                logger.error(f"Đã xảy ra lỗi khi nhận thông số kỹ thuật từ {spec_filename}: {e}")
+                logger.error(translations["spec_error"].format(spec_filename=spec_filename, e=e))
                 spec = spectrogram_torch(
                     audio_norm,
                     self.filter_length,
@@ -1035,7 +1038,7 @@ class EpochRecorder:
         elapsed_time = round(elapsed_time, 1)
         elapsed_time_str = str(datetime.timedelta(seconds=int(elapsed_time)))
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
-        return f"thời gian={current_time} | tốc độ huấn luyện={elapsed_time_str}"
+        return translations["time_or_speed_training"].format(current_time=current_time, elapsed_time_str=elapsed_time_str)
     
 
 def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
@@ -1106,9 +1109,9 @@ def replace_keys_in_dict(d, old_key_part, new_key_part):
     return updated_dict
 
 
-def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, version, hps):
+def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, version, hps, model_author):
     try:
-        logger.info(f"Đã lưu mô hình '{model_dir}' (kỷ nguyên {epoch} và bước {step})")
+        logger.info(translations["savemodel"].format(model_dir=model_dir, epoch=epoch, step=step))
 
         model_dir_path = os.path.join("assets", "weights")
 
@@ -1150,21 +1153,22 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, versio
         hash_input = f"{str(ckpt)} {epoch} {step} {datetime.datetime.now().isoformat()}"
         model_hash = hashlib.sha256(hash_input.encode()).hexdigest()
         opt["model_hash"] = model_hash
+        opt["model_name"] = name
+        opt["author"] = model_author
 
         torch.save(opt, os.path.join(model_dir_path, pth_file))
 
         model = torch.load(model_dir, map_location=torch.device("cpu"))
-
         torch.save(replace_keys_in_dict(replace_keys_in_dict(model, ".parametrizations.weight.original1", ".weight_v"), ".parametrizations.weight.original0", ".weight_g"), pth_file_old_version_path)
 
         os.remove(model_dir)
         os.rename(pth_file_old_version_path, model_dir)
 
     except Exception as e:
-        logger.error(f"Đã xảy ra lỗi khi trích xuất mô hình: {e}")
+        logger.error(f"{translations['extract_model_error']}: {e}")
 
 
-def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device):
+def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, model_author):
     global global_step
 
     if rank == 0:
@@ -1204,7 +1208,7 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         net_d = DDP(net_d)
 
     try:
-        logger.info("Bắt đầu huấn luyện")
+        logger.info(translations["start_training"])
 
         _, _, _, epoch_str = load_checkpoint(latest_checkpoint_path(experiment_dir, "D_*.pth"), net_d, optim_d)
         _, _, _, epoch_str = load_checkpoint(latest_checkpoint_path(experiment_dir, "G_*.pth"), net_g, optim_g)
@@ -1217,18 +1221,18 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         global_step = 0
 
         if pretrainG != "":
-            if rank == 0: logger.info(f"Đã nạp huấn luyện trước (G) '{pretrainG}'")
+            if rank == 0: logger.info(translations["import_pretrain"].format(dg="G", pretrain=pretrainG))
 
             if hasattr(net_g, "module"): net_g.module.load_state_dict(torch.load(pretrainG, map_location="cpu")["model"])
             else: net_g.load_state_dict(torch.load(pretrainG, map_location="cpu")["model"])
-        else: logger.warning(f"Sẽ không có huấn luyện trước (G) được sử dụng")
+        else: logger.warning(translations["not_using_pretrain"].format(dg="G"))
 
         if pretrainD != "":
-            if rank == 0: logger.info(f"Đã nạp huấn luyện trước (D) '{pretrainD}'")
+            if rank == 0: logger.info(translations["import_pretrain"].format(dg="D", pretrain=pretrainD))
 
             if hasattr(net_d, "module"): net_d.module.load_state_dict(torch.load(pretrainD, map_location="cpu")["model"])
             else: net_d.load_state_dict(torch.load(pretrainD, map_location="cpu")["model"])
-        else: logger.warning(f"Sẽ không có huấn luyện trước (D) được sử dụng")
+        else: logger.warning(translations["not_using_pretrain"].format(dg="D"))
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=config.train.lr_decay, last_epoch=epoch_str - 2)
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=config.train.lr_decay, last_epoch=epoch_str - 2)
@@ -1252,14 +1256,14 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         break
 
     for epoch in range(epoch_str, total_epoch + 1):
-        if rank == 0: train_and_evaluate(rank, epoch, config, [net_g, net_d], [optim_g, optim_d], scaler, [train_loader, None], [writer, writer_eval], cache, custom_save_every_weights, custom_total_epoch, device, reference)
-        else: train_and_evaluate(rank, epoch, config, [net_g, net_d], [optim_g, optim_d], scaler, [train_loader, None], None, cache, custom_save_every_weights, custom_total_epoch, device, reference)
+        if rank == 0: train_and_evaluate(rank, epoch, config, [net_g, net_d], [optim_g, optim_d], scaler, [train_loader, None], [writer, writer_eval], cache, custom_save_every_weights, custom_total_epoch, device, reference, model_author)
+        else: train_and_evaluate(rank, epoch, config, [net_g, net_d], [optim_g, optim_d], scaler, [train_loader, None], None, cache, custom_save_every_weights, custom_total_epoch, device, reference, model_author)
 
         scheduler_g.step()
         scheduler_d.step()
 
 
-def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers, cache, custom_save_every_weights, custom_total_epoch, device, reference):
+def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers, cache, custom_save_every_weights, custom_total_epoch, device, reference, model_author):
     global global_step, lowest_value, loss_disc, consecutive_increases_gen, consecutive_increases_disc
 
     if epoch == 1:
@@ -1405,7 +1409,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                         lowest_value["step"] = global_step
                         lowest_value["epoch"] = epoch
                        
-                        if epoch > lowest_value["epoch"]: logger.warning("CẢNH BÁO: Tổn thất tạo ra thấp hơn đã bị vượt quá tổn thất thấp hơn trong kỷ nguyên tiếp theo.")
+                        if epoch > lowest_value["epoch"]: logger.warning(translations["training_warning"])
 
             optim_g.zero_grad()
             scaler.scale(loss_gen_all).backward()
@@ -1502,7 +1506,6 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
     model_del = []
     done = False
     
-
     if rank == 0:
         if epoch % save_every_epoch == False:
             checkpoint_suffix = f"{2333333 if save_only_latest else global_step}.pth"
@@ -1526,7 +1529,6 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
             loss_gen_history.append(current_loss_gen)
 
             smoothed_value_gen = update_exponential_moving_average(smoothed_loss_gen_history, current_loss_gen)
-
             is_overtraining_gen = check_overtraining(smoothed_loss_gen_history, overtraining_threshold, 0.01)
 
             if is_overtraining_gen: consecutive_increases_gen += 1
@@ -1535,10 +1537,10 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
             if epoch % save_every_epoch == 0: save_to_json(training_file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history)
 
             if (is_overtraining_gen and consecutive_increases_gen == overtraining_threshold or is_overtraining_disc and consecutive_increases_disc == (overtraining_threshold * 2)):
-                logger.info(f"Tập luyện quá sức được phát hiện ở kỷ nguyên {epoch} với loss_g được làm mịn {smoothed_value_gen:.3f} và mất mát d {smoothed_value_disc:.3f}")
+                logger.info(translations["overtraining_find"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
                 done = True
             else:
-                logger.info(f"Kỷ nguyên mới tốt nhất {epoch} với loss_g được làm mịn {smoothed_value_gen:.3f} và mất mát d {smoothed_value_disc:.3f}")
+                logger.info(translations["best_epoch"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
 
                 old_model_files = glob.glob(os.path.join("assets", "weights", f"{model_name}_*e_*s_best_epoch.pth"))
 
@@ -1551,8 +1553,8 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
             lowest_value_rounded = float(lowest_value["value"])
             lowest_value_rounded = round(lowest_value_rounded, 3)
 
-            logger.info(f"Đã đào tạo hoàn thành với {epoch} kỷ nguyên, {global_step} các bước và {round(loss_gen_all.item(), 3)} mất mát gen.")
-            logger.info(f"Tổn thất gen thấp nhất: {lowest_value_rounded} ở ký nguyên {lowest_value['epoch']}, bước {lowest_value['step']}")
+            logger.info(translations["success_training"].format(epoch=epoch, global_step=global_step, loss_gen_all=round(loss_gen_all.item(), 3)))
+            logger.info(translations["training_info"].format(lowest_value_rounded=lowest_value_rounded, lowest_value_epoch=lowest_value['epoch'], lowest_value_step=lowest_value['step']))
 
             pid_file_path = os.path.join(experiment_dir, "config.json")
 
@@ -1569,23 +1571,21 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
             ckpt = (net_g.module.state_dict() if hasattr(net_g, "module") else net_g.state_dict())
 
             for m in model_add:
-                if not os.path.exists(m): extract_model(ckpt=ckpt, sr=sample_rate, pitch_guidance=pitch_guidance == True, name=model_name, model_dir=m, epoch=epoch, step=global_step, version=version, hps=hps)
+                if not os.path.exists(m): extract_model(ckpt=ckpt, sr=sample_rate, pitch_guidance=pitch_guidance == True, name=model_name, model_dir=m, epoch=epoch, step=global_step, version=version, hps=hps, model_author=model_author)
 
         for m in model_del:
             os.remove(m)
 
-
         lowest_value_rounded = float(lowest_value["value"])
         lowest_value_rounded = round(lowest_value_rounded, 3)
-
 
         if epoch > 1 and overtraining_detector:
             remaining_epochs_gen = overtraining_threshold - consecutive_increases_gen
             remaining_epochs_disc = (overtraining_threshold * 2) - consecutive_increases_disc
 
-            logger.info(f"{model_name} | kỷ nguyên={epoch} | bước={global_step} | {epoch_recorder.record()} | giá trị thấp nhất={lowest_value_rounded} (kỷ nguyên {lowest_value['epoch']} và bước {lowest_value['step']}) | Số kỷ nguyên còn lại để tập luyện quá sức: g/total: {remaining_epochs_gen} d/total: {remaining_epochs_disc} | làm mịn mất mát gen={smoothed_value_gen:.3f} | làm mịn mất mát disc={smoothed_value_disc:.3f}")
-        elif epoch > 1 and overtraining_detector == False: logger.info(f"{model_name} | kỷ nguyên={epoch} | bước={global_step} | {epoch_recorder.record()} | giá trị thấp nhất={lowest_value_rounded} (kỷ nguyên {lowest_value['epoch']} và bước {lowest_value['step']})")
-        else: logger.info(f"{model_name} | kỷ nguyên={epoch} | bước={global_step} | {epoch_recorder.record()}")
+            logger.info(translations["model_training_info"].format(model_name=model_name, epoch=epoch, global_step=global_step, epoch_recorder=epoch_recorder.record(), lowest_value_rounded=lowest_value_rounded, lowest_value_epoch=lowest_value['epoch'], lowest_value_step=lowest_value['step'], remaining_epochs_gen=remaining_epochs_gen, remaining_epochs_disc=remaining_epochs_disc, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
+        elif epoch > 1 and overtraining_detector == False: logger.info(translations["model_training_info_2"].format(model_name=model_name, epoch=epoch, global_step=global_step, epoch_recorder=epoch_recorder.record(), lowest_value_rounded=lowest_value_rounded, lowest_value_epoch=lowest_value['epoch'], lowest_value=lowest_value['step']))
+        else: logger.info(translations["model_training_info_3"].format(model_name=model_name, epoch=epoch, global_step=global_step, epoch_recorder=epoch_recorder.record()))
 
         last_loss_gen_all = loss_gen_all
 
@@ -1597,4 +1597,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        logger.error(f"Đã xảy ra lỗi khi huấn luyện mô hình {e}")
+        logger.error(f"{translations['training_error']} {e}")

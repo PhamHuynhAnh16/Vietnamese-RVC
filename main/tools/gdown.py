@@ -13,10 +13,14 @@ import textwrap
 from time import sleep, time
 from urllib.parse import urlparse, parse_qs, unquote
 
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
+translations = Config().translations
 
 CHUNK_SIZE = 512 * 1024 
 HOME = os.path.expanduser("~")
-
 
 def indent(text, prefix):
     return "".join((prefix + line if line.strip() else line) for line in text.splitlines(True))
@@ -39,11 +43,7 @@ def parse_url(url, warning=True):
                 break
 
     if warning and not is_download_link:
-        warnings.warn(
-            "Bạn đã chỉ định một liên kết Google Drive không phải là liên kết chính xác "
-            "để tải xuống một tập tin. Bạn có thể muốn thử tùy chọn `--fuzzy` "
-            f"hoặc url sau: https://drive.google.com/uc?id={file_id}"
-        )
+        warnings.warn(translations["gdown_warning"].format(file_id=file_id))
 
     return file_id, is_download_link
 
@@ -67,11 +67,7 @@ def get_url_from_gdrive_confirmation(contents):
         error = match.group(1)
         raise Exception(error)
 
-    raise Exception(
-        "Không thể truy xuất liên kết công khai của tệp. "
-        "Bạn có thể cần phải thay đổi quyền thành "
-        "'Bất kỳ ai có liên kết' hoặc đã có nhiều quyền truy cập."
-    )
+    raise Exception(translations["gdown_error"])
 
 
 def _get_session(proxy, use_cookies, return_cookies_file=False):
@@ -95,7 +91,7 @@ def _get_session(proxy, use_cookies, return_cookies_file=False):
 
 
 def gdown_download(url=None, output=None, output_dir=None, quiet=False, proxy=None, speed=None, use_cookies=True, verify=True, id=None, fuzzy=True, resume=False, format=None):
-    if not (id is None) ^ (url is None): raise ValueError("Phải chỉ định url hoặc id")
+    if not (id is None) ^ (url is None): raise ValueError(translations["gdown_value_error"])
     if id is not None: url = f"https://drive.google.com/uc?id={id}"
 
     url_origin = url
@@ -149,14 +145,8 @@ def gdown_download(url=None, output=None, output_dir=None, quiet=False, proxy=No
         try:
             url = get_url_from_gdrive_confirmation(res.text)
         except Exception as e:
-            message = (
-                "Không thể truy xuất url tệp:\n\n"
-                "{}\n\n"
-                "Bạn vẫn có thể truy cập tệp từ trình duyệt:"
-                f"\n\n\t{url_origin}\n\n"
-                "nhưng Gdown không thể. Vui lòng kiểm tra kết nối và quyền."
-            ).format(indent("\n".join(textwrap.wrap(str(e))), prefix="\t"))
-            raise Exception(message)
+            error = indent("\n".join(textwrap.wrap(str(e))), prefix="\t")
+            raise Exception(translations["gdown_error_2"].format(error=error, url_origin=url_origin))
 
     if gdrive_file_id and is_gdrive_download_link:
         content_disposition = unquote(res.headers["Content-Disposition"])
@@ -178,12 +168,12 @@ def gdown_download(url=None, output=None, output_dir=None, quiet=False, proxy=No
 
         if resume and existing_tmp_files:
             if len(existing_tmp_files) > 1:
-                print("Có nhiều tệp tạm thời để tiếp tục:", file=sys.stderr)
+                print(translations["temps"], file=sys.stderr)
 
                 for file in existing_tmp_files:
                     print(f"\t{file}", file=sys.stderr)
 
-                print("Vui lòng xóa chúng ngoại trừ một để tiếp tục tải xuống.", file=sys.stderr)
+                print(translations["del_all_temps"], file=sys.stderr)
                 return
             
             tmp_file = existing_tmp_files[0]
@@ -200,9 +190,9 @@ def gdown_download(url=None, output=None, output_dir=None, quiet=False, proxy=No
     if tmp_file is not None and f.tell() != 0: res = sess.get(url, headers={"Range": f"bytes={f.tell()}-"}, stream=True, verify=verify)
 
     if not quiet:
-        if resume: print("Tiếp tục:", tmp_file, file=sys.stderr)
+        if resume: print(translations["continue"], tmp_file, file=sys.stderr)
 
-        print("Đến:", os.path.abspath(output) if output_is_path else output, file=sys.stderr)
+        print(translations["to"], os.path.abspath(output) if output_is_path else output, file=sys.stderr)
 
     try:
         if not quiet: pbar = tqdm.tqdm(total=int(res.headers.get("Content-Length", 0)), unit="B", unit_scale=True)

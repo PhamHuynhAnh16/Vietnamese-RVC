@@ -66,7 +66,7 @@ class BagOfModels(nn.Module):
         self.weights = weights
 
     def forward(self, x):
-        raise NotImplementedError("Gọi `apply_model` về điều này.")
+        raise NotImplementedError("`apply_model`")
 
 
 class TensorChunk:

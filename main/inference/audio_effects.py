@@ -1,4 +1,5 @@
 import os
+import sys
 import librosa
 import argparse
 
@@ -9,6 +10,11 @@ from distutils.util import strtobool
 from scipy.signal import butter, filtfilt
 from pedalboard import Pedalboard, Chorus, Distortion, Reverb, PitchShift, Delay, Limiter, Gain, Bitcrush, Clipping, Compressor, Phaser
 
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
+translations = Config().translations
 
 def parse_arguments() -> tuple:
     parser = argparse.ArgumentParser()
@@ -70,13 +76,12 @@ def parse_arguments() -> tuple:
     args = parser.parse_args()
     return args
 
+
 def main():
     args = parse_arguments()
 
-    try:
-        process_audio(input_path=args.input_path, output_path=args.output_path, resample=args.resample, resample_sr=args.resample_sr, chorus_depth=args.chorus_depth, chorus_rate=args.chorus_rate, chorus_mix=args.chorus_mix, chorus_delay=args.chorus_delay, chorus_feedback=args.chorus_feedback, distortion_drive=args.drive_db, reverb_room_size=args.reverb_room_size, reverb_damping=args.reverb_damping, reverb_wet_level=args.reverb_wet_level, reverb_dry_level=args.reverb_dry_level, reverb_width=args.reverb_width, reverb_freeze_mode=args.reverb_freeze_mode, pitch_shift=args.pitch_shift, delay_seconds=args.delay_seconds, delay_feedback=args.delay_feedback, delay_mix=args.delay_mix, compressor_threshold=args.compressor_threshold, compressor_ratio=args.compressor_ratio, compressor_attack_ms=args.compressor_attack_ms, compressor_release_ms=args.compressor_release_ms, limiter_threshold=args.limiter_threshold, limiter_release=args.limiter_release, gain_db=args.gain_db, bitcrush_bit_depth=args.bitcrush_bit_depth, clipping_threshold=args.clipping_threshold, phaser_rate_hz=args.phaser_rate_hz, phaser_depth=args.phaser_depth, phaser_centre_frequency_hz=args.phaser_centre_frequency_hz, phaser_feedback=args.phaser_feedback, phaser_mix=args.phaser_mix, bass_boost_db=args.bass_boost_db, bass_boost_frequency=args.bass_boost_frequency, treble_boost_db=args.treble_boost_db, treble_boost_frequency=args.treble_boost_frequency, fade_in_duration=args.fade_in_duration, fade_out_duration=args.fade_out_duration, export_format=args.export_format, chorus=args.chorus, distortion=args.distortion, reverb=args.reverb, pitchshift=args.pitchshift, delay=args.delay, compressor=args.compressor, limiter=args.limiter, gain=args.gain, bitcrush=args.bitcrush, clipping=args.clipping, phaser=args.phaser, treble_bass_boost=args.treble_bass_boost, fade_in_out=args.fade_in_out)
-    except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi áp dụng hiệu ứng: {e}")
+    process_audio(input_path=args.input_path, output_path=args.output_path, resample=args.resample, resample_sr=args.resample_sr, chorus_depth=args.chorus_depth, chorus_rate=args.chorus_rate, chorus_mix=args.chorus_mix, chorus_delay=args.chorus_delay, chorus_feedback=args.chorus_feedback, distortion_drive=args.drive_db, reverb_room_size=args.reverb_room_size, reverb_damping=args.reverb_damping, reverb_wet_level=args.reverb_wet_level, reverb_dry_level=args.reverb_dry_level, reverb_width=args.reverb_width, reverb_freeze_mode=args.reverb_freeze_mode, pitch_shift=args.pitch_shift, delay_seconds=args.delay_seconds, delay_feedback=args.delay_feedback, delay_mix=args.delay_mix, compressor_threshold=args.compressor_threshold, compressor_ratio=args.compressor_ratio, compressor_attack_ms=args.compressor_attack_ms, compressor_release_ms=args.compressor_release_ms, limiter_threshold=args.limiter_threshold, limiter_release=args.limiter_release, gain_db=args.gain_db, bitcrush_bit_depth=args.bitcrush_bit_depth, clipping_threshold=args.clipping_threshold, phaser_rate_hz=args.phaser_rate_hz, phaser_depth=args.phaser_depth, phaser_centre_frequency_hz=args.phaser_centre_frequency_hz, phaser_feedback=args.phaser_feedback, phaser_mix=args.phaser_mix, bass_boost_db=args.bass_boost_db, bass_boost_frequency=args.bass_boost_frequency, treble_boost_db=args.treble_boost_db, treble_boost_frequency=args.treble_boost_frequency, fade_in_duration=args.fade_in_duration, fade_out_duration=args.fade_out_duration, export_format=args.export_format, chorus=args.chorus, distortion=args.distortion, reverb=args.reverb, pitchshift=args.pitchshift, delay=args.delay, compressor=args.compressor, limiter=args.limiter, gain=args.gain, bitcrush=args.bitcrush, clipping=args.clipping, phaser=args.phaser, treble_bass_boost=args.treble_bass_boost, fade_in_out=args.fade_in_out)
+
 
 def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, pitchshift, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out):
     def bass_boost(audio, gain_db, frequency, sample_rate):
@@ -113,15 +118,20 @@ def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, 
         audio[start:end] = audio[start:end] * np.linspace(0.0, 1.0, length)
         return audio
     
-    if not os.path.exists(input_path): return print("Không tìm thấy đầu vào")
-    if output_path is None or output_path == "": return print("Vui lòng nhập đầu vào")
+    if not input_path or not os.path.exists(input_path): 
+        print(translations["input_not_valid"])
+        sys.exit(1)
+
+    if not output_path: 
+        print(translations["output_not_valid"])
+        sys.exit(1)
     
     if os.path.exists(output_path): os.remove(output_path)
     
     try:
         audio, sample_rate = sf.read(input_path)
     except Exception as e:
-        raise RuntimeError(f"Lỗi khi tải âm thanh: {e}")
+        raise RuntimeError(translations["errors_loading_audio"].format(e=e))
     
     try:
         board = Pedalboard()
@@ -152,7 +162,7 @@ def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, 
             processed_audio = librosa.resample(processed_audio, orig_sr=sample_rate, target_sr=resample_sr)
             sample_rate = resample_sr
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi áp dụng hiệu ứng: {e}")
+        raise RuntimeError(translations["apply_error"].format(e=e))
 
     sf.write(output_path.replace(".wav", f".{export_format}"), processed_audio, sample_rate, format=export_format)
     return output_path

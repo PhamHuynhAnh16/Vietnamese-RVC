@@ -20,7 +20,11 @@ from pydub import AudioSegment, silence
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
+from main.configs.config import Config
 from main.library.algorithm.separator import Separator
+
+
+translations = Config().translations
 
 
 log_file = os.path.join("assets", "logs", "create_dataset.log")
@@ -92,29 +96,30 @@ def main():
     skip_start_audios = args.skip_start_audios
     skip_end_audios = args.skip_end_audios
 
-    logger.debug(f"Đầu vào: {input_audio}")
-    logger.debug(f"Đầu ra: {output_dataset}")
-    logger.debug(f"Lấy mẫu lại: {resample}")
-    if resample: logger.debug(f"Tỷ lệ lấy mẫu lại: {resample_sr}")
-    logger.debug(f"Làm sạch dữ liệu: {clean_dataset}")
-    if clean_dataset: logger.debug(f"Mức độ làm sạch dữ liệu: {clean_strength}")
-    logger.debug(f"Tách bỏ nhạc: {separator_music}")
-    logger.debug(f"Tách bỏ vang: {separator_reverb}")
-    if separator_music: logger.debug(f"Phiên bản mô hình tách giọng: {kim_vocal_version}")
-    logger.debug(f"Kích thước phân đoạn: {segments_size}")
-    logger.debug(f"Mức chồng chéo: {overlap}")
+    logger.debug(f"{translations['audio_path']}: {input_audio}")
+    logger.debug(f"{translations['output_path']}: {output_dataset}")
+    logger.debug(f"{translations['resample']}: {resample}")
+    if resample: logger.debug(f"{translations['sample_rate']}: {resample_sr}")
+    logger.debug(f"{translations['clear_dataset']}: {clean_dataset}")
+    if clean_dataset: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
+    logger.debug(f"{translations['separator_music']}: {separator_music}")
+    logger.debug(f"{translations['dereveb_audio']}: {separator_reverb}")
+    if separator_music: logger.debug(f"{translations['training_version']}: {kim_vocal_version}")
+    logger.debug(f"{translations['segments_size']}: {segments_size}")
+    logger.debug(f"{translations['ovverlap']}: {overlap}")
     logger.debug(f"Hop length: {hop_length}")
-    logger.debug(f"Kích thước lô: {batch_size}")
-    logger.debug(f"Khữ nhiễu MDX: {denoise_mdx}")
-    logger.debug(f"Bỏ qua âm thanh: {skip}")
-    if skip: logger.debug(f"Bỏ qua âm thanh đầu: {skip_start_audios}")
-    if skip: logger.debug(f"Bỏ qua âm thanh cuối: {skip_end_audios}")
+    logger.debug(f"{translations['batch_size']}: {batch_size}")
+    logger.debug(f"{translations['denoise_mdx']}: {denoise_mdx}")
+    logger.debug(f"{translations['skip']}: {skip}")
+    if skip: logger.debug(f"{translations['skip_start']}: {skip_start_audios}")
+    if skip: logger.debug(f"{translations['skip_end']}: {skip_end_audios}")
 
 
-    if kim_vocal_version != 1 and kim_vocal_version != 2: raise ValueError("Phiên bản tách giọng không hợp lệ")
-    if separator_reverb and not separator_music: raise ValueError("Bật tùy chọn tách nhạc để có thể sử dụng tùy chọn tách vang")
+    if kim_vocal_version != 1 and kim_vocal_version != 2: raise ValueError(translations["version_not_valid"])
+    if separator_reverb and not separator_music: raise ValueError(translations["create_dataset_value_not_valid"])
 
     start_time = time.time()
+
 
     try:
         paths = []
@@ -131,8 +136,12 @@ def main():
             skip_start_audios = skip_start_audios.replace(", ", ",").split(",")
             skip_end_audios = skip_end_audios.replace(", ", ",").split(",")
 
-            if len(skip_start_audios) < len(paths) or len(skip_end_audios) < len(paths): logger.warning("Không thể bỏ qua vì số lượng thời gian bỏ qua thấp hơn số lượng tệp âm thanh")
-            elif len(skip_start_audios) > len(paths) or len(skip_end_audios) > len(paths): logger.warning("Không thể bỏ qua vì số lượng thời gian bỏ qua cao hơn số lượng tệp âm thanh")
+            if len(skip_start_audios) < len(paths) or len(skip_end_audios) < len(paths): 
+                logger.warning(translations["skip<audio"])
+                sys.exit(1)
+            elif len(skip_start_audios) > len(paths) or len(skip_end_audios) > len(paths): 
+                logger.warning(translations["skip>audio"])
+                sys.exit(1)
             else:
                 for audio, skip_start_audio, skip_end_audio in zip(paths, skip_start_audios, skip_end_audios):
                     skip_start(audio, skip_start_audio)
@@ -142,7 +151,7 @@ def main():
             separator_paths = []
 
             for audio in paths:
-                vocals = separatormusic(audio, dataset_temp, segments_size, overlap, denoise_mdx, kim_vocal_version, hop_length, batch_size)
+                vocals = separator_music_main(audio, dataset_temp, segments_size, overlap, denoise_mdx, kim_vocal_version, hop_length, batch_size)
 
                 if separator_reverb: vocals = separator_reverb_audio(vocals, dataset_temp, segments_size, overlap, denoise_mdx, hop_length, batch_size)
                 separator_paths.append(vocals)
@@ -169,15 +178,16 @@ def main():
 
             sf.write(audio_path, data, sample_rate)
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tạo dữ liệu huấn luyện: {e}")
+        raise RuntimeError(f"{translations['create_dataset_error']}: {e}")
     finally:
         for audio in paths:
             shutil.move(audio, output_dataset)
 
         if os.path.exists(dataset_temp): shutil.rmtree(dataset_temp, ignore_errors=True)
 
+
     elapsed_time = time.time() - start_time
-    logger.info(f"Quá trình tạo dữ liệu huấn huyện đã hoàn thành sau: {elapsed_time:.2f} giây")
+    logger.info(translations["create_dataset_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
 
 
 def downloader(url, name):
@@ -196,10 +206,10 @@ def downloader(url, name):
             'verbose': False, 
         }
 
-        logger.info(f"Bắt đầu tải xuống: {url}...")
+        logger.info(f"{translations['starting_download']}: {url}...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info(url)  
-            logger.info(f"Đã tải xuống xong: {url}")
+            logger.info(f"{translations['download_success']}: {url}")
         
     return os.path.join(dataset_temp, f"{name}" + ".wav")
 
@@ -209,14 +219,14 @@ def skip_start(input_file, seconds):
     
     total_duration = len(data) / sr
     
-    if seconds <= 0: logger.warning(f"Thời gian bỏ qua bằng 0 nên bỏ qua")
-    elif seconds >= total_duration: logger.warning(f"Thời gian bỏ qua ({seconds} giây) vượt quá độ dài âm thanh ({total_duration:.2f} giây). Bỏ qua.")
+    if seconds <= 0: logger.warning(translations["=<0"])
+    elif seconds >= total_duration: logger.warning(translations["skip_warning"].format(seconds=seconds, total_duration=f"{total_duration:.2f}"))
     else: 
-        logger.info(f"Bỏ qua âm thanh đầu: {input_file}...")
+        logger.info(f"{translations['skip_start']}: {input_file}...")
 
         sf.write(input_file, data[int(seconds * sr):], sr)
 
-        logger.info(f"Bỏ qua âm thanh đầu thành công: {input_file}")
+        logger.info(translations["skip_start_audio"].format(input_file=input_file))
 
 
 def skip_end(input_file, seconds):
@@ -224,14 +234,14 @@ def skip_end(input_file, seconds):
     
     total_duration = len(data) / sr
 
-    if seconds <= 0: logger.warning(f"Thời gian bỏ qua bằng 0 nên bỏ qua")
-    elif seconds > total_duration: logger.warning(f"Số giây cần bỏ qua ({seconds} giây) vượt quá thời lượng âm thanh ({total_duration:.2f} giây). Bỏ qua.")
+    if seconds <= 0: logger.warning(translations["=<0"])
+    elif seconds > total_duration: logger.warning(translations["skip_warning"].format(seconds=seconds, total_duration=f"{total_duration:.2f}"))
     else: 
-        logger.info(f"Bỏ qua âm thanh cuối: {input_file}...")
+        logger.info(f"{translations['skip_end']}: {input_file}...")
 
         sf.write(input_file, data[:-int(seconds * sr)], sr)
 
-        logger.info(f"Bỏ qua âm thanh cuối thành công: {input_file}")
+        logger.info(translations["skip_end_audio"].format(input_file=input_file))
 
 
 def process_audio(file_path):
@@ -251,9 +261,9 @@ def process_audio(file_path):
                 chunk.export(chunk_file_path, format="wav")
 
                 cut_files.append(chunk_file_path)
-            else: logger.warning(f"Phần {i} được bỏ qua vì quá ngắn: {len(chunk)}ms")
+            else: logger.warning(translations["skip_file"].format(i=i, chunk=len(chunk)))
 
-        logger.info(f"Tổng số phần chứa âm thanh của {file_path} là: {len(cut_files)}")
+        logger.info(f"{translations['split_total']}: {len(cut_files)}")
 
         def extract_number(filename):
             match = re.search(r'_(\d+)', filename)
@@ -269,40 +279,40 @@ def process_audio(file_path):
 
         output_path = os.path.splitext(file_path)[0] + "_processed" + ".wav"
 
-        logger.info("Đã ghép các phần chứa âm thanh lại")
+        logger.info(translations["merge_audio"])
 
         combined.export(output_path, format="wav")
 
         return output_path
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi xử lý và ghép âm thanh: {e}")
+        raise RuntimeError(f"{translations['process_audio_error']}: {e}")
 
 
-def separatormusic(input, output, segments_size, overlap, denoise, version, hop_length, batch_size):
+def separator_music_main(input, output, segments_size, overlap, denoise, version, hop_length, batch_size):
     if not os.path.exists(input): 
-        logger.warning("Không tìm thấy đầu vào")
+        logger.warning(translations["input_not_valid"])
         return None
     
     if not os.path.exists(output): 
-        logger.warning("Không tìm thấy đầu ra")
+        logger.warning(translations["output_not_valid"])
         return None
 
     model = f"Kim_Vocal_{version}.onnx"
 
-    logger.info(f"Đang tách giọng: {input}...")
+    logger.info(translations["separator_process"].format(input=input))
     output_separator = separator_main(audio_file=input, model_filename=model, output_format="wav", output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=batch_size, mdx_hop_length=hop_length, mdx_enable_denoise=denoise)
 
     for f in output_separator:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
+        if not os.path.exists(path): logger.error(translations["not_found"].format(name=path))
 
         if '_(Instrumental)_' in f: os.rename(path, os.path.splitext(path)[0].replace("(", "").replace(")", "") + ".wav")
         elif '_(Vocals)_' in f:
             rename_file = os.path.splitext(path)[0].replace("(", "").replace(")", "") + ".wav"
             os.rename(path, rename_file)
 
-    logger.info(f"Đã tách giọng giọng thành công: {rename_file}")
+    logger.info(f": {rename_file}")
     return rename_file
 
 
@@ -310,27 +320,27 @@ def separator_reverb_audio(input, output, segments_size, overlap, denoise, hop_l
     reverb_models = "Reverb_HQ_By_FoxJoy.onnx"
     
     if not os.path.exists(input): 
-        logger.warning("Không tìm thấy đầu vào")
+        logger.warning(translations["input_not_valid"])
         return None
     
     if not os.path.exists(output): 
-        logger.warning("Không tìm thấy đầu ra")
+        logger.warning(translations["output_not_valid"])
         return None
 
-    logger.info(f"Đang tách âm vang: {input}...")
+    logger.info(f"{translations['dereverb']}: {input}...")
     output_dereverb = separator_main(audio_file=input, model_filename=reverb_models, output_format="wav", output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=hop_length, mdx_hop_length=batch_size, mdx_enable_denoise=denoise)
 
     for f in output_dereverb:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
+        if not os.path.exists(path): logger.error(translations["not_found"].format(name=path))
 
         if '_(Reverb)_' in f: os.rename(path, os.path.splitext(path)[0].replace("(", "").replace(")", "") + ".wav")
         elif '_(No Reverb)_' in f:
             rename_file = os.path.splitext(path)[0].replace("(", "").replace(")", "") + ".wav"
             os.rename(path, rename_file)    
 
-    logger.info(f"Đã tách âm vang thành công: {rename_file}")
+    logger.info(f"{translations['dereverb_success']}: {rename_file}")
     return rename_file
 
 

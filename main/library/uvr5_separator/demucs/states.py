@@ -1,3 +1,5 @@
+import os
+import sys
 import torch
 import inspect
 import warnings
@@ -5,6 +7,13 @@ import functools
 
 from pathlib import Path
 from diffq import restore_quantized_state
+
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
+
+translations = Config().translations
 
 
 def load_model(path_or_package, strict=False):
@@ -15,12 +24,13 @@ def load_model(path_or_package, strict=False):
 
             path = path_or_package
             package = torch.load(path, map_location="cpu")
-    else: raise ValueError(f"Loại không hợp lệ cho {path_or_package}.")
+    else: raise ValueError(f"{translations['type_not_valid']} {path_or_package}.")
 
 
     klass = package["klass"]
     args = package["args"]
     kwargs = package["kwargs"]
+
 
     if strict: model = klass(*args, **kwargs)
     else:
@@ -28,7 +38,7 @@ def load_model(path_or_package, strict=False):
 
         for key in list(kwargs):
             if key not in sig.parameters:
-                warnings.warn("Bỏ tham số không tồn tại " + key)
+                warnings.warn(translations["del_parameter"] + key)
                 
                 del kwargs[key]
 

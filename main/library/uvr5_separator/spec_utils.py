@@ -15,6 +15,12 @@ import soundfile as sf
 
 from scipy.signal import correlate, hilbert
 
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
+translations = Config().translations
+
 OPERATING_SYSTEM = platform.system()
 SYSTEM_ARCH = platform.platform()
 SYSTEM_PROC = platform.processor()
@@ -54,7 +60,7 @@ def crop_center(h1, h2):
     h2_shape = h2.size()
 
     if h1_shape[3] == h2_shape[3]: return h1
-    elif h1_shape[3] < h2_shape[3]: raise ValueError("h1_shape[3] phải lớn hơn h2_shape[3]")
+    elif h1_shape[3] < h2_shape[3]: raise ValueError("h1_shape[3] > h2_shape[3]")
 
     s_time = (h1_shape[3] - h2_shape[3]) // 2
     e_time = s_time + h2_shape[3]
@@ -101,11 +107,9 @@ def write_array_to_mem(audio_data, subtype):
 def spectrogram_to_image(spec, mode="magnitude"):
     if mode == "magnitude":
         y = np.abs(spec) if np.iscomplexobj(spec) else spec
-
         y = np.log10(y**2 + 1e-8)
     elif mode == "phase":
         y = np.angle(spec) if np.iscomplexobj(spec) else spec
-
 
     y -= y.min()
     y *= 255 / y.max()
@@ -132,7 +136,7 @@ def merge_artifacts(y_mask, thres=0.01, min_range=64, fade_size=32):
     mask = y_mask
 
     try:
-        if min_range < fade_size * 2: raise ValueError("phạm vi tối thiểu phải >= fade_size * 2")
+        if min_range < fade_size * 2: raise ValueError("min_range >= fade_size * 2")
 
         idx = np.where(y_mask.min(axis=(0, 1)) > thres)[0]
         start_idx = np.insert(idx[np.where(np.diff(idx) != 1)[0] + 1], 0, idx[0])
@@ -159,13 +163,12 @@ def merge_artifacts(y_mask, thres=0.01, min_range=64, fade_size=32):
 
         v_mask = 1 - y_mask
         y_mask += weight * v_mask
-
         mask = y_mask
     except Exception as e:
         error_name = f"{type(e).__name__}"
         traceback_text = "".join(traceback.format_tb(e.__traceback__))
         message = f'{error_name}: "{e}"\n{traceback_text}"'
-        print("Quá trình đăng không thành công: ", message)
+        print(translations["not_success"], message)
 
     return mask
 
@@ -218,7 +221,6 @@ def combine_spectrograms(specs, mp, is_v51_model=False):
     return np.asfortranarray(spec_c)
 
 def wave_to_spectrogram(wave, hop_length, n_fft, mp, band, is_v51_model=False):
-
     if wave.ndim == 1: wave = np.asfortranarray([wave, wave])
 
     if not is_v51_model:
@@ -299,8 +301,8 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
                 try:
                     wave = librosa.resample(spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model), orig_sr=bp["sr"], target_sr=sr, res_type=wav_resolution)
                 except ValueError as e:
-                    print(f"Lỗi trong quá trình lấy mẫu lại: {e}")
-                    print(f"Hình dạng Spec_s: {spec_s.shape}, SR: {sr}, Loại độ phân giải: {wav_resolution}")
+                    print(f"{translations['resample_error']}: {e}")
+                    print(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
             else:  
                 if is_v51_model:
                     spec_s *= get_hp_filter_mask(spec_s.shape[1], bp["hpf_start"], bp["hpf_stop"] - 1)
@@ -314,8 +316,8 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
                 try:
                     wave = librosa.resample(wave2, orig_sr=bp["sr"], target_sr=sr, res_type=wav_resolution)
                 except ValueError as e:
-                    print(f"Lỗi trong quá trình lấy mẫu lại: {e}")
-                    print(f"Hình dạng Spec_s: {spec_s.shape}, SR: {sr}, Loại độ phân giải: {wav_resolution}")
+                    print(f"{translations['resample_error']}: {e}")
+                    print(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
 
     return wave
 
@@ -362,7 +364,6 @@ def spectrogram_to_wave_old(spec, hop_length=1024):
 def wave_to_spectrogram_old(wave, hop_length, n_fft):
     wave_left = np.asfortranarray(wave[0])
     wave_right = np.asfortranarray(wave[1])
-
     spec_left = librosa.stft(wave_left, n_fft=n_fft, hop_length=hop_length)
     spec_right = librosa.stft(wave_right, n_fft=n_fft, hop_length=hop_length)
 
@@ -388,7 +389,7 @@ def adjust_aggr(mask, is_non_accom_stem, aggressiveness):
         if is_non_accom_stem:
             aggr = 1 - aggr
 
-        if np.any(aggr > 10) or np.any(aggr < -10): print(f"Cảnh báo: Đã phát hiện các giá trị cực kỳ hung hãn: {aggr}")
+        if np.any(aggr > 10) or np.any(aggr < -10): print(f"{translations['warnings']}: {aggr}")
 
         aggr = [aggr, aggr]
 
@@ -421,7 +422,7 @@ def istft(spec, hl):
     return wave
 
 def spec_effects(wave, algorithm="Default", value=None):
-    if np.isnan(wave).any() or np.isinf(wave).any(): print(f"Cảnh báo: Đã phát hiện NaN hoặc giá trị vô hạn trong đầu vào sóng. Hình dạng: {wave.shape}")
+    if np.isnan(wave).any() or np.isinf(wave).any(): print(f"{translations['warnings_2']}: {wave.shape}")
 
     spec = [stft(wave[0], 2048, 1024), stft(wave[1], 2048, 1024)]
 
@@ -445,7 +446,6 @@ def spec_effects(wave, algorithm="Default", value=None):
 
 def spectrogram_to_wave_no_mp(spec, n_fft=2048, hop_length=1024):
     wave = librosa.istft(spec, n_fft=n_fft, hop_length=hop_length)
-
     if wave.ndim == 1: wave = np.asfortranarray([wave, wave])
 
     return wave
@@ -799,7 +799,7 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_s
 
     wav2_org = wav2.copy()
 
-    command_Text("Đang xử lý tập tin... \n")
+    command_Text(translations["process_file"])
     seconds_length = min(wav1_length, wav2_length)
 
     wav2_aligned_sources = []
@@ -855,7 +855,7 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_s
 
     wav_sub = np.clip(wav_sub, -1, +1)
 
-    command_Text(f"Lưu bản nhạc ngược... ")
+    command_Text(translations["save_instruments"])
 
     if is_save_aligned or is_spec_match:
         wav1 = match_mono_array_shapes(wav1, wav_sub) if is_mono else match_array_shapes(wav1, wav_sub, is_swap=True)
@@ -918,7 +918,7 @@ def time_correction(mix: np.ndarray, instrumental: np.ndarray, seconds_length, a
 
         return shifted_tracks[min(shifted_tracks.keys())]
 
-    assert mix.shape == instrumental.shape, f"Các tệp âm thanh phải có hình dạng giống nhau - Mix: {mix.shape}, Inst: {instrumental.shape}"
+    assert mix.shape == instrumental.shape, translations["assert"].format(mixshape=mix.shape, instrumentalshape=instrumental.shape)
 
     seconds_length = seconds_length // 2
 
@@ -1011,7 +1011,6 @@ def ensemble_wav_min(waveforms):
         ln = min(len(wave), len(waveforms[i]))
         wave = wave[:ln]
         waveforms[i] = waveforms[i][:ln]
-
         wave = np.where(np.abs(waveforms[i]) <= np.abs(wave), waveforms[i], wave)
 
     return wave
@@ -1024,7 +1023,6 @@ def align_audio_test(wav1, wav2, sr1=44100):
 
     wav1 = wav1.transpose()
     wav2 = wav2.transpose()
-
     wav2_org = wav2.copy()
 
     index = sr1  
@@ -1040,7 +1038,6 @@ def align_audio_test(wav1, wav2, sr1=44100):
 
 def load_audio(audio_file):
     wav, sr = librosa.load(audio_file, sr=44100, mono=False)
-
     if wav.ndim == 1: wav = np.asfortranarray([wav, wav])
 
     return wav
@@ -1076,12 +1073,7 @@ def __rubberband(y, sr, **kwargs):
 
         if y.ndim == 1: y_out = np.squeeze(y_out)
     except OSError as exc:
-        six.raise_from(
-            RuntimeError('Không thể thực Rubberband. '
-                'Vui lòng xác minh rằng Rubberband-cli '
-            'đã được cài đặt.'), 
-        exc)
-
+        six.raise_from(RuntimeError(translations["rubberband"]), exc)
     finally:
         os.unlink(infile)
         os.unlink(outfile)
@@ -1089,10 +1081,9 @@ def __rubberband(y, sr, **kwargs):
     return y_out
 
 def time_stretch(y, sr, rate, rbargs=None):
-    if rate <= 0: raise ValueError('tỷ lệ phải hoàn toàn tích cực')
+    if rate <= 0: raise ValueError(translations["rate"])
 
     if rate == 1.0: return y
-
     if rbargs is None: rbargs = dict()
 
     rbargs.setdefault('--tempo', rate)
@@ -1102,7 +1093,6 @@ def time_stretch(y, sr, rate, rbargs=None):
 def pitch_shift(y, sr, n_steps, rbargs=None):
 
     if n_steps == 0: return y
-
     if rbargs is None: rbargs = dict()
 
     rbargs.setdefault('--pitch', n_steps)

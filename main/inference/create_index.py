@@ -1,4 +1,5 @@
 import os
+import sys
 import faiss
 import logging
 import argparse
@@ -8,6 +9,14 @@ import numpy as np
 
 from multiprocessing import cpu_count
 from sklearn.cluster import MiniBatchKMeans
+
+
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
+
+translations = Config().translations
 
 
 def parse_arguments() -> tuple:
@@ -49,10 +58,11 @@ def main():
         logger.addHandler(file_handler)
         logger.setLevel(logging.DEBUG)
 
-    logger.debug(f"Tên mô hình: {args.model_name}")
-    logger.debug(f"Đường dẫn mô hình: {exp_dir}")
-    logger.debug(f"Phiên bản mô hình: {version}")
-    logger.debug(f"Tùy chọn chỉ mục: {index_algorithm}")
+    logger.debug(f"{translations['modelname']}: {args.model_name}")
+    logger.debug(f"{translations['model_path']}: {exp_dir}")
+    logger.debug(f"{translations['training_version']}: {version}")
+    logger.debug(f"{translations['index_algorithm_info']}: {index_algorithm}")
+
 
     try:
         feature_dir = os.path.join(exp_dir, f"{version}_extracted")
@@ -103,8 +113,8 @@ def main():
 
         faiss.write_index(index_added, index_filepath_added)
 
-        logger.info(f"Đã lưu tệp chỉ mục '{index_filepath_added}'")
+        logger.info(f"{translations['save_index']} '{index_filepath_added}'")
     except Exception as e:
-        logger.error(f"Đã xảy ra lỗi khi tạo chỉ mục: {e}")
+        logger.error(f"{translations['create_index_error']}: {e}")
 
 if __name__ == "__main__": main()

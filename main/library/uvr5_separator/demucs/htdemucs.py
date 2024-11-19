@@ -1,3 +1,5 @@
+import os
+import sys
 import math
 import torch
 import random
@@ -8,12 +10,18 @@ import typing as tp
 from torch import nn
 from einops import rearrange
 from fractions import Fraction
-
 from torch.nn import functional as F
+
+
+now_dir = os.getcwd()
+sys.path.append(now_dir)
 
 from .states import capture_init
 from .demucs import rescale_module
+from main.configs.config import Config
 from .hdemucs import pad1d, spectro, ispectro, wiener, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
+
+translations = Config().translations
 
 
 def create_sin_embedding(length: int, dim: int, shift: int = 0, device="cpu", max_period=10000):
@@ -28,7 +36,7 @@ def create_sin_embedding(length: int, dim: int, shift: int = 0, device="cpu", ma
     return torch.cat([torch.cos(phase), torch.sin(phase)], dim=-1)
 
 def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=10000):
-    if d_model % 4 != 0: raise ValueError("Không thể sử dụng mã hóa vị trí sin/cos với thứ nguyên lẻ " "(có dim={:d})".format(d_model))
+    if d_model % 4 != 0: raise ValueError(translations["dims"].format(dims=d_model))
 
     pe = torch.zeros(d_model, height, width)
 
@@ -316,7 +324,7 @@ class CrossTransformerEncoderLayer(nn.Module):
         if activation == "relu": return F.relu
         elif activation == "gelu": return F.gelu
 
-        raise RuntimeError("kích hoạt phải là relu/gelu, không phải {}".format(activation))
+        raise RuntimeError(translations["activation"].format(activation=activation))
 
 
 class HTDemucs(nn.Module):
@@ -554,7 +562,7 @@ class HTDemucs(nn.Module):
         if not self.use_train_segment: return length
         
         training_length = int(self.segment * self.samplerate)
-        if training_length < length: raise ValueError(f"Độ dài cho trước {length} dài hơn " f"thời lượng huấn luyện {training_length}")
+        if training_length < length: raise ValueError(translations["length_or_training_length"].format(length=length, training_length=training_length))
         
         return training_length
 
@@ -612,6 +620,7 @@ class HTDemucs(nn.Module):
 
             saved.append(x)
 
+
         if self.crosstransformer:
             if self.bottom_channels:
                 b, c, f, t = x.shape
@@ -651,6 +660,7 @@ class HTDemucs(nn.Module):
         assert len(saved) == 0
         assert len(lengths_t) == 0
         assert len(saved_t) == 0
+
 
         S = len(self.sources)
         x = x.view(B, S, -1, Fq, T)

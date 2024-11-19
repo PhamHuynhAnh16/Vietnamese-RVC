@@ -33,6 +33,7 @@ from distutils.util import strtobool
 from fairseq import checkpoint_utils
 from pydub import AudioSegment, silence
 
+
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
@@ -65,6 +66,8 @@ log_file = os.path.join("assets", "logs", "convert.log")
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
+
+translations = Config().translations
 
 
 if logger.hasHandlers(): logger.handlers.clear()
@@ -140,28 +143,29 @@ def main():
     batch_size = args.batch_size 
     split_audio = args.split_audio
 
-    logger.debug(f"Cao độ giọng nói: {pitch}")
-    logger.debug(f"Lọc trung vị: {filter_radius}")
-    logger.debug(f"Ảnh hưởng của chỉ mục: {index_rate}")
-    logger.debug(f"Đường bao âm thanh: {volume_envelope}")
-    logger.debug(f"Bảo vệ phụ âm: {protect}")
+    logger.debug(f"{translations['pitch']}: {pitch}")
+    logger.debug(f"{translations['filter_radius']}: {filter_radius}")
+    logger.debug(f"{translations['index_strength']} {index_rate}")
+    logger.debug(f"{translations['volume_envelope']}: {volume_envelope}")
+    logger.debug(f"{translations['protect']}: {protect}")
     if f0_method == "crepe" or f0_method == "crepe-tiny": logger.debug(f"Hop length: {hop_length}")
-    logger.debug(f"Phương pháp trích xuất âm thanh: {f0_method}")
-    logger.debug(f"Đường dẫn đầu vào âm thanh: {input_path}")
-    logger.debug(f"Đường dẫn đầu ra ân thanh: {output_path.replace('.wav', f'.{export_format}')}")
-    logger.debug(f"Đường dẫn tệp tin mô hình: {pth_path}")
-    logger.debug(f"Đường dẫn tệp tin chỉ mục: {index_path}")
-    logger.debug(f"Tự động điều chỉnh trích xuất: {f0_autotune}")
-    logger.debug(f"Làm sạch âm thanh: {clean_audio}")
-    if clean_audio: logger.debug(f"Mức độ làm sạch âm thanh: {clean_strength}")
-    logger.debug(f"Định dạng âm thanh đầu ra: {export_format}")
-    logger.debug(f"Mô hình học cách nói: {embedder_model}")
-    logger.debug(f"Tăng chất lượng âm thanh: {upscale_audio}")
-    if resample_sr != 0: logger.debug(f"Tỷ lệ lấy mẫu lại: {resample_sr}")
-    if split_audio: logger.debug(f"Sử dụng xử lý đa luồng: {batch_process}")
-    if batch_process and split_audio: logger.debug(f"Số luồng xử lý cùng lúc: {batch_size}")
-    logger.debug(f"Cắt nhỏ âm thanh: {split_audio}")
-    if f0_autotune: logger.debug(f"Mức độ điều chỉnh trích xuất: {f0_autotune_strength}")
+    logger.debug(f"{translations['f0_method']}: {f0_method}")
+    logger.debug(f"f0_method: {input_path}")
+    logger.debug(f"{translations['audio_path']}: {input_path}")
+    logger.debug(f"{translations['output_path']}: {output_path.replace('.wav', f'.{export_format}')}")
+    logger.debug(f"{translations['model_path']}: {pth_path}")
+    logger.debug(f"{translations['indexpath']}: {index_path}")
+    logger.debug(f"{translations['autotune']}: {f0_autotune}")
+    logger.debug(f"{translations['clear_audio']}: {clean_audio}")
+    if clean_audio: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
+    logger.debug(f"{translations['export_format']}: {export_format}")
+    logger.debug(f"{translations['hubert_model']}: {embedder_model}")
+    logger.debug(f"{translations['upscale_audio']}: {upscale_audio}")
+    if resample_sr != 0: logger.debug(f"{translations['sample_rate']}: {resample_sr}")
+    if split_audio: logger.debug(f"{translations['batch_process']}: {batch_process}")
+    if batch_process and split_audio: logger.debug(f"{translations['batch_size']}: {batch_size}")
+    logger.debug(f"{translations['split_audio']}: {split_audio}")
+    if f0_autotune: logger.debug(f"{translations['autotune_rate_info']}: {f0_autotune_strength}")
 
 
     check_rmvpe_fcpe(f0_method)
@@ -176,6 +180,7 @@ def check_rmvpe_fcpe(method):
 
     def download_fcpe():
         if not os.path.exists(os.path.join("assets", "model", "predictors", "fcpe.pt")): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "fcpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
+
 
     if method == "rmvpe": download_rmvpe()
     elif method == "fcpe": download_fcpe()
@@ -198,15 +203,14 @@ def check_hubert(hubert):
 def load_audio_infer(file, sample_rate):
     try:
         file = file.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
-        if not os.path.isfile(file): raise FileNotFoundError(f"Không tìm thấy tệp: {file}")
+        if not os.path.isfile(file): raise FileNotFoundError(translations["not_found"].format(name=file))
 
         audio, sr = sf.read(file)
 
         if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
         if sr != sample_rate: audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
-
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {e}") 
+        raise RuntimeError(f"{translations['errors_loading_audio']}: {e}") 
      
     return audio.flatten()
 
@@ -221,6 +225,7 @@ def process_audio(file_path, output_path):
 
         min_chunk_duration = 30
 
+
         for i, (start_i, end_i) in enumerate(nonsilent_parts):
             chunk = song[start_i:end_i]
 
@@ -232,19 +237,22 @@ def process_audio(file_path, output_path):
 
                 cut_files.append(chunk_file_path)
                 time_stamps.append((start_i, end_i))
-            else: logger.debug(f"Phần {i} được bỏ qua vì quá ngắn: {len(chunk)}ms")
+            else: logger.debug(translations["skip_file"].format(i=i, chunk=len(chunk)))
 
-        logger.info(f"Tổng số phần đã cắt: {len(cut_files)}")
+
+        logger.info(f"{translations['split_total']}: {len(cut_files)}")
         return cut_files, time_stamps
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi cắt âm thanh: {e}")
+        raise RuntimeError(f"{translations['process_audio_error']}: {e}")
 
 
 def merge_audio(files_list, time_stamps, original_file_path, output_path, format):
     try:
         def extract_number(filename):
             match = re.search(r'_(\d+)', filename)
+
             return int(match.group(1)) if match else 0
+
 
         files_list = sorted(files_list, key=extract_number)
         total_duration = len(AudioSegment.from_file(original_file_path))
@@ -265,7 +273,7 @@ def merge_audio(files_list, time_stamps, original_file_path, output_path, format
         combined.export(output_path, format=format)
         return output_path
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi ghép âm thanh: {e}")
+        raise RuntimeError(f"{translations['merge_error']}: {e}")
 
 
 def run_batch_convert(params):
@@ -293,29 +301,38 @@ def run_batch_convert(params):
     resample_sr = params["resample_sr"]
     processed_segments = params["processed_segments"]
     
+
     segment_output_path = os.path.join(audio_temp, f"output_{cut_files.index(path)}.{export_format}")
     if os.path.exists(segment_output_path): os.remove(segment_output_path)
 
     cvt.convert_audio(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, audio_input_path=path, audio_output_path=segment_output_path, model_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, upscale_audio=upscale_audio, embedder_model=embedder_model, resample_sr=resample_sr)
     os.remove(path)
 
+
     if os.path.exists(segment_output_path): processed_segments.append(segment_output_path)
     else: 
-        logger.warning(f"Không tìm thấy tệp đã xử lý: {segment_output_path}")
+        logger.warning(f"{translations['not_found_convert_file']}: {segment_output_path}")
         sys.exit(1)
  
+
+def run_batch_convert_with_update(params, pbar):
+    run_batch_convert(params)
+    pbar.update(1)
+
 
 def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, upscale_audio, embedder_model, resample_sr, batch_process, batch_size, split_audio):
     cvt = VoiceConverter()
     start_time = time.time()
 
+
     if not pth_path or not os.path.exists(pth_path) or os.path.isdir(pth_path) or not pth_path.endswith(".pth"):
-        logger.warning("Mô hình không hợp lệ!")
+        logger.warning(translations["provide_file"].format(filename=translations["model"]))
         sys.exit(1)
     
     if not index_path or not os.path.exists(index_path) or os.path.isdir(index_path) or not index_path.endswith(".index"):
-        logger.warning("Chỉ mục không hợp lệ!")
+        logger.warning(translations["provide_file"].format(filename=translations["index"]))
         sys.exit(1)
+
 
     output_dir = os.path.dirname(output_path)
     output_dir = output_path if not output_dir else output_dir
@@ -324,25 +341,29 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
-    mp.set_start_method("spawn", force=True)
+
+    if split_audio and batch_process: mp.set_start_method("spawn", force=True)
 
     audio_temp = os.path.join("audios_temp")
     if not os.path.exists(audio_temp) and split_audio: os.makedirs(audio_temp, exist_ok=True)
     
+
     if os.path.isdir(input_path):
         try:
-            logger.info(f"Chuyển đổi hàng loạt...")
+            logger.info(translations["convert_batch"])
 
-            audio_files = [f for f in os.listdir(input_path) if f.endswith(("wav","mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]
+
+            audio_files = [f for f in os.listdir(input_path) if f.endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]
             if not audio_files: 
-                logger.warning("Không tìm thấy tệp âm thanh!")
+                logger.warning(translations["not_found_audio"])
                 sys.exit(1)
 
-            logger.info(f"Tìm thấy {len(audio_files)} tệp âm thanh cho việc chuyển đổi.")
+            logger.info(translations["found_audio"].format(audio_files=len(audio_files)))
 
             for audio in audio_files:
                 audio_path = os.path.join(input_path, audio)
                 output_audio = os.path.join(input_path, os.path.splitext(audio)[0] + f"_output.{export_format}")
+
 
                 if split_audio:
                     try:
@@ -378,43 +399,59 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
 
                         if batch_process:
-                            num_threads = min(batch_size, len(cut_files))
+                            num_processes = min(batch_size, len(cut_files))
+                            processes = []
+                            
+                            with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                                for _, params in enumerate(params_list):
+                                    p = mp.Process(target=run_batch_convert_with_update, args=(params, pbar))
+                                    p.start()
+                                    processes.append(p)
+                                    
+                                    if len(processes) >= num_processes:
+                                        for p in processes:
+                                            p.join()
+                                        processes = [] 
 
-                            with mp.Pool(processes=num_threads) as pool:
-                                with tqdm(total=len(params_list), desc="Chuyển Đổi Âm Thanh", unit="iB", unit_scale=True) as pbar:
-                                    for _ in pool.imap_unordered(run_batch_convert, params_list):
-                                        pbar.update(1)
+                                for p in processes:
+                                    p.join()
                         else: 
-                            for params in tqdm(params_list, desc="Chuyển Đổi Âm Thanh", unit="iB", unit_scale=True):
+                            for params in tqdm(params_list, desc=translations["convert_audio"], unit="iB", unit_scale=True):
                                 run_batch_convert(params)
+
 
                         merge_audio(processed_segments, time_stamps, audio_path, output_audio, export_format)
                     except Exception as e:
-                        logger.error(f"Đã xảy ra lỗi khi chuyển đổi các đoạn âm thanh cắt: {e}")
+                        logger.error(translations["error_convert_batch"].format(e=e))
                     finally:
                         if os.path.exists(audio_temp): shutil.rmtree(audio_temp, ignore_errors=True)
                 else:
                     try:
-                        logger.info(f"Chuyển đổi âm thanh '{audio_path}'...")
+                        logger.info(f"{translations['convert_audio']} '{audio_path}'...")
 
                         if os.path.exists(output_audio): os.remove(output_audio)
 
-                        with tqdm(total=1, desc="Chuyển Đổi Âm Thanh", unit="iB", unit_scale=True) as pbar:
+                        with tqdm(total=1, desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
                             cvt.convert_audio(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, audio_input_path=audio_path, audio_output_path=output_audio, model_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, upscale_audio=upscale_audio, embedder_model=embedder_model, resample_sr=resample_sr)
                             pbar.update(1)
                     except Exception as e:
-                        logger.error(f"Đã xảy ra lỗi khi chuyển đổi âm thanh: {e}")
+                        logger.error(translations["error_convert"].format(e=e))
+
 
             elapsed_time = time.time() - start_time
-            logger.info(f"Đã chuyển đổi hàng loạt thành công sau {elapsed_time:.2f} giây. {output_path.replace('.wav', f'.{export_format}')}")
+            logger.info(translations["convert_batch_success"].format(elapsed_time=f"{elapsed_time:.2f}", output_path=output_path.replace('.wav', f'.{export_format}')))
         except Exception as e:
-            logger.error(f"Đã xảy ra lỗi khi chuyển đổi âm thanh hàng loạt: {e}")
+            logger.error(translations["error_convert_batch_2"].format(e=e))
     else:
-        logger.info(f"Chuyển đổi âm thanh '{input_path}'...")
+        logger.info(f"{translations['convert_audio']} '{input_path}'...")
 
         if not os.path.exists(input_path):
-            logger.warning("Không tìm thấy tệp âm thanh!")
+            logger.warning(translations["not_found_audio"])
             sys.exit(1)
+        
+        if os.path.isdir(output_path): output_path = os.path.join(output_path, f"output.{export_format}")
+        if os.path.exists(output_path): os.remove(output_path)
+
 
         if split_audio:
             try:              
@@ -449,33 +486,41 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                 ]
 
                 if batch_process:
-                    num_threads = min(batch_size, len(cut_files))
+                    num_processes = min(batch_size, len(cut_files))
+                    processes = []
+                    
+                    with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                        for _, params in enumerate(params_list):
+                            p = mp.Process(target=run_batch_convert_with_update, args=(params, pbar))
+                            p.start()
+                            processes.append(p)
+                            
+                            if len(processes) >= num_processes:
+                                for p in processes:
+                                    p.join()
+                                processes = [] 
 
-                    with mp.Pool(processes=num_threads) as pool:
-                        with tqdm(total=len(params_list), desc="Chuyển Đổi Âm Thanh", unit="iB", unit_scale=True) as pbar:
-                            for _ in pool.imap_unordered(run_batch_convert, params_list):
-                                pbar.update(1)
+                        for p in processes:
+                            p.join()
                 else: 
-                    for params in tqdm(params_list, desc="Chuyển Đổi Âm Thanh", unit="iB", unit_scale=True):
+                    for params in tqdm(params_list, desc=translations["convert_audio"], unit="iB", unit_scale=True):
                         run_batch_convert(params)
 
                 merge_audio(processed_segments, time_stamps, input_path, output_path.replace(".wav", f".{export_format}"), export_format)
             except Exception as e:
-                logger.error(f"Đã xảy ra lỗi khi chuyển đổi các đoạn âm thanh cắt: {e}")
+                logger.error(translations["error_convert_batch"].format(e=e))
             finally:
                 if os.path.exists(audio_temp): shutil.rmtree(audio_temp, ignore_errors=True)
         else:
             try:
-                if os.path.exists(output_path): os.remove(output_path)
-
-                with tqdm(total=1, desc="Chuyển Đổi Âm Thanh", unit="iB", unit_scale=True) as pbar:
+                with tqdm(total=1, desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
                     cvt.convert_audio(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, audio_input_path=input_path, audio_output_path=output_path, model_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, upscale_audio=upscale_audio, embedder_model=embedder_model, resample_sr=resample_sr)
                     pbar.update(1)
             except Exception as e:
-                logger.error(f"Đã xảy ra lỗi khi chuyển đổi âm thanh: {e}")
+                logger.error(translations["error_convert"].format(e=e))
 
         elapsed_time = time.time() - start_time
-        logger.info(f"Tệp {input_path} được chuyển đổi thành công sau {elapsed_time:.2f} giây. {output_path.replace('.wav', f'.{export_format}')}")
+        logger.info(translations["convert_audio_success"].format(input_path=input_path, elapsed_time=f"{elapsed_time:.2f}", output_path=output_path.replace('.wav', f'.{export_format}')))
 
 
 def change_rms(source_audio: np.ndarray, source_rate: int, target_audio: np.ndarray, target_rate: int, rate: float) -> np.ndarray:
@@ -505,6 +550,7 @@ def change_rms(source_audio: np.ndarray, source_rate: int, target_audio: np.ndar
 
     rms2 = torch.maximum(rms2, torch.zeros_like(rms2) + 1e-6)
 
+
     adjusted_audio = (target_audio * (torch.pow(rms1, 1 - rate) * torch.pow(rms2, rate - 1)).numpy())
     return adjusted_audio
 
@@ -517,6 +563,7 @@ class Autotune:
 
     def autotune_f0(self, f0, f0_autotune_strength):
         autotuned_f0 = np.zeros_like(f0)
+
 
         for i, freq in enumerate(f0):
             closest_note = min(self.note_dict, key=lambda x: abs(x - freq))
@@ -613,6 +660,7 @@ class VC:
         audio = torch.from_numpy(x).to(self.device, copy=True)
         audio = torch.unsqueeze(audio, dim=0)
 
+
         if audio.ndim == 2 and audio.shape[0] > 1: audio = torch.mean(audio, dim=0, keepdim=True).detach()
 
         audio = audio.detach()
@@ -637,7 +685,7 @@ class VC:
         if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
 
         f0_computation_stack = []
-        logger.debug(f"Tính toán ước lượng cao độ f0 cho các phương pháp {str(methods)}")
+        logger.debug(translations["hybrid_methods"].format(methods=methods))
 
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
@@ -645,6 +693,7 @@ class VC:
 
         for method in methods:
             f0 = None
+
 
             if method == "pm":
                 f0 = (parselmouth.Sound(x, self.sample_rate).to_pitch_ac(time_step=self.window / self.sample_rate * 1000 / 1000, voicing_threshold=0.6, pitch_floor=self.f0_min, pitch_ceiling=self.f0_max).selected_array["frequency"])
@@ -674,7 +723,7 @@ class VC:
                 f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sample_rate)
 
                 if filter_radius > 2: f0 = signal.medfilt(f0, 3)
-            else: raise ValueError("Phương pháp không hợp lệ")
+            else: raise ValueError(translations["method_not_valid"])
    
             f0_computation_stack.append(f0)
             
@@ -722,7 +771,7 @@ class VC:
         elif "hybrid" in f0_method:
             input_audio_path2wav[input_audio_path] = x.astype(np.double)
             f0 = self.get_f0_hybrid(f0_method, x, self.f0_min, self.f0_max, p_len, hop_length, filter_radius)
-        else: raise ValueError("Method không hợp lệ")
+        else: raise ValueError(translations["method_not_valid"])
 
         if f0_autotune: f0 = Autotune.autotune_f0(self, f0, f0_autotune_strength)
 
@@ -818,7 +867,7 @@ class VC:
                 index = faiss.read_index(file_index)
                 big_npy = index.reconstruct_n(0, index.ntotal)
             except Exception as e:
-                logger.error(f"Đã xảy ra lỗi khi đọc chỉ mục FAISS: {e}")
+                logger.error(translations["read_faiss_index_error"].format(e=e))
                 index = big_npy = None
         else: index = big_npy = None
 
@@ -888,12 +937,16 @@ class VoiceConverter:
     def __init__(self):
         self.config = Config()  
         self.hubert_model = (None)
+
         self.tgt_sr = None 
         self.net_g = None 
+
         self.vc = None
         self.cpt = None  
+
         self.version = None 
         self.n_spk = None  
+
         self.use_f0 = None  
         self.loaded_model = None
     
@@ -902,7 +955,7 @@ class VoiceConverter:
         try:
             models, _, _ = checkpoint_utils.load_model_ensemble_and_task([os.path.join(now_dir, "assets", "model", "embedders", embedder_model + '.pt')], suffix="")
         except Exception as e:
-            raise ImportError(f"Thất bại khi tải mô hình: {e}")
+            raise ImportError(translations["read_model_error"].format(e=e))
         
         self.hubert_model = models[0].to(self.config.device)
         self.hubert_model = (self.hubert_model.half() if self.config.is_half else self.hubert_model.float())
@@ -917,7 +970,7 @@ class VoiceConverter:
 
             return reduced_noise
         except Exception as e:
-            logger.error(f"Đã xảy ra lỗi khi loại bỏ tiếng ồn: {e}")
+            logger.error(translations["denoise_error"].format(e=e))
             return None
 
 
@@ -925,8 +978,9 @@ class VoiceConverter:
     def convert_audio_format(input_path, output_path, output_format):
         try:
             if output_format != "wav":
-                logger.info(f"Đang chuyển đổi âm thanh sang định dạng {output_format}...")
+                logger.debug(translations["change_format"].format(output_format=output_format))
                 audio, sample_rate = sf.read(input_path)
+
 
                 common_sample_rates = [
                     8000, 
@@ -947,7 +1001,7 @@ class VoiceConverter:
 
             return output_path
         except Exception as e:
-            raise RuntimeError(f"Đã xảy ra lỗi khi chuyển đổi định dạng âm thanh: {e}")
+            raise RuntimeError(translations["change_format_error"].format(e=e))
 
 
     def convert_audio(self, audio_input_path, audio_output_path, model_path, index_path, embedder_model, pitch, f0_method, index_rate, volume_envelope, protect, hop_length, f0_autotune, f0_autotune_strength, filter_radius, clean_audio, clean_strength, export_format, upscale_audio, resample_sr = 0, sid = 0):
@@ -959,6 +1013,7 @@ class VoiceConverter:
             audio = load_audio_infer(audio_input_path, 16000)
 
             audio_max = np.abs(audio).max() / 0.95
+
 
             if audio_max > 1: audio /= audio_max
 
@@ -982,7 +1037,7 @@ class VoiceConverter:
             output_path_format = audio_output_path.replace(".wav", f".{export_format}")
             audio_output_path = self.convert_audio_format(audio_output_path, output_path_format, export_format)
         except Exception as e:
-            logger.error(f"Đã xảy ra lỗi trong quá trình chuyển đổi âm thanh: {e}")
+            logger.error(translations["error_convert"].format(e=e))
             logger.error(traceback.format_exc())
 
 

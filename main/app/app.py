@@ -1,12 +1,14 @@
 import os
 import re
 import sys
+import json
 import torch
 import codecs
 import yt_dlp
 import shutil
 import zipfile
 import logging
+import platform
 import edge_tts
 import requests
 import warnings
@@ -26,7 +28,8 @@ from multiprocessing import cpu_count
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
-from main.tools import gdown, meganz, mediafire
+from main.configs.config import Config
+from main.tools import gdown, meganz, mediafire, pixeldrain
 
 
 logging.getLogger("wget").setLevel(logging.WARNING)
@@ -38,8 +41,9 @@ logging.getLogger("gradio").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-
+config = Config()
 python = sys.executable
+translations = config.translations
 
 model_name = []
 index_path = []
@@ -63,117 +67,26 @@ pretrained_v1_link = codecs.decode("uggcf://uhttvatsnpr.pb/VNUvfcnab/Nccyvb/erfb
 pretrained_v2_link = codecs.decode("uggcf://uhttvatsnpr.pb/yw1995/IbvprPbairefvbaJroHV/erfbyir/znva/cergenvarq_i2/", "rot13")
 
 
+configs_json = os.path.join("main", "configs", "config.json")
+
+with open(configs_json, "r") as f:
+    configs = json.load(f)
+
+theme = configs["theme"]
+server_name = configs["server_name"]
+port = configs["app_port"]
+show_error = configs["app_show_error"]
+share = configs["share"]
+tts_voice = configs["tts_voice"] 
+
+
+if not theme: theme = "NoCrypt/miku"
+if not server_name: server_name = "0.0.0.0"
+if not port: port = 7860
+if not tts_voice: tts_voice = ["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"]
+
+
 if not os.path.exists(os.path.join("assets", "miku.png")): run(["wget", "-q", "--show-progress", "--no-check-certificate", miku_image, "-P", os.path.join("assets")], check=True)
-
-
-tts_voice = [
-    'af-ZA-AdriNeural', 'af-ZA-WillemNeural', 'sq-AL-AnilaNeural', 
-    'sq-AL-IlirNeural', 'am-ET-AmehaNeural', 'am-ET-MekdesNeural', 
-    'ar-DZ-AminaNeural', 'ar-DZ-IsmaelNeural', 'ar-BH-AliNeural', 
-    'ar-BH-LailaNeural', 'ar-EG-SalmaNeural', 'ar-EG-ShakirNeural', 
-    'ar-IQ-BasselNeural', 'ar-IQ-RanaNeural', 'ar-JO-SanaNeural', 
-    'ar-JO-TaimNeural', 'ar-KW-FahedNeural', 'ar-KW-NouraNeural', 
-    'ar-LB-LaylaNeural', 'ar-LB-RamiNeural', 'ar-LY-ImanNeural', 
-    'ar-LY-OmarNeural', 'ar-MA-JamalNeural', 'ar-MA-MounaNeural', 
-    'ar-OM-AbdullahNeural', 'ar-OM-AyshaNeural', 'ar-QA-AmalNeural', 
-    'ar-QA-MoazNeural', 'ar-SA-HamedNeural', 'ar-SA-ZariyahNeural', 
-    'ar-SY-AmanyNeural', 'ar-SY-LaithNeural', 'ar-TN-HediNeural', 
-    'ar-TN-ReemNeural', 'ar-AE-FatimaNeural', 'ar-AE-HamdanNeural', 
-    'ar-YE-MaryamNeural', 'ar-YE-SalehNeural', 'az-AZ-BabekNeural', 
-    'az-AZ-BanuNeural', 'bn-BD-NabanitaNeural', 'bn-BD-PradeepNeural', 
-    'bn-IN-BashkarNeural', 'bn-IN-TanishaaNeural', 'bs-BA-GoranNeural', 
-    'bs-BA-VesnaNeural', 'bg-BG-BorislavNeural', 'bg-BG-KalinaNeural', 
-    'my-MM-NilarNeural', 'my-MM-ThihaNeural', 'ca-ES-EnricNeural', 
-    'ca-ES-JoanaNeural', 'zh-HK-HiuGaaiNeural', 'zh-HK-HiuMaanNeural', 
-    'zh-HK-WanLungNeural', 'zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural', 
-    'zh-CN-YunjianNeural', 'zh-CN-YunxiNeural', 'zh-CN-YunxiaNeural', 
-    'zh-CN-YunyangNeural', 'zh-CN-liaoning-XiaobeiNeural', 'zh-TW-HsiaoChenNeural', 
-    'zh-TW-YunJheNeural', 'zh-TW-HsiaoYuNeural', 'zh-CN-shaanxi-XiaoniNeural', 
-    'hr-HR-GabrijelaNeural', 'hr-HR-SreckoNeural', 'cs-CZ-AntoninNeural', 
-    'cs-CZ-VlastaNeural', 'da-DK-ChristelNeural', 'da-DK-JeppeNeural', 
-    'nl-BE-ArnaudNeural', 'nl-BE-DenaNeural', 'nl-NL-ColetteNeural', 
-    'nl-NL-FennaNeural', 'nl-NL-MaartenNeural', 'en-AU-NatashaNeural', 
-    'en-AU-WilliamNeural', 'en-CA-ClaraNeural', 'en-CA-LiamNeural', 
-    'en-HK-SamNeural', 'en-HK-YanNeural', 'en-IN-NeerjaExpressiveNeural', 
-    'en-IN-NeerjaNeural', 'en-IN-PrabhatNeural', 'en-IE-ConnorNeural', 
-    'en-IE-EmilyNeural', 'en-KE-AsiliaNeural', 'en-KE-ChilembaNeural', 
-    'en-NZ-MitchellNeural', 'en-NZ-MollyNeural', 'en-NG-AbeoNeural', 
-    'en-NG-EzinneNeural', 'en-PH-JamesNeural', 'en-PH-RosaNeural', 
-    'en-SG-LunaNeural', 'en-SG-WayneNeural', 'en-ZA-LeahNeural', 
-    'en-ZA-LukeNeural', 'en-TZ-ElimuNeural', 'en-TZ-ImaniNeural', 
-    'en-GB-LibbyNeural', 'en-GB-MaisieNeural', 'en-GB-RyanNeural', 
-    'en-GB-SoniaNeural', 'en-GB-ThomasNeural', 'en-US-AvaMultilingualNeural', 
-    'en-US-AndrewMultilingualNeural', 'en-US-EmmaMultilingualNeural', 
-    'en-US-BrianMultilingualNeural', 'en-US-AvaNeural', 'en-US-AndrewNeural', 
-    'en-US-EmmaNeural', 'en-US-BrianNeural', 'en-US-AnaNeural', 'en-US-AriaNeural', 
-    'en-US-ChristopherNeural', 'en-US-EricNeural', 'en-US-GuyNeural', 
-    'en-US-JennyNeural', 'en-US-MichelleNeural', 'en-US-RogerNeural', 
-    'en-US-SteffanNeural', 'et-EE-AnuNeural', 'et-EE-KertNeural', 
-    'fil-PH-AngeloNeural', 'fil-PH-BlessicaNeural', 'fi-FI-HarriNeural', 
-    'fi-FI-NooraNeural', 'fr-BE-CharlineNeural', 'fr-BE-GerardNeural', 
-    'fr-CA-ThierryNeural', 'fr-CA-AntoineNeural', 'fr-CA-JeanNeural', 
-    'fr-CA-SylvieNeural', 'fr-FR-VivienneMultilingualNeural', 'fr-FR-RemyMultilingualNeural', 
-    'fr-FR-DeniseNeural', 'fr-FR-EloiseNeural', 'fr-FR-HenriNeural', 
-    'fr-CH-ArianeNeural', 'fr-CH-FabriceNeural', 'gl-ES-RoiNeural', 
-    'gl-ES-SabelaNeural', 'ka-GE-EkaNeural', 'ka-GE-GiorgiNeural', 
-    'de-AT-IngridNeural', 'de-AT-JonasNeural', 'de-DE-SeraphinaMultilingualNeural', 
-    'de-DE-FlorianMultilingualNeural', 'de-DE-AmalaNeural', 'de-DE-ConradNeural', 
-    'de-DE-KatjaNeural', 'de-DE-KillianNeural', 'de-CH-JanNeural', 
-    'de-CH-LeniNeural', 'el-GR-AthinaNeural', 'el-GR-NestorasNeural', 
-    'gu-IN-DhwaniNeural', 'gu-IN-NiranjanNeural', 'he-IL-AvriNeural', 
-    'he-IL-HilaNeural', 'hi-IN-MadhurNeural', 'hi-IN-SwaraNeural', 
-    'hu-HU-NoemiNeural', 'hu-HU-TamasNeural', 'is-IS-GudrunNeural', 
-    'is-IS-GunnarNeural', 'id-ID-ArdiNeural', 'id-ID-GadisNeural', 
-    'ga-IE-ColmNeural', 'ga-IE-OrlaNeural', 'it-IT-GiuseppeNeural', 
-    'it-IT-DiegoNeural', 'it-IT-ElsaNeural', 'it-IT-IsabellaNeural', 
-    'ja-JP-KeitaNeural', 'ja-JP-NanamiNeural', 'jv-ID-DimasNeural', 
-    'jv-ID-SitiNeural', 'kn-IN-GaganNeural', 'kn-IN-SapnaNeural', 
-    'kk-KZ-AigulNeural', 'kk-KZ-DauletNeural', 'km-KH-PisethNeural', 
-    'km-KH-SreymomNeural', 'ko-KR-HyunsuNeural', 'ko-KR-InJoonNeural', 
-    'ko-KR-SunHiNeural', 'lo-LA-ChanthavongNeural', 'lo-LA-KeomanyNeural', 
-    'lv-LV-EveritaNeural', 'lv-LV-NilsNeural', 'lt-LT-LeonasNeural', 
-    'lt-LT-OnaNeural', 'mk-MK-AleksandarNeural', 'mk-MK-MarijaNeural', 
-    'ms-MY-OsmanNeural', 'ms-MY-YasminNeural', 'ml-IN-MidhunNeural', 
-    'ml-IN-SobhanaNeural', 'mt-MT-GraceNeural', 'mt-MT-JosephNeural', 
-    'mr-IN-AarohiNeural', 'mr-IN-ManoharNeural', 'mn-MN-BataaNeural', 
-    'mn-MN-YesuiNeural', 'ne-NP-HemkalaNeural', 'ne-NP-SagarNeural', 
-    'nb-NO-FinnNeural', 'nb-NO-PernilleNeural', 'ps-AF-GulNawazNeural', 
-    'ps-AF-LatifaNeural', 'fa-IR-DilaraNeural', 'fa-IR-FaridNeural', 
-    'pl-PL-MarekNeural', 'pl-PL-ZofiaNeural', 'pt-BR-ThalitaNeural', 
-    'pt-BR-AntonioNeural', 'pt-BR-FranciscaNeural', 'pt-PT-DuarteNeural', 
-    'pt-PT-RaquelNeural', 'ro-RO-AlinaNeural', 'ro-RO-EmilNeural', 
-    'ru-RU-DmitryNeural', 'ru-RU-SvetlanaNeural', 'sr-RS-NicholasNeural', 
-    'sr-RS-SophieNeural', 'si-LK-SameeraNeural', 'si-LK-ThiliniNeural', 
-    'sk-SK-LukasNeural', 'sk-SK-ViktoriaNeural', 'sl-SI-PetraNeural', 
-    'sl-SI-RokNeural', 'so-SO-MuuseNeural', 'so-SO-UbaxNeural', 
-    'es-AR-ElenaNeural', 'es-AR-TomasNeural', 'es-BO-MarceloNeural', 
-    'es-BO-SofiaNeural', 'es-CL-CatalinaNeural', 'es-CL-LorenzoNeural', 
-    'es-ES-XimenaNeural', 'es-CO-GonzaloNeural', 'es-CO-SalomeNeural', 
-    'es-CR-JuanNeural', 'es-CR-MariaNeural', 'es-CU-BelkysNeural', 
-    'es-CU-ManuelNeural', 'es-DO-EmilioNeural', 'es-DO-RamonaNeural', 
-    'es-EC-AndreaNeural', 'es-EC-LuisNeural', 'es-SV-LorenaNeural', 
-    'es-SV-RodrigoNeural', 'es-GQ-JavierNeural', 'es-GQ-TeresaNeural', 
-    'es-GT-AndresNeural', 'es-GT-MartaNeural', 'es-HN-CarlosNeural', 
-    'es-HN-KarlaNeural', 'es-MX-DaliaNeural', 'es-MX-JorgeNeural', 
-    'es-NI-FedericoNeural', 'es-NI-YolandaNeural', 'es-PA-MargaritaNeural', 
-    'es-PA-RobertoNeural', 'es-PY-MarioNeural', 'es-PY-TaniaNeural', 
-    'es-PE-AlexNeural', 'es-PE-CamilaNeural', 'es-PR-KarinaNeural', 
-    'es-PR-VictorNeural', 'es-ES-AlvaroNeural', 'es-ES-ElviraNeural', 
-    'es-US-AlonsoNeural', 'es-US-PalomaNeural', 'es-UY-MateoNeural', 
-    'es-UY-ValentinaNeural', 'es-VE-PaolaNeural', 'es-VE-SebastianNeural', 
-    'su-ID-JajangNeural', 'su-ID-TutiNeural', 'sw-KE-RafikiNeural', 
-    'sw-KE-ZuriNeural', 'sw-TZ-DaudiNeural', 'sw-TZ-RehemaNeural', 
-    'sv-SE-MattiasNeural', 'sv-SE-SofieNeural', 'ta-IN-PallaviNeural', 
-    'ta-IN-ValluvarNeural', 'ta-MY-KaniNeural', 'ta-MY-SuryaNeural', 
-    'ta-SG-AnbuNeural', 'ta-SG-VenbaNeural', 'ta-LK-KumarNeural', 
-    'ta-LK-SaranyaNeural', 'te-IN-MohanNeural', 'te-IN-ShrutiNeural', 
-    'th-TH-NiwatNeural', 'th-TH-PremwadeeNeural', 'tr-TR-AhmetNeural', 
-    'tr-TR-EmelNeural', 'uk-UA-OstapNeural', 'uk-UA-PolinaNeural', 
-    'ur-IN-GulNeural', 'ur-IN-SalmanNeural', 'ur-PK-AsadNeural', 
-    'ur-PK-UzmaNeural', 'uz-UZ-MadinaNeural', 'uz-UZ-SardorNeural', 
-    'vi-VN-HoaiMyNeural', 'vi-VN-NamMinhNeural', 'cy-GB-AledNeural', 
-    'cy-GB-NiaNeural', 'zu-ZA-ThandoNeural', 'zu-ZA-ThembaNeural'
-]
 
 
 for model in os.listdir(os.path.join("assets", "weights")):
@@ -224,7 +137,7 @@ def get_gpu_info():
             mem = int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)
             gpu_infos.append(f"{i}: {gpu_name} ({mem} GB)") 
 
-    return "\n".join(gpu_infos) if len(gpu_infos) > 0 else "Thật không may, không có GPU tương thích để hỗ trợ việc đào tạo của bạn."
+    return "\n".join(gpu_infos) if len(gpu_infos) > 0 else translations["no_support_gpu"]
 
 
 def change_choices_pretrained():
@@ -253,6 +166,7 @@ def change_choices():
         for name in files:
             if name.endswith(".index"): index_path.append(f"{root}/{name}")
 
+
     return [{"choices": sorted(model_name), "__type__": "update"}, {"choices": sorted(index_path), "__type__": "update"}]
 
 
@@ -270,6 +184,7 @@ def interactive_1(value):
 
 def valueFalse_interactive1(inp): 
     return {"value": False, "interactive": inp, "__type__": "update"}
+
 
 def valueFalse_interactive2(inp1, inp2): 
     return {"value": False, "interactive": inp1 and inp2, "__type__": "update"}
@@ -298,6 +213,7 @@ def model_separator_change(mdx):
     if not mdx: choices = ["HT-Normal", "HT-Tuned", "HD_MMI", "HT_6S"]
     else: choices = ["Main_340", "Main_390", "Main_406", "Main_427", "Main_438", "Inst_full_292", "Inst_HQ_1", "Inst_HQ_2", "Inst_HQ_3", "Inst_HQ_4", "Kim_Vocal_1", "Kim_Vocal_2", "Kim_Inst", "Inst_187_beta", "Inst_82_beta", "Inst_90_beta", "Voc_FT", "Crowd_HQ", "Inst_1", "Inst_2", "Inst_3", "MDXNET_1_9703", "MDXNET_2_9682", "MDXNET_3_9662", "Inst_Main", "MDXNET_Main", "MDXNET_9482"]
 
+
     return {"value": choices[0], "choices": choices, "__type__": "update"}
 
 
@@ -310,6 +226,7 @@ def hoplength_show(method, hybrid_method=None):
         visible = methods[0] in ["crepe-tiny", "crepe", "fcpe"] or methods[1] in ["crepe-tiny", "crepe", "fcpe"]
     else: visible = False
     
+
     return {"visible": visible, "__type__": "update"}
 
 
@@ -317,7 +234,8 @@ def process_input(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         file_contents = file.read()
 
-    gr.Info(f"Đã tải lên tệp văn bản thành công")
+    gr.Info(translations["upload_success"].format(name=translations["text"]))
+
 
     return file_contents
 
@@ -326,12 +244,13 @@ def download_change(select):
     selects = [False]*10
 
 
-    if select == "Tải từ đường dẫn liên kết": selects[0] = selects[1] = selects[2] = True
-    elif select == "Tải từ kho mô hình csv":  selects[3] = selects[4] = True
-    elif select == "Tải mô hình từ Applio": selects[5] = selects[6] = True
-    elif select == "Tải lên": selects[9] = True
-    else: gr.Warning("Tùy chọn không hợp lệ")
+    if select == translations["download_url"]: selects[0] = selects[1] = selects[2] = True
+    elif select == translations["download_from_csv"]:  selects[3] = selects[4] = True
+    elif select == translations["download_from_applio"]: selects[5] = selects[6] = True
+    elif select == translations["upload"]: selects[9] = True
+    else: gr.Warning(translations["option_not_valid"])
     
+
     return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
 
 
@@ -346,10 +265,11 @@ def download_pretrained_change(select):
     selects = [False]*8
 
 
-    if select == "Đường dẫn mô hình": selects[0] = selects[1] = selects[2] = True
-    elif select == "Danh sách mô hình": selects[3] = selects[4] = selects[5] = True
-    elif select == "Tải lên": selects[6] = selects[7] = True
-    else: gr.Warning("Tùy chọn không hợp lệ")
+    if select == translations["download_url"]: selects[0] = selects[1] = selects[2] = True
+    elif select == translations["list_model"]: selects[3] = selects[4] = selects[5] = True
+    elif select == translations["upload"]: selects[6] = selects[7] = True
+    else: gr.Warning(translations["option_not_valid"])
+
 
     return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
 
@@ -357,7 +277,7 @@ def download_pretrained_change(select):
 def update_sample_rate_dropdown(model):
     data = fetch_pretrained_data()
 
-    if model != "Hoàn thành": return {"choices": list(data[model].keys()), "value": list(data[model].keys())[0], "__type__": "update"}
+    if model != translations["success"]: return {"choices": list(data[model].keys()), "value": list(data[model].keys())[0], "__type__": "update"}
 
 
 def if_done(done, p):
@@ -367,6 +287,48 @@ def if_done(done, p):
 
 
     done[0] = True
+
+
+def restart_app():
+    global app
+    
+    if platform.system() == "Windows": os.system("cls")
+    else: os.system("clear")
+
+    app.close()
+    os.system(f"{python} {os.path.join(now_dir, 'main', 'app', 'app.py')}")
+
+
+def change_language(lang):
+    gr.Info(translations["30s"])
+
+    with open(configs_json, "r") as f:
+        configs = json.load(f)
+
+    configs["language"] = lang
+
+    with open(configs_json, "w") as f:
+        json.dump(configs, f, indent=4)
+
+
+def change_theme(theme):
+    gr.Info(translations["30s"])
+
+    with open(configs_json, "r") as f:
+        configs = json.load(f)
+
+    configs["theme"] = theme
+
+    with open(configs_json, "w") as f:
+        json.dump(configs, f, indent=4)
+
+
+def change_fp(fp):
+    gr.Info(translations["fp_select"])
+
+    config.set_precision(fp)
+
+    gr.Info(translations["fp_select_2"].format(fp=fp))
 
 
 def pretrained_selector(pitch_guidance):
@@ -405,25 +367,25 @@ def pretrained_selector(pitch_guidance):
 def zip_file(name, pth, index):
     pth_path = os.path.join("assets", "weights", pth)
 
-    if not pth or not os.path.exists(pth_path): return gr.Warning("Vui lòng cung cấp tệp mô hình hợp lệ!")
-    if not index or not os.path.exists(index): return gr.Warning("Vui lòng cung cấp tệp chỉ mục hợp lệ")
+    if not pth or not os.path.exists(pth_path) or not pth.endswith(".pth"): return gr.Warning(translations["provide_file"].format(filename=translations["model"]))
+    if not index or not os.path.exists(index) or not index.endswith(".pth"): return gr.Warning(translations["provide_file"].format(filename=translations["index"]))
     
 
     zip_file_path = os.path.join("assets", name + ".zip")
 
-    gr.Info("Bắt đầu nén tệp...")
+    gr.Info(translations["start"].format(start=translations["zip"]))
     
     with zipfile.ZipFile(zip_file_path, 'w') as zipf:
         zipf.write(pth_path, os.path.basename(pth_path))
         zipf.write(index, os.path.basename(index))
 
 
-    gr.Info("Hoàn thành")
+    gr.Info(translations["success"])
     return zip_file_path    
 
 
 def search_models(name):
-    gr.Info("Bắt đầu tìm kiếm...")
+    gr.Info(translations["start"].format(start="search"))
     url = f"https://cjtfqzjfdimgpvpwhzlv.supabase.co/rest/v1/models?name=ilike.%25{name}%25&order=created_at.desc&limit=15"
     
     response = requests.get(url, headers={"apikey": model_search_api})
@@ -431,15 +393,15 @@ def search_models(name):
 
 
     if len(data) == 0:
-        gr.Info(f"Không tìm thấy {name}")
+        gr.Info(translations["not_found"].format(name=name))
 
-        return [None, None]
+        return [None]*2
     else:
         model_options.clear()
         model_options.update({item["name"] + " " + item["epochs"] + "e": item["link"] for item in data})
 
-        gr.Info(f"Đã tìm thấy {len(model_options)} kết quả")
-        return [{"value": "", "choices": model_options, "interactive": True, "visible": True, "__type__": "update"}, {"value": "Tải xuống", "visible": True, "__type__": "update"}]
+        gr.Info(translations["found"].format(results=len(model_options)))
+        return [{"value": "", "choices": model_options, "interactive": True, "visible": True, "__type__": "update"}, {"value": translations["downloads"], "visible": True, "__type__": "update"}]
 
 
 def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
@@ -464,7 +426,7 @@ def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
 
 
 def download_url(url):
-    if not url: return gr.Warning("Vui lòng nhập đường dẫn liên kết")
+    if not url: return gr.Warning(translations["provide_url"])
     if not os.path.exists("audios"): os.makedirs("audios", exist_ok=True)
 
 
@@ -488,19 +450,19 @@ def download_url(url):
             'verbose': False,
         }
 
-        gr.Info("Bắt đầu tải nhạc...")
+        gr.Info(translations["start"].format(start=translations["download_music"]))
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
 
-        gr.Info("Hoàn thành!")
-        return [audio_output, audio_output, "Hoàn thành"]
+        gr.Info(translations["success"])
+        return [audio_output, audio_output, translations["success"]]
 
 
 def download_model(url=None, model=None):
-    if not url: return gr.Warning("Vui lòng cung cấp đường dẫn liên kết mô hình")
-    if not model: return gr.Warning("Vui lòng nhập tên mô hình để lưu")
+    if not url: return gr.Warning(translations["provide_url"])
+    if not model: return gr.Warning(translations["provide_name_is_save"])
 
 
     model = model.replace('.pth', '').replace('.index', '').replace('.zip', '').replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '').strip()
@@ -516,7 +478,7 @@ def download_model(url=None, model=None):
     
 
     try:
-        gr.Info("Bắt đầu tải xuống...")
+        gr.Info(translations["start"].format(start=translations["download"]))
 
         if url.endswith('.pth'):
             run(["wget", "-q", "--show-progress", "--no-check-certificate", url, "-O", os.path.join(weights_dir, f"{model}.pth")], check=True)
@@ -554,23 +516,29 @@ def download_model(url=None, model=None):
                 if file.endswith('.zip'): shutil.unpack_archive(file, download_dir)
 
                 move_files_from_directory(download_dir, weights_dir, logs_dir, model)
-            else:
-                gr.Warning("Liên kết mô hình của bạn không được hỗ trợ")
-                return "Liên kết mô hình của bạn không được hỗ trợ"
-        
-        gr.Info("Hoàn thành")
-        return "Hoàn thành"
-    except Exception as e:
-        gr.Error(message=f"Đã xảy ra lỗi: {e}")
+            elif 'pixeldrain.com' in url:
+                file = pixeldrain.pixeldrain(url, download_dir)
+                if file.endswith('.zip'): shutil.unpack_archive(file, download_dir)
 
-        print(f"Đã xảy ra lỗi: {e}")
-        return f"Đã xảy ra lỗi: {e}"
+                move_files_from_directory(download_dir, weights_dir, logs_dir, model)
+            else:
+                gr.Warning(translations["not_support_url"])
+                return translations["not_support_url"]
+        
+        gr.Info(translations["success"])
+        return translations["success"]
+    except Exception as e:
+        gr.Error(message=translations["error_occurred"].format(e=e))
+
+        print(translations["error_occurred"].format(e=e))
+        return translations["error_occurred"].format(e=e)
     finally:
         shutil.rmtree(download_dir, ignore_errors=True)
 
 
 def extract_name_model(filename):
     match = re.search(r"([A-Za-z]+)(?=_v|\.|$)", filename)
+
     return match.group(1) if match else None
 
 
@@ -590,7 +558,7 @@ def save_drop_model(dropbox):
     try:
         file_name = os.path.basename(dropbox)
 
-        if file_name.endswith(".pth") and file_name.endswith(".index"): gr.Warning("Tệp bạn vừa tải lên không phải là tệp mô hình!")
+        if file_name.endswith(".pth") and file_name.endswith(".index"): gr.Warning(translations["not_model"])
         else:    
             if file_name.endswith(".zip"):
                 shutil.unpack_archive(os.path.join(save_model_temp, file_name), save_model_temp)
@@ -606,22 +574,22 @@ def save_drop_model(dropbox):
                 if not os.path.exists(model_logs): os.makedirs(model_logs, exist_ok=True)
                 shutil.move(os.path.join(save_model_temp, file_name), model_logs)
             else: 
-                gr.Warning("Không phân tích được mô hình!")
+                gr.Warning(translations["unable_analyze_model"])
                 return None
         
-        gr.Info(f"Đã tải lên thành công {file_name}")
+        gr.Info(translations["upload_success"].format(name=translations["model"]))
         return None
     except Exception as e:
-        gr.Error(message=f"Đã xảy ra lỗi {e}")
+        gr.Error(message=translations["error_occurred"].format(e=e))
 
-        print(f"Đã xảy ra lỗi {e}")
+        print(translations["error_occurred"].format(e=e))
         return None
     finally:
         shutil.rmtree(save_model_temp, ignore_errors=True)
 
 
 def download_pretrained_model(choices, model, sample_rate):
-    if choices == "Danh sách mô hình":
+    if choices == translations["list_model"]:
         data = fetch_pretrained_data()
         paths = data[model][sample_rate]
 
@@ -633,53 +601,54 @@ def download_pretrained_model(choices, model, sample_rate):
         d_url = hugging_face_codecs + f"/{paths['D']}"
         g_url = hugging_face_codecs + f"/{paths['G']}"
 
-        gr.Info("Tải xuống huấn luyện trước...")
+        gr.Info(translations["download_pretrain"])
 
         run(["wget", "-q", "--show-progress", "--no-check-certificate", d_url.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join(pretraineds_custom_path)], check=True)
         run(["wget", "-q", "--show-progress", "--no-check-certificate", g_url.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join(pretraineds_custom_path)], check=True)
 
-        gr.Info("Hoàn thành")
-        return "Hoàn thành"
-    elif choices == "Đường dẫn mô hình":
-        if not model: return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước D")
-        if not sample_rate: return gr.Warning("Vui lòng cung cấp đường dẫn mô hình huấn luyện trước G")
+        gr.Info(translations["success"])
+        return translations["success"]
+    elif choices == translations["download_url"]:
+        if not model: return gr.Warning(translations["provide_pretrain"].format(dg="D"))
+        if not sample_rate: return gr.Warning(translations["provide_pretrain"].format(dg="G"))
 
 
-        gr.Info("Tải xuống huấn luyện trước...")
+        gr.Info(translations["download_pretrain"])
 
         run(["wget", "-q", "--show-progress", "--no-check-certificate", model, "-P", os.path.join(pretraineds_custom_path)], check=True)
         run(["wget", "-q", "--show-progress", "--no-check-certificate", sample_rate, "-P", os.path.join(pretraineds_custom_path)], check=True)
 
-        gr.Info("Hoàn thành")
-        return "Hoàn thành"
+        gr.Info(translations["success"])
+        return translations["success"]
     
 
 def hubert_download(hubert):
     if not hubert: 
-        gr.Warning("Vui lòng đưa đường dẫn liên kết đến mô hình học cách nói")
-        return "Vui lòng đưa đường dẫn liên kết đến mô hình học cách nói"
+        gr.Warning(translations["provide_hubert"])
+        return translations["provide_hubert"]
     
 
     run(["wget", "-q", "--show-progress", "--no-check-certificate", hubert.replace('/blob/', '/resolve/').replace('?download=true', '').strip(), "-P", os.path.join("assets", "model", "embedders")], check=True)
 
-    gr.Info("Hoàn Thành!")
-    return "Hoàn Thành!"
+    gr.Info(translations["success"])
+    return translations["success"]
 
 
 def fushion_model(name, pth_1, pth_2, ratio):
     if not name:
-        gr.Warning("Vui lòng cung cấp tên") 
-        return ["Vui lòng cung cấp tên", None]
+        gr.Warning(translations["provide_name_is_save"]) 
+        return [translations["provide_name_is_save"], None]
     
     if not name.endswith(".pth"): name = name + ".pth"
     
+
     if not pth_1 or not os.path.exists(pth_1) or not pth_1.endswith(".pth"):
-        gr.Warning("Vui lòng cung cấp mô hình 1")
-        return ["Vui lòng cung cấp mô hình 1", None]
+        gr.Warning(translations["provide_file"].format(filename=translations["model"] + " 1"))
+        return [translations["provide_file"].format(filename=translations["model"] + " 1"), None]
     
     if not pth_2 or not os.path.exists(pth_2) or not pth_1.endswith(".pth"):
-        gr.Warning("Vui lòng cung cấp mô hình 2")
-        return ["Vui lòng cung cấp mô hình 2", None]
+        gr.Warning(translations["provide_file"].format(filename=translations["model"] + " 2"))
+        return [translations["provide_file"].format(filename=translations["model"] + " 2"), None]
     
 
     def extract(ckpt):
@@ -700,8 +669,8 @@ def fushion_model(name, pth_1, pth_2, ratio):
         ckpt2 = torch.load(pth_2, map_location="cpu")
 
         if ckpt1["sr"] != ckpt2["sr"]: 
-            gr.Warning("Tốc độ lấy mẫu của hai mô hình không giống nhau")
-            return ["Tốc độ lấy mẫu của hai mô hình không giống nhau", None]
+            gr.Warning(translations["sr_not_same"])
+            return [translations["sr_not_same"], None]
 
         cfg = ckpt1["config"]
         cfg_f0 = ckpt1["f0"]
@@ -712,10 +681,10 @@ def fushion_model(name, pth_1, pth_2, ratio):
         ckpt2 = extract(ckpt2) if "model" in ckpt2 else ckpt2["weight"]
 
         if sorted(list(ckpt1.keys())) != sorted(list(ckpt2.keys())): 
-            gr.Warning("Không thể hợp nhất các mô hình. Các kiến ​​trúc mô hình không giống nhau")
-            return ["Không thể hợp nhất các mô hình. Các kiến ​​trúc mô hình không giống nhau", None]
+            gr.Warning(translations["architectures_not_same"])
+            return [translations["architectures_not_same"], None]
          
-        gr.Info("Bắt đầu dung hợp mô hình...")
+        gr.Info(translations["start"].format(start=translations["fushion_model"]))
 
         opt = OrderedDict()
         opt["weight"] = {}
@@ -730,7 +699,7 @@ def fushion_model(name, pth_1, pth_2, ratio):
         opt["sr"] = cfg_sr
         opt["f0"] = cfg_f0
         opt["version"] = cfg_version
-        opt["infos"] = f"Mô hình được {name} được dung hợp từ {pth_1} và {pth_2} với ratio {ratio}"
+        opt["infos"] = translations["model_fushion_info"].format(name=name, pth_1=pth_1, pth_2=pth_2, ratio=ratio)
 
         output_model = os.path.join("assets", "weights")
 
@@ -739,30 +708,31 @@ def fushion_model(name, pth_1, pth_2, ratio):
         torch.save(opt, os.path.join(output_model, f"{name}.pth"))
 
 
-        gr.Info("Hoàn thành")
-        return ["Hoàn thành", output_model]
+        gr.Info(translations["success"])
+        return [translations["success"], output_model]
     except Exception as e:
-        gr.Error(message=f"Đã xảy ra lỗi khi hợp nhất các mô hình: {e}")
+        gr.Error(message=translations["error_occurred"].format(e=e))
 
-        print(f"Đã xảy ra lỗi khi hợp nhất các mô hình: {e}")
+        print(translations["error_occurred"].format(e=e))
         return [e, None]
 
 
 def model_info(path):
-    if not path or not os.path.exists(path) or os.path.isdir(path) or not path.endswith(".pth"): return gr.Warning("Mô hình không hợp lệ!!")
+    if not path or not os.path.exists(path) or os.path.isdir(path) or not path.endswith(".pth"): return gr.Warning(translations["provide_file"].format(filename=translations["model"]))
     
 
     def prettify_date(date_str):
-        if date_str == "Không tìm thấy thời gian tạo": return None
+        if date_str == translations["not_found_create_time"]: return None
 
         try:
             return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
         except ValueError:
-            return "Định dạng không hợp lệ"
+            return translations["format_not_valid"]
         
+
     model_data = torch.load(path, map_location=torch.device("cpu"))
 
-    gr.Info(f"Các mô hình được huấn luyện trên các ứng dụng khác nhau có thể đem lại các thông tin khác nhau hoặc không thể đọc!")
+    gr.Info(translations["read_info"])
 
     epochs = model_data.get("epoch", None)
 
@@ -770,42 +740,36 @@ def model_info(path):
         epochs = model_data.get("info", None)
         epoch = epochs.replace("epoch", "").replace("e", "").isdigit()
 
-        if epoch and epochs is None: epochs = "Không tìm thấy kỷ nguyên"
+        if epoch and epochs is None: epochs = translations["not_found"].format(name=translations["epoch"])
         
-    steps = model_data.get("step", "Không tìm thấy")
+    steps = model_data.get("step", translations["not_found"].format(name=translations["step"]))
 
-    sr = model_data.get("sr", "Không tìm thấy tốc độ lấy mẫu")
-    f0 = model_data.get("f0", "Không tìm thấy huấn luyện cao độ")
+    sr = model_data.get("sr", translations["not_found"].format(name=translations["sr"]))
+    f0 = model_data.get("f0", translations["not_found"].format(name=translations["f0"]))
 
-    version = model_data.get("version", "Không tìm thấy phiên bản")
-    creation_date = model_data.get("creation_date", "Không tìm thấy thời gian tạo")
-    model_hash = model_data.get("model_hash", "Không tìm thấy")
+    version = model_data.get("version", translations["not_found"].format(name=translations["version"]))
+    creation_date = model_data.get("creation_date", translations["not_found_create_time"])
+    model_hash = model_data.get("model_hash", translations["not_found"].format(name="model_hash"))
 
-    pitch_guidance = "Được huấn luyện cao độ" if f0 == 1 else "Không được huấn luyện cao độ"
+    pitch_guidance = translations["trained_f0"] if f0 else translations["not_f0"]
 
-    creation_date_str = prettify_date(creation_date) if creation_date else "Không tìm thấy thời gian tạo"
+    creation_date_str = prettify_date(creation_date) if creation_date else translations["not_found_create_time"]
 
+    model_name = model_data.get("model_name", translations["unregistered"])
+    model_author = model_data.get("author", translations["not_author"])
 
-    gr.Info("Hoàn thành")
+    gr.Info(translations["success"])
 
-    return (
-        f"Kỷ nguyên: {epochs}\n"
-        f"Số bước: {steps}\n"
-        f"Phiên bản của mô hình: {version}\n"
-        f"Tốc độ lấy mẫu: {sr}\n"
-        f"Huấn luyện cao độ: {pitch_guidance}\n"
-        f"Hash (ID): {model_hash}\n"
-        f"Thời gian tạo: {creation_date_str}\n"
-    )
+    return translations["model_info"].format(model_name=model_name, model_author=model_author, epochs=epochs, steps=steps, version=version, sr=sr, pitch_guidance=pitch_guidance, model_hash=model_hash, creation_date_str=creation_date_str)
 
 
 def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out):
     if not input_path or not os.path.exists(input_path) or os.path.isdir(input_path): 
-        gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
+        gr.Warning(translations["input_not_valid"])
         return None
         
     if not output_path:
-        gr.Warning("Vui lòng nhập đầu ra!")
+        gr.Warning(translations["output_not_valid"])
         return None
     
     if os.path.isdir(output_path): output_path = os.path.join(output_path, f"audio_effects.{export_format}")
@@ -818,7 +782,8 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
     
     if os.path.exists(output_path): os.remove(output_path)
     
-    gr.Info("Bắt đầu áp dụng hiệu ứng...")
+
+    gr.Info(translations["start"].format(start=translations["apply_effect"]))
 
     pitchshift = pitch_shift != 0
 
@@ -826,28 +791,28 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
     os.system(cmd)
 
 
-    gr.Info("Hoàn thành")
+    gr.Info(translations["success"])
 
     return output_path 
 
 
 async def TTS(prompt, voice, speed, output):
     if not prompt:
-        gr.Warning("Vui lòng nhập văn bản để đọc!")
+        gr.Warning(translations["enter_the_text"])
         return None
     
     if not voice:
-        gr.Warning("Vui lòng chọn giọng!")
+        gr.Warning(translations["choose_voice"])
         return None
     
     if not output: 
-        gr.Warning("Vui lòng cung cấp đầu ra!")
+        gr.Warning(translations["output_not_valid"])
         return None
     
     if os.path.isdir(output): output = os.path.join(output, f"output_tts.wav")
 
 
-    gr.Info("Chuyển đổi văn bản...")
+    gr.Info(translations["convert"].format(name=translations["text"]))
 
     output_dir = os.path.dirname(output)
     output_dir = output if not output_dir else output_dir
@@ -857,7 +822,7 @@ async def TTS(prompt, voice, speed, output):
     await edge_tts.Communicate(text=prompt, voice=voice, rate=f"+{speed}%" if speed >= 0 else f"{speed}%").save(output)
 
 
-    gr.Info("Hoàn thành")
+    gr.Info(translations["success"])
 
     return output
 
@@ -868,17 +833,17 @@ def separator_music(input, output_audio, format, shifts, segments_size, overlap,
     
 
     if not input or not os.path.exists(input) or os.path.isdir(input): 
-        gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
+        gr.Warning(translations["input_not_valid"])
         return [None]*4
     
     if not os.path.exists(output): 
-        gr.Warning("Không tìm thấy thư mục đầu ra!")
+        gr.Warning(translations["output_not_valid"])
         return [None]*4
 
 
-    gr.Info("Bắt đầu tách nhạc...")
+    gr.Info(translations["start"].format(start=translations["separator_music"]))
 
-    cmd = f'{python} main/inference/separator_music.py --input_path {input} --output_path {output} --format {format} --shifts {shifts} --segments_size {segments_size} --overlap {overlap} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --clean_audio {clean_audio} --clean_strength {clean_strength} --backing_denoise {backing_denoise} --kara_model {kara_model} --backing {backing} --mdx {mdx} --mdx_denoise {mdx_denoise} --reverb {reverb} --reverb_denoise {reverb_denoise} --backing_reverb {backing_reverb}'
+    cmd = f'{python} main/inference/separator_music.py --input_path "{input}" --output_path "{output}" --format {format} --shifts {shifts} --segments_size {segments_size} --overlap {overlap} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --clean_audio {clean_audio} --clean_strength {clean_strength} --backing_denoise {backing_denoise} --kara_model {kara_model} --backing {backing} --mdx {mdx} --mdx_denoise {mdx_denoise} --reverb {reverb} --reverb_denoise {reverb_denoise} --backing_reverb {backing_reverb}'
 
 
     if separator_model == "HT-Normal" or separator_model == "HT-Tuned" or separator_model == "HD_MMI" or separator_model == "HT_6S": cmd += f' --demucs_model {separator_model}'
@@ -886,9 +851,10 @@ def separator_music(input, output_audio, format, shifts, segments_size, overlap,
 
     os.system(cmd)
     
-    gr.Info("Hoàn thành")
+    gr.Info(translations["success"])
 
     if not os.path.exists(output): os.makedirs(output)
+
 
     original_output = os.path.join(output, f"Original_Vocals_No_Reverb.{format}") if reverb else os.path.join(output, f"Original_Vocals.{format}")
     instrument_output = os.path.join(output, f"Instruments.{format}")
@@ -901,7 +867,7 @@ def separator_music(input, output_audio, format, shifts, segments_size, overlap,
 
 
 def convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, clean_audio, clean_strength, export_format, embedder_model, upscale_audio, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength):
-    cmd = f"{python} main/inference/convert.py --pitch {pitch} --filter_radius {filter_radius} --index_rate {index_rate} --volume_envelope {volume_envelope} --protect {protect} --hop_length {hop_length} --f0_method {f0_method} --input_path {input_path} --output_path {output_path} --pth_path {pth_path} --index_path {index_path} --f0_autotune {f0_autotune} --clean_audio {clean_audio} --clean_strength {clean_strength} --export_format {export_format} --embedder_model {embedder_model} --upscale_audio {upscale_audio} --resample_sr {resample_sr} --batch_process {batch_process} --batch_size {batch_size} --split_audio {split_audio} --f0_autotune_strength {f0_autotune_strength}"
+    cmd = f'{python} main/inference/convert.py --pitch {pitch} --filter_radius {filter_radius} --index_rate {index_rate} --volume_envelope {volume_envelope} --protect {protect} --hop_length {hop_length} --f0_method {f0_method} --input_path "{input_path}" --output_path "{output_path}" --pth_path {pth_path} --index_path {index_path} --f0_autotune {f0_autotune} --clean_audio {clean_audio} --clean_strength {clean_strength} --export_format {export_format} --embedder_model {embedder_model} --upscale_audio {upscale_audio} --resample_sr {resample_sr} --batch_process {batch_process} --batch_size {batch_size} --split_audio {split_audio} --f0_autotune_strength {f0_autotune_strength}'
 
     os.system(cmd)
 
@@ -909,7 +875,7 @@ def convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_leng
 def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, volume_envelope, protect, batch_process, batch_size, split_audio, f0_autotune_strength):
     def get_audio_file(label):
         matching_files = [f for f in os.listdir("audios") if label in f]
-        if not matching_files: return "Không tìm thấy"
+        if not matching_files: return translations["notfound"]
         
         return os.path.join("audios", matching_files[0])
 
@@ -918,23 +884,23 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
 
     if not use_audio:
         if merge_instrument or not_merge_backing or convert_backing or use_original:
-            gr.Warning("Vui lòng bật sử dụng âm thanh vừa tách để sử dụng")
+            gr.Warning(translations["turn_on_use_audio"])
             return [None]*5
 
     if use_original:
         if convert_backing:
-            gr.Warning("Tắt chuyển đổi giọng bè để có thể sử dụng giọng gốc")
+            gr.Warning(translations["turn_off_convert_backup"])
             return [None]*5
         elif not_merge_backing:
-            gr.Warning("Tắt không kết hợp giọng bè để có thể sử dụng giọng gốc")
+            gr.Warning(translations["turn_off_merge_backup"])
             return [None]*5
 
     if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith(".pth"):
-        gr.Warning("Mô hình không hợp lệ!")
+        gr.Warning(translations["provide_file"].format(filename=translations["model"]))
         return [None]*5
     
     if not index or not os.path.exists(index) or os.path.isdir(index) or not index.endswith(".index"):
-        gr.Warning("Chỉ mục không hợp lệ!")
+        gr.Warning(translations["provide_file"].format(filename=translations["index"]))
         return [None]*5
 
 
@@ -957,10 +923,10 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
         if use_original:
             original_vocal = get_audio_file('Original_Vocals_No_Reverb.')
 
-            if original_vocal == "Không tìm thấy": original_vocal = get_audio_file('Original_Vocals.')
+            if original_vocal == translations["notfound"]: original_vocal = get_audio_file('Original_Vocals.')
 
-            if original_vocal == "Không tìm thấy": 
-                gr.Warning("Không tìm thấy giọng gốc!")
+            if original_vocal == translations["notfound"]: 
+                gr.Warning(translations["not_found_original_vocal"])
                 return [None]*5
             
             input_path = original_vocal
@@ -968,35 +934,35 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             main_vocal = get_audio_file('Main_Vocals_No_Reverb.')
             backing_vocal = get_audio_file('Backing_Vocals_No_Reverb.')
 
-            if main_vocal == "Không tìm thấy": main_vocal = get_audio_file('Main_Vocals.')
-            if not not_merge_backing and backing_vocal == "Không tìm thấy": backing_vocal = get_audio_file('Backing_Vocals.')
+            if main_vocal == translations["notfound"]: main_vocal = get_audio_file('Main_Vocals.')
+            if not not_merge_backing and backing_vocal == translations["notfound"]: backing_vocal = get_audio_file('Backing_Vocals.')
 
-            if main_vocal == "Không tìm thấy": 
-                gr.Warning("Không tìm thấy giọng chính!")
+            if main_vocal == translations["notfound"]: 
+                gr.Warning(translations["not_found_main_vocal"])
                 return [None]*5
             
-            if not not_merge_backing and backing_vocal == "Không tìm thấy": 
-                gr.Warning("Không tìm thấy giọng bè!")
+            if not not_merge_backing and backing_vocal == translations["notfound"]: 
+                gr.Warning(translations["not_found_backing_vocal"])
                 return [None]*5
             
             input_path = main_vocal
             backing_path = backing_vocal
 
 
-        gr.Info("Đang chuyển đổi giọng nói...")
+        gr.Info(translations["convert_vocal"])
 
         convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input_path, output_path, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
-        gr.Info("Đã Hoàn thành chuyển đổi giọng nói!")
+        gr.Info(translations["convert_success"])
 
         if convert_backing:
             if os.path.exists(output_backing): os.remove(output_backing)
 
-            gr.Info("Đang chuyển đổi giọng bè...")
+            gr.Info(translations["convert_backup"])
 
             convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, backing_path, output_backing, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
-            gr.Info("Đã Hoàn thành chuyển đổi giọng bè!")
+            gr.Info(translations["convert_backup_success"])
 
         if not not_merge_backing and not use_original:
             backing_source = output_backing if convert_backing else backing_vocal
@@ -1004,54 +970,54 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             if os.path.exists(output_merge_backup): os.remove(output_merge_backup)
 
 
-            gr.Info("Kết hợp giọng với giọng bè...")
+            gr.Info(translations["merge_backup"])
 
             AudioSegment.from_file(output_path).overlay(AudioSegment.from_file(backing_source)).export(output_merge_backup, format=format)
 
-            gr.Info("Kết hợp Hoàn thành")
+            gr.Info(translations["merge_success"])
 
         if merge_instrument:    
             vocals = output_merge_backup if not not_merge_backing and not use_original else output_path
 
             if os.path.exists(output_merge_instrument): os.remove(output_merge_instrument)
 
-            gr.Info("Kết hợp giọng với nhạc nền...")
+            gr.Info(translations["merge_instruments_process"])
 
             instruments = get_audio_file('Instruments.')
             
-            if instruments == "Không tìm thấy": 
-                gr.Warning("Không tìm thấy nhạc nền")
+            if instruments == translations["notfound"]: 
+                gr.Warning(translations["not_found_instruments"])
                 output_merge_instrument = None
             else: AudioSegment.from_file(instruments).overlay(AudioSegment.from_file(vocals)).export(output_merge_instrument, format=format)
             
-            gr.Info("Kết hợp Hoàn thành")
+            gr.Info(translations["merge_success"])
 
         return [(None if use_original else output_path), output_backing, (None if not_merge_backing and use_original else output_merge_backup), (output_path if use_original else None), (output_merge_instrument if merge_instrument else None)]
     else:
         if not input or not os.path.exists(input): 
-            gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
+            gr.Warning(translations["input_not_valid"])
             return [None]*5
         
         if not output:
-            gr.Warning("Vui lòng nhập đầu ra!")
+            gr.Warning(translations["output_not_valid"])
             return [None]*5
         
 
         if os.path.isdir(input):
-            gr.Info("Đầu vào là một thư mục: Chuyển đổi tất cả tệp âm thanh trong thư mục...")
+            gr.Info(translations["is_folder"])
 
             if not [f for f in os.listdir(input) if f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]:
-                gr.Warning("Không tìm thấy tệp âm thanh trong thư mục!")
+                gr.Warning(translations["not_found_in_folder"])
                 return [None]*5
             
-            gr.Info("Đang chuyển đổi hàng loạt...")
+            gr.Info(translations["batch_convert"])
 
             output_dir = os.path.dirname(output)
             output_dir = output if not output_dir else output_dir
 
             convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output_dir, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
-            gr.Info("Chuyển đổi hàng loạt thành công!")
+            gr.Info(translations["batch_convert_success"])
 
             return [None]*5
         else:
@@ -1063,11 +1029,11 @@ def convert_audio(clean, upscale, autotune, use_audio, use_original, convert_bac
             if os.path.exists(output): os.remove(output)
 
 
-            gr.Info("Đang chuyển đổi giọng nói...")
+            gr.Info(translations["convert_vocal"])
 
             convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
-            gr.Info("Chuyển đổi thành công!")
+            gr.Info(translations["convert_success"])
 
             return [output, None, None, None, None]
 
@@ -1076,28 +1042,28 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
     model_path = os.path.join("assets", "weights", model)
 
     if not model_path or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith(".pth"):
-        gr.Warning("Mô hình không hợp lệ!")
+        gr.Warning(translations["provide_file"].format(filename=translations["model"]))
         return None
     
     if not index or not os.path.exists(index) or os.path.isdir(index) or not index.endswith(".index"):
-        gr.Warning("Chỉ mục không hợp lệ!")
+        gr.Warning(translations["provide_file"].format(filename=translations["index"]))
         return None
 
     if not input or not os.path.exists(input): 
-        gr.Warning("Vui lòng nhập đầu vào hợp lệ!")
+        gr.Warning(translations["input_not_valid"])
         return None
     
     if os.path.isdir(input): 
         input_audio = [f for f in os.listdir(input) if "output_tts" in f and f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]
         
         if not input_audio:
-            gr.Warning("Không tìm thấy đầu vào!")
+            gr.Warning(translations["not_found_in_folder"])
             return None
         
         input = os.path.join(input, input_audio[0])
     
     if not output:
-        gr.Warning("Vui lòng nhập đầu ra!")
+        gr.Warning(translations["output_not_valid"])
         return None
     
     if os.path.isdir(output): output = os.path.join(output, f"output_tts-convert.{format}")
@@ -1112,21 +1078,21 @@ def convert_tts(clean, upscale, autotune, pitch, clean_strength, model, index, i
     
     embedder_model = embedders if embedders != "custom" else custom_embedders
 
-    gr.Info("Đang chuyển đổi giọng nói...")
+    gr.Info(translations["convert_vocal"])
 
     convert(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, upscale, resample_sr, batch_process, batch_size, split_audio, f0_autotune_strength)
 
 
-    gr.Info("Đã Hoàn thành chuyển đổi giọng nói")
+    gr.Info(translations["convert_success"])
     return output
 
 
 def create_dataset(input_audio, output_dataset, resample, resample_sr, clean_dataset, clean_strength, separator_music, separator_reverb, kim_vocals_version, overlap, segments_size, denoise_mdx, skip, skip_start, skip_end, hop_length, batch_size):
     version = 1 if kim_vocals_version == "Version-1" else 2
 
-    cmd = f'{python} main/inference/create_dataset.py --input_audio "{input_audio}" --output_dataset {output_dataset} --resample {resample} --resample_sr {resample_sr} --clean_dataset {clean_dataset} --clean_strength {clean_strength} --separator_music {separator_music} --separator_reverb {separator_reverb} --kim_vocal_version {version} --overlap {overlap} --segments_size {segments_size} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --denoise_mdx {denoise_mdx} --skip {skip} --skip_start_audios "{skip_start}" --skip_end_audios "{skip_end}"'
+    cmd = f'{python} main/inference/create_dataset.py --input_audio "{input_audio}" --output_dataset "{output_dataset}" --resample {resample} --resample_sr {resample_sr} --clean_dataset {clean_dataset} --clean_strength {clean_strength} --separator_music {separator_music} --separator_reverb {separator_reverb} --kim_vocal_version {version} --overlap {overlap} --segments_size {segments_size} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --denoise_mdx {denoise_mdx} --skip {skip} --skip_start_audios "{skip_start}" --skip_end_audios "{skip_end}"'
 
-    gr.Info("Bắt đầu tạo...")
+    gr.Info(translations["start"].format(start=translations["create"]))
 
 
     p = Popen(cmd, shell=True)
@@ -1157,10 +1123,11 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
     dataset = os.path.join(path)
     sr = int(sample_rate.rstrip("k")) * 1000
 
-    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
-    if len([f for f in os.listdir(os.path.join(dataset)) if os.path.isfile(os.path.join(dataset, f)) and f.lower().endswith((".wav", ".mp3", ".flac", ".ogg"))]) < 1: return gr.Warning("Không tìm thấy dữ liệu")
+    if not model_name: return gr.Warning(translations["provide_name"])
+    if len([f for f in os.listdir(os.path.join(dataset)) if os.path.isfile(os.path.join(dataset, f)) and f.lower().endswith((".wav", ".mp3", ".flac", ".ogg"))]) < 1: return gr.Warning(translations["not_found_data"])
 
-    cmd = f'{python} main/inference/preprocess.py --model_name {model_name} --dataset_path {dataset} --sample_rate {sr} --cpu_cores {cpu_core} --cut_preprocess {cut_preprocess} --process_effects {process_effects} --clean_dataset {clean_dataset} --clean_strength {clean_strength}'
+
+    cmd = f'{python} main/inference/preprocess.py --model_name "{model_name}" --dataset_path "{dataset}" --sample_rate {sr} --cpu_cores {cpu_core} --cut_preprocess {cut_preprocess} --process_effects {process_effects} --clean_dataset {clean_dataset} --clean_strength {clean_strength}'
 
 
     p = Popen(cmd, shell=True)
@@ -1196,11 +1163,12 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
 
     sr = int(sample_rate.rstrip("k")) * 1000
 
-    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
+    if not model_name: return gr.Warning(translations["provide_name"])
 
-    if len([f for f in os.listdir(os.path.join(model_dir, "sliced_audios")) if os.path.isfile(os.path.join(model_dir, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k")) if os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được xử lý, vui lòng xử lý lại âm thanh")
+    if len([f for f in os.listdir(os.path.join(model_dir, "sliced_audios")) if os.path.isfile(os.path.join(model_dir, "sliced_audios", f))]) < 1 or len([f for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k")) if os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f))]) < 1: return gr.Warning(translations["not_found_data_preprocess"])
 
-    cmd = f'{python} main/inference/extract.py --model_name {model_name} --rvc_version {version} --f0_method {method} --pitch_guidance {pitch_guidance} --hop_length {hop_length} --cpu_cores {cpu_cores} --gpu {gpu} --sample_rate {sr} --embedder_model {embedder_model}'
+
+    cmd = f'{python} main/inference/extract.py --model_name "{model_name}" --rvc_version {version} --f0_method {method} --pitch_guidance {pitch_guidance} --hop_length {hop_length} --cpu_cores {cpu_cores} --gpu {gpu} --sample_rate {sr} --embedder_model {embedder_model}'
 
 
     p = Popen(cmd, shell=True)
@@ -1230,12 +1198,13 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
 
 
 def create_index(model_name, rvc_version, index_algorithm):
-    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
+    if not model_name: return gr.Warning(translations["provide_name"])
     model_dir = os.path.join("assets", "logs", model_name)
 
-    if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
+    if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning(translations["not_found_data_extract"])
 
-    cmd = f'{python} main/inference/create_index.py --model_name {model_name} --rvc_version {rvc_version} --index_algorithm {index_algorithm}'
+
+    cmd = f'{python} main/inference/create_index.py --model_name "{model_name}" --rvc_version {rvc_version} --index_algorithm {index_algorithm}'
 
 
     p = Popen(cmd, shell=True)
@@ -1264,21 +1233,21 @@ def create_index(model_name, rvc_version, index_algorithm):
     yield log
 
 
-def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_every_weights, total_epoch, sample_rate, batch_size, gpu, pitch_guidance, not_pretrain, custom_pretrained, pretrain_g, pretrain_d, detector, threshold, sync_graph, cache):
+def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_every_weights, total_epoch, sample_rate, batch_size, gpu, pitch_guidance, not_pretrain, custom_pretrained, pretrain_g, pretrain_d, detector, threshold, sync_graph, cache, model_author):
     sr = int(sample_rate.rstrip("k")) * 1000
     model_dir = os.path.join("assets", "logs", model_name)
 
-    if not model_name: return gr.Warning("Vui lòng cung cấp tên")
-    if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning("Không tìm thấy dữ liệu được trích xuất, vui lòng trích xuất lại âm thanh")
+    if not model_name: return gr.Warning(translations["provide_name"])
+    if len([f for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted")) if os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f))]) < 1: return gr.Warning(translations["not_found_data_extract"])
 
-    cmd = f'{python} main/inference/train.py --model_name {model_name} --rvc_version {rvc_version} --save_every_epoch {save_every_epoch} --save_only_latest {save_only_latest} --save_every_weights {save_every_weights} --total_epoch {total_epoch} --sample_rate {sr} --batch_size {batch_size} --gpu {gpu} --pitch_guidance {pitch_guidance} --overtraining_detector {detector} --overtraining_threshold {threshold} --sync_graph {sync_graph} --cache_data_in_gpu {cache}'
+    cmd = f'{python} main/inference/train.py --model_name "{model_name}" --rvc_version {rvc_version} --save_every_epoch {save_every_epoch} --save_only_latest {save_only_latest} --save_every_weights {save_every_weights} --total_epoch {total_epoch} --sample_rate {sr} --batch_size {batch_size} --gpu {gpu} --pitch_guidance {pitch_guidance} --overtraining_detector {detector} --overtraining_threshold {threshold} --sync_graph {sync_graph} --cache_data_in_gpu {cache}'
 
 
     if not not_pretrain:
         if not custom_pretrained: pg, pd = pretrained_selector(pitch_guidance)[sr]
         else:
-            if not pretrain_g: return gr.Warning("Vui lòng nhập huấn luyện G")
-            if not pretrain_d: return gr.Warning("Vui lòng nhập huấn luyện D")
+            if not pretrain_g: return gr.Warning(translations["provide_pretrained"].format(dg="G"))
+            if not pretrain_d: return gr.Warning(translations["provide_pretrained"].format(dg="D"))
             
             pg = pretrain_g
             pd = pretrain_d
@@ -1295,22 +1264,22 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
         
         if not custom_pretrained:
             if not os.path.exists(pretrained_G):
-                gr.Info(f"Tải xuống huấn luyện trước G{rvc_version} gốc")
+                gr.Info(translations["download_pretrained"].format(dg="G", rvc_version=rvc_version))
                 run(["wget", "-q", "--show-progress", "-q", "--show-progress", "--no-check-certificate", f"{download_version}{pg}", "-P", os.path.join("assets", "model", f"pretrained_{rvc_version}")], check=True)
                 
             if not os.path.exists(pretrained_D):
-                gr.Info(f"Tải xuống huấn luyện trước D{rvc_version} gốc")
+                gr.Info(translations["download_pretrained"].format(dg="D", rvc_version=rvc_version))
                 run(["wget", "-q", "--show-progress", "-q", "--show-progress", "--no-check-certificate", f"{download_version}{pd}", "-P", os.path.join("assets", "model", f"pretrained_{rvc_version}")], check=True)
         else:
-            if not os.path.exists(pretrained_G): return gr.Warning("Không tìm thấy huấn luyện trước G")
-            if not os.path.exists(pretrained_D): return gr.Warning("Không tìm thấy huấn luyện trước D")
+            if not os.path.exists(pretrained_G): return gr.Warning(translations["not_found_pretrain"].format(dg="G"))
+            if not os.path.exists(pretrained_D): return gr.Warning(translations["not_found_pretrain"].format(dg="D"))
 
         cmd += f" --g_pretrained_path {pretrained_G} --d_pretrained_path {pretrained_D}"
-    else: gr.Warning("Sẽ không có huấn luyện trước được sử dụng")
+    else: gr.Warning(translations["not_use_pretrain"])
 
+    if model_author: cmd += f'--model_author {model_author}'
 
-    gr.Info("Bắt đầu huấn luyện...")
-
+    gr.Info(translations["start"].format(start=translations["training"]))
 
     p = Popen(cmd, shell=True)
     done = [False]
@@ -1339,73 +1308,74 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
 
 
 
-with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku') as app:
-    gr.HTML("<h1> 🎵 Giao diện chuyển đổi và huấn luyện mô hình giọng nói được tạo bởi Anh 🎵 <h1>")
+with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
+    gr.HTML(translations["display_title"])
     with gr.Row(): 
-        gr.Markdown(f"Bấm vào đây nếu bạn muốn bị Rick Roll:) ---> [RickRoll]({codecs.decode('uggcf://jjj.lbhghor.pbz/jngpu?i=qDj4j9JtKpD', 'rot13')})")
+        gr.Markdown(translations["rick_roll"].format(rickroll=codecs.decode('uggcf://jjj.lbhghor.pbz/jngpu?i=qDj4j9JtKpD', 'rot13')))
     with gr.Row(): 
-        gr.Markdown("**Vui lòng không sử dụng Dự án với bất kỳ mục đích nào vi phạm đạo đức, pháp luật, hoặc gây tổn hại đến cá nhân, tổ chức...**")
+        gr.Markdown(translations["terms_of_use"])
     with gr.Row():
-        gr.Markdown("**Trong trường hợp người sử dụng không tuân thủ các điều khoản hoặc vi phạm, tôi sẽ không chịu trách nhiệm về bất kỳ khiếu nại, thiệt hại, hay trách nhiệm pháp lý nào, dù là trong hợp đồng, do sơ suất, hay các lý do khác, phát sinh từ, ngoài, hoặc liên quan đến phần mềm, việc sử dụng phần mềm hoặc các giao dịch khác liên quan đến phần mềm.**")
+        gr.Markdown(translations["exemption"])
+
     with gr.Tabs():
         paths_for_files = lambda path: [os.path.abspath(os.path.join(path, f)) for f in os.listdir(path) if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a')]
 
-        with gr.TabItem("Tách Nhạc"):
-            gr.Markdown("## Tách Nhạc")
+        with gr.TabItem(translations["separator_tab"]):
+            gr.Markdown(f"## {translations['separator_tab']}")
             with gr.Row(): 
-                gr.Markdown("Một hệ thống tách nhạc đơn giản có thể tách được 4 phần: Nhạc, giọng, giọng chính, giọng bè")
+                gr.Markdown(translations["4_part"])
             with gr.Row():
                 with gr.Column():
                     with gr.Group():
                         with gr.Row():       
-                            cleaner = gr.Checkbox(label="Làm sạch âm thanh", value=False, interactive=True)       
-                            backing = gr.Checkbox(label="Tách giọng bè", value=False, interactive=True)
-                            denoise = gr.Checkbox(label="Khữ giọng bè", value=False, interactive=False)
-                            separator_denoise = gr.Checkbox(label="Khữ tách MDX", value=False, interactive=False)       
-                            mdx_model = gr.Checkbox(label="Sử dụng MDX", value=False, interactive=True)
-                            reverb = gr.Checkbox(label="Tách vang giọng", value=False, interactive=True)
-                            backing_reverb = gr.Checkbox(label="Tách vang bè", value=False, interactive=False)
-                            reverb_denoise = gr.Checkbox(label="Khữ tách vang", value=False, interactive=False)                   
+                            cleaner = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)       
+                            backing = gr.Checkbox(label=translations["separator_backing"], value=False, interactive=True)
+                            denoise = gr.Checkbox(label=translations["denoise_backing"], value=False, interactive=False)
+                            separator_denoise = gr.Checkbox(label=translations["denoise_mdx"], value=False, interactive=False)       
+                            mdx_model = gr.Checkbox(label=translations["use_mdx"], value=False, interactive=True)
+                            reverb = gr.Checkbox(label=translations["dereveb_audio"], value=False, interactive=True)
+                            backing_reverb = gr.Checkbox(label=translations["dereveb_backing"], value=False, interactive=False)
+                            reverb_denoise = gr.Checkbox(label=translations["denoise_dereveb"], value=False, interactive=False)                   
                         with gr.Row():
-                            separator_model = gr.Dropdown(label="Mô hình tách nhạc", value="HT-Normal", choices=["HT-Normal", "HT-Tuned", "HD_MMI", "HT_6S"], interactive=True, visible=True)
-                            separator_backing_model = gr.Dropdown(label="Mô hình tách bè", value="Version-1", choices=["Version-1", "Version-2"], interactive=True, visible=False)
+                            separator_model = gr.Dropdown(label=translations["separator_model"], value="HT-Normal", choices=["HT-Normal", "HT-Tuned", "HD_MMI", "HT_6S"], interactive=True, visible=True)
+                            separator_backing_model = gr.Dropdown(label=translations["separator_backing_model"], value="Version-1", choices=["Version-1", "Version-2"], interactive=True, visible=False)
                 with gr.Column():
-                    separator_button = gr.Button("Tách Nhạc", variant="primary", scale=2)
+                    separator_button = gr.Button(translations["separator_tab"], variant="primary", scale=2)
             with gr.Row():
                 with gr.Column():
                     with gr.Group():
                         with gr.Row():
-                            shifts = gr.Slider(label="Số lượng dự đoán", info="Càng cao chất lượng càng tốt nhưng lâu nhưng tốn tài nguyên", minimum=1, maximum=20, value=2, step=1, interactive=True)
-                            segment_size = gr.Slider(label="Kích Thước Phân Đoạn", info="Càng cao chất lượng càng tốt nhưng tốn tài nguyên", minimum=32, maximum=4000, value=256, step=8, interactive=True)
+                            shifts = gr.Slider(label=translations["shift"], info=translations["shift_info"], minimum=1, maximum=20, value=2, step=1, interactive=True)
+                            segment_size = gr.Slider(label=translations["segments_size"], info=translations["segments_size_info"], minimum=32, maximum=4000, value=256, step=8, interactive=True)
                         with gr.Row():
-                            mdx_batch_size = gr.Slider(label="Kích thước lô", info="Số lượng mẫu được xử lý cùng một lúc. Việc chia thành các lô giúp tối ưu hóa quá trình tính toán. Lô quá lớn có thể làm tràn bộ nhớ, khi lô quá nhỏ sẽ làm giảm hiệu quả dùng tài nguyên", minimum=1, maximum=64, value=1, step=1, interactive=True, visible=False)
+                            mdx_batch_size = gr.Slider(label=translations["batch_size"], info=translations["mdx_batch_size_info"], minimum=1, maximum=64, value=1, step=1, interactive=True, visible=False)
                 with gr.Column():
                     with gr.Group():
                         with gr.Row():
-                            overlap = gr.Radio(label="Chồng chéo", info="Số lượng chồng chéo giữa các cửa sổ dự đoán", choices=["0.25", "0.5", "0.75", "0.99"], value="0.25", interactive=True)
-                            format = gr.Radio(label="Định dạng âm thanh", info="Định dạng âm thanh khi xuất tệp âm thanh ra", choices=["wav", "mp3", "flac"], value="wav", interactive=True)
+                            overlap = gr.Radio(label=translations["overlap"], info=translations["overlap_info"], choices=["0.25", "0.5", "0.75", "0.99"], value="0.25", interactive=True)
+                            format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac"], value="wav", interactive=True)
                         with gr.Row():
-                            mdx_hop_length = gr.Slider(label="Hop length", info="Biểu thị khoảng thời gian di chuyển cửa sổ phân tích trên tín hiệu âm thanh khi thực hiện các phép biến đổi. Giá trị nhỏ hơn tăng độ chi tiết nhưng tốn tài nguyên tính toán hơn", minimum=1, maximum=8192, value=1024, step=1, interactive=True, visible=False)
+                            mdx_hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=8192, value=1024, step=1, interactive=True, visible=False)
             with gr.Row():
                 with gr.Column():
-                    input = gr.File(label="Thả âm thanh vào đây", file_types=['audio'])    
-                    with gr.Accordion("Sử dụng link youtube", open=False):
-                        url = gr.Textbox(label="Đường dẫn liên kết đến âm thanh", value="", placeholder="https://www.youtube.com/...", scale=6)
-                        download_button = gr.Button("Tải Xuống")
+                    input = gr.File(label=translations["drop_audio"], file_types=['audio'])    
+                    with gr.Accordion(translations["use_url"], open=False):
+                        url = gr.Textbox(label=translations["url_audio"], value="", placeholder="https://www.youtube.com/...", scale=6)
+                        download_button = gr.Button(translations["downloads"])
                 with gr.Column():
-                    clean_strength = gr.Slider(label="Sức mạnh làm sạch âm thanh", info="Sức mạnh của bộ làm sạch âm thanh để lọc giọng hát khi xuất", minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
-                    with gr.Accordion("Đầu vào, đầu ra âm thanh"):
-                        input_audio = gr.Dropdown(label="Đường dẫn âm thanh", value="" if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios")[0], choices=[] if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios"), allow_custom_value=True, interactive=True)
-                        refesh_separator = gr.Button("Tải lại")
-                        output_separator = gr.Textbox(label="Đường dẫn thư mục đầu ra âm thanh", value="audios", placeholder="audios", info="Nhập đường dẫn thư mục âm thanh sẽ xuất ra ở đó", interactive=True)
-                    audio_input = gr.Audio(show_download_button=True, interactive=False, label="Đầu vào âm thanh")
+                    clean_strength = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
+                    with gr.Accordion(translations["input_output"]):
+                        input_audio = gr.Dropdown(label=translations["audio_path"], value="" if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios")[0], choices=[] if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios"), allow_custom_value=True, interactive=True)
+                        refesh_separator = gr.Button(translations["refesh"])
+                        output_separator = gr.Textbox(label=translations["output_folder"], value="audios", placeholder="audios", info=translations["output_folder_info"], interactive=True)
+                    audio_input = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
             with gr.Row():
-                gr.Markdown("Âm thanh đã được tách")
+                gr.Markdown(translations["output_separator"])
             with gr.Row():
-                instruments_audio = gr.Audio(show_download_button=True, interactive=False, label="Nhạc nền")
-                original_vocals = gr.Audio(show_download_button=True, interactive=False, label="Giọng gốc")
-                main_vocals = gr.Audio(show_download_button=True, interactive=False, label="Giọng chính", visible=False)
-                backing_vocals = gr.Audio(show_download_button=True, interactive=False, label="Giọng bè", visible=False)
+                instruments_audio = gr.Audio(show_download_button=True, interactive=False, label=translations["instruments"])
+                original_vocals = gr.Audio(show_download_button=True, interactive=False, label=translations["original_vocal"])
+                main_vocals = gr.Audio(show_download_button=True, interactive=False, label=translations["main_vocal"], visible=False)
+                backing_vocals = gr.Audio(show_download_button=True, interactive=False, label=translations["backing_vocal"], visible=False)
             with gr.Row():
                 backing.change(fn=lambda a, b, c: [visible_1(a or b or c), visible_1(a or b or c)], inputs=[backing, mdx_model, reverb], outputs=[mdx_batch_size, mdx_hop_length])
                 mdx_model.change(fn=lambda a, b, c: [visible_1(a or b or c), visible_1(a or b or c)], inputs=[backing, mdx_model, reverb], outputs=[mdx_batch_size, mdx_hop_length])
@@ -1463,76 +1433,76 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name='separator_music'
                 )
 
-        with gr.TabItem("Chuyển Đổi"):
-            gr.Markdown("## Chuyển Đổi Âm Thanh")
+        with gr.TabItem(translations["convert_audio"]):
+            gr.Markdown(f"## {translations['convert_audio']}")
             with gr.Row():
-                gr.Markdown("Chuyển đổi âm thanh bằng mô hình giọng nói đã được huấn luyện")
+                gr.Markdown(translations["convert_info"])
             with gr.Row():
                 with gr.Column():
                     with gr.Group():
                         with gr.Row():
-                            cleaner0 = gr.Checkbox(label="Làm sạch âm thanh", value=False, interactive=True)
-                            upscale = gr.Checkbox(label="Tăng chất lượng", value=False, interactive=True)
-                            autotune = gr.Checkbox(label="Tự động điều chỉnh", value=False, interactive=True)
-                            use_audio = gr.Checkbox(label="Sử dụng âm thanh vừa tách", value=False, interactive=True)
-                            use_original = gr.Checkbox(label="Chuyển đổi giọng gốc", value=False, interactive=True, visible=False) 
-                            convert_backing = gr.Checkbox(label="Chuyển đổi giọng bè", value=False, interactive=True, visible=False)   
-                            not_merge_backing = gr.Checkbox(label="Không kết hợp giọng bè", value=False, interactive=True, visible=False)
-                            merge_instrument = gr.Checkbox(label="Kết hợp nhạc nền", value=False, interactive=True, visible=False)  
+                            cleaner0 = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)
+                            upscale = gr.Checkbox(label=translations["upscale_audio"], value=False, interactive=True)
+                            autotune = gr.Checkbox(label=translations["autotune"], value=False, interactive=True)
+                            use_audio = gr.Checkbox(label=translations["use_audio"], value=False, interactive=True)
+                            use_original = gr.Checkbox(label=translations["convert_original"], value=False, interactive=True, visible=False) 
+                            convert_backing = gr.Checkbox(label=translations["convert_backing"], value=False, interactive=True, visible=False)   
+                            not_merge_backing = gr.Checkbox(label=translations["not_merge_backing"], value=False, interactive=True, visible=False)
+                            merge_instrument = gr.Checkbox(label=translations["merge_instruments"], value=False, interactive=True, visible=False)  
                     with gr.Row():
-                        pitch = gr.Slider(minimum=-20, maximum=20, step=1, info="Khuyến cáo: chỉnh lên 12 để chuyển giọng nam thành nữ và ngược lại", label="Cao độ", value=0, interactive=True)
-                        clean_strength0 = gr.Slider(label="Sức mạnh làm sạch âm thanh", info="Sức mạnh của bộ làm sạch âm thanh để lọc giọng hát khi xuất", minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
+                        pitch = gr.Slider(minimum=-20, maximum=20, step=1, info=translations["pitch_info"], label=translations["pitch"], value=0, interactive=True)
+                        clean_strength0 = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
                 with gr.Column():
-                    convert_button = gr.Button("Chuyển Đổi", variant="primary", scale=4)
+                    convert_button = gr.Button(translations["convert_audio"], variant="primary", scale=4)
             with gr.Row():
                 with gr.Column():
-                    input0 = gr.File(label="Thả âm thanh vào đây", file_types=['audio'])  
-                    play_audio = gr.Audio(show_download_button=True, interactive=False, label="Đầu vào âm thanh")
+                    input0 = gr.File(label=translations["drop_audio"], file_types=['audio'])  
+                    play_audio = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
                 with gr.Column():
-                    with gr.Accordion("Mô hình và chỉ mục", open=True):
+                    with gr.Accordion(translations["model_accordion"], open=True):
                         with gr.Row():
-                            model_pth = gr.Dropdown(label="Tệp mô hình", choices=sorted(model_name), value=sorted(model_name)[0] if len(sorted(model_name)) > 0 else '', interactive=True, allow_custom_value=True)
-                            model_index = gr.Dropdown(label="Tệp chỉ mục", choices=sorted(index_path), value=sorted(index_path)[0] if len(sorted(index_path)) > 0 else '', interactive=True, allow_custom_value=True)
+                            model_pth = gr.Dropdown(label=translations["model_name"], choices=sorted(model_name), value=sorted(model_name)[0] if len(sorted(model_name)) > 0 else '', interactive=True, allow_custom_value=True)
+                            model_index = gr.Dropdown(label=translations["index_path"], choices=sorted(index_path), value=sorted(index_path)[0] if len(sorted(index_path)) > 0 else '', interactive=True, allow_custom_value=True)
                         with gr.Row():
-                            refesh = gr.Button("Tải lại")
+                            refesh = gr.Button(translations["refesh"])
                         with gr.Row():
-                            index_strength = gr.Slider(label="Ảnh hưởng của chỉ mục", info="Càng cao ảnh hưởng càng lớn. Tuy nhiên, việc chọn giá trị thấp hơn có thể giảm hiện tượng giả trong âm thanh", minimum=0, maximum=1, value=0.5, step=0.01, interactive=True)
-                    with gr.Accordion("Đầu vào, đầu ra âm thanh", open=False):
+                            index_strength = gr.Slider(label=translations["index_strength"], info=translations["index_strength_info"], minimum=0, maximum=1, value=0.5, step=0.01, interactive=True)
+                    with gr.Accordion(translations["input_output"], open=False):
                         with gr.Column():
-                            export_format = gr.Radio(label="Định dạng", info="Định dạng khi xuất tệp âm thanh ra", choices=["wav", "mp3", "flac", "ogg", "m4a"], value="wav", interactive=True)
-                            input_audio0 = gr.Dropdown(label="Đường dẫn đầu vào âm thanh", value="" if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios")[0], choices=[] if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios"), info="Nhập đường dẫn đến tệp âm thanh", allow_custom_value=True, interactive=True)
-                            output_audio = gr.Textbox(label="Đường dẫn đầu ra âm thanh", value="audios/output.wav", placeholder="audios/output.wav", info="Nhập đường dẫn đầu ra(cứ để định dạng .wav khi chuyển đổi nó tự sửa)", interactive=True)
+                            export_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac", "ogg", "m4a"], value="wav", interactive=True)
+                            input_audio0 = gr.Dropdown(label=translations["audio_path"], value="" if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios")[0], choices=[] if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios"), info="Nhập đường dẫn đến tệp âm thanh", allow_custom_value=True, interactive=True)
+                            output_audio = gr.Textbox(label=translations["output_path"], value="audios/output.wav", placeholder="audios/output.wav", info=translations["output_path_info"], interactive=True)
                         with gr.Column():
-                            refesh0 = gr.Button("Tải lại")
-                    with gr.Accordion("Cài đặt chung", open=False):
-                        with gr.Accordion("Phương pháp trích xuất", open=False):
-                            method = gr.Radio(label="Phương pháp trích xuất", info="Phương pháp để trích xuất dữ liệu âm thanh để cho mô hình nói", choices=["pm", "dio", "crepe-tiny", "crepe", "fcpe", "rmvpe", "harvest", "hybrid"], value="rmvpe", interactive=True)
-                            hybrid_method = gr.Radio(label="Phương pháp trích xuất HYBRID", info="Sự kết hợp của hai loại trích xuất khác nhau", choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[rmvpe+harvest]"], value="hybrid[pm+dio]", interactive=True, visible=False)
-                            hop_length = gr.Slider(label="Hop length", info="Khoảng cách giữa các khung âm thanh khi xử lý tín hiệu. Giá trị lớn xử lý nhẹ hơn, chi tiết giảm, giá trị nhỏ chi tiết cao, xử lý nặng", minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
-                        with gr.Accordion("Mô hình học cách nói", open=False):
-                            embedders = gr.Radio(label="Mô hình học cách nói", info="Mô hình được huấn luyện trước để giúp cho mô hình học cách nói cách ngắt hơi", choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
-                            custom_embedders = gr.Textbox(label="Tên của mô hình", info="Nếu bạn có msô hình riêng chỉ cần tải và nhập tên của mô hình vào đây", value="", placeholder="hubert_base", interactive=True, visible=False)
+                            refesh0 = gr.Button(translations["refesh"])
+                    with gr.Accordion(translations["setting"], open=False):
+                        with gr.Accordion(translations["f0_method"], open=False):
+                            method = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=["pm", "dio", "crepe-tiny", "crepe", "fcpe", "rmvpe", "harvest", "hybrid"], value="rmvpe", interactive=True)
+                            hybrid_method = gr.Radio(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[rmvpe+harvest]"], value="hybrid[pm+dio]", interactive=True, visible=False)
+                            hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                        with gr.Accordion(translations["hubert_model"], open=False):
+                            embedders = gr.Radio(label=translations["hubert_model"], info=translations["hubert_info"], choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
+                            custom_embedders = gr.Textbox(label=translations["modelname"], info=translations["modelname_info"], value="", placeholder="hubert_base", interactive=True, visible=False)
                         with gr.Column():
                             with gr.Group():
                                 with gr.Row():
-                                    split_audio = gr.Checkbox(label="Cắt âm thanh", info="Cắt âm thanh ra các phần nhỏ để chuyển đổi có thể giúp tăng tốc độ", value=False, interactive=True)
-                                    batch_process = gr.Checkbox(label="Xử lý lô", info="Xử lý lô có thể giảm thời gian huấn luyện nhưng có thể bị quá tải", value=False, interactive=True, visible=False)
+                                    split_audio = gr.Checkbox(label=translations["split_audio"], info=translations["split_audio_info"], value=False, interactive=True)
+                                    batch_process = gr.Checkbox(label=translations["batch_process"], info=translations["batch_process_info"], value=False, interactive=True, visible=False)
                                 with gr.Row():
-                                    batch_size = gr.Slider(minimum=1, maximum=10, label="Số lượng lô", info="Số lượng lô xử lý cùng lúc", value=1, step=1, interactive=True, visible=False)
-                            f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label="Mức độ điều chỉnh", info="Mức độ điều chỉnh của điều chỉnh tự động", value=1, step=0.1, interactive=True, visible=False)
-                            resample_sr = gr.Slider(minimum=0, maximum=48000, label="Lấy mẫu lại", info="Lấy mẫu lại sau xử lý đến tốc độ lấy mẫu cuối cùng, 0 có nghĩa là không lấy mẫu lại", value=0, step=1, interactive=True)
-                            filter_radius = gr.Slider(minimum=0, maximum=7, label="Lọc trung vị", info="Nếu giá trị lớn hơn ba sẽ áp dụng tính năng lọc trung vị. Giá trị đại diện cho bán kính bộ lọc và có thể làm giảm hơi thở hoặc tắt thở.", value=3, step=1, interactive=True)
-                            volume_envelope = gr.Slider(minimum=0, maximum=1, label="Đường bao âm thanh", info="Sử dụng đường bao âm lượng của đầu vào để thay thế hoặc trộn với đường bao âm lượng của đầu ra. Càng gần 1 thì đường bao đầu ra càng được sử dụng nhiều", value=1, step=0.1, interactive=True)
-                            protect = gr.Slider(minimum=0, maximum=1, label="Bảo vệ phụ âm", info="Bảo vệ các phụ âm riêng biệt và âm thanh thở ngăn chặn việc rách điện âm và các hiện tượng giả khác. Việc chỉnh tối đa sẽ bảo vệ toàn diện. Việc giảm giá trị này có thể giảm độ bảo vệ, đồng thời có khả năng giảm thiểu hiệu ứng lập chỉ mục", value=0.33, step=0.01, interactive=True)
+                                    batch_size = gr.Slider(minimum=1, maximum=10, label=translations["batch_size"], info=translations["batch_size_info"], value=1, step=1, interactive=True, visible=False)
+                            f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=False)
+                            resample_sr = gr.Slider(minimum=0, maximum=48000, label=translations["resample"], info=translations["resample_info"], value=0, step=1, interactive=True)
+                            filter_radius = gr.Slider(minimum=0, maximum=7, label=translations["filter_radius"], info=translations["filter_radius_info"], value=3, step=1, interactive=True)
+                            volume_envelope = gr.Slider(minimum=0, maximum=1, label=translations["volume_envelope"], info=translations["volume_envelope_info"], value=1, step=0.1, interactive=True)
+                            protect = gr.Slider(minimum=0, maximum=1, label=translations["protect"], info=translations["protect_info"], value=0.33, step=0.01, interactive=True)
             with gr.Row():
-                gr.Markdown("Âm thanh đã được chuyển đổi")
+                gr.Markdown(translations["output_convert"])
             with gr.Row():
-                main_convert = gr.Audio(show_download_button=True, interactive=False, label="Chuyển đổi giọng chính")
-                backing_convert = gr.Audio(show_download_button=True, interactive=False, label="Chuyển đổi giọng bè", visible=False)
-                main_backing = gr.Audio(show_download_button=True, interactive=False, label="Giọng chính + Giọng bè", visible=False)  
+                main_convert = gr.Audio(show_download_button=True, interactive=False, label=translations["main_convert"])
+                backing_convert = gr.Audio(show_download_button=True, interactive=False, label=translations["convert_backing"], visible=False)
+                main_backing = gr.Audio(show_download_button=True, interactive=False, label=translations["main_or_backing"], visible=False)  
             with gr.Row():
-                original_convert = gr.Audio(show_download_button=True, interactive=False, label="Chuyển đổi giọng gốc", visible=False)
-                vocal_instrument = gr.Audio(show_download_button=True, interactive=False, label="Giọng + Nhạc nền", visible=False)  
+                original_convert = gr.Audio(show_download_button=True, interactive=False, label=translations["convert_original"], visible=False)
+                vocal_instrument = gr.Audio(show_download_button=True, interactive=False, label=translations["voice_or_instruments"], visible=False)  
             with gr.Row():
                 split_audio.change(fn=valueFalse_visible1, inputs=[split_audio], outputs=[batch_process])
                 batch_process.change(fn=visible_1, inputs=[batch_process], outputs=[batch_size])
@@ -1607,72 +1577,67 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name="convert_audio"
                 )
 
-        with gr.TabItem("Chuyển Đổi Văn Bản"):
-            gr.Markdown("## Chuyển Đổi Văn Bản Thành Giọng Nói")
+        with gr.TabItem(translations["convert_text"]):
+            gr.Markdown(translations["convert_text_markdown"])
             with gr.Row():
-                gr.Markdown("Chuyển văn bản thành giọng nói và đọc lại bằng mô hình giọng nói được huấn luyện")
+                gr.Markdown(translations["convert_text_markdown_2"])
             with gr.Row():
                 with gr.Column():
-                    use_txt = gr.Checkbox(label="Nhập dữ liệu từ tệp văn bản txt", value=False, interactive=True)
-                    prompt = gr.Textbox(label="Văn bản cần đọc", value="", placeholder="Xin chào thế giới!", lines=2)
+                    use_txt = gr.Checkbox(label=translations["input_txt"], value=False, interactive=True)
+                    prompt = gr.Textbox(label=translations["text_to_speech"], value="", placeholder="Hello Words", lines=2)
                     with gr.Row():
-                        speed = gr.Slider(label="Tốc độ đọc", info="Tốc độ đọc của giọng nói", minimum=-100, maximum=100, value=0, step=1)
-                        pitch0 = gr.Slider(minimum=-20, maximum=20, step=1, info="Khuyến cáo: chỉnh lên 12 để chuyển giọng nam thành nữ và ngược lại", label="Cao độ", value=0, interactive=True)
+                        speed = gr.Slider(label=translations["voice_speed"], info=translations["voice_speed_info"], minimum=-100, maximum=100, value=0, step=1)
+                        pitch0 = gr.Slider(minimum=-20, maximum=20, step=1, info=translations["pitch_info"], label=translations["pitch"], value=0, interactive=True)
                 with gr.Column():
-                    tts_button = gr.Button("1. Chuyển Đổi Văn Bản", variant="primary", scale=2)
-                    convert_button0 = gr.Button("2. Chuyển Đổi Giọng Nói", variant="secondary", scale=2)
+                    tts_button = gr.Button(translations["tts_1"], variant="primary", scale=2)
+                    convert_button0 = gr.Button(translations["tts_2"], variant="secondary", scale=2)
             with gr.Row():
                 with gr.Column():
-                    tts_voice = gr.Dropdown(
-                        label="Giọng nói của mô hình chuyển đổi",  
-                        choices=tts_voice, 
-                        interactive=True, 
-                        value="vi-VN-NamMinhNeural"
-                    )
-                    txt_input = gr.File(label="Thả tệp văn bản vào đây", file_types=['txt'], visible=False)  
+                    tts_voice = gr.Dropdown(label=translations["voice"], choices=tts_voice, interactive=True, value="vi-VN-NamMinhNeural")
+                    txt_input = gr.File(label=translations["drop_text"], file_types=['txt'], visible=False)  
                 with gr.Column():
-                    with gr.Accordion("Mô hình và chỉ mục", open=True):
+                    with gr.Accordion(translations["model_accordion"], open=True):
                         with gr.Row():
-                            model_pth0 = gr.Dropdown(label="Tệp mô hình", choices=sorted(model_name), value=sorted(model_name)[0] if len(sorted(model_name)) > 0 else '', interactive=True, allow_custom_value=True)
-                            model_index0 = gr.Dropdown(label="Tệp chỉ mục", choices=sorted(index_path), value=sorted(index_path)[0] if len(sorted(index_path)) > 0 else '', interactive=True, allow_custom_value=True)
+                            model_pth0 = gr.Dropdown(label=translations["model_name"], choices=sorted(model_name), value=sorted(model_name)[0] if len(sorted(model_name)) > 0 else '', interactive=True, allow_custom_value=True)
+                            model_index0 = gr.Dropdown(label=translations["index_path"], choices=sorted(index_path), value=sorted(index_path)[0] if len(sorted(index_path)) > 0 else '', interactive=True, allow_custom_value=True)
                         with gr.Row():
-                            refesh1 = gr.Button("Tải lại")
+                            refesh1 = gr.Button(translations["refesh"])
                         with gr.Row():
-                            index_strength0 = gr.Slider(label="Ảnh hưởng của chỉ mục", info="Càng cao ảnh hưởng càng lớn. Tuy nhiên, việc chọn giá trị thấp hơn có thể giảm hiện tượng giả trong âm thanh", minimum=0, maximum=1, value=0.5, step=0.01, interactive=True)
-                    with gr.Accordion("đầu ra âm thanh", open=False):
-                        export_format0 = gr.Radio(label="Định dạng", info="Định dạng khi xuất tệp âm thanh ra", choices=["wav", "mp3", "flac", "ogg", "m4a"], value="wav", interactive=True)
-                        output_audio0 = gr.Textbox(label="Đường dẫn đầu ra giọng nói", value="audios/tts.wav", placeholder="audios/tts.wav", info="Nhập đường dẫn đầu ra", interactive=True)
-                        output_audio1 = gr.Textbox(label="Đường dẫn đầu ra giọng chuyển đổi", value="audios/tts-convert.wav", placeholder="audios/tts-convert.wav", info="Nhập đường dẫn đầu ra(cứ để định dạng .wav khi chuyển đổi nó tự sửa)", interactive=True)
-                    with gr.Accordion("Cài đặt chung", open=False):
-                        with gr.Accordion("Phương pháp trích xuất", open=False):
-                            method0 = gr.Radio(label="Phương pháp trích xuất", info="Phương pháp để trích xuất dữ liệu âm thanh để cho mô hình nói", choices=["pm", "dio", "crepe-tiny", "crepe", "fcpe", "rmvpe", "harvest", "hybrid"], value="rmvpe", interactive=True)
-                            hybrid_method0 = gr.Radio(label="Phương pháp trích xuất HYBRID", info="Sự kết hợp của hai loại trích xuất khác nhau", choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[rmvpe+harvest]"], value="hybrid[pm+dio]", interactive=True, visible=False)
-                            hop_length0 = gr.Slider(label="Hop length", info="Khoảng cách giữa các khung âm thanh khi xử lý tín hiệu. Giá trị lớn xử lý nhẹ hơn, chi tiết giảm, giá trị nhỏ chi tiết cao, xử lý nặng", minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
-                        with gr.Accordion("Mô hình học cách nói", open=False):
-                            embedders0 = gr.Radio(label="Mô hình học cách nói", info="Mô hình được huấn luyện trước để giúp cho mô hình học cách nói cách ngắt hơi", choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
-                            custom_embedders0 = gr.Textbox(label="Tên của mô hình", info="Nếu bạn có mô hình riêng chỉ cần tải và nhập tên của mô hình vào đây", value="", placeholder="hubert_base", interactive=True, visible=False)
+                            index_strength0 = gr.Slider(label=translations["index_strength"], info=translations["index_strength_info"], minimum=0, maximum=1, value=0.5, step=0.01, interactive=True)
+                    with gr.Accordion(translations["output_path"], open=False):
+                        export_format0 = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac", "ogg", "m4a"], value="wav", interactive=True)
+                        output_audio0 = gr.Textbox(label=translations["output_tts"], value="audios/tts.wav", placeholder="audios/tts.wav", info=translations["tts_output"], interactive=True)
+                        output_audio1 = gr.Textbox(label=translations["output_tts_convert"], value="audios/tts-convert.wav", placeholder="audios/tts-convert.wav", info=translations["tts_output"], interactive=True)
+                    with gr.Accordion(translations["setting"], open=False):
+                        with gr.Accordion(translations["f0_method"], open=False):
+                            method0 = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=["pm", "dio", "crepe-tiny", "crepe", "fcpe", "rmvpe", "harvest", "hybrid"], value="rmvpe", interactive=True)
+                            hybrid_method0 = gr.Radio(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[rmvpe+harvest]"], value="hybrid[pm+dio]", interactive=True, visible=False)
+                            hop_length0 = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                        with gr.Accordion(translations["hubert_model"], open=False):
+                            embedders0 = gr.Radio(label=translations["hubert_model"], info=translations["hubert_info"], choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
+                            custom_embedders0 = gr.Textbox(label=translations["modelname"], info=translations["modelname_info"], value="", placeholder="hubert_base", interactive=True, visible=False)
                         with gr.Group():
                             with gr.Row():
-                                split_audio0 = gr.Checkbox(label="Cắt âm thanh", info="Cắt âm thanh ra các phần nhỏ để chuyển đổi có thể giúp tăng tốc độ", value=False, interactive=True)
-                                batch_process0 = gr.Checkbox(label="Xử lý lô", info="Xử lý lô có thể giảm thời gian huấn luyện", value=False, interactive=True, visible=False)
+                                split_audio0 = gr.Checkbox(label=translations["split_audio"], info=translations["split_audio_info"], value=False, interactive=True)
+                                batch_process0 = gr.Checkbox(label=translations["batch_process"], info=translations["batch_process_info"], value=False, interactive=True, visible=False)
                             with gr.Row():
-                                    batch_size0 = gr.Slider(minimum=1, maximum=10, label="Số lượng lô", info="Số lượng lô xử lý cùng lúc", value=1, step=1, interactive=True, visible=False)
+                                    batch_size0 = gr.Slider(minimum=1, maximum=10, label=translations["batch_size"], info=translations["batch_size_info"], value=1, step=1, interactive=True, visible=False)
                         with gr.Row():
-                            cleaner1 = gr.Checkbox(label="Làm sạch âm thanh", value=False, interactive=True)
-                            upscale2 = gr.Checkbox(label="Tăng chất lượng", value=False, interactive=True)
-                            autotune3 = gr.Checkbox(label="Tự động điều chỉnh", value=False, interactive=True)          
+                            cleaner1 = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)
+                            upscale2 = gr.Checkbox(label=translations["upscale_audio"], value=False, interactive=True)
+                            autotune3 = gr.Checkbox(label=translations["autotune"], value=False, interactive=True)          
                         with gr.Column():
-                            f0_autotune_strength0 = gr.Slider(minimum=0, maximum=1, label="Mức độ điều chỉnh", info="Mức độ điều chỉnh của điều chỉnh tự động", value=1, step=0.1, interactive=True, visible=False)
-                            clean_strength1 = gr.Slider(label="Sức mạnh làm sạch âm thanh", info="Sức mạnh của bộ làm sạch âm thanh để lọc giọng hát khi xuất", minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
-                            resample_sr0 = gr.Slider(minimum=0, maximum=48000, label="Lấy mẫu lại", info="Lấy mẫu lại sau xử lý đến tốc độ lấy mẫu cuối cùng, 0 có nghĩa là không lấy mẫu lại", value=0, step=1, interactive=True)
-                            filter_radius0 = gr.Slider(minimum=0, maximum=7, label="Lọc trung vị", info="Nếu giá trị lớn hơn ba sẽ áp dụng tính năng lọc trung vị. Giá trị đại diện cho bán kính bộ lọc và có thể làm giảm hơi thở hoặc tắt thở.", value=3, step=1, interactive=True)
-                            volume_envelope0 = gr.Slider(minimum=0, maximum=1, label="Đường bao âm thanh", info="Sử dụng đường bao âm lượng của đầu vào để thay thế hoặc trộn với đường bao âm lượng của đầu ra. Càng gần 1 thì đường bao đầu ra càng được sử dụng nhiều", value=1, step=0.1, interactive=True)
-                            protect0 = gr.Slider(minimum=0, maximum=1, label="Bảo vệ phụ âm", info="Bảo vệ các phụ âm riêng biệt và âm thanh thở ngăn chặn việc rách điện âm và các hiện tượng giả khác. Việc chỉnh tối đa sẽ bảo vệ toàn diện. Việc giảm giá trị này có thể giảm độ bảo vệ, đồng thời có khả năng giảm thiểu hiệu ứng lập chỉ mục", value=0.33, step=0.01, interactive=True)
+                            f0_autotune_strength0 = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=False)
+                            clean_strength1 = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
+                            resample_sr0 = gr.Slider(minimum=0, maximum=48000, label=translations["resample"], info=translations["resample_info"], value=0, step=1, interactive=True)
+                            filter_radius0 = gr.Slider(minimum=0, maximum=7, label=translations["filter_radius"], info=translations["filter_radius_info"], value=3, step=1, interactive=True)
+                            volume_envelope0 = gr.Slider(minimum=0, maximum=1, label=translations["volume_envelope"], info=translations["volume_envelope_info"], value=1, step=0.1, interactive=True)
+                            protect0 = gr.Slider(minimum=0, maximum=1, label=translations["protect"], info=translations["protect_info"], value=0.33, step=0.01, interactive=True)
             with gr.Row():
-                gr.Markdown("Âm thanh chưa được chuyển đổi và âm thanh đã được chuyển đổi")
+                gr.Markdown(translations["output_tts_markdown"])
             with gr.Row():
-                tts_voice_audio = gr.Audio(show_download_button=True, interactive=False, label="Giọng được tạo bởi chuyển đổi văn bản thành giọng nói")
-                tts_voice_convert = gr.Audio(show_download_button=True, interactive=False, label="Giọng được chuyển đổi bởi mô hình")
+                tts_voice_audio = gr.Audio(show_download_button=True, interactive=False, label=translations["output_text_to_speech"])
+                tts_voice_convert = gr.Audio(show_download_button=True, interactive=False, label=translations["output_file_tts_convert"])
             with gr.Row():
                 batch_process0.change(fn=visible_1, inputs=[batch_process0], outputs=[batch_size0])
                 split_audio0.change(fn=valueFalse_visible1, inputs=[split_audio0], outputs=[batch_process0])
@@ -1733,107 +1698,109 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name="convert_tts"
                 )
 
-        with gr.TabItem("Hiệu Ứng Âm Thanh"):
-            gr.Markdown("## Áp Dụng Thêm Hiệu Ứng Cho Âm Thanh")
+        with gr.TabItem(translations["audio_effects"]):
+            gr.Markdown(translations["apply_audio_effects"])
             with gr.Row():
-                gr.Markdown("Chỉnh sửa thêm hiệu ứng cho âm thanh")
+                gr.Markdown(translations["audio_effects_edit"])
             with gr.Row():
                 with gr.Column():
                     with gr.Group():
                         with gr.Row():
-                            reverb_check_box = gr.Checkbox(label="Hiệu ứng vọng âm", value=False, interactive=True)
-                            chorus_check_box = gr.Checkbox(label="Hiệu ứng hòa âm", value=False, interactive=True)
-                            delay_check_box = gr.Checkbox(label="Hiệu ứng độ trễ", value=False, interactive=True)
+                            reverb_check_box = gr.Checkbox(label=translations["reverb"], value=False, interactive=True)
+                            chorus_check_box = gr.Checkbox(label=translations["chorus"], value=False, interactive=True)
+                            delay_check_box = gr.Checkbox(label=translations["delay"], value=False, interactive=True)
                         with gr.Row():
-                            more_options = gr.Checkbox(label="Tùy chọn thêm", value=False, interactive=True)    
-                            phaser_check_box = gr.Checkbox(label="Hiệu ứng xoay pha", value=False, interactive=True)
-                            compressor_check_box = gr.Checkbox(label="Hiệu ứng nén", value=False, interactive=True)
+                            more_options = gr.Checkbox(label=translations["more_option"], value=False, interactive=True)    
+                            phaser_check_box = gr.Checkbox(label=translations["phaser"], value=False, interactive=True)
+                            compressor_check_box = gr.Checkbox(label=translations["compressor"], value=False, interactive=True)
                 with gr.Column():
-                    apply_effects_button = gr.Button("Áp dụng", variant="primary", scale=2)
+                    apply_effects_button = gr.Button(translations["apply"], variant="primary", scale=2)
             with gr.Row():
                 with gr.Row():
-                    with gr.Accordion("Đầu vào, đầu ra của âm thanh", open=False):
+                    with gr.Accordion(translations["input_output"], open=False):
                         with gr.Row():
-                            upload_audio = gr.File(label="Thả tệp âm thanh vào đây", file_types=['audio'])
+                            upload_audio = gr.File(label=translations["drop_audio"], file_types=['audio'])
                         with gr.Row():
-                            audio_in_path = gr.Dropdown(label="Đầu vào âm thanh", value="" if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios")[0], choices=[] if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios"), info="Nhập đường dẫn đầu vào âm thanh", interactive=True, allow_custom_value=True)
-                            audio_out_path = gr.Textbox(label="Đầu ra âm thanh", value="audios/audio_effects.wav", placeholder="audios/audio_effects.wav", info="Nhập đường dẫn đầu ra(cứ để .wav khi áp dụng sẽ tự sửa)", interactive=True)
+                            audio_in_path = gr.Dropdown(label=translations["input_audio"], value="" if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios")[0], choices=[] if len(list(f for f in os.listdir("audios") if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a'))) < 1 else paths_for_files("audios"), info="Nhập đường dẫn đầu vào âm thanh", interactive=True, allow_custom_value=True)
+                            audio_out_path = gr.Textbox(label=translations["output_audio"], value="audios/audio_effects.wav", placeholder="audios/audio_effects.wav", info=translations["provide_output"], interactive=True)
                         with gr.Row():
-                            audio_output_format = gr.Radio(label="Định dạng âm thanh", info="Định dạng âm thanh khi xuất tệp âm thanh ra", choices=["wav", "mp3", "flac"], value="wav", interactive=True)
-                            audio_effects_refesh = gr.Button("Tải lại")
+                            audio_output_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac"], value="wav", interactive=True)
+                            audio_effects_refesh = gr.Button(translations["refesh"])
             with gr.Row():
                 with gr.Column():
                     with gr.Row():
-                        with gr.Accordion("Hiệu ứng vọng âm", open=False, visible=False) as reverb_accordion:
-                            reverb_freeze_mode = gr.Checkbox(label="Chế độ đóng băng", info="Tạo hiệu ứng vang liên tục khi bật chế độ này", value=False, interactive=True)
-                            reverb_room_size = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Kích thước phòng", info="Điều chỉnh không gian của phòng để tạo độ vang", interactive=True)
-                            reverb_damping = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Giảm âm", info="Điều chỉnh độ hút âm, kiểm soát mức độ vang", interactive=True)
-                            reverb_wet_level = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.3, label="Mức độ tín hiệu vang", info="Điều chỉnh mức độ của tín hiệu có hiệu ứng vọng âm", interactive=True)
-                            reverb_dry_level = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.7, label="Mức độ tín hiệu gốc", info="Điều chỉnh mức độ của tín hiệu không có hiệu ứng", interactive=True)
-                            reverb_width = gr.Slider(minimum=0, maximum=1, step=0.01, value=1, label="Chiều rộng âm thanh", info="Điều chỉnh độ rộng của không gian âm thanh", interactive=True)
+                        with gr.Accordion(translations["reverb"], open=False, visible=False) as reverb_accordion:
+                            reverb_freeze_mode = gr.Checkbox(label=translations["reverb_freeze"], info=translations["reverb_freeze_info"], value=False, interactive=True)
+                            reverb_room_size = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["room_size"], info=translations["room_size_info"], interactive=True)
+                            reverb_damping = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["damping"], info=translations["damping_info"], interactive=True)
+                            reverb_wet_level = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.3, label=translations["wet_level"], info=translations["wet_level_info"], interactive=True)
+                            reverb_dry_level = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.7, label=translations["dry_level"], info=translations["dry_level_info"], interactive=True)
+                            reverb_width = gr.Slider(minimum=0, maximum=1, step=0.01, value=1, label=translations["width"], info=translations["width_info"], interactive=True)
                     with gr.Row():
-                        with gr.Accordion("Hiệu ứng hòa âm", open=False, visible=False) as chorus_accordion:
-                            chorus_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Độ sâu", info="Điều chỉnh cường độ hòa âm, tạo ra cảm giác rộng cho âm thanh", interactive=True)
-                            chorus_rate_hz = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1.5, label="Tần số", info="Điều chỉnh tốc độ dao động của hòa âm", interactive=True)
-                            chorus_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Trộn tín hiệu", info="Điều chỉnh mức độ trộn giữa âm gốc và âm có hiệu ứng", interactive=True)
-                            chorus_centre_delay_ms = gr.Slider(minimum=0, maximum=50, step=1, value=10, label="Đỗ trễ trung tâm (mili giây)", info="Khoảng thời gian trễ giữa các kênh stereo để tạo hiệu ứng hòa âm", interactive=True)
-                            chorus_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label="Phản hồi", info="Điều chỉnh lượng tín hiệu hiệu ứng được quay lại vào tín hiệu gốc", interactive=True)
+                        with gr.Accordion(translations["chorus"], open=False, visible=False) as chorus_accordion:
+                            chorus_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["chorus_depth"], info=translations["chorus_depth_info"], interactive=True)
+                            chorus_rate_hz = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1.5, label=translations["chorus_rate_hz"], info=translations["chorus_rate_hz_info"], interactive=True)
+                            chorus_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["chorus_mix"], info=translations["chorus_mix_info"], interactive=True)
+                            chorus_centre_delay_ms = gr.Slider(minimum=0, maximum=50, step=1, value=10, label=translations["chorus_centre_delay_ms"], info=translations["chorus_centre_delay_ms_info"], interactive=True)
+                            chorus_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label=translations["chorus_feedback"], info=translations["chorus_feedback_info"], interactive=True)
                     with gr.Row():
-                        with gr.Accordion("Hiệu ứng độ trễ", open=False, visible=False) as delay_accordion:
-                            delay_second = gr.Slider(minimum=0, maximum=5, step=0.01, value=0.5, label="Thời gian trễ", info="Điều chỉnh khoảng thời gian trễ giữa âm gốc và âm có hiệu ứng", interactive=True)
-                            delay_feedback = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Phản hồi độ trễ", info="Điều chỉnh lượng tín hiệu được quay lại, tạo hiệu ứng lặp lại", interactive=True)
-                            delay_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Trộn tín hiệu độ trễ", info="Điều chỉnh mức độ trộn giữa âm gốc và âm trễ", interactive=True)
+                        with gr.Accordion(translations["delay"], open=False, visible=False) as delay_accordion:
+                            delay_second = gr.Slider(minimum=0, maximum=5, step=0.01, value=0.5, label=translations["delay_seconds"], info=translations["delay_seconds_info"], interactive=True)
+                            delay_feedback = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["delay_feedback"], info=translations["delay_feedback_info"], interactive=True)
+                            delay_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["delay_mix"], info=translations["delay_mix_info"], interactive=True)
                 with gr.Column():
                     with gr.Row():
-                        with gr.Accordion("Tùy chọn thêm", open=False, visible=False) as more_accordion:
+                        with gr.Accordion(translations["more_option"], open=False, visible=False) as more_accordion:
                             with gr.Row():
-                                fade = gr.Checkbox(label="Hiệu ứng mờ dần", value=False, interactive=True)
-                                bass_or_treble = gr.Checkbox(label="Âm trầm và âm cao", value=False, interactive=True)
-                                limiter = gr.Checkbox(label="Giới hạn ngưỡng", value=False, interactive=True)
-                                resample_checkbox = gr.Checkbox(label="Lấy mẫu lại", value=False, interactive=True)
+                                fade = gr.Checkbox(label=translations["fade"], value=False, interactive=True)
+                                bass_or_treble = gr.Checkbox(label=translations["bass_or_treble"], value=False, interactive=True)
+                                limiter = gr.Checkbox(label=translations["limiter"], value=False, interactive=True)
+                                resample_checkbox = gr.Checkbox(label=translations["resample"], value=False, interactive=True)
                             with gr.Row():
-                                distortion_checkbox = gr.Checkbox(label="Hiệu ứng nhiễu âm", value=False, interactive=True)
-                                gain_checkbox = gr.Checkbox(label="Cường độ âm", value=False, interactive=True)
-                                bitcrush_checkbox = gr.Checkbox(label="Hiệu ứng giảm bits", value=False, interactive=True)
-                                clipping_checkbox = gr.Checkbox(label="Hiệu ứng méo âm", value=False, interactive=True)
-                            with gr.Accordion("Hiệu ứng mờ dần", open=True, visible=False) as fade_accordion:
+                                distortion_checkbox = gr.Checkbox(label=translations["distortion"], value=False, interactive=True)
+                                gain_checkbox = gr.Checkbox(label=translations["gain"], value=False, interactive=True)
+                                bitcrush_checkbox = gr.Checkbox(label=translations["bitcrush"], value=False, interactive=True)
+                                clipping_checkbox = gr.Checkbox(label=translations["clipping"], value=False, interactive=True)
+                            with gr.Accordion(translations["fade"], open=True, visible=False) as fade_accordion:
                                 with gr.Row():
-                                    fade_in = gr.Slider(minimum=0, maximum=10000, step=100, value=0, label="Hiệu ứng mờ dần vào (mili giây)", info="Thời gian mà âm thanh sẽ tăng dần từ mức 0 đến mức bình thường", interactive=True)
-                                    fade_out = gr.Slider(minimum=0, maximum=10000, step=100, value=0, label="Hiệu ứng mờ dần ra (mili giây)", info="thời gian mà âm thanh sẽ giảm dần từ xuống 0", interactive=True)
-                            with gr.Accordion("Âm trầm và âm cao", open=True, visible=False) as bass_treble_accordion:
+                                    fade_in = gr.Slider(minimum=0, maximum=10000, step=100, value=0, label=translations["fade_in"], info=translations["fade_in_info"], interactive=True)
+                                    fade_out = gr.Slider(minimum=0, maximum=10000, step=100, value=0, label=translations["fade_out"], info=translations["fade_out_info"], interactive=True)
+                            with gr.Accordion(translations["bass_or_treble"], open=True, visible=False) as bass_treble_accordion:
                                 with gr.Row():
-                                    bass_boost = gr.Slider(minimum=0, maximum=20, step=1, value=0, label="Độ khuếch đại âm trầm (db)", info="mức độ tăng cường âm trầm", interactive=True)
-                                    bass_frequency = gr.Slider(minimum=20, maximum=200, step=10, value=100, label="Tần số cắt của bộ lọc thông thấp (Hz)", info="tần số mà âm thanh bắt đầu bị giảm. Tần số thấp hơn sẽ làm âm trầm rõ hơn", interactive=True)
+                                    bass_boost = gr.Slider(minimum=0, maximum=20, step=1, value=0, label=translations["bass_boost"], info=translations["bass_boost_info"], interactive=True)
+                                    bass_frequency = gr.Slider(minimum=20, maximum=200, step=10, value=100, label=translations["bass_frequency"], info=translations["bass_frequency_info"], interactive=True)
                                 with gr.Row():
-                                    treble_boost = gr.Slider(minimum=0, maximum=20, step=1, value=0, label="Độ khuếch đại âm cao (db)", info="mức độ tăng cường âm cao", interactive=True)
-                                    treble_frequency = gr.Slider(minimum=1000, maximum=10000, step=500, value=3000, label="Tần số cắt của bộ lọc thông cao (Hz)", info="âm thanh dưới tần số này sẽ bị lọc bỏ. Tần số càng cao thì chỉ giữ lại âm càng cao", interactive=True)
-                            with gr.Accordion("Giới hạn ngưỡng", open=True, visible=False) as limiter_accordion:
+                                    treble_boost = gr.Slider(minimum=0, maximum=20, step=1, value=0, label=translations["treble_boost"], info=translations["treble_boost_info"], interactive=True)
+                                    treble_frequency = gr.Slider(minimum=1000, maximum=10000, step=500, value=3000, label=translations["treble_frequency"], info=translations["treble_frequency_info"], interactive=True)
+                            with gr.Accordion(translations["limiter"], open=True, visible=False) as limiter_accordion:
                                 with gr.Row():
-                                    limiter_threashold_db = gr.Slider(minimum=-60, maximum=0, step=1, value=-1, label="Ngưỡng giới hạn", info="Giới hạn mức độ âm thanh tối đa, ngăn không cho vượt quá ngưỡng", interactive=True)
-                                    limiter_release_ms = gr.Slider(minimum=10, maximum=1000, step=1, value=100, label="Thời gian thả", info="Khoảng thời gian để âm thanh trở lại sau khi bị giới hạn", interactive=True)
+                                    limiter_threashold_db = gr.Slider(minimum=-60, maximum=0, step=1, value=-1, label=translations["limiter_threashold_db"], info=translations["limiter_threashold_db_info"], interactive=True)
+                                    limiter_release_ms = gr.Slider(minimum=10, maximum=1000, step=1, value=100, label=translations["limiter_release_ms"], info=translations["limiter_release_ms_info"], interactive=True)
                             with gr.Column():
-                                pitch_shift_semitones = gr.Slider(minimum=-20, maximum=20, step=1, value=0, label="Cao độ", info="Điều chỉnh cao độ của âm thanh, mỗi bán cung tương ứng với nữa nốt nhạc", interactive=True)
-                                audio_effect_resample_sr = gr.Slider(minimum=0, maximum=48000, step=1, value=0, label="Tốc độ lấy mẫu lại", info="Lấy mẫu lại sau khi áp dụng hiệu ứng đến tốc độ lấy mẫu cuối cùng, 0 có nghĩa là không lấy mẫu lại", interactive=True, visible=False)
-                                distortion_drive_db = gr.Slider(minimum=0, maximum=50, step=1, value=20, label="Hiệu ứng nhiễu âm", info="Điều chỉnh mức độ nhiễu âm, tạo hiệu ứng méo tiếng", interactive=True, visible=False)
-                                gain_db = gr.Slider(minimum=-60, maximum=60, step=1, value=0, label="Cường độ âm", info="Tăng giảm âm lượng của tín hiệu", interactive=True, visible=False)
-                                clipping_threashold_db = gr.Slider(minimum=-60, maximum=0, step=1, value=-1, label="Ngưỡng cắt", info="Cắt bớt tín hiệu vượt quá ngưỡng, tạo âm thanh méo", interactive=True, visible=False)
-                                bitcrush_bit_depth = gr.Slider(minimum=1, maximum=24, step=1, value=16, label="Độ sâu bit", info="Giảm chất lượng âm thanh bằng cách giảm số bit, tạo hiệu ứng âm thanh bị méo", interactive=True, visible=False)
+                                pitch_shift_semitones = gr.Slider(minimum=-20, maximum=20, step=1, value=0, label=translations["pitch"], info=translations["pitch_info"], interactive=True)
+                                audio_effect_resample_sr = gr.Slider(minimum=0, maximum=48000, step=1, value=0, label=translations["resample"], info=translations["resample_info"], interactive=True, visible=False)
+                                distortion_drive_db = gr.Slider(minimum=0, maximum=50, step=1, value=20, label=translations["distortion"], info=translations["distortion_info"], interactive=True, visible=False)
+                                gain_db = gr.Slider(minimum=-60, maximum=60, step=1, value=0, label=translations["gain"], info=translations["gain_info"], interactive=True, visible=False)
+                                clipping_threashold_db = gr.Slider(minimum=-60, maximum=0, step=1, value=-1, label=translations["clipping_threashold_db"], info=translations["clipping_threashold_db_info"], interactive=True, visible=False)
+                                bitcrush_bit_depth = gr.Slider(minimum=1, maximum=24, step=1, value=16, label=translations["bitcrush_bit_depth"], info=translations["bitcrush_bit_depth_info"], interactive=True, visible=False)
                     with gr.Row():
-                        with gr.Accordion("Hiệu ứng xoay pha", open=False, visible=False) as phaser_accordion:
-                            phaser_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Độ sâu", info="Điều chỉnh độ sâu của hiệu ứng, ảnh hưởng đến cường độ của hiệu ứng xoay pha", interactive=True)
-                            phaser_rate_hz = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1, label="Tần số", info="Điều chỉnh tốc độ của hiệu ứng hiệu ứng xoay pha", interactive=True)
-                            phaser_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label="Trộn tín hiệu", info="Điều chỉnh mức độ trộn giữa tín hiệu gốc và tín hiệu đã qua xử lý", interactive=True)
-                            phaser_centre_frequency_hz = gr.Slider(minimum=50, maximum=5000, step=10, value=1000, label="Tần số trung tâm", info="Tần số trung tâm của hiệu ứng xoay pha, ảnh hưởng đến tần số bị điều chỉnh", interactive=True)
-                            phaser_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label="Phản hồi", info="Điều chỉnh lượng phản hồi tín hiệu, tạo cảm giác xoay pha mạnh hoặc nhẹ", interactive=True)
+                        with gr.Accordion(translations["phaser"], open=False, visible=False) as phaser_accordion:
+                            phaser_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["phaser_depth"], info=translations["phaser_depth_info"], interactive=True)
+                            phaser_rate_hz = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1, label=translations["phaser_rate_hz"], info=translations["phaser_rate_hz_info"], interactive=True)
+                            phaser_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["phaser_mix"], info=translations["phaser_mix_info"], interactive=True)
+                            phaser_centre_frequency_hz = gr.Slider(minimum=50, maximum=5000, step=10, value=1000, label=translations["phaser_centre_frequency_hz"], info=translations["phaser_centre_frequency_hz_info"], interactive=True)
+                            phaser_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label=translations["phaser_feedback"], info=translations["phaser_feedback_info"], interactive=True)
                     with gr.Row():
-                        with gr.Accordion("Hiệu ứng nén", open=False, visible=False) as compressor_accordion:
-                            compressor_threashold_db = gr.Slider(minimum=-60, maximum=0, step=1, value=-20, label="Ngưỡng nén", info="Ngưỡng mức âm thanh sẽ bị nén khi vượt qua ngưỡng này", interactive=True)
-                            compressor_ratio = gr.Slider(minimum=1, maximum=20, step=0.1, value=1, label="Tỉ lệ nén", info="Điều chỉnh mức độ nén âm thanh khi vượt qua ngưỡng", interactive=True)
-                            compressor_attack_ms = gr.Slider(minimum=0.1, maximum=100, step=0.1, value=10, label="Thời gian tấn công (mili giây)", info="Khoảng thời gian nén bắt đầu tác dụng sau khi âm thanh vượt ngưỡng", interactive=True)
-                            compressor_release_ms = gr.Slider(minimum=10, maximum=1000, step=1, value=100, label="Thời gian thả", info="Thời gian để âm thanh trở lại trạng thái bình thường sau khi bị nén", interactive=True)   
+                        with gr.Accordion(translations["compressor"], open=False, visible=False) as compressor_accordion:
+                            compressor_threashold_db = gr.Slider(minimum=-60, maximum=0, step=1, value=-20, label=translations["compressor_threashold_db"], info=translations["compressor_threashold_db_info"], interactive=True)
+                            compressor_ratio = gr.Slider(minimum=1, maximum=20, step=0.1, value=1, label=translations["compressor_ratio"], info=translations["compressor_ratio_info"], interactive=True)
+                            compressor_attack_ms = gr.Slider(minimum=0.1, maximum=100, step=0.1, value=10, label=translations["compressor_attack_ms"], info=translations["compressor_attack_ms_info"], interactive=True)
+                            compressor_release_ms = gr.Slider(minimum=10, maximum=1000, step=1, value=100, label=translations["compressor_release_ms"], info=translations["compressor_release_ms_info"], interactive=True)   
             with gr.Row():
-                audio_play_input = gr.Audio(show_download_button=True, interactive=False, label="Đầu vào âm thanh")
-                audio_play_output = gr.Audio(show_download_button=True, interactive=False, label="Đầu ra âm thanh")
+                gr.Markdown(translations["output_audio"])
+            with gr.Row():
+                audio_play_input = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
+                audio_play_output = gr.Audio(show_download_button=True, interactive=False, label=translations["output_audio"])
             with gr.Row():
                 reverb_check_box.change(fn=visible_1, inputs=[reverb_check_box], outputs=[reverb_accordion])
                 chorus_check_box.change(fn=visible_1, inputs=[chorus_check_box], outputs=[chorus_accordion])
@@ -1857,8 +1824,8 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                 audio_in_path.change(fn=lambda audio: audio if not os.path.isdir(audio) else None, inputs=[audio_in_path], outputs=[audio_play_input])
                 audio_effects_refesh.click(fn=lambda: refesh_audio, inputs=[], outputs=[audio_in_path])
             with gr.Row():
-                more_options.change(fn=lambda: [False, False, False, False], inputs=[], outputs=[fade, bass_or_treble, limiter, resample_checkbox])
-                more_options.change(fn=lambda: [False, False, False, False], inputs=[], outputs=[distortion_checkbox, gain_checkbox, clipping_checkbox, bitcrush_checkbox])
+                more_options.change(fn=lambda: [False]*4, inputs=[], outputs=[fade, bass_or_treble, limiter, resample_checkbox])
+                more_options.change(fn=lambda: [False]*4, inputs=[], outputs=[distortion_checkbox, gain_checkbox, clipping_checkbox, bitcrush_checkbox])
             with gr.Row():
                 apply_effects_button.click(
                     fn=audio_effects,
@@ -1921,59 +1888,56 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name="audio_effects"
                 )
 
-        with gr.TabItem("Tạo dữ liệu"):
-            gr.Markdown("## Tạo Dữ Liệu Huấn Luyện Từ Youtube")
+        with gr.TabItem(translations["createdataset"]):
+            gr.Markdown(translations["create_dataset_markdown"])
             with gr.Row():
-                gr.Markdown("Xử lý và tạo tập tin dữ liệu huấn luyện bằng đường dẫn youtube")
+                gr.Markdown(translations["create_dataset_markdown_2"])
             with gr.Row():
-                dataset_url = gr.Textbox(label="Đường dẫn liên kết âm thanh", info="Đường dẫn liên kết đến âm thanh(sử dụng dấu , để sử dụng nhiều liên kết)", value="", placeholder="https://www.youtube.com/...", interactive=True)
+                dataset_url = gr.Textbox(label=translations["url_audio"], info=translations["create_dataset_url"], value="", placeholder="https://www.youtube.com/...", interactive=True)
             with gr.Row():
                 with gr.Row():
                     with gr.Column():
                         with gr.Group():
                             with gr.Row():
-                                separator_audio = gr.Checkbox(label="Tách nhạc", value=False, interactive=True)
-                                separator_reverb = gr.Checkbox(label="Tách vang", value=False, interactive=False)
-                                denoise_mdx = gr.Checkbox(label="Khử nhiễu mô hình", value=False, interactive=False)
+                                separator_audio = gr.Checkbox(label=translations["separator_tab"], value=False, interactive=True)
+                                separator_reverb = gr.Checkbox(label=translations["dereveb_audio"], value=False, interactive=False)
+                                denoise_mdx = gr.Checkbox(label=translations["denoise"], value=False, interactive=False)
                             with gr.Row():
-                                clean_audio = gr.Checkbox(label="Làm sạch dữ liệu", value=False, interactive=True)
-                                resample = gr.Checkbox(label="Lấy mẫu lại", value=False, interactive=True)
-                                skip = gr.Checkbox(label="Bỏ qua giây", value=False, interactive=True)
+                                clean_audio = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)
+                                resample = gr.Checkbox(label=translations["resample"], value=False, interactive=True)
+                                skip = gr.Checkbox(label=translations["skip"], value=False, interactive=True)
                         with gr.Row():
-                            resample_sample_rate = gr.Slider(minimum=0, maximum=48000, step=1, value=0, label="Tốc độ lấy mẫu lại", info="Tốc độ lấy mẫu lại dữ liệu sau khi tạo xong dữ liệu huấn luyện", interactive=True, visible=False)
-                            dataset_clean_strength = gr.Slider(minimum=0, maximum=1, step=0.1, value=0.5, label="Sức mạnh làm sạch", info="Sức mạnh của bộ làm sạch âm thanh để lọc âm thanh sau khi tạo xong dữ liệu huấn luyện", interactive=True, visible=False)
+                            resample_sample_rate = gr.Slider(minimum=0, maximum=48000, step=1, value=0, label=translations["resample"], info=translations["resample_info"], interactive=True, visible=False)
+                            dataset_clean_strength = gr.Slider(minimum=0, maximum=1, step=0.1, value=0.5, label=translations["clean_strength"], info=translations["clean_strength_info"], interactive=True, visible=False)
                     with gr.Column():
-                        create_button = gr.Button("Tạo dữ liệu", variant="primary", scale=2)
+                        create_button = gr.Button(translations["createdataset"], variant="primary", scale=2)
             with gr.Row():
                 with gr.Column():
                     with gr.Group(visible=False) as separator_dataset:
-                        with gr.Row():
-                            kim_vocal_version = gr.Radio(label="Phiên bản tách giọng", info="Phiên bản của mô hình tách nhạc để tách giọng", choices=["Version-1", "Version-2"], value="Version-2", interactive=True, visible=False)
-                            kim_vocal_overlap = gr.Radio(label="Chồng chéo", info="Số lượng chồng chéo giữa các cửa sổ dự đoán", choices=["0.25", "0.5", "0.75", "0.99"], value="0.25", interactive=True, visible=False)
-                        with gr.Row():
-                            kim_vocal_segments_size = gr.Slider(label="Kích Thước Phân Đoạn", info="Càng cao chất lượng càng tốt nhưng tốn tài nguyên", minimum=32, maximum=4000, value=256, step=8, interactive=True, visible=False)
-                            kim_vocal_hop_length = gr.Slider(label="Hop length", info="Biểu thị khoảng thời gian di chuyển cửa sổ phân tích trên tín hiệu âm thanh khi thực hiện các phép biến đổi. Giá trị nhỏ hơn tăng độ chi tiết nhưng tốn tài nguyên tính toán hơn", minimum=1, maximum=8192, value=1024, step=1, interactive=True, visible=False)
-                        with gr.Row():
-                            kim_vocal_batch_size = gr.Slider(label="Kích thước lô", info="Số lượng mẫu được xử lý cùng một lúc. Việc chia thành các lô giúp tối ưu hóa quá trình tính toán. Lô quá lớn có thể làm tràn bộ nhớ, khi lô quá nhỏ sẽ làm giảm hiệu quả dùng tài nguyên", minimum=1, maximum=64, value=1, step=1, interactive=True, visible=False)
+                        with gr.Row() as kim_vocal_row:
+                            kim_vocal_version = gr.Radio(label=translations["model_ver"], info=translations["model_ver_info"], choices=["Version-1", "Version-2"], value="Version-2", interactive=True, visible=False)
+                            kim_vocal_overlap = gr.Radio(label=translations["overlap"], info=translations["overlap_info"], choices=["0.25", "0.5", "0.75", "0.99"], value="0.25", interactive=True, visible=False)
+                        with gr.Row() as kim_vocal_row_2:
+                            kim_vocal_segments_size = gr.Slider(label=translations["segments_size"], info=translations["segments_size_info"], minimum=32, maximum=4000, value=256, step=8, interactive=True, visible=False)
+                            kim_vocal_hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=8192, value=1024, step=1, interactive=True, visible=False)
+                        with gr.Row() as kim_vocal_row_3:
+                            kim_vocal_batch_size = gr.Slider(label=translations["batch_size"], info=translations["mdx_batch_size_info"], minimum=1, maximum=64, value=1, step=1, interactive=True, visible=False)
                     with gr.Row():
-                        create_dataset_info = gr.Textbox(label="Thông tin tạo dữ liệu", value="", interactive=False)
+                        create_dataset_info = gr.Textbox(label=translations["create_dataset_info"], value="", interactive=False)
                 with gr.Row():
                     with gr.Column():
-                        output_dataset = gr.Textbox(label="Đầu ra dữ liệu", info="Đầu ra dữ liệu sau khi tạo xong dữ liệu", value="dataset", placeholder="dataset", interactive=True)
+                        output_dataset = gr.Textbox(label=translations["output_data"], info=translations["output_data_info"], value="dataset", placeholder="dataset", interactive=True)
                         with gr.Row():
-                            skip_start = gr.Textbox(label="Bỏ qua phần đầu", info="Bỏ qua số giây đầu của âm thanh, dùng dấu , để sử dụng cho nhiều âm thanh", value="", placeholder="0,...", interactive=True, visible=False)
-                            skip_end = gr.Textbox(label="Bỏ qua phần cuối", info="Bỏ qua số giây cuối của âm thanh, dùng dấu , để sử dụng cho nhiều âm thanh", value="", placeholder="0,...", interactive=True, visible=False)
+                            skip_start = gr.Textbox(label=translations["skip_start"], info=translations["skip_start_info"], value="", placeholder="0,...", interactive=True, visible=False)
+                            skip_end = gr.Textbox(label=translations["skip_end"], info=translations["skip_end_info"], value="", placeholder="0,...", interactive=True, visible=False)
             with gr.Row():
                 separator_audio.change(fn=interactive_1, inputs=[separator_audio], outputs=[separator_reverb])
                 separator_audio.change(fn=interactive_1, inputs=[separator_audio], outputs=[denoise_mdx])
                 separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[separator_dataset])
             with gr.Row():
-                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_version])
-                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_overlap])
-                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_segments_size])
-            with gr.Row():
-                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_hop_length])
-                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_batch_size])
+                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_row])
+                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_row_2])
+                separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_row_3])
             with gr.Row():
                 resample.change(fn=visible_1, inputs=[resample], outputs=[resample_sample_rate])
                 clean_audio.change(fn=visible_1, inputs=[clean_audio], outputs=[dataset_clean_strength])
@@ -2006,93 +1970,96 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name="create_dataset"
                 )
 
-        with gr.TabItem("Huấn Luyện"):
-            gr.Markdown("## Huấn Luyện Mô Hình")
+        with gr.TabItem(translations["training_model"]):
+            gr.Markdown(f"## {translations['training_model']}")
             with gr.Row():
-                gr.Markdown("Huấn luyện và đào tạo mô hình giọng nói bằng một lượng dữ liệu giọng nói")
+                gr.Markdown(translations["training_markdown"])
             with gr.Row():
                 with gr.Column():
                     with gr.Row():
                         with gr.Column():
-                            training_name = gr.Textbox(label="Tên của mô hình", info="Tên của mô hình khi huấn luyện(không sử dụng ký tự đặc biệt hay dấu cách)", value="", placeholder="Tên mô hình", interactive=True)
-                            training_sr = gr.Radio(label="Tỉ lệ lấy mẫu", info="Tỉ lệ lấy mẫu của mô hình", choices=["32k", "40k", "48k"], value="48k", interactive=True) 
-                            training_ver = gr.Radio(label="Phiên bản mô hình", info="Phiên bản mô hình khi huấn luyện", choices=["v1", "v2"], value="v2", interactive=True) 
+                            training_name = gr.Textbox(label=translations["modelname"], info=translations["training_model_name"], value="", placeholder=translations["modelname"], interactive=True)
+                            training_sr = gr.Radio(label=translations["sample_rate"], info=translations["sample_rate_info"], choices=["32k", "40k", "48k"], value="48k", interactive=True) 
+                            training_ver = gr.Radio(label=translations["training_version"], info=translations["training_version_info"], choices=["v1", "v2"], value="v2", interactive=True) 
                             with gr.Row():
-                                training_f0 = gr.Checkbox(label="Huấn luyện cao độ", info="Huấn luyện cao độ cho mô hình", value=True, interactive=True)
-                                upload = gr.Checkbox(label="Tải lên", info="Tải lên dữ liệu huấn luyện", value=False, interactive=True)
-                                preprocess_cut = gr.Checkbox(label="Cắt âm thanh", info="Nên tắt nếu dữ liệu đã được xử lý", value=False, interactive=True)
-                                process_effects = gr.Checkbox(label="Hiệu ứng quá trình", info="Nên tắt nếu dữ liệu đã được xử lý", value=False, interactive=True)
+                                training_f0 = gr.Checkbox(label=translations["training_pitch"], info=translations["training_pitch_info"], value=True, interactive=True)
+                                upload = gr.Checkbox(label=translations["upload"], info=translations["upload_dataset"], value=False, interactive=True)
+                                preprocess_cut = gr.Checkbox(label=translations["split_audio"], info=translations["preprocess_split"], value=False, interactive=True)
+                                process_effects = gr.Checkbox(label=translations["preprocess_effect"], info=translations["preprocess_effect_info"], value=False, interactive=True)
                             with gr.Column():
-                                clean_dataset = gr.Checkbox(label="Làm sạch dữ liệu", info="Làm sạch các đoạn dữ liệu", value=False, interactive=True)
-                                clean_dataset_strength = gr.Slider(label="Mức làm sạch", info="Mức độ làm sạch các đoạn dữ liệu", minimum=0, maximum=1, value=0.7, step=0.1, interactive=True, visible=False)
+                                clean_dataset = gr.Checkbox(label=translations["clear_dataset"], info=translations["clear_dataset_info"], value=False, interactive=True)
+                                clean_dataset_strength = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.7, step=0.1, interactive=True, visible=False)
                         with gr.Column():
-                            preprocess_button = gr.Button("1. Xử lý dữ liệu", scale=2)
-                            upload_dataset = gr.Files(label="Thả dữ liệu vào đây", file_types=['audio'], visible=False)
-                            preprocess_info = gr.Textbox(label="Thông tin phần xử lý trước", value="", interactive=False)
+                            preprocess_button = gr.Button(translations["preprocess_button"], scale=2)
+                            upload_dataset = gr.Files(label=translations["drop_audio"], file_types=['audio'], visible=False)
+                            preprocess_info = gr.Textbox(label=translations["preprocess_info"], value="", interactive=False)
                 with gr.Column():
                     with gr.Row():
                         with gr.Column():
-                            extract_method = gr.Radio(label="Phương pháp trích xuất", info="Phương pháp trích xuất dữ liệu huấn luyện", choices=["pm", "dio", "crepe", "crepe-tiny", "fcpe", "rmvpe", "harvest"], value="pm", interactive=True)
-                            extract_hop_length = gr.Slider(label="Hop length", info="Khoảng cách giữa các khung âm thanh khi xử lý tín hiệu. Giá trị lớn xử lý nhẹ hơn, chi tiết giảm, giá trị nhỏ chi tiết cao, xử lý nặng", minimum=0, maximum=512, value=128, step=1, interactive=True, visible=False)
-                            with gr.Accordion(label="Mô hình học cách nói", open=False):
-                                extract_embedders = gr.Radio(label="Mô hình học cách nói", info="Mô hình được huấn luyện trước để giúp cho mô hình học cách nói cách ngắt hơi", choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
+                            extract_method = gr.Radio(label=translations["f0_method"], info=translations["f0_method"], choices=["pm", "dio", "crepe", "crepe-tiny", "fcpe", "rmvpe", "harvest"], value="pm", interactive=True)
+                            extract_hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                            with gr.Accordion(label=translations["hubert_model"], open=False):
+                                extract_embedders = gr.Radio(label=translations["hubert_model"], info=translations["hubert_info"], choices=["contentvec_base", "hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "custom"], value="contentvec_base", interactive=True)
                                 with gr.Row():
-                                    extract_embedders_custom = gr.Textbox(label="Tên của mô hình", info="Nếu bạn có mô hình riêng chỉ cần tải và nhập tên của mô hình vào đây", value="", placeholder="hubert_base", interactive=True, visible=False)
+                                    extract_embedders_custom = gr.Textbox(label=translations["modelname"], info=translations["modelname_info"], value="", placeholder="hubert_base", interactive=True, visible=False)
                         with gr.Column():
-                            extract_button = gr.Button("2. Trích xuất dữ liệu", scale=2)
-                            extract_info = gr.Textbox(label="Thông tin phần trích xuất dữ liệu", value="", interactive=False)
+                            extract_button = gr.Button(translations["extract_button"], scale=2)
+                            extract_info = gr.Textbox(label=translations["extract_info"], value="", interactive=False)
                 with gr.Column():
                     with gr.Row():
                         with gr.Column():
-                            total_epochs = gr.Slider(label="Tổng số kỷ nguyên", info="Tổng số kỷ nguyên huấn luyện đào tạo", minimum=1, maximum=10000, value=300, step=1, interactive=True)
-                            save_epochs = gr.Slider(label="Tần suất lưu", info="Tần suất lưu mô hình khi huấn luyện, giúp việc huấn luyện lại mô hình", minimum=1, maximum=10000, value=50, step=1, interactive=True)
+                            total_epochs = gr.Slider(label=translations["total_epoch"], info=translations["total_epoch_info"], minimum=1, maximum=10000, value=300, step=1, interactive=True)
+                            save_epochs = gr.Slider(label=translations["save_epoch"], info=translations["save_epoch_info"], minimum=1, maximum=10000, value=50, step=1, interactive=True)
                         with gr.Column():
-                            index_button = gr.Button("3. Tạo chỉ mục", variant="primary", scale=2)
-                            training_button = gr.Button("4. Huấn luyện", variant="primary", scale=2)
+                            index_button = gr.Button(f"3. {translations['create_index']}", variant="primary", scale=2)
+                            training_button = gr.Button(f"4. {translations['training_model']}", variant="primary", scale=2)
                     with gr.Row():
-                        with gr.Accordion(label="Cài đặt chung", open=False):
+                        with gr.Accordion(label=translations["setting"], open=False):
                             with gr.Row():
-                                index_algorithm = gr.Radio(label="Thuật toán chỉ mục", info="Thuật toán tạo chỉ mục", choices=["Auto", "Faiss", "KMeans"], value="Auto", interactive=True)
+                                index_algorithm = gr.Radio(label=translations["index_algorithm"], info=translations["index_algorithm_info"], choices=["Auto", "Faiss", "KMeans"], value="Auto", interactive=True)
                             with gr.Row():
-                                custom_dataset = gr.Checkbox(label="Tùy chọn thư mục", info="Tùy chọn thư mục dữ liệu huấn luyện", value=False, interactive=True)
-                                overtraining_detector = gr.Checkbox(label="Kiểm tra quá sức", info="Kiểm tra huấn luyện mô hình quá sức", value=False, interactive=True)
-                                sync_graph = gr.Checkbox(label="Đồng bộ biểu đồ", info="Đồng bộ biểu đồ huấn luyện", value=False, interactive=True)
-                                cache_in_gpu = gr.Checkbox(label="Lưu mô hình vào đệm", info="Lưu mô hình vào bộ nhớ đệm gpu", value=False, interactive=True)
+                                custom_dataset = gr.Checkbox(label=translations["custom_dataset"], info=translations["custom_dataset_info"], value=False, interactive=True)
+                                overtraining_detector = gr.Checkbox(label=translations["overtraining_detector"], info=translations["overtraining_detector_info"], value=False, interactive=True)
+                                sync_graph = gr.Checkbox(label=translations["sync_graph"], info=translations["sync_graph_info"], value=False, interactive=True)
+                                cache_in_gpu = gr.Checkbox(label=translations["cache_in_gpu"], info=translations["cache_in_gpu_info"], value=False, interactive=True)
                             with gr.Column():
-                                dataset_path = gr.Textbox(label="Thư mục chứa dữ liệu", value="dataset", interactive=True, visible=False)
+                                dataset_path = gr.Textbox(label=translations["dataset_folder"], value="dataset", interactive=True, visible=False)
                             with gr.Column():
-                                threshold = gr.Slider(minimum=1, maximum=100, value=50, step=1, label="Ngưỡng huấn luyện quá sức", interactive=True, visible=False)
-                                with gr.Accordion("Tùy chọn CPU/GPU", open=False):
+                                threshold = gr.Slider(minimum=1, maximum=100, value=50, step=1, label=translations["threshold"], interactive=True, visible=False)
+                                with gr.Accordion(translations["setting_cpu_gpu"], open=False):
                                     with gr.Column():
-                                        gpu_number = gr.Textbox(label="Số gpu được sử dụng", value=str(get_number_of_gpus()), info="Số của GPU được sử dụng trong huấn luyện", interactive=True)
-                                        gpu_info = gr.Textbox(label="Thông tin của GPU", value=get_gpu_info(), info="Thông tin của GPU được sử dụng trong huấn luyện", interactive=False)
-                                        cpu_core = gr.Slider(label="Số lõi xử lý có thể sử dụng", info="Số lõi cpu được sử dụng trong việc huấn luyện", minimum=0, maximum=cpu_count(), value=cpu_count(), step=1, interactive=True)
-                                        train_batch_size = gr.Slider(label="Kích thước lô", info="Số lượng mẫu xử lý đồng thời trong một lần huấn luyện. Cao có thể gây tràn bộ nhợ", minimum=1, maximum=64, value=8, step=1, interactive=True)
+                                        gpu_number = gr.Textbox(label=translations["gpu_number"], value=str(get_number_of_gpus()), info=translations["gpu_number_info"], interactive=True)
+                                        gpu_info = gr.Textbox(label=translations["gpu_info"], value=get_gpu_info(), info=translations["gpu_info_2"], interactive=False)
+                                        cpu_core = gr.Slider(label=translations["cpu_core"], info=translations["cpu_core_info"], minimum=0, maximum=cpu_count(), value=cpu_count(), step=1, interactive=True)
+                                        train_batch_size = gr.Slider(label=translations["batch_size"], info=translations["batch_size_info"], minimum=1, maximum=64, value=8, step=1, interactive=True)
                             with gr.Row():
                                 with gr.Row():
-                                    save_only_latest = gr.Checkbox(label="Chỉ lưu mới nhất", info="Chỉ lưu mô hình D và G mới nhất", value=True, interactive=True)
-                                    save_every_weights = gr.Checkbox(label="Lưu mọi mô hình", info="Lưu mọi mô hình sau mỗi lượt kỷ nguyên", value=True, interactive=True)
-                                    not_use_pretrain = gr.Checkbox(label="Không dùng huấn luyện", info="Không dùng huấn luyện trước", value=False, interactive=True)
-                                    custom_pretrain = gr.Checkbox(label="Tùy chỉnh huấn luyện", info="Tùy chỉnh huấn luyện trước", value=False, interactive=True)
+                                    save_only_latest = gr.Checkbox(label=translations["save_only_latest"], info=translations["save_only_latest_info"], value=True, interactive=True)
+                                    save_every_weights = gr.Checkbox(label=translations["save_every_weights"], info=translations["save_every_weights_info"], value=True, interactive=True)
+                                    not_use_pretrain = gr.Checkbox(label=translations["not_use_pretrain_2"], info=translations["not_use_pretrain_info"], value=False, interactive=True)
+                                    custom_pretrain = gr.Checkbox(label=translations["custom_pretrain"], info=translations["custom_pretrain_info"], value=False, interactive=True)
+                            with gr.Row():
+                                with gr.Row():
+                                    model_author = gr.Textbox(label=translations["training_author"], info=translations["training_author_info"], value="", placeholder=translations["training_author"], interactive=True)
                             with gr.Row():
                                 with gr.Column():
-                                    with gr.Accordion("Tùy chọn huấn luyện trước", open=False, visible=False) as pretrain_setting:
-                                        pretrained_D = gr.Dropdown(label="Tệp mô hình huấn luyện trước D", choices=sorted(pretrainedD), value=sorted(pretrainedD)[0] if len(sorted(pretrainedD)) > 0 else '', interactive=True, allow_custom_value=True, visible=False)
-                                        pretrained_G = gr.Dropdown(label="Tệp mô hình huấn luyện trước G", choices=sorted(pretrainedG), value=sorted(pretrainedG)[0] if len(sorted(pretrainedG)) > 0 else '', interactive=True, allow_custom_value=True, visible=False)
-                                        refesh_pretrain = gr.Button("Tải lại huấn luyện trước", scale=2, visible=False)
+                                    with gr.Accordion(translations["custom_pretrain_info"], open=False, visible=False) as pretrain_setting:
+                                        pretrained_D = gr.Dropdown(label=translations["pretrain_file"].format(dg="D"), choices=sorted(pretrainedD), value=sorted(pretrainedD)[0] if len(sorted(pretrainedD)) > 0 else '', interactive=True, allow_custom_value=True, visible=False)
+                                        pretrained_G = gr.Dropdown(label=translations["pretrain_file"].format(dg="G"), choices=sorted(pretrainedG), value=sorted(pretrainedG)[0] if len(sorted(pretrainedG)) > 0 else '', interactive=True, allow_custom_value=True, visible=False)
+                                        refesh_pretrain = gr.Button(translations["refesh_pretrain"], scale=2, visible=False)
                     with gr.Row():
-                        training_info = gr.Textbox(label="Thông tin phần huấn luyện", value="", interactive=False)
+                        training_info = gr.Textbox(label=translations["train_info"], value="", interactive=False)
                     with gr.Row():
                         with gr.Column():
-                            with gr.Accordion("5. Xuất Mô hình", open=False):
+                            with gr.Accordion(translations["export_model"], open=False):
                                 with gr.Row():
-                                    model_file= gr.Dropdown(label="Tệp mô hình", choices=sorted(model_name), value=sorted(model_name)[0] if len(sorted(model_name)) > 0 else '', interactive=True, allow_custom_value=True)
-                                    index_file = gr.Dropdown(label="Tệp chỉ mục", choices=sorted(index_path), value=sorted(index_path)[0] if len(sorted(index_path)) > 0 else '', interactive=True, allow_custom_value=True)
+                                    model_file= gr.Dropdown(label=translations["model_name"], choices=sorted(model_name), value=sorted(model_name)[0] if len(sorted(model_name)) > 0 else '', interactive=True, allow_custom_value=True)
+                                    index_file = gr.Dropdown(label=translations["index_path"], choices=sorted(index_path), value=sorted(index_path)[0] if len(sorted(index_path)) > 0 else '', interactive=True, allow_custom_value=True)
                                 with gr.Row():
-                                    refesh_file = gr.Button("1. Tải lại", scale=2)
-                                    zip_model = gr.Button("2. Nén mô hình", variant="primary", scale=2)
+                                    refesh_file = gr.Button(f"1. {translations['refesh']}", scale=2)
+                                    zip_model = gr.Button(translations["zip_model"], variant="primary", scale=2)
                                 with gr.Row():
-                                    zip_output = gr.File(label="Đầu ra tệp khi nén", file_types=['zip'], interactive=False, visible=False)
+                                    zip_output = gr.File(label=translations["output_zip"], file_types=['zip'], interactive=False, visible=False)
             with gr.Row():
                 refesh_file.click(fn=change_choices, inputs=[], outputs=[model_file, index_file]) 
                 zip_model.click(fn=lambda: visible_1(True), inputs=[], outputs=[zip_output])           
@@ -2188,32 +2155,33 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                         overtraining_detector,
                         threshold,
                         sync_graph,
-                        cache_in_gpu
+                        cache_in_gpu,
+                        model_author
                     ],
                     outputs=[training_info],
                     api_name="training_model"
                 )
 
-        with gr.TabItem("Dung Hợp"):
-            gr.Markdown("## Dung Hợp Hai Mô Hình Với Nhau")
+        with gr.TabItem(translations["fushion"]):
+            gr.Markdown(translations["fushion_markdown"])
             with gr.Row():
-                gr.Markdown("Dung hợp hai mô hình giọng nói lại với nhau để tạo thành một mô hình duy nhất")
+                gr.Markdown(translations["fushion_markdown_2"])
             with gr.Row():
                 with gr.Column():
-                    name_to_save = gr.Textbox(label="Tên mô hình khi lưu", placeholder="Tên mô hình", value="", max_lines=1, interactive=True)
+                    name_to_save = gr.Textbox(label=translations["modelname"], placeholder="Model.pth", value="", max_lines=1, interactive=True)
                 with gr.Column():
-                    fushion_button = gr.Button("Dung Hợp", variant="primary", scale=4)
+                    fushion_button = gr.Button(translations["fushion"], variant="primary", scale=4)
             with gr.Column():
                 with gr.Row():
-                    model_a = gr.File(label="Mô hình A", file_types=['pth']) 
-                    model_b = gr.File(label="Mô hình B", file_types=['pth'])
+                    model_a = gr.File(label=f"{translations['model_name']} 1", file_types=['pth']) 
+                    model_b = gr.File(label=f"{translations['model_name']} 2", file_types=['pth'])
                 with gr.Row():
-                    model_path_a = gr.Textbox(label="Đường dẫn mô hình A", value="", placeholder="Đường dẫn")
-                    model_path_b = gr.Textbox(label="Đường dẫn mô hình B", value="", placeholder="Đường dẫn")
+                    model_path_a = gr.Textbox(label=f"{translations['model_path']} 1", value="", placeholder="assets/weights/Model_1.pth")
+                    model_path_b = gr.Textbox(label=f"{translations['model_path']} 2", value="", placeholder="assets/weights/Model_2.pth")
             with gr.Row():
-                ratio = gr.Slider(minimum=0, maximum=1, label="Tỉ lệ mô hình", info="Chỉnh hướng về bên nào sẽ làm cho mô hình giống với bên đó", value=0.5, interactive=True)
+                ratio = gr.Slider(minimum=0, maximum=1, label=translations["model_ratio"], info=translations["model_ratio_info"], value=0.5, interactive=True)
             with gr.Row():
-                output_model = gr.File(label="Đầu ra mô hình", visible=False)
+                output_model = gr.File(label=translations["output_model_path"], visible=False)
             with gr.Row():
                 model_a.upload(fn=lambda model: shutil.move(model.name, os.path.join("assets", "weights")), inputs=[model_a], outputs=[model_path_a])
                 model_b.upload(fn=lambda model: shutil.move(model.name, os.path.join("assets", "weights")), inputs=[model_b], outputs=[model_path_b])
@@ -2231,18 +2199,18 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                 )
                 fushion_button.click(fn=lambda: visible_1(True), inputs=[], outputs=[output_model])  
 
-        with gr.TabItem("Đọc Thông Tin"):
-            gr.Markdown("## Đọc Thông Tin Của Mô Hình")
+        with gr.TabItem(translations["read_model"]):
+            gr.Markdown(translations["read_model_markdown"])
             with gr.Row():
-                gr.Markdown("đọc các thông tin được ghi trong mô hình")
+                gr.Markdown(translations["read_model_markdown_2"])
             with gr.Row():
                 with gr.Column():
-                    model = gr.File(label="Thả mô hình vào đây", file_types=['pth']) 
+                    model = gr.File(label=translations["drop_model"], file_types=['pth']) 
                 with gr.Column():
-                    read_button = gr.Button("Đọc mô hình", variant="primary", scale=2)
+                    read_button = gr.Button(translations["readmodel"], variant="primary", scale=2)
             with gr.Column():
-                model_path = gr.Textbox(label="Đường dẫn mô hình", value="", info="Nhập đường dẫn đến tệp mô hình", interactive=True)
-                output_info = gr.Textbox(label="Thông Tin Mô Hình", value="", interactive=False, scale=6)
+                model_path = gr.Textbox(label=translations["download_url"], value="", info=translations["model_path_info"], interactive=True)
+                output_info = gr.Textbox(label=translations["modelinfo"], value="", interactive=False, scale=6)
             with gr.Row():
                 model.upload(fn=lambda model: shutil.move(model.name, os.path.join("assets", "weights")), inputs=[model], outputs=[model_path])
                 read_button.click(
@@ -2252,56 +2220,56 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name="read_model"
                 )
 
-        with gr.TabItem("Tải Xuống"):
-            gr.Markdown("## Tải Xuống Mô Hình")
+        with gr.TabItem(translations["downloads"]):
+            gr.Markdown(translations["download_markdown"])
             with gr.Row():
-                gr.Markdown("Tải xuống mô hình giọng nói, mô hình huấn luyện trước, mô hình học cách nói")
+                gr.Markdown(translations["download_markdown_2"])
             with gr.Row():
-                with gr.Accordion("Tải xuống mô hình giọng nói", open=True):
+                with gr.Accordion(translations["model_download"], open=True):
                     with gr.Row():
-                        downloadmodel = gr.Radio(label="Chọn cách tải mô hình", choices=["Tải từ đường dẫn liên kết", "Tải từ kho mô hình csv", "Tải mô hình từ Applio", "Tải lên"], interactive=True, value="Tải từ đường dẫn liên kết")
+                        downloadmodel = gr.Radio(label=translations["model_download_select"], choices=[translations["download_url"], translations["download_from_csv"], translations["download_from_applio"], translations["upload"]], interactive=True, value=translations["download_url"])
                     with gr.Row():
                         gr.Markdown("___")
                     with gr.Row():
-                        url_input = gr.Textbox(label="Đường dẫn liên kết đến mô hình", value="", placeholder="https://...", scale=6, visible=True)
-                        model_name = gr.Textbox(label="Tên mô hình để lưu", value="", placeholder="Tên của mô hình", scale=2, visible=True)
-                        url_download = gr.Button(value="Tải xuống", scale=2, visible=True)
+                        url_input = gr.Textbox(label=translations["model_url"], value="", placeholder="https://...", scale=6, visible=True)
+                        model_name = gr.Textbox(label=translations["modelname"], value="", placeholder=translations["modelname"], scale=2, visible=True)
+                        url_download = gr.Button(value=translations["downloads"], scale=2, visible=True)
                     with gr.Row():
-                        model_browser = gr.Dropdown(choices=models.keys(), label="Kho mô hình", scale=8, allow_custom_value=True, visible=False)
-                        download_from_browser = gr.Button(value="Nhận mô hình", scale=2, variant="primary", visible=False)
+                        model_browser = gr.Dropdown(choices=models.keys(), label=translations["model_warehouse"], scale=8, allow_custom_value=True, visible=False)
+                        download_from_browser = gr.Button(value=translations["get_model"], scale=2, variant="primary", visible=False)
                     with gr.Row():
-                        model_upload = gr.File(label="Thả mô hình vào đây", file_types=['pth', 'index', 'zip'], visible=False)
+                        model_upload = gr.File(label=translations["drop_model"], file_types=['pth', 'index', 'zip'], visible=False)
                     with gr.Column():
                         with gr.Row():
-                            search_name = gr.Textbox(label="Tên để tìm kiếm", placeholder="Tên mô hình", interactive=True, scale=8, visible=False)
-                            search = gr.Button("Tìm kiếm", scale=2, visible=False)
+                            search_name = gr.Textbox(label=translations["name_to_search"], placeholder=translations["modelname"], interactive=True, scale=8, visible=False)
+                            search = gr.Button(translations["search_2"], scale=2, visible=False)
                         with gr.Row():
-                            search_dropdown = gr.Dropdown(label="Chọn mô hình đã được tìm kiếm(Bấm vào để chọn)", value="", choices=[], allow_custom_value=True, interactive=False, visible=False)
-                            download = gr.Button("Tải xuống", variant="primary", visible=False)
+                            search_dropdown = gr.Dropdown(label=translations["select_download_model"], value="", choices=[], allow_custom_value=True, interactive=False, visible=False)
+                            download = gr.Button(translations["downloads"], variant="primary", visible=False)
             with gr.Row():
-                with gr.Accordion("Tải xuống mô hình huấn luyện trước", open=False):
+                with gr.Accordion(translations["download_pretrainec"], open=False):
                     with gr.Row():
-                        pretrain_download_choices = gr.Radio(label="Chọn cách tải mô hình", choices=["Đường dẫn mô hình", "Danh sách mô hình", "Tải lên"], value="Link mô hình", interactive=True)  
+                        pretrain_download_choices = gr.Radio(label=translations["model_download_select"], choices=[translations["download_url"], translations["list_model"], translations["upload"]], value=translations["download_url"], interactive=True)  
                     with gr.Row():
                         gr.Markdown("___")
                     with gr.Row():
-                        pretrainD = gr.Textbox(label="Đường dẫn liên kết đến mô hình huấn luyện trước D", value="", info="Chỉ hỗ trợ huggingface.co", placeholder="https://...", interactive=True, scale=4, visible=True)
-                        pretrainG = gr.Textbox(label="Đường dẫn liên kết đến mô hình huấn luyện trước G", value="", info="Chỉ hỗ trợ huggingface.co", placeholder="https://...", interactive=True, scale=4, visible=True)
-                        download_pretrain_button = gr.Button("Tải xuống", scale=2)
+                        pretrainD = gr.Textbox(label=translations["pretrained_url"].format(dg="D"), value="", info=translations["only_huggingface"], placeholder="https://...", interactive=True, scale=4, visible=True)
+                        pretrainG = gr.Textbox(label=translations["pretrained_url"].format(dg="G"), value="", info=translations["only_huggingface"], placeholder="https://...", interactive=True, scale=4, visible=True)
+                        download_pretrain_button = gr.Button(translations["downloads"], scale=2)
                     with gr.Row():
-                        pretrain_choices = gr.Dropdown(label="Chọn mô hình huấn luyện trước", info="Chọn mô hình huấn luyện trước để cài đặt về", choices=list(fetch_pretrained_data().keys()), value="Titan_Medium", allow_custom_value=True, interactive=True, scale=6, visible=False)
-                        sample_rate_pretrain = gr.Dropdown(label="Tốc độ lấy mẫu của mô hình", choices=["48k", "40k", "32k"], value="48k", interactive=True, visible=False)
-                        download_pretrain_choices_button = gr.Button("Tải xuống", scale=2, variant="primary", visible=False)
+                        pretrain_choices = gr.Dropdown(label=translations["select_pretrain"], info=translations["select_pretrain_info"], choices=list(fetch_pretrained_data().keys()), value="Titan_Medium", allow_custom_value=True, interactive=True, scale=6, visible=False)
+                        sample_rate_pretrain = gr.Dropdown(label=translations["pretrain_sr"], choices=["48k", "40k", "32k"], value="48k", interactive=True, visible=False)
+                        download_pretrain_choices_button = gr.Button(translations["downloads"], scale=2, variant="primary", visible=False)
                     with gr.Row():
-                        pretrain_upload_g = gr.File(label="Thả mô hình huấn luyện trước G vào đây", file_types=['pth'], visible=False)
-                        pretrain_upload_d = gr.File(label="Thả mô hình huấn luyện trước D vào đây", file_types=['pth'], visible=False)
+                        pretrain_upload_g = gr.File(label=translations["drop_pretrain"].format(dg="G"), file_types=['pth'], visible=False)
+                        pretrain_upload_d = gr.File(label=translations["drop_pretrain"].format(dg="D"), file_types=['pth'], visible=False)
             with gr.Row():
-                with gr.Accordion("Tải xuống mô hình học cách nói", open=False):
+                with gr.Accordion(translations["hubert_download"], open=False):
                     with gr.Row():
-                        hubert_url = gr.Textbox(label="Đường dẫn liên kết tới mô hình học cách nói", value="", info="Chỉ hỗ trợ huggingface.co", placeholder="https://...", interactive=True, scale=8)
-                        hubert_button = gr.Button("Tải xuống", scale=2, variant="primary")
+                        hubert_url = gr.Textbox(label=translations["hubert_url"], value="", info=translations["only_huggingface"], placeholder="https://...", interactive=True, scale=8)
+                        hubert_button = gr.Button(translations["downloads"], scale=2, variant="primary")
                     with gr.Row():
-                        hubert_input = gr.File(label="Thả mô hình học cách nói vào đây", file_types=['pt'])    
+                        hubert_input = gr.File(label=translations["drop_hubert"], file_types=['pt'])    
             with gr.Row():
                 url_download.click(
                     fn=download_model, 
@@ -2378,30 +2346,55 @@ with gr.Blocks(title = "📱 Vietnamese-RVC GUI BY ANH", theme = 'NoCrypt/miku')
                     api_name="upload_hubert"
                 )
 
-        with gr.TabItem("Tùy Chỉnh"):
-            gr.Markdown("## Tùy Chỉnh Thêm")
+        with gr.TabItem(translations["settings"]):
+            gr.Markdown(translations["settings_markdown"])
             with gr.Row():
-                gr.Markdown("Tùy chỉnh thêm một số tính năng của dự án")
+                gr.Markdown(translations["settings_markdown_2"])
             with gr.Row():
-                toggle_button = gr.Button("Đổi Chế Độ").click(None, js="""() => {document.body.classList.toggle('dark')}""")
-                
-        with gr.TabItem("Nguồn Gốc"):
-            gr.Markdown("## Nguồn Gốc Và Tác Giả Của Dự án")
+                with gr.Column():
+                    language_dropdown = gr.Dropdown(label=translations["lang"], interactive=True, info=translations["lang_restart"], choices=configs["support_language"], value=configs["language"])
+                    change_lang = gr.Button(translations["change_lang"], variant=["primary"], scale=2)
+                with gr.Column():
+                    toggle_button = gr.Button(translations["change_light_dark"], variant=["secondary"], scale=2)
+            with gr.Row():
+                with gr.Column():
+                    fp_select = gr.Radio(label=translations["fp_train"], info=translations["fp_info"], value="fp32", choices=["fp16", "fp32"], interactive=True)
+                    fp_button = gr.Button(translations["fp_button"], variant=["primary"], scale=2)
+                with gr.Column():
+                    theme_dropdown = gr.Dropdown(label=translations["theme"], interactive=True, info=translations["theme_restart"], choices=configs["themes"], value=configs["theme"], allow_custom_value=True)
+                    changetheme = gr.Button(translations["theme_button"], variant=["primary"], scale=2)
+            with gr.Row():
+                toggle_button.click(fn=None, js="""() => {document.body.classList.toggle('dark')}""")
+                fp_button.click(fn=change_fp, inputs=[fp_select], outputs=[])
+            with gr.Row():
+                change_lang.click(fn=change_language, inputs=[language_dropdown], outputs=[])
+                change_lang.click(fn=restart_app, inputs=[], outputs=[])
+            with gr.Row():
+                changetheme.click(fn=change_theme, inputs=[theme_dropdown], outputs=[])
+                changetheme.click(fn=restart_app, inputs=[], outputs=[])
+            with gr.Row():
+                change_lang.click(fn=None, js="""setTimeout(function() {location.reload()}, 30000)""", inputs=[], outputs=[])
+                changetheme.click(fn=None, js="""setTimeout(function() {location.reload()}, 30000)""", inputs=[], outputs=[])
+
+        with gr.TabItem(translations["source"]):
+            gr.Markdown(translations["source_info"])
             with gr.Row():
                 gr.Markdown("___")
             with gr.Row():
-                gr.Markdown(f"""
- 
-                    **Dự án này được nấu bởi [Phạm Huỳnh Anh]({codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16", "rot13")})**
+                gr.Markdown(translations["credits"].format(author=codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16", "rot13"), applio=codecs.decode("uggcf://tvguho.pbz/VNUvfcnab/Nccyvb/gerr/znva?gno=ernqzr-bi-svyr", "rot13"), ai_hispano=codecs.decode("uggcf://tvguho.pbz/VNUvfcnab", "rot13"), rvc_webui=codecs.decode("uggcf://tvguho.pbz/EIP-Cebwrpg/Ergevriny-onfrq-Ibvpr-Pbairefvba-JroHV?gno=ernqzr-bi-svyr", "rot13"), rvc_boss=codecs.decode("uggcf://tvguho.pbz/EIP-Obff", "rot13"), python_audio_separator=codecs.decode("uggcf://tvguho.pbz/abznqxnenbxr/clguba-nhqvb-frcnengbe?gno=ernqzr-bi-svyr", "rot13"), andrew_beveridge=codecs.decode("uggcf://tvguho.pbz/orirenqo", "rot13")))
 
-                    **Dự án được nấu dựa trên một số dự án chính như:**
-
-                    **Chuyển đổi, Xử lý, Trích xuất, Huấn luyện, Đọc mô hình, dung hợp mô hình, mô hình huấn luyện, kho mô hình...: [Applio]({codecs.decode("uggcf://tvguho.pbz/VNUvfcnab/Nccyvb/gerr/znva?gno=ernqzr-bi-svyr", "rot13")}) của nhóm [AI Hispano]({codecs.decode("uggcf://tvguho.pbz/VNUvfcnab", "rot13")})**
-
-                    **Phương pháp trích xuất, cách hiển thị thông tin, cách ghi nhật ký, mô hình huấn luyện...: [Retrieval-based-Voice-Conversion-WebUI]({codecs.decode("uggcf://tvguho.pbz/EIP-Cebwrpg/Ergevriny-onfrq-Ibvpr-Pbairefvba-JroHV?gno=ernqzr-bi-svyr", "rot13")}) của tác giả [RVC BOSS]({codecs.decode("uggcf://tvguho.pbz/EIP-Obff", "rot13")})**
-                    
-                    **Mô hình tách nhạc MDX-Net và Demucs: [Python-audio-separator]({codecs.decode("uggcf://tvguho.pbz/abznqxnenbxr/clguba-nhqvb-frcnengbe?gno=ernqzr-bi-svyr", "rot13")}) của tác giả [Andrew Beveridge]({codecs.decode("uggcf://tvguho.pbz/orirenqo", "rot13")})**
-
-                """)
-
-    app.queue().launch(favicon_path=os.path.join("assets", "miku.png"), server_name="localhost", server_port=7860, show_error=True, inbrowser=True, share=True)
+    for i in range(configs["num_of_restart"]):
+        try:
+            app.queue().launch(
+                favicon_path=os.path.join("assets", "miku.png"), 
+                server_name=server_name, 
+                server_port=port, 
+                show_error=show_error, 
+                inbrowser=False, 
+                share=share
+            )
+            break
+        except OSError:
+            port -= 1
+        except Exception as e:
+            raise RuntimeError(translations["error_occurred"].format(e=e))

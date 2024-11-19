@@ -26,15 +26,20 @@ from main.configs.config import Config
 logger = logging.getLogger(__name__)
 
 
-logging.getLogger("numba.core.byteflow").setLevel(logging.WARNING)
-logging.getLogger("numba.core.ssa").setLevel(logging.WARNING)
-logging.getLogger("numba.core.interpreter").setLevel(logging.WARNING)
+logging.getLogger("numba.core.byteflow").setLevel(logging.ERROR)
+logging.getLogger("numba.core.ssa").setLevel(logging.ERROR)
+logging.getLogger("numba.core.interpreter").setLevel(logging.ERROR)
 
 OVERLAP = 0.3
 MAX_AMPLITUDE = 0.9
 ALPHA = 0.75
 HIGH_PASS_CUTOFF = 48
 SAMPLE_RATE_16K = 16000
+
+
+config = Config()
+per = 3.0 if config.is_half else 3.7
+translations = config.translations
 
 
 def parse_arguments() -> tuple:
@@ -52,10 +57,6 @@ def parse_arguments() -> tuple:
     return args
 
 
-config = Config()
-per = 3.0 if config.is_half else 3.7
-
-
 def load_audio(file, sample_rate):
     try:
         file = file.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
@@ -64,14 +65,14 @@ def load_audio(file, sample_rate):
         if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
         if sr != sample_rate: audio = librosa.resample(audio, orig_sr=sr, target_sr=sample_rate)
     except Exception as e:
-        raise RuntimeError(f"Đã xảy ra lỗi khi tải âm thanh: {e}")
+        raise RuntimeError(f"{translations['errors_loading_audio']}: {e}")
 
     return audio.flatten()
 
 class Slicer:
     def __init__(self, sr, threshold = -40.0, min_length = 5000, min_interval = 300, hop_size = 20, max_sil_kept = 5000):
-        if not min_length >= min_interval >= hop_size: raise ValueError("min_length lớn hơn hoặc bằng min_interval lớn hơn hoặc bằng hop_size là bắt buộc")
-        if not max_sil_kept >= hop_size: raise ValueError("max_sil_kept lớn hơn hoặc bằng hop_size là bắt buộc")
+        if not min_length >= min_interval >= hop_size: raise ValueError(translations["min_length>=min_interval>=hop_size"])
+        if not max_sil_kept >= hop_size: raise ValueError(translations["max_sil_kept>=hop_size"])
 
         min_interval = sr * min_interval / 1000
         self.threshold = 10 ** (threshold / 20.0)
@@ -250,7 +251,7 @@ class PreProcess:
                         
             else: self.process_audio_segment(audio, sid, idx0, idx1)
         except Exception as e:
-            raise RuntimeError(f"Đã xảy ra lỗi khi xử lý âm thanh: {e}")
+            raise RuntimeError(f"{translations['process_audio_error']}: {e}")
 
 def process_file(args):
     pp, file, cut_preprocess, process_effects, clean_dataset, clean_strength = (args)
@@ -262,7 +263,7 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
     start_time = time.time()
 
     pp = PreProcess(sr, exp_dir, per)
-    logger.info(f"Đang bắt đầu xử lý dữ liệu với {num_processes} lõi xử lý...")
+    logger.info(translations["start_preprocess"].format(num_processes=num_processes))
 
     files = []
     idx = 0
@@ -275,9 +276,9 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
                     files.append((os.path.join(root, f), idx, sid))
                     idx += 1
         except ValueError:
-            raise ValueError(f'Thư mục ID giọng nói phải là số nguyên, thay vào đó có "{os.path.basename(root)}".')
+            raise ValueError(f'{translations['not_integer']} "{os.path.basename(root)}".')
 
-    with tqdm(total=len(files), desc="Xử lý dữ liệu", unit="iB", unit_scale=True) as pbar:
+    with tqdm(total=len(files), desc=translations["preprocess"], unit="iB", unit_scale=True) as pbar:
         with ProcessPoolExecutor(max_workers=num_processes) as executor:
             futures = [
                 executor.submit(
@@ -297,12 +298,12 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
                 try:
                     future.result() 
                 except Exception as e:
-                    raise RuntimeError(f"Đã xảy ra lỗi khi xử lý: {e}")
+                    raise RuntimeError(f"{translations['process_error']}: {e}")
 
                 pbar.update(1)
 
     elapsed_time = time.time() - start_time
-    logger.info(f"Quá trình xử lý hoàn tất sau {elapsed_time:.2f} giây.")
+    logger.info(translations["preprocess_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
 
 if __name__ == "__main__":
     args = parse_arguments()
@@ -341,20 +342,19 @@ if __name__ == "__main__":
         logger.addHandler(file_handler)
         logger.setLevel(logging.DEBUG)
 
-    logger.debug(f"Tên mô hình: {args.model_name}")
-    logger.debug(f"Đường dẫn xử lý của mô hình: {experiment_directory}")
-    logger.debug(f"Đường dẫn chứa dữ liệu huấn luyện {dataset}")
-    logger.debug(f"Tốc độ lấy mẫu của mô hình: {sample_rate}")
-    logger.debug(f"Số lượng lõi xử lý: {num_processes}")
-    logger.debug(f"Cắt xử lý trước: {cut_preprocess}")
-    logger.debug(f"Hiệu ứng xử lý trước: {preprocess_effects}")
-    logger.debug(f"Làm sạch dữ liệu xử lý: {clean_dataset}")
-
-    if clean_dataset: logger.debug(f"Mức độ làm sạch dữ liệu xử lý: {clean_strength}")
+    logger.debug(f"{translations['modelname']}: {args.model_name}")
+    logger.debug(f"{translations['export_process']}: {experiment_directory}")
+    logger.debug(f"{translations['dataset_folder']}: {dataset}")
+    logger.debug(f"{translations['pretrain_sr']}: {sample_rate}")
+    logger.debug(f"{translations['cpu_core']}: {num_processes}")
+    logger.debug(f"{translations['split_audio']}: {cut_preprocess}")
+    logger.debug(f"{translations['preprocess_effect']}: {preprocess_effects}")
+    logger.debug(f"{translations['clear_audio']}: {clean_dataset}")
+    if clean_dataset: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
     
     try:
         preprocess_training_set(dataset, sample_rate, num_processes, experiment_directory, per, cut_preprocess, preprocess_effects, clean_dataset, clean_strength)
     except Exception as e:
-        logger.error(f"Đã xảy ra lỗi khi xử lý âm thanh {e}")
+        logger.error(f"{translations['process_audio_error']} {e}")
 
-    logger.info(f"Đã hoàn thành xử lý trước dữ liệu cho mô hình {args.model_name}")
+    logger.info(f"{translations['preprocess_model_success']} {args.model_name}")

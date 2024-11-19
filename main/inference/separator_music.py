@@ -14,7 +14,10 @@ from distutils.util import strtobool
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
+from main.configs.config import Config
 from main.library.algorithm.separator import Separator
+
+translations = Config().translations
 
 log_file = os.path.join("assets", "logs", "separator.log")
 logger = logging.getLogger(__name__)
@@ -132,33 +135,34 @@ def main():
         backing_reverb = args.backing_reverb
 
         if backing_reverb and not reverb: 
-            logger.warning("Điều kiện cần để sử dụng tách vang giọng bè là phải bật tách vang")
-            return None, None, None, None
+            logger.warning(translations["turn_on_dereverb"])
+            sys.exit(1)
 
         if backing_reverb and not backing: 
-            logger.warning("Điều kiện cần để sử dụng tách vang giọng bè là phải bật tách bè")
-            return None, None, None, None
+            logger.warning(translations["turn_on_separator_backing"])
+            sys.exit(1)
 
-        logger.debug(f"Đường dẫn đầu vào: {input_path}")
-        logger.debug(f"Đường dẫn đầu ra: {output_path}")
-        logger.debug(f"Định dạng đầu ra: {export_format}")
-        if not mdx: logger.debug(f"Số lượng dự đoán: {shifts}") 
-        logger.debug(f"Kích thước phân đoạn: {segments_size}")
-        logger.debug(f"Mức chồng chéo: {overlap}")
-        if clean_audio: logger.debug(f"Lọc Tạp Âm: {clean_audio}")
-        if clean_audio: logger.debug(f"Sức mạnh làm sạch: {clean_strength}")
-        if not mdx: logger.debug(f"Mô hình của Demucs: {demucs_model}")
-        if backing: logger.debug(f"Khữ nhiễu của tách bè: {backing_denoise}")
-        if backing: logger.debug(f"Phiên bản mô hình của tách bè: {kara_model}")
-        if backing: logger.debug(f"Có tách bè hay không: {backing}")
-        if mdx: logger.debug(f"Sử dụng mô hình mdx: {mdx}")
-        if mdx: logger.debug(f"Mô hình mdx: {mdx_model}")
-        if mdx: logger.debug(f"Khữ nhiễu của mô hình mdx: {mdx_denoise}")
+        logger.debug(f"{translations['audio_path']}: {input_path}")
+        logger.debug(f"{translations['output_path']}: {output_path}")
+        logger.debug(f"{translations['export_format']}: {export_format}")
+        if not mdx: logger.debug(f"{translations['shift']}: {shifts}") 
+        logger.debug(f"{translations['segments_size']}: {segments_size}")
+        logger.debug(f"{translations['ovverlap']}: {overlap}")
+        if clean_audio: logger.debug(f"{translations['clear_audio']}: {clean_audio}")
+        if clean_audio: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
+        if not mdx: logger.debug(f"{translations['demucs_model']}: {demucs_model}")
+        if backing: logger.debug(f"{translations['denoise_backing']}: {backing_denoise}")
+        if backing: logger.debug(f"{translations['backing_model_ver']}: {kara_model}")
+        if backing: logger.debug(f"{translations['separator_backing']}: {backing}")
+        if mdx: logger.debug(f"{translations['use_mdx']}: {mdx}")
+        if mdx: logger.debug(f"{translations['mdx_model']}: {mdx_model}")
+        if mdx: logger.debug(f"{translations['denoise_mdx']}: {mdx_denoise}")
         if mdx or backing or reverb: logger.debug(f"Hop length: {hop_length}")
-        if mdx or backing or reverb: logger.debug(f"Kích thước lô: {batch_size}")
-        if reverb: logger.debug(f"Tách âm vang: {reverb}")
-        if reverb: logger.debug(f"Khữ nhiễu âm vang: {reverb_denoise}")
-        if reverb: logger.debug(f"Có tách vang giọng bè: {backing_reverb}")
+        if mdx or backing or reverb: logger.debug(f"{translations['batch_size']}: {batch_size}")
+        if reverb: logger.debug(f"{translations['dereveb_audio']}: {reverb}")
+        if reverb: logger.debug(f"{translations['denoise_dereveb']}: {reverb_denoise}")
+        if reverb: logger.debug(f"{translations['dereveb_backing']}: {backing_reverb}")
+
 
         start_time = time.time()
 
@@ -173,7 +177,7 @@ def main():
         backing_output = os.path.join(output_path, f"Backing_Vocals_No_Reverb.{export_format}") if reverb and backing_reverb else os.path.join(output_path, f"Backing_Vocals.{export_format}")
         
         if clean_audio:
-            logger.info(f"Đang thực hiện lọc tạp âm...")
+            logger.info(f"{translations['clear_audio']}...")
             vocal_data, vocal_sr = sf.read(vocals_no_reverb if reverb else vocals)
             main_data, main_sr = sf.read(main_vocals_no_reverb if reverb and backing else main_vocals)
             backing_data, backing_sr = sf.read(backing_vocals_no_reverb if reverb and backing_reverb else backing_vocals)
@@ -188,23 +192,23 @@ def main():
                 sf.write(main_output, mains_clean, main_sr, format=export_format)
                 sf.write(backing_output, backing_clean, backing_sr, format=export_format)          
 
-            logger.info(f"Đã lọc tạp âm thành công!")
+            logger.info(translations["clean_audio_success"])
     except Exception as e:
-        logger.error(f"Đã xảy ra lỗi khi tách nhạc: {e}")
+        logger.error(f"{translations['separator_error']}: {e}")
         
     elapsed_time = time.time() - start_time
-    logger.info(f"Quá trình tách nhạc đã hoàn thành sau: {elapsed_time:.2f} giây")
+    logger.info(translations["separator_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
     
     return original_output, instruments, main_output, backing_output
 
 def separator_music_demucs(input, output, format, shifts, overlap, segments_size, demucs_model):
     if not os.path.exists(input): 
-        logger.warning("Không tìm thấy đầu vào")
-        return None, None
+        logger.warning(translations["input_not_valid"])
+        sys.exit(1)
     
     if not os.path.exists(output): 
-        logger.warning("Không tìm thấy đầu ra")
-        return None, None
+        logger.warning(translations["output_not_valid"])
+        sys.exit(1)
     
     for i in [f"Original_Vocals.{format}", f"Instruments.{format}"]:
         if os.path.exists(os.path.join(output, i)): os.remove(os.path.join(output, i))
@@ -213,14 +217,14 @@ def separator_music_demucs(input, output, format, shifts, overlap, segments_size
 
     segment_size = segments_size / 2
 
-    logger.info(f"Đang xử lý tách nhạc...")
+    logger.info(f"{translations['separator_process_2']}...")
 
     demucs_output = separator_main(audio_file=input, model_filename=model, output_format=format, output_dir=output, demucs_segment_size=segment_size, demucs_shifts=shifts, demucs_overlap=overlap)
     
     for f in demucs_output:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
+        if not os.path.exists(path): logger.error(translations["not_found"].format(name=path))
 
         if '_(Drums)_' in f: drums = path
         elif '_(Bass)_' in f: bass = path
@@ -232,24 +236,24 @@ def separator_music_demucs(input, output, format, shifts, overlap, segments_size
     for f in [drums, bass, other]:
         if os.path.exists(f): os.remove(f)
     
-    logger.info("Đã tách nhạc thành công!")
+    logger.info(translations["separator_success_2"])
     return os.path.join(output, f"Original_Vocals.{format}"), os.path.join(output, f"Instruments.{format}")
 
 def separator_backing(input, output, format, segments_size, overlap, denoise, kara_model, hop_length, batch_size):
     if not os.path.exists(input): 
-        logger.warning("Không tìm thấy đầu vào")
-        return None, None
+        logger.warning(translations["input_not_valid"])
+        sys.exit(1)
     
     if not os.path.exists(output): 
-        logger.warning("Không tìm thấy đầu ra")
-        return None, None
+        logger.warning(translations["output_not_valid"])
+        sys.exit(1)
     
     for f in [f"Main_Vocals.{format}", f"Backing_Vocals.{format}"]:
         if os.path.exists(os.path.join(output, f)): os.remove(os.path.join(output, f))
 
     model_2 = kara_models.get(kara_model)
 
-    logger.info(f"Đang xử lý tách giọng bè...")
+    logger.info(f"{translations['separator_process_backing']}...")
     backing_outputs = separator_main(audio_file=input, model_filename=model_2, output_format=format, output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=batch_size, mdx_hop_length=hop_length, mdx_enable_denoise=denoise)
 
     main_output = os.path.join(output, f"Main_Vocals.{format}")
@@ -258,29 +262,29 @@ def separator_backing(input, output, format, segments_size, overlap, denoise, ka
     for f in backing_outputs:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
+        if not os.path.exists(path): logger.error(translations["not_found"].format(name=path))
 
         if '_(Instrumental)_' in f: os.rename(path, backing_output)
         elif '_(Vocals)_' in f: os.rename(path, main_output)
 
-    logger.info(f"Đã tách giọng bè thành công!")
+    logger.info(translations["separator_process_backing_success"])
     return main_output, backing_output
 
 def separator_music_mdx(input, output, format, segments_size, overlap, denoise, mdx_model, hop_length, batch_size):
     if not os.path.exists(input): 
-        logger.warning("Không tìm thấy đầu vào")
-        return None, None
+        logger.warning(translations["input_not_valid"])
+        sys.exit(1)
     
     if not os.path.exists(output): 
-        logger.warning("Không tìm thấy đầu ra")
-        return None, None
+        logger.warning(translations["output_not_valid"])
+        sys.exit(1)
 
     for i in [f"Original_Vocals.{format}", f"Instruments.{format}"]:
         if os.path.exists(os.path.join(output, i)): os.remove(os.path.join(output, i))
     
     model_3 = mdx_models.get(mdx_model)
 
-    logger.info("Đang xử lý tách nhạc...")
+    logger.info(f"{translations['separator_process_2']}...")
     output_music = separator_main(audio_file=input, model_filename=model_3, output_format=format, output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=batch_size, mdx_hop_length=hop_length, mdx_enable_denoise=denoise)
     
     original_output = os.path.join(output, f"Original_Vocals.{format}")
@@ -289,22 +293,18 @@ def separator_music_mdx(input, output, format, segments_size, overlap, denoise, 
     for f in output_music:
         path = os.path.join(output, f)
 
-        if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
+        if not os.path.exists(path): logger.error(translations["not_found"].format(name=path))
 
         if '_(Instrumental)_' in f: os.rename(path, instruments_output)
         elif '_(Vocals)_' in f: os.rename(path, original_output)
 
-    logger.info(f"Đã tách giọng nhạc thành công!")
+    logger.info(translations["separator_process_backing_success"])
     return original_output, instruments_output
 
 def separator_reverb(output, format, segments_size, overlap, denoise, original, main, backing_reverb, hop_length, batch_size):
-    if not os.path.exists(input): 
-        logger.warning("Không tìm thấy đầu vào")
-        return None, None, None
-    
     if not os.path.exists(output): 
-        logger.warning("Không tìm thấy đầu ra")
-        return None, None, None
+        logger.warning(translations["output_not_valid"])
+        sys.exit(1)
     
     for i in [f"Original_Vocals_Reverb.{format}", f"Main_Vocals_Reverb.{format}", f"Original_Vocals_No_Reverb.{format}", f"Main_Vocals_No_Reverb.{format}"]:
         if os.path.exists(os.path.join(output, i)): os.remove(os.path.join(output, i))
@@ -315,56 +315,56 @@ def separator_reverb(output, format, segments_size, overlap, denoise, original, 
         try:
             dereveb_path.append(os.path.join(output, [f for f in os.listdir(output) if 'Original_Vocals' in f][0]))
         except IndexError:
-            logger.warning("Không tìm thấy giọng gốc")
-            return None, None, None
+            logger.warning(translations["not_found_original_vocal"])
+            sys.exit(1)
         
     if main:
         try:
             dereveb_path.append(os.path.join(output, [f for f in os.listdir(output) if 'Main_Vocals' in f][0]))
         except IndexError:
-            logger.warning("Không tìm thấy giọng chính")
-            return None, None, None
+            logger.warning(translations["not_found_main_vocal"])
+            sys.exit(1)
     
     if backing_reverb:
         try:
             dereveb_path.append(os.path.join(output, [f for f in os.listdir(output) if 'Backing_Vocals' in f][0]))
         except IndexError:
-            logger.warning("Không tìm thấy giọng bè")
-            return None, None, None
+            logger.warning(translations["not_found_backing_vocal"])
+            sys.exit(1)
         
     for path in dereveb_path:
         if not os.path.exists(path): 
-            logger.warning(f"Không tìm thấy: {path}")
-            return None, None, None
+            logger.warning(translations["not_found"].format(name=path))
+            sys.exit(1)
         
         if "Original_Vocals" in path: 
             reverb_path = os.path.join(output, f"Original_Vocals_Reverb.{format}")
             no_reverb_path = os.path.join(output, f"Original_Vocals_No_Reverb.{format}")
-            start_title = "Đang xử lý tách âm vang giọng gốc..."
-            end_title = "Đã tách âm vang giọng gốc thành công!"
+            start_title = translations["process_original"]
+            end_title = translations["process_original_success"]
         elif "Main_Vocals" in path:
             reverb_path = os.path.join(output, f"Main_Vocals_Reverb.{format}")
             no_reverb_path = os.path.join(output, f"Main_Vocals_No_Reverb.{format}")
-            start_title = "Đang xử lý tách âm vang giọng chính..."
-            end_title = "Đã tách âm vang giọng chính thành công!"
+            start_title = translations["process_main"]
+            end_title = translations["process_main_success"]
         elif "Backing_Vocals" in path:
             reverb_path = os.path.join(output, f"Backing_Vocals_Reverb.{format}")
             no_reverb_path = os.path.join(output, f"Backing_Vocals_No_Reverb.{format}")
-            start_title = "Đang xử lý tách âm vang giọng bè..."
-            end_title = "Đã tách âm vang giọng bè thành công!"
+            start_title = translations["process_backing"]
+            end_title = translations["process_backing_success"]
 
-        print(start_title)
+        logger.info(start_title)
         output_dereveb = separator_main(audio_file=path, model_filename="Reverb_HQ_By_FoxJoy.onnx", output_format=format, output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=batch_size, mdx_hop_length=hop_length, mdx_enable_denoise=denoise)
 
         for f in output_dereveb:
             path = os.path.join(output, f)
 
-            if not os.path.exists(path): logger.error(f"Không tìm thấy: {path}")
+            if not os.path.exists(path): logger.error(translations["not_found"].format(name=path))
 
             if '_(Reverb)_' in f: os.rename(path, reverb_path)
             elif '_(No Reverb)_' in f: os.rename(path, no_reverb_path)
 
-        print(end_title)
+        logger.info(end_title)
 
     return (os.path.join(output, f"Original_Vocals_No_Reverb.{format}") if original else None), (os.path.join(output, f"Main_Vocals_No_Reverb.{format}") if main else None), (os.path.join(output, f"Backing_Vocals_No_Reverb.{format}") if backing_reverb else None)
 

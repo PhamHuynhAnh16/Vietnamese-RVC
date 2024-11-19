@@ -23,7 +23,7 @@ def load_wav_to_torch(full_path, target_sr=None, return_empty_on_exception=False
     try:
         data, sample_rate = sf.read(full_path, always_2d=True)
     except Exception as e:
-        print(f"Đã xảy ra lỗi khi tải {full_path}: {e}")
+        print(f"{full_path}: {e}")
         if return_empty_on_exception: return [], sample_rate or target_sr or 48000
         else: raise
 
@@ -198,7 +198,7 @@ class Swish(nn.Module):
 class Transpose(nn.Module):
     def __init__(self, dims):
         super().__init__()
-        assert len(dims) == 2, "dims phải là một bộ hai chiều"
+        assert len(dims) == 2, "dims == 2"
         self.dims = dims
 
     def forward(self, x):
@@ -264,7 +264,7 @@ def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform
 
     if scaling == 0: multiplier = torch.randn((nb_rows, nb_columns), device=device).norm(dim=1)
     elif scaling == 1: multiplier = math.sqrt((float(nb_columns))) * torch.ones((nb_rows,), device=device)
-    else: raise ValueError(f"Chia Tỉ lệ không hợp lệ {scaling}")
+    else: raise ValueError(f"Chia không hợp lệ {scaling}")
 
     return torch.diag(multiplier) @ final_matrix
 
@@ -316,7 +316,7 @@ class FastAttention(nn.Module):
 class SelfAttention(nn.Module):
     def __init__(self, dim, causal=False, heads=8, dim_head=64, local_heads=0, local_window_size=256, nb_features=None, feature_redraw_interval=1000, generalized_attention=False, kernel_fn=nn.ReLU(), qr_uniform_q=False, dropout=0.0, no_projection=False):
         super().__init__()
-        assert dim % heads == 0, "kích thước phải chia hết cho số đầu"
+        assert dim % heads == 0
         dim_head = default(dim_head, dim // heads)
         inner_dim = dim_head * heads
         self.fast_attention = FastAttention(dim_head, nb_features, causal=causal, generalized_attention=generalized_attention, kernel_fn=kernel_fn, qr_uniform_q=qr_uniform_q, no_projection=no_projection)
@@ -357,7 +357,7 @@ class SelfAttention(nn.Module):
             attn_outs.append(out)
 
         if not empty(lq):
-            assert (not cross_attend), "sự chú ý cục bộ không tương thích với sự chú ý chéo"
+            assert (not cross_attend), "not cross_attend"
             out = self.local_attn(lq, lk, lv, input_mask=mask)
             attn_outs.append(out)
 
@@ -376,8 +376,8 @@ def l2_regularization(model, l2_alpha):
 class _FCPE(nn.Module):
     def __init__(self, input_channel=128, out_dims=360, n_layers=12, n_chans=512, use_siren=False, use_full=False, loss_mse_scale=10, loss_l2_regularization=False, loss_l2_regularization_scale=1, loss_grad1_mse=False, loss_grad1_mse_scale=1, f0_max=1975.5, f0_min=32.70, confidence=False, threshold=0.05, use_input_conv=True):
         super().__init__()
-        if use_siren: raise ValueError("Siren chưa được hỗ trợ.")
-        if use_full: raise ValueError("Mô hình đầy đủ chưa được hỗ trợ.")
+        if use_siren: raise ValueError("Siren not support")
+        if use_full: raise ValueError("Mô hình full not support")
 
         self.loss_mse_scale = loss_mse_scale if (loss_mse_scale is not None) else 10
         self.loss_l2_regularization = (loss_l2_regularization if (loss_l2_regularization is not None) else False)

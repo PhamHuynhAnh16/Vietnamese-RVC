@@ -129,7 +129,7 @@ def _invert(M: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor
         out[..., 1, 0, :] = _mul(-invDet, M[..., 1, 0, :], out[..., 1, 0, :])
         out[..., 0, 1, :] = _mul(-invDet, M[..., 0, 1, :], out[..., 0, 1, :])
         out[..., 1, 1, :] = _mul(invDet, M[..., 0, 0, :], out[..., 1, 1, :])
-    else: raise Exception("Chỉ có 2 kênh được hỗ trợ cho phiên bản torch.")
+    else: raise Exception("Torch == 2 Channels")
     
     return out
 

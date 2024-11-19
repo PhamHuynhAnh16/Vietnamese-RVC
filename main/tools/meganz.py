@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import json
 import tqdm
 import codecs
@@ -13,6 +14,13 @@ import tempfile
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from tenacity import retry, wait_exponential, retry_if_exception_type
+
+
+now_dir = os.getcwd()
+sys.path.append(now_dir)
+
+from main.configs.config import Config
+translations = Config().translations
 
 
 def makebyte(x):
@@ -63,7 +71,7 @@ def _api_request(data):
 
     if int_resp is not None:
         if int_resp == 0: return int_resp
-        if int_resp == -3: raise RuntimeError('Yêu cầu không thành công, đang thử lại')
+        if int_resp == -3: raise RuntimeError('int_resp==-3')
         
         raise Exception(int_resp)
     
@@ -100,9 +108,10 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
         iv = file['iv']
         meta_mac = file['meta_mac']
 
-    if 'g' not in file_data: raise Exception('Tập tin không thể truy cập được nữa')
+    if 'g' not in file_data: raise Exception(translations["file_not_access"])
     
     file_size = file_data['s']
+
     attribs = base64_url_decode(file_data['at'])
     attribs = decrypt_attr(attribs, k)
 
@@ -122,6 +131,7 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
 
     mac_str = b'\0' * 16
     mac_encryptor = AES.new(k_str, AES.MODE_CBC, mac_str)
+    
     iv_str = a32_to_str([iv[0], iv[1], iv[0], iv[1]])
 
     pbar = tqdm.tqdm(total=file_size, unit='B', unit_scale=True)
@@ -150,7 +160,7 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
     file_mac = str_to_a32(mac_str)
     temp_output_file.close()
 
-    if (file_mac[0] ^ file_mac[1], file_mac[2] ^ file_mac[3]) != meta_mac: raise ValueError('Mac không khớp')
+    if (file_mac[0] ^ file_mac[1], file_mac[2] ^ file_mac[3]) != meta_mac: raise ValueError(translations["mac_not_match"])
     
     file_path = os.path.join(dest_path, file_name)
     if os.path.exists(file_path): os.remove(file_path)
@@ -165,6 +175,6 @@ def mega_download_url(url, dest_path=None, dest_filename=None):
 
         path = f'{file_id}!{url[re.search(file_id, url).end() + 1:]}'.split('!')
     elif '!' in url: path = re.findall(r'/#!(.*)', url)[0].split('!')
-    else: raise Exception('Thiếu khóa url')
+    else: raise Exception(translations["missing_url"])
 
     return mega_download_file(file_handle=path[0], file_key=path[1], dest_path=dest_path, dest_filename=dest_filename)
