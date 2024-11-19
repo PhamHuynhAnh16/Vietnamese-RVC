@@ -181,7 +181,6 @@ def check_rmvpe_fcpe(method):
     def download_fcpe():
         if not os.path.exists(os.path.join("assets", "model", "predictors", "fcpe.pt")): subprocess.run(["wget", "-q", "--show-progress", "--no-check-certificate", codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Pbyno_EIP_Cebwrpg_2/erfbyir/znva/", "rot13") + "fcpe.pt", "-P", os.path.join("assets", "model", "predictors")], check=True)
 
-
     if method == "rmvpe": download_rmvpe()
     elif method == "fcpe": download_fcpe()
     elif "hybrid" in method:
@@ -225,7 +224,6 @@ def process_audio(file_path, output_path):
 
         min_chunk_duration = 30
 
-
         for i, (start_i, end_i) in enumerate(nonsilent_parts):
             chunk = song[start_i:end_i]
 
@@ -239,7 +237,6 @@ def process_audio(file_path, output_path):
                 time_stamps.append((start_i, end_i))
             else: logger.debug(translations["skip_file"].format(i=i, chunk=len(chunk)))
 
-
         logger.info(f"{translations['split_total']}: {len(cut_files)}")
         return cut_files, time_stamps
     except Exception as e:
@@ -252,7 +249,6 @@ def merge_audio(files_list, time_stamps, original_file_path, output_path, format
             match = re.search(r'_(\d+)', filename)
 
             return int(match.group(1)) if match else 0
-
 
         files_list = sorted(files_list, key=extract_number)
         total_duration = len(AudioSegment.from_file(original_file_path))
@@ -299,7 +295,6 @@ def run_batch_convert(params):
     upscale_audio = params["upscale_audio"]
     embedder_model = params["embedder_model"]
     resample_sr = params["resample_sr"]
-    processed_segments = params["processed_segments"]
     
 
     segment_output_path = os.path.join(audio_temp, f"output_{cut_files.index(path)}.{export_format}")
@@ -309,15 +304,10 @@ def run_batch_convert(params):
     os.remove(path)
 
 
-    if os.path.exists(segment_output_path): processed_segments.append(segment_output_path)
+    if os.path.exists(segment_output_path): return segment_output_path
     else: 
         logger.warning(f"{translations['not_found_convert_file']}: {segment_output_path}")
         sys.exit(1)
- 
-
-def run_batch_convert_with_update(params, pbar):
-    run_batch_convert(params)
-    pbar.update(1)
 
 
 def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, upscale_audio, embedder_model, resample_sr, batch_process, batch_size, split_audio):
@@ -341,17 +331,16 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
 
-
-    if split_audio and batch_process: mp.set_start_method("spawn", force=True)
-
     audio_temp = os.path.join("audios_temp")
     if not os.path.exists(audio_temp) and split_audio: os.makedirs(audio_temp, exist_ok=True)
-    
+
+    processed_segments = []
+
+    num_threads = min(batch_size, len(cut_files))
 
     if os.path.isdir(input_path):
         try:
             logger.info(translations["convert_batch"])
-
 
             audio_files = [f for f in os.listdir(input_path) if f.endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]
             if not audio_files: 
@@ -364,11 +353,9 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                 audio_path = os.path.join(input_path, audio)
                 output_audio = os.path.join(input_path, os.path.splitext(audio)[0] + f"_output.{export_format}")
 
-
                 if split_audio:
                     try:
                         cut_files, time_stamps = process_audio(audio_path, audio_temp)
-                        processed_segments = []
 
                         params_list = [
                             {
@@ -391,34 +378,20 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                                 "clean_strength": clean_strength,
                                 "upscale_audio": upscale_audio,
                                 "embedder_model": embedder_model,
-                                "resample_sr": resample_sr,
-                                "processed_segments": processed_segments,
+                                "resample_sr": resample_sr
                             }
                             for path in cut_files
                         ]
 
-
                         if batch_process:
-                            num_processes = min(batch_size, len(cut_files))
-                            processes = []
-                            
-                            with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
-                                for _, params in enumerate(params_list):
-                                    p = mp.Process(target=run_batch_convert_with_update, args=(params, pbar))
-                                    p.start()
-                                    processes.append(p)
-                                    
-                                    if len(processes) >= num_processes:
-                                        for p in processes:
-                                            p.join()
-                                        processes = [] 
-
-                                for p in processes:
-                                    p.join()
+                            with mp.Pool(processes=num_threads) as pool:
+                                with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                                    for results in pool.imap_unordered(run_batch_convert, params_list):
+                                        processed_segments.append(results)
+                                        pbar.update(1)
                         else: 
                             for params in tqdm(params_list, desc=translations["convert_audio"], unit="iB", unit_scale=True):
                                 run_batch_convert(params)
-
 
                         merge_audio(processed_segments, time_stamps, audio_path, output_audio, export_format)
                     except Exception as e:
@@ -437,7 +410,6 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                     except Exception as e:
                         logger.error(translations["error_convert"].format(e=e))
 
-
             elapsed_time = time.time() - start_time
             logger.info(translations["convert_batch_success"].format(elapsed_time=f"{elapsed_time:.2f}", output_path=output_path.replace('.wav', f'.{export_format}')))
         except Exception as e:
@@ -452,11 +424,9 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
         if os.path.isdir(output_path): output_path = os.path.join(output_path, f"output.{export_format}")
         if os.path.exists(output_path): os.remove(output_path)
 
-
         if split_audio:
             try:              
                 cut_files, time_stamps = process_audio(input_path, audio_temp)
-                processed_segments = []
 
                 params_list = [
                     {
@@ -479,29 +449,17 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                         "clean_strength": clean_strength,
                         "upscale_audio": upscale_audio,
                         "embedder_model": embedder_model,
-                        "resample_sr": resample_sr,
-                        "processed_segments": processed_segments,
+                        "resample_sr": resample_sr
                     }
                     for path in cut_files
                 ]
 
                 if batch_process:
-                    num_processes = min(batch_size, len(cut_files))
-                    processes = []
-                    
-                    with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
-                        for _, params in enumerate(params_list):
-                            p = mp.Process(target=run_batch_convert_with_update, args=(params, pbar))
-                            p.start()
-                            processes.append(p)
-                            
-                            if len(processes) >= num_processes:
-                                for p in processes:
-                                    p.join()
-                                processes = [] 
-
-                        for p in processes:
-                            p.join()
+                    with mp.Pool(processes=num_threads) as pool:
+                        with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                            for results in pool.imap_unordered(run_batch_convert, params_list):
+                                processed_segments.append(results)
+                                pbar.update(1)
                 else: 
                     for params in tqdm(params_list, desc=translations["convert_audio"], unit="iB", unit_scale=True):
                         run_batch_convert(params)
@@ -1097,4 +1055,6 @@ class VoiceConverter:
             self.vc = VC(self.tgt_sr, self.config)
             self.n_spk = self.cpt["config"][-3]
 
-if __name__ == "__main__": main()
+if __name__ == "__main__": 
+    mp.set_start_method("spawn", force=True)
+    main()

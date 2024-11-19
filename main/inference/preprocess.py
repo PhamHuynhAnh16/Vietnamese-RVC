@@ -276,7 +276,7 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
                     files.append((os.path.join(root, f), idx, sid))
                     idx += 1
         except ValueError:
-            raise ValueError(f'{translations['not_integer']} "{os.path.basename(root)}".')
+            raise ValueError(f"{translations['not_integer']} '{os.path.basename(root)}'.")
 
     with tqdm(total=len(files), desc=translations["preprocess"], unit="iB", unit_scale=True) as pbar:
         with ProcessPoolExecutor(max_workers=num_processes) as executor:

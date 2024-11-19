@@ -24,7 +24,6 @@ from subprocess import Popen, run
 from collections import OrderedDict
 from multiprocessing import cpu_count
 
-
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
@@ -65,7 +64,6 @@ hugging_face_codecs = codecs.decode("uggcf://uhttvatsnpr.pb", "rot13")
 
 pretrained_v1_link = codecs.decode("uggcf://uhttvatsnpr.pb/VNUvfcnab/Nccyvb/erfbyir/znva/Erfbheprf/cergenvarq_i1/", "rot13")
 pretrained_v2_link = codecs.decode("uggcf://uhttvatsnpr.pb/yw1995/IbvprPbairefvbaJroHV/erfbyir/znva/cergenvarq_i2/", "rot13")
-
 
 configs_json = os.path.join("main", "configs", "config.json")
 
@@ -787,7 +785,7 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
 
     pitchshift = pitch_shift != 0
 
-    cmd = f"{python} main/inference/audio_effects.py --input_path {input_path} --output_path {output_path} --resample {resample} --resample_sr {resample_sr} --chorus_depth {chorus_depth} --chorus_rate {chorus_rate} --chorus_mix {chorus_mix} --chorus_delay {chorus_delay} --chorus_feedback {chorus_feedback} --drive_db {distortion_drive} --reverb_room_size {reverb_room_size} --reverb_damping {reverb_damping} --reverb_wet_level {reverb_wet_level} --reverb_dry_level {reverb_dry_level} --reverb_width {reverb_width} --reverb_freeze_mode {reverb_freeze_mode} --pitch_shift {pitch_shift} --delay_seconds {delay_seconds} --delay_feedback {delay_feedback} --delay_mix {delay_mix} --compressor_threshold {compressor_threshold} --compressor_ratio {compressor_ratio} --compressor_attack_ms {compressor_attack_ms} --compressor_release_ms {compressor_release_ms} --limiter_threshold {limiter_threshold} --limiter_release {limiter_release} --gain_db {gain_db} --bitcrush_bit_depth {bitcrush_bit_depth} --clipping_threshold {clipping_threshold} --phaser_rate_hz {phaser_rate_hz} --phaser_depth {phaser_depth} --phaser_centre_frequency_hz {phaser_centre_frequency_hz} --phaser_feedback {phaser_feedback} --phaser_mix {phaser_mix} --bass_boost_db {bass_boost_db} --bass_boost_frequency {bass_boost_frequency} --treble_boost_db {treble_boost_db} --treble_boost_frequency {treble_boost_frequency} --fade_in_duration {fade_in_duration} --fade_out_duration {fade_out_duration} --export_format {export_format} --chorus {chorus} --distortion {distortion} --reverb {reverb} --pitchshift {pitchshift} --delay {delay} --compressor {compressor} --limiter {limiter} --gain {gain} --bitcrush {bitcrush} --clipping {clipping} --phaser {phaser} --treble_bass_boost {treble_bass_boost} --fade_in_out {fade_in_out}"
+    cmd = f'{python} main/inference/audio_effects.py --input_path "{input_path}" --output_path "{output_path}" --resample {resample} --resample_sr {resample_sr} --chorus_depth {chorus_depth} --chorus_rate {chorus_rate} --chorus_mix {chorus_mix} --chorus_delay {chorus_delay} --chorus_feedback {chorus_feedback} --drive_db {distortion_drive} --reverb_room_size {reverb_room_size} --reverb_damping {reverb_damping} --reverb_wet_level {reverb_wet_level} --reverb_dry_level {reverb_dry_level} --reverb_width {reverb_width} --reverb_freeze_mode {reverb_freeze_mode} --pitch_shift {pitch_shift} --delay_seconds {delay_seconds} --delay_feedback {delay_feedback} --delay_mix {delay_mix} --compressor_threshold {compressor_threshold} --compressor_ratio {compressor_ratio} --compressor_attack_ms {compressor_attack_ms} --compressor_release_ms {compressor_release_ms} --limiter_threshold {limiter_threshold} --limiter_release {limiter_release} --gain_db {gain_db} --bitcrush_bit_depth {bitcrush_bit_depth} --clipping_threshold {clipping_threshold} --phaser_rate_hz {phaser_rate_hz} --phaser_depth {phaser_depth} --phaser_centre_frequency_hz {phaser_centre_frequency_hz} --phaser_feedback {phaser_feedback} --phaser_mix {phaser_mix} --bass_boost_db {bass_boost_db} --bass_boost_frequency {bass_boost_frequency} --treble_boost_db {treble_boost_db} --treble_boost_frequency {treble_boost_frequency} --fade_in_duration {fade_in_duration} --fade_out_duration {fade_out_duration} --export_format {export_format} --chorus {chorus} --distortion {distortion} --reverb {reverb} --pitchshift {pitchshift} --delay {delay} --compressor {compressor} --limiter {limiter} --gain {gain} --bitcrush {bitcrush} --clipping {clipping} --phaser {phaser} --treble_bass_boost {treble_bass_boost} --fade_in_out {fade_in_out}'
     os.system(cmd)
 
 
@@ -1395,7 +1393,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 mdx_model.change(fn=model_separator_change, inputs=[mdx_model], outputs=[separator_model])
                 mdx_model.change(fn=lambda inp: visible_1(not inp), inputs=[mdx_model], outputs=[shifts])
             with gr.Row():
-                input_audio.change(fn=lambda audio: audio, inputs=[input_audio], outputs=[audio_input])
+                input_audio.change(fn=lambda audio: audio if audio else None, inputs=[input_audio], outputs=[audio_input])
                 cleaner.change(fn=visible_1, inputs=[cleaner], outputs=[clean_strength])
                 input.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input], outputs=[input_audio])
                 refesh_separator.click(fn=refesh_audio, inputs=[], outputs=[input_audio])
@@ -1535,10 +1533,10 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 model_pth.change(fn=get_index, inputs=[model_pth], outputs=[model_index])
             with gr.Row():
                 input0.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input0], outputs=[input_audio0])
-                input_audio0.change(fn=lambda audio: audio if not os.path.isdir(audio) else None, inputs=[input_audio0], outputs=[play_audio])
+                input_audio0.change(fn=lambda audio: audio if audio else None, inputs=[input_audio0], outputs=[play_audio])
             with gr.Row():
                 embedders.change(fn=lambda embedders: visible_1(True if embedders == "custom" else False), inputs=[embedders], outputs=[custom_embedders])
-                refesh0.click(fn=lambda: refesh_audio, inputs=[], outputs=[input_audio0])
+                refesh0.click(fn=refesh_audio, inputs=[], outputs=[input_audio0])
             with gr.Row():
                 convert_button.click(
                     fn=convert_audio,
@@ -1821,8 +1819,8 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 bitcrush_checkbox.change(fn=visible_1, inputs=[bitcrush_checkbox], outputs=[bitcrush_bit_depth])
             with gr.Row():
                 upload_audio.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[upload_audio], outputs=[audio_in_path])
-                audio_in_path.change(fn=lambda audio: audio if not os.path.isdir(audio) else None, inputs=[audio_in_path], outputs=[audio_play_input])
-                audio_effects_refesh.click(fn=lambda: refesh_audio, inputs=[], outputs=[audio_in_path])
+                audio_in_path.change(fn=lambda audio: audio if audio else None, inputs=[audio_in_path], outputs=[audio_play_input])
+                audio_effects_refesh.click(fn=refesh_audio, inputs=[], outputs=[audio_in_path])
             with gr.Row():
                 more_options.change(fn=lambda: [False]*4, inputs=[], outputs=[fade, bass_or_treble, limiter, resample_checkbox])
                 more_options.change(fn=lambda: [False]*4, inputs=[], outputs=[distortion_checkbox, gain_checkbox, clipping_checkbox, bitcrush_checkbox])
@@ -2382,6 +2380,8 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 gr.Markdown("___")
             with gr.Row():
                 gr.Markdown(translations["credits"].format(author=codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16", "rot13"), applio=codecs.decode("uggcf://tvguho.pbz/VNUvfcnab/Nccyvb/gerr/znva?gno=ernqzr-bi-svyr", "rot13"), ai_hispano=codecs.decode("uggcf://tvguho.pbz/VNUvfcnab", "rot13"), rvc_webui=codecs.decode("uggcf://tvguho.pbz/EIP-Cebwrpg/Ergevriny-onfrq-Ibvpr-Pbairefvba-JroHV?gno=ernqzr-bi-svyr", "rot13"), rvc_boss=codecs.decode("uggcf://tvguho.pbz/EIP-Obff", "rot13"), python_audio_separator=codecs.decode("uggcf://tvguho.pbz/abznqxnenbxr/clguba-nhqvb-frcnengbe?gno=ernqzr-bi-svyr", "rot13"), andrew_beveridge=codecs.decode("uggcf://tvguho.pbz/orirenqo", "rot13")))
+    
+    print(translations["set_lang"].format(lang=configs["language"]))
 
     for i in range(configs["num_of_restart"]):
         try:

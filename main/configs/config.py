@@ -63,7 +63,7 @@ class Config:
         with open(lang_path, encoding="utf-8") as f:
             translations = json.load(f)
         
-        print(translations["set_lang"].format(lang=lang))
+        
         return translations
 
     def set_precision(self, precision):

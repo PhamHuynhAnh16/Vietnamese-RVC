@@ -110,6 +110,8 @@ def parse_arguments() -> tuple:
     return args
 
 def main():
+    start_time = time.time()
+
     try:
         args = parse_arguments()
 
@@ -147,7 +149,7 @@ def main():
         logger.debug(f"{translations['export_format']}: {export_format}")
         if not mdx: logger.debug(f"{translations['shift']}: {shifts}") 
         logger.debug(f"{translations['segments_size']}: {segments_size}")
-        logger.debug(f"{translations['ovverlap']}: {overlap}")
+        logger.debug(f"{translations['overlap']}: {overlap}")
         if clean_audio: logger.debug(f"{translations['clear_audio']}: {clean_audio}")
         if clean_audio: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
         if not mdx: logger.debug(f"{translations['demucs_model']}: {demucs_model}")
@@ -162,9 +164,6 @@ def main():
         if reverb: logger.debug(f"{translations['dereveb_audio']}: {reverb}")
         if reverb: logger.debug(f"{translations['denoise_dereveb']}: {reverb_denoise}")
         if reverb: logger.debug(f"{translations['dereveb_backing']}: {backing_reverb}")
-
-
-        start_time = time.time()
 
         if not mdx: vocals, instruments = separator_music_demucs(input_path, output_path, export_format, shifts, overlap, segments_size, demucs_model)
         else: vocals, instruments = separator_music_mdx(input_path, output_path, export_format, segments_size, overlap, mdx_denoise, mdx_model, hop_length, batch_size)
@@ -193,13 +192,14 @@ def main():
                 sf.write(backing_output, backing_clean, backing_sr, format=export_format)          
 
             logger.info(translations["clean_audio_success"])
+            return original_output, instruments, main_output, backing_output
     except Exception as e:
         logger.error(f"{translations['separator_error']}: {e}")
-        
+        return None, None, None, None
+    
     elapsed_time = time.time() - start_time
     logger.info(translations["separator_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
     
-    return original_output, instruments, main_output, backing_output
 
 def separator_music_demucs(input, output, format, shifts, overlap, segments_size, demucs_model):
     if not os.path.exists(input): 

@@ -99,7 +99,7 @@ class Separator:
         self.logger.info(f"{translations['os']}: {os_name} {os_version}")
 
         system_info = platform.uname()
-        self.logger.info(translations["platform_info"].format(system_info=system_info, node=system_info.node, release=system_info.release, processor=system_info.processor))
+        self.logger.info(translations["platform_info"].format(system_info=system_info, node=system_info.node, release=system_info.release, machine=system_info.machine, processor=system_info.processor))
 
         python_version = platform.python_version()
         self.logger.info(f"{translations['name_ver'].format(name='python')}: {python_version}")
@@ -385,7 +385,7 @@ class Separator:
         self.model_instance = separator_class(common_config=common_params, arch_config=self.arch_specific_params[model_type])
 
         self.logger.debug(translations["loading_model_success"])
-        self.logger.info(f'{translations['loading_model_duration']}: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - load_model_start_time)))}')
+        self.logger.info(f"{translations['loading_model_duration']}: {time.strftime('%H:%M:%S', time.gmtime(int(time.perf_counter() - load_model_start_time)))}")
 
     def separate(self, audio_file_path):
         self.logger.info(f"{translations['starting_separator']}: {audio_file_path}")
@@ -402,7 +402,7 @@ class Separator:
         self.print_uvr_vip_message()
 
         self.logger.debug(translations["separator_success_3"])
-        self.logger.info(f'{translations['separator_duration']}: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - separate_start_time)))}')
+        self.logger.info(f"{translations['separator_duration']}: {time.strftime('%H:%M:%S', time.gmtime(int(time.perf_counter() - separate_start_time)))}")
 
         return output_files
 

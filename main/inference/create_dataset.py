@@ -106,7 +106,7 @@ def main():
     logger.debug(f"{translations['dereveb_audio']}: {separator_reverb}")
     if separator_music: logger.debug(f"{translations['training_version']}: {kim_vocal_version}")
     logger.debug(f"{translations['segments_size']}: {segments_size}")
-    logger.debug(f"{translations['ovverlap']}: {overlap}")
+    logger.debug(f"{translations['overlap']}: {overlap}")
     logger.debug(f"Hop length: {hop_length}")
     logger.debug(f"{translations['batch_size']}: {batch_size}")
     logger.debug(f"{translations['denoise_mdx']}: {denoise_mdx}")
