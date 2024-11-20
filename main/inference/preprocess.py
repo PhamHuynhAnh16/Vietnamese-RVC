@@ -278,7 +278,7 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
         except ValueError:
             raise ValueError(f"{translations['not_integer']} '{os.path.basename(root)}'.")
 
-    with tqdm(total=len(files), desc=translations["preprocess"], unit="iB", unit_scale=True) as pbar:
+    with tqdm(total=len(files), desc=translations["preprocess"]) as pbar:
         with ProcessPoolExecutor(max_workers=num_processes) as executor:
             futures = [
                 executor.submit(
@@ -327,13 +327,13 @@ if __name__ == "__main__":
     if logger.hasHandlers(): logger.handlers.clear()
     else:
         console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
 
         file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-        file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(logging.DEBUG)

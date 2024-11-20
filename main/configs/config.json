@@ -208,13 +208,22 @@
         "cy-GB-NiaNeural", "zu-ZA-ThandoNeural", "zu-ZA-ThembaNeural"
     ],
 
+    
+    "separator_tab": true,
+    "convert_tab": true,
+    "tts_tab": true,
+    "effects_tab": true,
+    "create_dataset_tab": true,
+    "training_tab": true,
+    "fushion_tab": true,
+    "read_tab": true,
+    "downloads_tab": true,
+    "settings_tab": true,
 
     "app_port": 7860,
     "tensorboard_port": 6870,
-
     "num_of_restart": 5,
     "server_name": "0.0.0.0",
-
     "app_show_error": true,
     "share": true
 }

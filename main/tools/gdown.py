@@ -195,7 +195,7 @@ def gdown_download(url=None, output=None, output_dir=None, quiet=False, proxy=No
         print(translations["to"], os.path.abspath(output) if output_is_path else output, file=sys.stderr)
 
     try:
-        if not quiet: pbar = tqdm.tqdm(total=int(res.headers.get("Content-Length", 0)), unit="B", unit_scale=True)
+        if not quiet: pbar = tqdm.tqdm(total=int(res.headers.get("Content-Length", 0)))
 
         t_start = time()
 

@@ -134,7 +134,7 @@ def mega_download_file(file_handle, file_key, dest_path=None, dest_filename=None
     
     iv_str = a32_to_str([iv[0], iv[1], iv[0], iv[1]])
 
-    pbar = tqdm.tqdm(total=file_size, unit='B', unit_scale=True)
+    pbar = tqdm.tqdm(total=file_size)
 
     for _, chunk_size in get_chunks(file_size):
         chunk = input_file.read(chunk_size)

@@ -293,7 +293,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
 
         process_partials = []
 
-        pbar = tqdm.tqdm(total=len(paths), desc=translations["extract_f0"], unit="iB", unit_scale=True)
+        pbar = tqdm.tqdm(total=len(paths), desc=translations["extract_f0"])
 
         for idx, gpu in enumerate(gpus):
             device = get_device(gpu)
@@ -313,7 +313,7 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, gpus):
     else:
         feature_input = FeatureInput(device="cpu")
         
-        with tqdm.tqdm(total=len(paths), desc=translations["extract_f0"], unit="iB", unit_scale=True) as pbar:
+        with tqdm.tqdm(total=len(paths), desc=translations["extract_f0"]) as pbar:
             with Pool(processes=num_processes) as pool:
                 process_file_partial = partial(feature_input.process_file, f0_method=f0_method, hop_length=hop_length)
 
@@ -372,7 +372,7 @@ def run_embedding_extraction(exp_dir, version, gpus, embedder_model):
         logger.warning(translations["not_found_audio_file"])
         sys.exit(1)
 
-    pbar = tqdm.tqdm(total=len(paths) * len(devices), desc=translations["extract_hubert"], unit="iB", unit_scale=True)
+    pbar = tqdm.tqdm(total=len(paths) * len(devices), desc=translations["extract_hubert"])
 
     tasks = [(file, wav_path, out_path, model, device, version, saved_cfg) for file in paths for device in devices]
 
@@ -412,13 +412,13 @@ if __name__ == "__main__":
     if logger.hasHandlers(): logger.handlers.clear()
     else:
         console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(logging.INFO)
 
         file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-        file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(logging.DEBUG)

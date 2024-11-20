@@ -73,13 +73,13 @@ translations = Config().translations
 if logger.hasHandlers(): logger.handlers.clear()
 else:
     console_handler = logging.StreamHandler()
-    console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.INFO)
 
     file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-    file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d - %(levelname)s - %(module)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.DEBUG)
@@ -336,8 +336,6 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
     processed_segments = []
 
-    num_threads = min(batch_size, len(cut_files))
-
     if os.path.isdir(input_path):
         try:
             logger.info(translations["convert_batch"])
@@ -356,6 +354,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                 if split_audio:
                     try:
                         cut_files, time_stamps = process_audio(audio_path, audio_temp)
+                        num_threads = min(batch_size, len(cut_files))
 
                         params_list = [
                             {
@@ -385,12 +384,12 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
                         if batch_process:
                             with mp.Pool(processes=num_threads) as pool:
-                                with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                                with tqdm(total=len(params_list), desc=translations["convert_audio"]) as pbar:
                                     for results in pool.imap_unordered(run_batch_convert, params_list):
                                         processed_segments.append(results)
                                         pbar.update(1)
                         else: 
-                            for params in tqdm(params_list, desc=translations["convert_audio"], unit="iB", unit_scale=True):
+                            for params in tqdm(params_list, desc=translations["convert_audio"]):
                                 run_batch_convert(params)
 
                         merge_audio(processed_segments, time_stamps, audio_path, output_audio, export_format)
@@ -404,7 +403,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
                         if os.path.exists(output_audio): os.remove(output_audio)
 
-                        with tqdm(total=1, desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                        with tqdm(total=1, desc=translations["convert_audio"]) as pbar:
                             cvt.convert_audio(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, audio_input_path=audio_path, audio_output_path=output_audio, model_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, upscale_audio=upscale_audio, embedder_model=embedder_model, resample_sr=resample_sr)
                             pbar.update(1)
                     except Exception as e:
@@ -427,6 +426,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
         if split_audio:
             try:              
                 cut_files, time_stamps = process_audio(input_path, audio_temp)
+                num_threads = min(batch_size, len(cut_files))
 
                 params_list = [
                     {
@@ -456,12 +456,12 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
 
                 if batch_process:
                     with mp.Pool(processes=num_threads) as pool:
-                        with tqdm(total=len(params_list), desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                        with tqdm(total=len(params_list), desc=translations["convert_audio"]) as pbar:
                             for results in pool.imap_unordered(run_batch_convert, params_list):
                                 processed_segments.append(results)
                                 pbar.update(1)
                 else: 
-                    for params in tqdm(params_list, desc=translations["convert_audio"], unit="iB", unit_scale=True):
+                    for params in tqdm(params_list, desc=translations["convert_audio"]):
                         run_batch_convert(params)
 
                 merge_audio(processed_segments, time_stamps, input_path, output_path.replace(".wav", f".{export_format}"), export_format)
@@ -471,7 +471,7 @@ def run_convert_script(pitch, filter_radius, index_rate, volume_envelope, protec
                 if os.path.exists(audio_temp): shutil.rmtree(audio_temp, ignore_errors=True)
         else:
             try:
-                with tqdm(total=1, desc=translations["convert_audio"], unit="iB", unit_scale=True) as pbar:
+                with tqdm(total=1, desc=translations["convert_audio"]) as pbar:
                     cvt.convert_audio(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, volume_envelope=volume_envelope, protect=protect, hop_length=hop_length, f0_method=f0_method, audio_input_path=input_path, audio_output_path=output_path, model_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, upscale_audio=upscale_audio, embedder_model=embedder_model, resample_sr=resample_sr)
                     pbar.update(1)
             except Exception as e:

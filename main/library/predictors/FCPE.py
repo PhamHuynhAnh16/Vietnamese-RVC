@@ -377,7 +377,7 @@ class _FCPE(nn.Module):
     def __init__(self, input_channel=128, out_dims=360, n_layers=12, n_chans=512, use_siren=False, use_full=False, loss_mse_scale=10, loss_l2_regularization=False, loss_l2_regularization_scale=1, loss_grad1_mse=False, loss_grad1_mse_scale=1, f0_max=1975.5, f0_min=32.70, confidence=False, threshold=0.05, use_input_conv=True):
         super().__init__()
         if use_siren: raise ValueError("Siren not support")
-        if use_full: raise ValueError("Mô hình full not support")
+        if use_full: raise ValueError("Model full not support")
 
         self.loss_mse_scale = loss_mse_scale if (loss_mse_scale is not None) else 10
         self.loss_l2_regularization = (loss_l2_regularization if (loss_l2_regularization is not None) else False)

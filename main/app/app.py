@@ -24,6 +24,7 @@ from subprocess import Popen, run
 from collections import OrderedDict
 from multiprocessing import cpu_count
 
+
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
@@ -40,9 +41,11 @@ logging.getLogger("gradio").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+
 config = Config()
 python = sys.executable
 translations = config.translations
+
 
 model_name = []
 index_path = []
@@ -65,10 +68,12 @@ hugging_face_codecs = codecs.decode("uggcf://uhttvatsnpr.pb", "rot13")
 pretrained_v1_link = codecs.decode("uggcf://uhttvatsnpr.pb/VNUvfcnab/Nccyvb/erfbyir/znva/Erfbheprf/cergenvarq_i1/", "rot13")
 pretrained_v2_link = codecs.decode("uggcf://uhttvatsnpr.pb/yw1995/IbvprPbairefvbaJroHV/erfbyir/znva/cergenvarq_i2/", "rot13")
 
+
 configs_json = os.path.join("main", "configs", "config.json")
 
 with open(configs_json, "r") as f:
     configs = json.load(f)
+
 
 theme = configs["theme"]
 server_name = configs["server_name"]
@@ -174,10 +179,6 @@ def get_index(model):
 
 def visible_1(value):
     return {"visible": value, "__type__": "update"}
-
-
-def interactive_1(value):
-    return {"interactive": value, "__type__": "update"}
 
 
 def valueFalse_interactive1(inp): 
@@ -289,6 +290,8 @@ def if_done(done, p):
 
 def restart_app():
     global app
+
+    gr.Info(translations["30s"])
     
     if platform.system() == "Windows": os.system("cls")
     else: os.system("clear")
@@ -298,8 +301,6 @@ def restart_app():
 
 
 def change_language(lang):
-    gr.Info(translations["30s"])
-
     with open(configs_json, "r") as f:
         configs = json.load(f)
 
@@ -310,8 +311,6 @@ def change_language(lang):
 
 
 def change_theme(theme):
-    gr.Info(translations["30s"])
-
     with open(configs_json, "r") as f:
         configs = json.load(f)
 
@@ -703,11 +702,11 @@ def fushion_model(name, pth_1, pth_2, ratio):
 
         if not os.path.exists(output_model): os.makedirs(output_model, exist_ok=True)
 
-        torch.save(opt, os.path.join(output_model, f"{name}.pth"))
+        torch.save(opt, os.path.join(output_model, name))
 
 
         gr.Info(translations["success"])
-        return [translations["success"], output_model]
+        return [translations["success"], os.path.join(output_model, name)]
     except Exception as e:
         gr.Error(message=translations["error_occurred"].format(e=e))
 
@@ -1134,7 +1133,7 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
     threading.Thread(target=if_done, args=(done, p)).start()
 
     model_dir = os.path.join("assets", "logs", model_name)
-    preprocess_log = os.path.join(model_dir, model_name, "preprocess.log")
+    preprocess_log = os.path.join(model_dir, "preprocess.log")
 
     os.makedirs(model_dir, exist_ok=True)
 
@@ -1210,7 +1209,7 @@ def create_index(model_name, rvc_version, index_algorithm):
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    create_index_log = os.path.join(model_dir, model_name, "create_index.log")
+    create_index_log = os.path.join(model_dir, "create_index.log")
 
     os.makedirs(model_dir, exist_ok=True)
 
@@ -1318,7 +1317,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
     with gr.Tabs():
         paths_for_files = lambda path: [os.path.abspath(os.path.join(path, f)) for f in os.listdir(path) if os.path.splitext(f)[1] in ('.mp3', '.wav', '.flac', '.ogg', '.m4a')]
 
-        with gr.TabItem(translations["separator_tab"]):
+        with gr.TabItem(translations["separator_tab"], visible=configs["separator_tab"]):
             gr.Markdown(f"## {translations['separator_tab']}")
             with gr.Row(): 
                 gr.Markdown(translations["4_part"])
@@ -1383,13 +1382,13 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 backing.change(fn=visible_1, inputs=[backing], outputs=[main_vocals])
                 backing.change(fn=visible_1, inputs=[backing], outputs=[backing_vocals])
             with gr.Row():
-                backing.change(fn=interactive_1, inputs=[backing], outputs=[denoise])
+                backing.change(fn=valueFalse_interactive1, inputs=[backing], outputs=[denoise])
                 backing.change(fn=valueFalse_interactive2,  inputs=[backing, reverb], outputs=[backing_reverb])
             with gr.Row():
-                reverb.change(fn=interactive_1, inputs=[reverb], outputs=[reverb_denoise])
+                reverb.change(fn=valueFalse_interactive1, inputs=[reverb], outputs=[reverb_denoise])
                 reverb.change(fn=valueFalse_interactive2, inputs=[backing, reverb], outputs=[backing_reverb])
             with gr.Row():
-                mdx_model.change(fn=interactive_1, inputs=[mdx_model], outputs=[separator_denoise])
+                mdx_model.change(fn=valueFalse_interactive1, inputs=[mdx_model], outputs=[separator_denoise])
                 mdx_model.change(fn=model_separator_change, inputs=[mdx_model], outputs=[separator_model])
                 mdx_model.change(fn=lambda inp: visible_1(not inp), inputs=[mdx_model], outputs=[shifts])
             with gr.Row():
@@ -1431,7 +1430,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name='separator_music'
                 )
 
-        with gr.TabItem(translations["convert_audio"]):
+        with gr.TabItem(translations["convert_audio"], visible=configs["convert_tab"]):
             gr.Markdown(f"## {translations['convert_audio']}")
             with gr.Row():
                 gr.Markdown(translations["convert_info"])
@@ -1575,7 +1574,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="convert_audio"
                 )
 
-        with gr.TabItem(translations["convert_text"]):
+        with gr.TabItem(translations["convert_text"], visible=configs["tts_tab"]):
             gr.Markdown(translations["convert_text_markdown"])
             with gr.Row():
                 gr.Markdown(translations["convert_text_markdown_2"])
@@ -1696,7 +1695,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="convert_tts"
                 )
 
-        with gr.TabItem(translations["audio_effects"]):
+        with gr.TabItem(translations["audio_effects"], visible=configs["effects_tab"]):
             gr.Markdown(translations["apply_audio_effects"])
             with gr.Row():
                 gr.Markdown(translations["audio_effects_edit"])
@@ -1886,7 +1885,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="audio_effects"
                 )
 
-        with gr.TabItem(translations["createdataset"]):
+        with gr.TabItem(translations["createdataset"], visible=configs["create_dataset_tab"]):
             gr.Markdown(translations["create_dataset_markdown"])
             with gr.Row():
                 gr.Markdown(translations["create_dataset_markdown_2"])
@@ -1929,8 +1928,8 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                             skip_start = gr.Textbox(label=translations["skip_start"], info=translations["skip_start_info"], value="", placeholder="0,...", interactive=True, visible=False)
                             skip_end = gr.Textbox(label=translations["skip_end"], info=translations["skip_end_info"], value="", placeholder="0,...", interactive=True, visible=False)
             with gr.Row():
-                separator_audio.change(fn=interactive_1, inputs=[separator_audio], outputs=[separator_reverb])
-                separator_audio.change(fn=interactive_1, inputs=[separator_audio], outputs=[denoise_mdx])
+                separator_audio.change(fn=valueFalse_interactive1, inputs=[separator_audio], outputs=[separator_reverb])
+                separator_audio.change(fn=valueFalse_interactive1, inputs=[separator_audio], outputs=[denoise_mdx])
                 separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[separator_dataset])
             with gr.Row():
                 separator_audio.change(fn=visible_1, inputs=[separator_audio], outputs=[kim_vocal_row])
@@ -1968,7 +1967,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="create_dataset"
                 )
 
-        with gr.TabItem(translations["training_model"]):
+        with gr.TabItem(translations["training_model"], visible=configs["training_tab"]):
             gr.Markdown(f"## {translations['training_model']}")
             with gr.Row():
                 gr.Markdown(translations["training_markdown"])
@@ -2160,7 +2159,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="training_model"
                 )
 
-        with gr.TabItem(translations["fushion"]):
+        with gr.TabItem(translations["fushion"], visible=configs["fushion_tab"]):
             gr.Markdown(translations["fushion_markdown"])
             with gr.Row():
                 gr.Markdown(translations["fushion_markdown_2"])
@@ -2197,7 +2196,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 )
                 fushion_button.click(fn=lambda: visible_1(True), inputs=[], outputs=[output_model])  
 
-        with gr.TabItem(translations["read_model"]):
+        with gr.TabItem(translations["read_model"], visible=configs["read_tab"]):
             gr.Markdown(translations["read_model_markdown"])
             with gr.Row():
                 gr.Markdown(translations["read_model_markdown_2"])
@@ -2218,7 +2217,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="read_model"
                 )
 
-        with gr.TabItem(translations["downloads"]):
+        with gr.TabItem(translations["downloads"], visible=configs["downloads_tab"]):
             gr.Markdown(translations["download_markdown"])
             with gr.Row():
                 gr.Markdown(translations["download_markdown_2"])
@@ -2344,7 +2343,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     api_name="upload_hubert"
                 )
 
-        with gr.TabItem(translations["settings"]):
+        with gr.TabItem(translations["settings"], visible=configs["settings_tab"]):
             gr.Markdown(translations["settings_markdown"])
             with gr.Row():
                 gr.Markdown(translations["settings_markdown_2"])
@@ -2381,6 +2380,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
             with gr.Row():
                 gr.Markdown(translations["credits"].format(author=codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16", "rot13"), applio=codecs.decode("uggcf://tvguho.pbz/VNUvfcnab/Nccyvb/gerr/znva?gno=ernqzr-bi-svyr", "rot13"), ai_hispano=codecs.decode("uggcf://tvguho.pbz/VNUvfcnab", "rot13"), rvc_webui=codecs.decode("uggcf://tvguho.pbz/EIP-Cebwrpg/Ergevriny-onfrq-Ibvpr-Pbairefvba-JroHV?gno=ernqzr-bi-svyr", "rot13"), rvc_boss=codecs.decode("uggcf://tvguho.pbz/EIP-Obff", "rot13"), python_audio_separator=codecs.decode("uggcf://tvguho.pbz/abznqxnenbxr/clguba-nhqvb-frcnengbe?gno=ernqzr-bi-svyr", "rot13"), andrew_beveridge=codecs.decode("uggcf://tvguho.pbz/orirenqo", "rot13")))
     
+
     print(translations["set_lang"].format(lang=configs["language"]))
 
     for i in range(configs["num_of_restart"]):
