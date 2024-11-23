@@ -12,9 +12,9 @@ import warnings
 import logging.handlers
 
 import numpy as np
-import torch.utils.data
 import matplotlib.pyplot as plt
 import torch.distributed as dist
+import torch.utils.data as tdata
 import torch.multiprocessing as mp
 
 from tqdm import tqdm
@@ -25,7 +25,6 @@ from random import randint, shuffle
  
 from torch.nn import functional as F
 from distutils.util import strtobool
-from torch.utils.data import DataLoader
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from librosa.filters import mel as librosa_mel_fn
@@ -39,6 +38,7 @@ from main.configs.config import Config
 from main.library.algorithm.residuals import LRELU_SLOPE
 from main.library.algorithm.synthesizers import Synthesizer
 from main.library.algorithm.commons import get_padding, slice_segments, clip_grad_value
+
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -213,11 +213,23 @@ def main():
 
     def start():
         children = []
+        pid_data = {"process_pids": []}
 
-        for i in range(n_gpus):
-            subproc = mp.Process(target=run, args=(i, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, model_author))
-            children.append(subproc)
-            subproc.start()
+        with open(config_save_path, "r") as pid_file:
+            try:
+                pid_data.update(json.load(pid_file))
+            except json.JSONDecodeError:
+                pass
+
+        with open(config_save_path, "w") as pid_file:
+            for i in range(n_gpus):
+                subproc = mp.Process(target=run, args=(i, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, model_author))
+                children.append(subproc)
+                subproc.start()
+
+                pid_data["process_pids"].append(subproc.pid)
+
+            json.dump(pid_data, pid_file, indent=4)
 
         for i in range(n_gpus):
             children[i].join()
@@ -474,7 +486,7 @@ def kl_loss(z_p, logs_q, m_p, logs_p, z_mask):
     return l
 
 
-class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
+class TextAudioLoaderMultiNSFsid(tdata.Dataset):
     def __init__(self, hparams):
         self.audiopaths_and_text = load_filepaths_and_text(hparams.training_files)
         self.max_wav_value = hparams.max_wav_value
@@ -663,7 +675,7 @@ class TextAudioCollateMultiNSFsid:
         )
 
 
-class TextAudioLoader(torch.utils.data.Dataset):
+class TextAudioLoader(tdata.Dataset):
     def __init__(self, hparams):
         self.audiopaths_and_text = load_filepaths_and_text(hparams.training_files)
         self.max_wav_value = hparams.max_wav_value
@@ -829,7 +841,7 @@ class TextAudioCollate:
         )
 
 
-class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
+class DistributedBucketSampler(tdata.distributed.DistributedSampler):
     def __init__(self, dataset, batch_size, boundaries, num_replicas=None, rank=None, shuffle=True):
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)
         self.lengths = dataset.lengths
@@ -1063,17 +1075,18 @@ hann_window = {}
 
 def spectrogram_torch(y, n_fft, hop_size, win_size, center=False):
     global hann_window
+
     dtype_device = str(y.dtype) + "_" + str(y.device)
     wnsize_dtype_device = str(win_size) + "_" + dtype_device
+
     if wnsize_dtype_device not in hann_window: hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
 
     y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)), mode="reflect")
-
     y = y.squeeze(1)
 
     spec = torch.stft(y, n_fft, hop_length=hop_size, win_length=win_size, window=hann_window[wnsize_dtype_device], center=center, pad_mode="reflect", normalized=False, onesided=True, return_complex=True)
-
     spec = torch.sqrt(spec.real.pow(2) + spec.imag.pow(2) + 1e-6)
+
     return spec
 
 
@@ -1088,6 +1101,7 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sample_rate, fmin, fmax):
 
     melspec = torch.matmul(mel_basis[fmax_dtype_device], spec)
     melspec = spectral_normalize_torch(melspec)
+
     return melspec
 
 
@@ -1152,6 +1166,7 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, versio
 
         hash_input = f"{str(ckpt)} {epoch} {step} {datetime.datetime.now().isoformat()}"
         model_hash = hashlib.sha256(hash_input.encode()).hexdigest()
+
         opt["model_hash"] = model_hash
         opt["model_name"] = name
         opt["author"] = model_author
@@ -1186,7 +1201,7 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
 
     collate_fn = TextAudioCollateMultiNSFsid()
 
-    train_loader = DataLoader(train_dataset, num_workers=4, shuffle=False, pin_memory=True, collate_fn=collate_fn, batch_sampler=train_sampler, persistent_workers=True, prefetch_factor=8)
+    train_loader = tdata.DataLoader(train_dataset, num_workers=4, shuffle=False, pin_memory=True, collate_fn=collate_fn, batch_sampler=train_sampler, persistent_workers=True, prefetch_factor=8)
 
     net_g = Synthesizer(config.data.filter_length // 2 + 1, config.train.segment_size // config.data.hop_length, **config.model, use_f0=pitch_guidance == True, is_half=config.train.fp16_run and device.type == "cuda", sr=sample_rate).to(device)
 
@@ -1207,6 +1222,7 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         net_g = DDP(net_g)
         net_d = DDP(net_d)
 
+
     try:
         logger.info(translations["start_training"])
 
@@ -1215,7 +1231,6 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
 
         epoch_str += 1
         global_step = (epoch_str - 1) * len(train_loader)
-
     except:
         epoch_str = 1
         global_step = 0
@@ -1330,6 +1345,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                 wave_lengths,
                 sid,
             ) = info
+
             if device.type == "cuda" and not cache_data_in_gpu:
                 phone = phone.cuda(rank, non_blocking=True)
                 phone_lengths = phone_lengths.cuda(rank, non_blocking=True)
@@ -1361,15 +1377,10 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                     z_mask,
                     (z, z_p, m_p, logs_p, m_q, logs_q),
                 ) = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
-                mel = spec_to_mel_torch(
-                    spec,
-                    config.data.filter_length,
-                    config.data.n_mel_channels,
-                    config.data.sample_rate,
-                    config.data.mel_fmin,
-                    config.data.mel_fmax,
-                )
+
+                mel = spec_to_mel_torch(spec, config.data.filter_length, config.data.n_mel_channels, config.data.sample_rate, config.data.mel_fmin, config.data.mel_fmax)
                 y_mel = slice_segments(mel, ids_slice, config.train.segment_size // config.data.hop_length, dim=3)
+
                 with autocast(enabled=False):
                     y_hat_mel = mel_spectrogram_torch(
                         y_hat.float().squeeze(1),
@@ -1439,15 +1450,11 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                             "loss/g/kl": loss_kl,
                         }
                     )
-                    scalar_dict.update(
-                        {f"loss/g/{i}": v for i, v in enumerate(losses_gen)}
-                    )
-                    scalar_dict.update(
-                        {f"loss/d_r/{i}": v for i, v in enumerate(losses_disc_r)}
-                    )
-                    scalar_dict.update(
-                        {f"loss/d_g/{i}": v for i, v in enumerate(losses_disc_g)}
-                    )
+
+                    scalar_dict.update({f"loss/g/{i}": v for i, v in enumerate(losses_gen)})
+                    scalar_dict.update({f"loss/d_r/{i}": v for i, v in enumerate(losses_disc_r)})
+                    scalar_dict.update({f"loss/d_g/{i}": v for i, v in enumerate(losses_disc_g)})
+
                     image_dict = {
                         "slice/mel_org": plot_spectrogram_to_numpy(
                             y_mel[0].data.cpu().numpy()
@@ -1464,15 +1471,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
 
 
                     audio_dict = {f"gen/audio_{global_step:07d}": o[0, :, :]}
-
-                    summarize(
-                        writer=writer,
-                        global_step=global_step,
-                        images=image_dict,
-                        scalars=scalar_dict,
-                        audios=audio_dict,
-                        audio_sample_rate=config.data.sample_rate,
-                    )
+                    summarize(writer=writer, global_step=global_step, images=image_dict, scalars=scalar_dict, audios=audio_dict, audio_sample_rate=config.data.sample_rate)
 
             global_step += 1
             pbar.update(1)
@@ -1560,6 +1559,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
 
             with open(pid_file_path, "r") as pid_file:
                 pid_data = json.load(pid_file)
+
             with open(pid_file_path, "w") as pid_file:
                 pid_data.pop("process_pids", None)
                 json.dump(pid_data, pid_file, indent=4)

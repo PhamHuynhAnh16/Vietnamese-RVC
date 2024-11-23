@@ -2244,7 +2244,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                             search_dropdown = gr.Dropdown(label=translations["select_download_model"], value="", choices=[], allow_custom_value=True, interactive=False, visible=False)
                             download = gr.Button(translations["downloads"], variant="primary", visible=False)
             with gr.Row():
-                with gr.Accordion(translations["download_pretrainec"], open=False):
+                with gr.Accordion(translations["download_pretrained_2"], open=False):
                     with gr.Row():
                         pretrain_download_choices = gr.Radio(label=translations["model_download_select"], choices=[translations["download_url"], translations["list_model"], translations["upload"]], value=translations["download_url"], interactive=True)  
                     with gr.Row():
@@ -2390,7 +2390,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 server_name=server_name, 
                 server_port=port, 
                 show_error=show_error, 
-                inbrowser=False, 
+                inbrowser="--open" in sys.argv, 
                 share=share
             )
             break

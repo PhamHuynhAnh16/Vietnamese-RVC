@@ -371,7 +371,7 @@
     "name_to_search": "Tên để tìm kiếm",
     "search_2": "Tìm kiếm",
     "select_download_model": "Chọn mô hình đã được tìm kiếm(Bấm vào để chọn)",
-    "download_pretrainec": "Tải xuống mô hình huấn luyện trước",
+    "download_pretrained_2": "Tải xuống mô hình huấn luyện trước",
     "only_huggingface": "Chỉ hỗ trợ huggingface.co",
     "pretrained_url": "Đường dẫn liên kết đến mô hình huấn luyện trước {dg}",
     "select_pretrain": "Chọn mô hình huấn luyện trước",
