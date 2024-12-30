@@ -7,7 +7,9 @@ Công cụ chuyển đổi giọng nói chất lượng và hiệu suất cao đ
 [![Licence](https://img.shields.io/badge/LICENSE-MIT-green.svg?style=for-the-badge)](https://github.com/PhamHuynhAnh16/Vietnamese-RVC/blob/main/LICENSE)
 </div>
 
+<div align="center">
 [![Vietnamese RVC](https://img.shields.io/badge/GitHub%20Pages-121013?logo=github&logoColor=white)](https://github.com/PhamHuynhAnh16/Vietnamese-RVC)
+</div>
 
 # Mô tả
 Dự án này là một công cụ chuyển đổi giọng nói đơn giản, dễ sử dụng, được thiết kế cho người Việt Nam. Với mục tiêu tạo ra các sản phẩm chuyển đổi giọng nói chất lượng cao và hiệu suất tối ưu, dự án cho phép người dùng thay đổi giọng nói một cách mượt mà, tự nhiên.
