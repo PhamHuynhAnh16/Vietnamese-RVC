@@ -2632,7 +2632,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                     agree_log = gr.Checkbox(label=translations["agree_log"], value=True, interactive=True) 
                     report_text = gr.Textbox(label=translations["error_info"], info=translations["error_info_2"], interactive=True)
                 with gr.Column():
-                    report_button = gr.Button(translations["report_bugs"], variant=["primary"])
+                    report_button = gr.Button(translations["report_bugs"], variant=["primary"], scale=2)
             with gr.Row():
                 gr.Markdown(translations["report_info"].format(github=codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16/Ivrganzrfr-EIP/vffhrf", "rot13")))
             with gr.Row():
