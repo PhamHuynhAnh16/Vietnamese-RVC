@@ -155,7 +155,7 @@ def process_audio(file_path, output_path):
 
         for i, (start_i, end_i) in enumerate(silence.detect_nonsilent(song, min_silence_len=750, silence_thresh=-70)):
             chunk = song[start_i:end_i]
-            if len(chunk) >= 30:
+            if len(chunk) > 10:
                 chunk_file_path = os.path.join(output_path, f"chunk{i}.wav")
 
                 if os.path.exists(chunk_file_path): os.remove(chunk_file_path)

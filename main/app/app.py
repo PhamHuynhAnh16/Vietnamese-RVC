@@ -164,9 +164,9 @@ def get_sid(model):
     if model:
         try:
             speakers_id = torch.load(os.path.join("assets", "weights", model), map_location="cpu").get("speakers_id")
-            return list(range(speakers_id)) if speakers_id else [0]
+            return {"choices": list(range(speakers_id)) if speakers_id else [0], "value": 0, "__type__": "update"} 
         except:
-            return [0]
+            return {"choices": [0], "value": 0, "__type__": "update"}
 
 def get_index(model):
     return {"value": next((f for f in [os.path.join(root, name) for root, _, files in os.walk(os.path.join("assets", "logs"), topdown=False) for name in files if name.endswith(".index")] if model.split(".")[0] in f), ""), "__type__": "update"}
@@ -408,7 +408,7 @@ def download_model(url=None, model=None):
                 
                 if file_id:
                     file = gdown.gdown_download(id=file_id, output=download_dir)
-                    if file.endswith(".zip"): shutil.unpack_archive(os.path.join(download_dir, file), download_dir)
+                    if file.endswith(".zip"): shutil.unpack_archive(file, download_dir)
                     move_files_from_directory(download_dir, weights_dir, logs_dir, model)
             elif "mega.nz" in url:
                 meganz.mega_download_url(url, download_dir)
@@ -1494,7 +1494,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                         with gr.Row():
                             refesh = gr.Button(translations["refesh"])
                         with gr.Row():
-                            sid = gr.Dropdown(label=translations["sid"], choices=get_sid(model_pth.value), value=0, interactive=True, allow_custom_value=True)
+                            sid = gr.Dropdown(label=translations["sid"], choices=[], value=0, interactive=True, allow_custom_value=True)
                         with gr.Row():
                             index_strength = gr.Slider(label=translations["index_strength"], info=translations["index_strength_info"], minimum=0, maximum=1, value=0.5, step=0.01, interactive=True, visible=lambda: os.path.exists(model_index))
                     with gr.Accordion(translations["input_output"], open=False):
@@ -1648,7 +1648,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
             with gr.Row():
                 input0.upload(fn=lambda audio_in: shutil.move(audio_in.name, os.path.join("audios")), inputs=[input0], outputs=[input_audio0])
                 input_audio0.change(fn=lambda audio: audio if audio else None, inputs=[input_audio0], outputs=[play_audio])
-                model_pth.change(fn=lambda model: [get_sid(model), 0], inputs=[model_pth], outputs=[sid, sid])
+                model_pth.change(fn=get_sid, inputs=[model_pth], outputs=[sid])
             with gr.Row():
                 embedders.change(fn=lambda embedders: visible_1(True if embedders == "custom" else False), inputs=[embedders], outputs=[custom_embedders])
                 refesh0.click(fn=change_audios_choices, inputs=[], outputs=[input_audio0])
@@ -1759,7 +1759,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                         with gr.Row():
                             refesh1 = gr.Button(translations["refesh"])
                         with gr.Row():
-                            sid0 = gr.Dropdown(label=translations["sid"], choices=get_sid(model_pth0.value), value=0, interactive=True, allow_custom_value=True)
+                            sid0 = gr.Dropdown(label=translations["sid"], choices=[], value=0, interactive=True, allow_custom_value=True)
                         with gr.Row():
                             index_strength0 = gr.Slider(label=translations["index_strength"], info=translations["index_strength_info"], minimum=0, maximum=1, value=0.5, step=0.01, interactive=True, visible=lambda: os.path.exists(model_index0))
                     with gr.Accordion(translations["output_path"], open=False):
@@ -1795,7 +1795,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme) as app:
                 tts_voice_convert = gr.Audio(show_download_button=True, interactive=False, label=translations["output_file_tts_convert"])
             with gr.Row():
                 autotune3.change(fn=visible_1, inputs=[autotune3], outputs=[f0_autotune_strength0])
-                model_pth0.change(fn=lambda model: [get_sid(model), 0], inputs=[model_pth0], outputs=[sid0, sid0])
+                model_pth0.change(fn=get_sid, inputs=[model_pth0], outputs=[sid0])
             with gr.Row():
                 cleaner1.change(fn=visible_1, inputs=[cleaner1], outputs=[clean_strength1])
                 method0.change(fn=lambda method: visible_1(True if method == "hybrid" else False), inputs=[method0], outputs=[hybrid_method0])
