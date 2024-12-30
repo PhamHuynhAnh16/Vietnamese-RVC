@@ -2,19 +2,11 @@ import tqdm
 import torch
 import random
 
-import typing as tp
-
 from torch import nn
 from torch.nn import functional as F
 from concurrent.futures import ThreadPoolExecutor
 
-from .demucs import Demucs
-from .hdemucs import HDemucs
-from .htdemucs import HTDemucs
 from .utils import center_trim
-
-
-Model = tp.Union[Demucs, HDemucs, HTDemucs]
 
 class DummyPoolExecutor:
     class DummyResult:
@@ -39,7 +31,7 @@ class DummyPoolExecutor:
         return
 
 class BagOfModels(nn.Module):
-    def __init__(self, models: tp.List[Model], weights: tp.Optional[tp.List[tp.List[float]]] = None, segment: tp.Optional[float] = None):
+    def __init__(self, models, weights = None, segment = None):
         super().__init__()
         assert len(models) > 0
         first = models[0]
@@ -66,8 +58,7 @@ class BagOfModels(nn.Module):
         self.weights = weights
 
     def forward(self, x):
-        raise NotImplementedError("`apply_model`")
-
+        pass
 
 class TensorChunk:
     def __init__(self, tensor, offset=0, length=None):
@@ -91,7 +82,6 @@ class TensorChunk:
     def shape(self):
         shape = list(self.tensor.shape)
         shape[-1] = self.length
-
         return shape
 
     def padded(self, target_length):
@@ -111,25 +101,18 @@ class TensorChunk:
         out = F.pad(self.tensor[..., correct_start:correct_end], (pad_left, pad_right))
 
         assert out.shape[-1] == target_length
-
         return out
-
 
 def tensor_chunk(tensor_or_chunk):
     if isinstance(tensor_or_chunk, TensorChunk): return tensor_or_chunk
     else:
         assert isinstance(tensor_or_chunk, torch.Tensor)
-
         return TensorChunk(tensor_or_chunk)
 
-
 def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power=1.0, static_shifts=1, set_progress_bar=None, device=None, progress=False, num_workers=0, pool=None):
-    global fut_length
-    global bag_num
-    global prog_bar
+    global fut_length, bag_num, prog_bar
 
     device = mix.device if device is None else torch.device(device)
-
     if pool is None: pool = ThreadPoolExecutor(num_workers) if num_workers > 0 and device.type == "cpu" else DummyPoolExecutor()
 
     kwargs = {
@@ -145,19 +128,15 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
     }
 
     if isinstance(model, BagOfModels):
-        estimates = 0
+        estimates, fut_length, prog_bar, current_model = 0, 0, 0, 0
         totals = [0] * len(model.sources)
         bag_num = len(model.models)
-        fut_length = 0
-        prog_bar = 0
-        current_model = 0 
 
         for sub_model, weight in zip(model.models, model.weights):
             original_model_device = next(iter(sub_model.parameters())).device
             sub_model.to(device)
             fut_length += fut_length
             current_model += 1
-
             out = apply_model(sub_model, mix, **kwargs)
             sub_model.to(original_model_device)
 
@@ -175,9 +154,7 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
 
     model.to(device)
     model.eval()
-
     assert transition_power >= 1
-
     batch, channels, length = mix.shape
 
     if shifts:
@@ -194,7 +171,6 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
             out += shifted_out[..., max_shift - offset :]
 
         out /= shifts
-
         return out
     elif split:
         kwargs["split"] = False
@@ -203,10 +179,8 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
         segment = int(model.samplerate * model.segment)
         stride = int((1 - overlap) * segment)
         offsets = range(0, length, stride)
-
         weight = torch.cat([torch.arange(1, segment // 2 + 1, device=device), torch.arange(segment - segment // 2, 0, -1, device=device)])
         assert len(weight) == segment
-
         weight = (weight / weight.max()) ** transition_power
         futures = []
 
@@ -233,11 +207,9 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
         assert sum_weight.min() > 0
 
         out /= sum_weight
-
         return out
     else:
         valid_length = model.valid_length(length) if hasattr(model, "valid_length") else length
-
         mix = tensor_chunk(mix)
         padded_mix = mix.padded(valid_length).to(device)
 
@@ -245,7 +217,6 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
             out = model(padded_mix)
 
         return center_trim(out, length)
-
 
 def demucs_segments(demucs_segment, demucs_model):
     if demucs_segment == "Default":
@@ -260,7 +231,6 @@ def demucs_segments(demucs_segment, demucs_model):
     else:
         try:
             segment = int(demucs_segment)
-
             if isinstance(demucs_model, BagOfModels):
                 if segment is not None:
                     for sub in demucs_model.models:

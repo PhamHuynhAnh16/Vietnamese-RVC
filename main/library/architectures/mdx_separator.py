@@ -10,20 +10,17 @@ import onnxruntime as ort
 
 from tqdm import tqdm
 
-now_dir = os.getcwd()
-sys.path.append(now_dir)
+sys.path.append(os.getcwd())
 
 from main.configs.config import Config
 from main.library.uvr5_separator import spec_utils
 from main.library.uvr5_separator.common_separator import CommonSeparator
-
 
 translations = Config().translations
 
 class MDXSeparator(CommonSeparator):
     def __init__(self, common_config, arch_config):
         super().__init__(config=common_config)
-
         self.segment_size = arch_config.get("segment_size")
         self.overlap = arch_config.get("overlap")
         self.batch_size = arch_config.get("batch_size", 1)
@@ -49,47 +46,36 @@ class MDXSeparator(CommonSeparator):
         self.audio_file_path = None
         self.audio_file_base = None
 
-
     def load_model(self):
         self.logger.debug(translations["load_model_onnx"])
 
         if self.segment_size == self.dim_t:
             ort_session_options = ort.SessionOptions()
-
-            if self.log_level > 10: ort_session_options.log_severity_level = 3
-            else: ort_session_options.log_severity_level = 0
-
+            ort_session_options.log_severity_level = 3 if self.log_level > 10 else 0
             ort_inference_session = ort.InferenceSession(self.model_path, providers=self.onnx_execution_provider, sess_options=ort_session_options)
             self.model_run = lambda spek: ort_inference_session.run(None, {"input": spek.cpu().numpy()})[0]
             self.logger.debug(translations["load_model_onnx_success"])
         else:
-            if platform.system() == 'Windows':
-                onnx_model = onnx.load(self.model_path)
-                self.model_run = onnx2torch.convert(onnx_model)
-            else: self.model_run = onnx2torch.convert(self.model_path)
-   
+            self.model_run = onnx2torch.convert(onnx.load(self.model_path)) if platform.system() == 'Windows' else onnx2torch.convert(self.model_path)
             self.model_run.to(self.torch_device).eval()
-            self.logger.warning(translations["onnx_to_pytorch"])
+            self.logger.debug(translations["onnx_to_pytorch"])
 
     def separate(self, audio_file_path):
         self.audio_file_path = audio_file_path
         self.audio_file_base = os.path.splitext(os.path.basename(audio_file_path))[0]
-
         self.logger.debug(translations["mix"].format(audio_file_path=self.audio_file_path))
         mix = self.prepare_mix(self.audio_file_path)
-
         self.logger.debug(translations["normalization_demix"])
         mix = spec_utils.normalize(wave=mix, max_peak=self.normalization_threshold)
-
         source = self.demix(mix)
         self.logger.debug(translations["mix_success"])
-
         output_files = []
         self.logger.debug(translations["process_output_file"])
 
         if not isinstance(self.primary_source, np.ndarray):
             self.logger.debug(translations["primary_source"])
             self.primary_source = spec_utils.normalize(wave=source, max_peak=self.normalization_threshold).T
+
         if not isinstance(self.secondary_source, np.ndarray):
             self.logger.debug(translations["secondary_source"])
             raw_mix = self.demix(mix, is_match_mix=True)
@@ -109,7 +95,6 @@ class MDXSeparator(CommonSeparator):
 
         if not self.output_single_stem or self.output_single_stem.lower() == self.primary_stem_name.lower():
             self.primary_stem_output_path = os.path.join(f"{self.audio_file_base}_({self.primary_stem_name})_{self.model_name}.{self.output_format.lower()}")
-
             if not isinstance(self.primary_source, np.ndarray): self.primary_source = source.T
 
             self.logger.info(translations["save_secondary_stem_output_path"].format(stem_name=self.primary_stem_name, stem_output_path=self.primary_stem_output_path))
@@ -164,8 +149,7 @@ class MDXSeparator(CommonSeparator):
 
             i = 0
             while i < n_sample + pad:
-                waves = np.array(mix_p[:, i : i + self.chunk_size])
-                mix_waves.append(waves)
+                mix_waves.append(np.array(mix_p[:, i : i + self.chunk_size]))
 
                 self.logger.debug(translations["process_part"].format(mix_waves=len(mix_waves), i=i, ii=i + self.chunk_size))
                 i += self.gen_size
@@ -178,10 +162,7 @@ class MDXSeparator(CommonSeparator):
     def demix(self, mix, is_match_mix=False):
         self.logger.debug(f"{translations['demix_is_match_mix']}: {is_match_mix}...")
         self.initialize_model_settings()
-
-        org_mix = mix
-        self.logger.debug(f"{translations['mix_shape']}: {org_mix.shape}")
-
+        self.logger.debug(f"{translations['mix_shape']}: {mix.shape}")
         tar_waves_ = []
 
         if is_match_mix:
@@ -193,14 +174,10 @@ class MDXSeparator(CommonSeparator):
             overlap = self.overlap
             self.logger.debug(translations["chunk_size_or_overlap_standard"].format(chunk_size=chunk_size, overlap=overlap))
 
-
         gen_size = chunk_size - 2 * self.trim
         self.logger.debug(f"{translations['calc_size']}: {gen_size}")
 
-
-        pad = gen_size + self.trim - ((mix.shape[-1]) % gen_size)
-
-        mixture = np.concatenate((np.zeros((2, self.trim), dtype="float32"), mix, np.zeros((2, pad), dtype="float32")), 1)
+        mixture = np.concatenate((np.zeros((2, self.trim), dtype="float32"), mix, np.zeros((2, gen_size + self.trim - ((mix.shape[-1]) % gen_size)), dtype="float32")), 1)
         self.logger.debug(f"{translations['mix_cache']}: {mixture.shape}")
 
         step = int((1 - overlap) * chunk_size)
@@ -213,7 +190,7 @@ class MDXSeparator(CommonSeparator):
         total_chunks = (mixture.shape[-1] + step - 1) // step
         self.logger.debug(f"{translations['all_process_part']}: {total_chunks}")
 
-        for i in tqdm(range(0, mixture.shape[-1], step)):
+        for i in tqdm(range(0, mixture.shape[-1], step), ncols=100, unit="f"):
             total += 1
             start = i
             end = min(i + chunk_size, mixture.shape[-1])
@@ -233,14 +210,14 @@ class MDXSeparator(CommonSeparator):
                 pad_size = (i + chunk_size) - end
                 mix_part_ = np.concatenate((mix_part_, np.zeros((2, pad_size), dtype="float32")), axis=-1)
 
-            mix_part = torch.tensor([mix_part_], dtype=torch.float32).to(self.torch_device)
+            mix_waves = torch.tensor([mix_part_], dtype=torch.float32).to(self.torch_device).split(self.batch_size)
 
-            mix_waves = mix_part.split(self.batch_size)
             total_batches = len(mix_waves)
             self.logger.debug(f"{translations['mix_or_batch']}: {total_batches}")
 
             with torch.no_grad():
                 batches_processed = 0
+                
                 for mix_wave in mix_waves:
                     batches_processed += 1
                     self.logger.debug(f"{translations['mix_wave']} {batches_processed}/{total_batches}")
@@ -259,8 +236,7 @@ class MDXSeparator(CommonSeparator):
         tar_waves = result / divider
         tar_waves_.append(tar_waves)
 
-        tar_waves_ = np.vstack(tar_waves_)[:, :, self.trim : -self.trim]
-        tar_waves = np.concatenate(tar_waves_, axis=-1)[:, : mix.shape[-1]]
+        tar_waves = np.concatenate(np.vstack(tar_waves_)[:, :, self.trim : -self.trim], axis=-1)[:, : mix.shape[-1]]
 
         source = tar_waves[:, 0:None]
         self.logger.debug(f"{translations['tar_waves']}: {tar_waves.shape}")
@@ -310,60 +286,34 @@ class STFT:
 
         if is_non_standard_device: input_tensor = input_tensor.cpu()
 
-        stft_window = self.hann_window.to(input_tensor.device)
-
         batch_dimensions = input_tensor.shape[:-2]
         channel_dim, time_dim = input_tensor.shape[-2:]
 
-        reshaped_tensor = input_tensor.reshape([-1, time_dim])
-        stft_output = torch.stft(reshaped_tensor, n_fft=self.n_fft, hop_length=self.hop_length, window=stft_window, center=True, return_complex=False)
-
-        permuted_stft_output = stft_output.permute([0, 3, 1, 2])
-
+        permuted_stft_output = torch.stft(input_tensor.reshape([-1, time_dim]), n_fft=self.n_fft, hop_length=self.hop_length, window=self.hann_window.to(input_tensor.device), center=True, return_complex=False).permute([0, 3, 1, 2])
         final_output = permuted_stft_output.reshape([*batch_dimensions, channel_dim, 2, -1, permuted_stft_output.shape[-1]]).reshape([*batch_dimensions, channel_dim * 2, -1, permuted_stft_output.shape[-1]])
 
         if is_non_standard_device: final_output = final_output.to(self.device)
-
         return final_output[..., : self.dim_f, :]
 
     def pad_frequency_dimension(self, input_tensor, batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins):
-        freq_padding = torch.zeros([*batch_dimensions, channel_dim, num_freq_bins - freq_dim, time_dim]).to(input_tensor.device)
-        padded_tensor = torch.cat([input_tensor, freq_padding], -2)
-
-        return padded_tensor
+        return torch.cat([input_tensor, torch.zeros([*batch_dimensions, channel_dim, num_freq_bins - freq_dim, time_dim]).to(input_tensor.device)], -2)
 
     def calculate_inverse_dimensions(self, input_tensor):
-        batch_dimensions = input_tensor.shape[:-3]
         channel_dim, freq_dim, time_dim = input_tensor.shape[-3:]
 
-        num_freq_bins = self.n_fft // 2 + 1
-
-        return batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins
+        return input_tensor.shape[:-3], channel_dim, freq_dim, time_dim, self.n_fft // 2 + 1
 
     def prepare_for_istft(self, padded_tensor, batch_dimensions, channel_dim, num_freq_bins, time_dim):
-        reshaped_tensor = padded_tensor.reshape([*batch_dimensions, channel_dim // 2, 2, num_freq_bins, time_dim])
-        flattened_tensor = reshaped_tensor.reshape([-1, 2, num_freq_bins, time_dim])
-        permuted_tensor = flattened_tensor.permute([0, 2, 3, 1])
-        complex_tensor = permuted_tensor[..., 0] + permuted_tensor[..., 1] * 1.0j
+        permuted_tensor = padded_tensor.reshape([*batch_dimensions, channel_dim // 2, 2, num_freq_bins, time_dim]).reshape([-1, 2, num_freq_bins, time_dim]).permute([0, 2, 3, 1])
 
-        return complex_tensor
+        return permuted_tensor[..., 0] + permuted_tensor[..., 1] * 1.0j
 
     def inverse(self, input_tensor):
         is_non_standard_device = not input_tensor.device.type in ["cuda", "cpu"]
-
         if is_non_standard_device: input_tensor = input_tensor.cpu()
 
-        stft_window = self.hann_window.to(input_tensor.device)
-
         batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins = self.calculate_inverse_dimensions(input_tensor)
-
-        padded_tensor = self.pad_frequency_dimension(input_tensor, batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins)
-
-        complex_tensor = self.prepare_for_istft(padded_tensor, batch_dimensions, channel_dim, num_freq_bins, time_dim)
-
-        istft_result = torch.istft(complex_tensor, n_fft=self.n_fft, hop_length=self.hop_length, window=stft_window, center=True)
-
-        final_output = istft_result.reshape([*batch_dimensions, 2, -1])
+        final_output = torch.istft(self.prepare_for_istft(self.pad_frequency_dimension(input_tensor, batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins), batch_dimensions, channel_dim, num_freq_bins, time_dim), n_fft=self.n_fft, hop_length=self.hop_length, window=self.hann_window.to(input_tensor.device), center=True).reshape([*batch_dimensions, 2, -1])
 
         if is_non_standard_device: final_output = final_output.to(self.device)
 

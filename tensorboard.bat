@@ -2,6 +2,6 @@
 setlocal
 title Vietnamese RVC Tensorboard
 
-python.exe main/app/run_tensorboard.py
+python.exe main/app/tensorboard.py
 echo.
 pause

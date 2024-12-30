@@ -1,8 +1,6 @@
 import math
 import torch
-import julius
-
-import typing as tp
+import inspect
 
 from torch import nn
 
@@ -12,24 +10,20 @@ from .utils import center_trim
 from .states import capture_init
 
 
+
 def unfold(a, kernel_size, stride):
     *shape, length = a.shape
     n_frames = math.ceil(length / stride)
-    
     tgt_length = (n_frames - 1) * stride + kernel_size
     a = F.pad(a, (0, tgt_length - length))
     strides = list(a.stride())
-
     assert strides[-1] == 1
-
     strides = strides[:-1] + [stride, 1]
-
     return a.as_strided([*shape, n_frames, kernel_size], strides)
 
 def rescale_conv(conv, reference):
     scale = (conv.weight.std().detach() / reference) ** 0.5
     conv.weight.data /= scale
-
     if conv.bias is not None: conv.bias.data /= scale
 
 def rescale_module(module, reference):
@@ -59,7 +53,6 @@ class BLSTM(nn.Module):
             x = frames.permute(0, 2, 1, 3).reshape(-1, C, width)
 
         x = x.permute(2, 0, 1)
-
         x = self.lstm(x)[0]
         x = self.linear(x)
         x = x.permute(1, 2, 0)
@@ -79,11 +72,10 @@ class BLSTM(nn.Module):
             x = out
 
         if self.skip: x = x + y
-
         return x
 
 class LayerScale(nn.Module):
-    def __init__(self, channels: int, init: float = 0):
+    def __init__(self, channels, init = 0):
         super().__init__()
         self.scale = nn.Parameter(torch.zeros(channels, requires_grad=True))
         self.scale.data[:] = init
@@ -92,43 +84,27 @@ class LayerScale(nn.Module):
         return self.scale[:, None] * x
 
 class DConv(nn.Module):
-    def __init__(self, channels: int, compress: float = 4, depth: int = 2, init: float = 1e-4, norm=True, attn=False, heads=4, ndecay=4, lstm=False, gelu=True, kernel=3, dilate=True):
+    def __init__(self, channels, compress = 4, depth = 2, init = 1e-4, norm=True, attn=False, heads=4, ndecay=4, lstm=False, gelu=True, kernel=3, dilate=True):
         super().__init__()
         assert kernel % 2 == 1
         self.channels = channels
         self.compress = compress
         self.depth = abs(depth)
         dilate = depth > 0
-
-        norm_fn: tp.Callable[[int], nn.Module]
         norm_fn = lambda d: nn.Identity()  
-
         if norm: norm_fn = lambda d: nn.GroupNorm(1, d)  
-
         hidden = int(channels / compress)
-
-        act: tp.Type[nn.Module]
         act = nn.GELU if gelu else nn.ReLU
-            
         self.layers = nn.ModuleList([])
 
         for d in range(self.depth):
             dilation = 2**d if dilate else 1
             padding = dilation * (kernel // 2)
 
-            mods = [
-                nn.Conv1d(channels, hidden, kernel, dilation=dilation, padding=padding),
-                norm_fn(hidden),
-                act(),
-                nn.Conv1d(hidden, 2 * channels, 1),
-                norm_fn(2 * channels),
-                nn.GLU(1),
-                LayerScale(channels, init),
-            ]
+            mods = [nn.Conv1d(channels, hidden, kernel, dilation=dilation, padding=padding), norm_fn(hidden), act(), nn.Conv1d(hidden, 2 * channels, 1), norm_fn(2 * channels), nn.GLU(1), LayerScale(channels, init)]
 
             if attn: mods.insert(3, LocalState(hidden, heads=heads, ndecay=ndecay))
             if lstm: mods.insert(3, BLSTM(hidden, layers=2, max_steps=200, skip=True))
-
             layer = nn.Sequential(*mods)
             self.layers.append(layer)
 
@@ -139,11 +115,9 @@ class DConv(nn.Module):
         return x
 
 class LocalState(nn.Module):
-    def __init__(self, channels: int, heads: int = 4, nfreqs: int = 0, ndecay: int = 4):
+    def __init__(self, channels, heads = 4, nfreqs = 0, ndecay = 4):
         super().__init__()
-
         assert channels % heads == 0, (channels, heads)
-
         self.heads = heads
         self.nfreqs = nfreqs
         self.ndecay = ndecay
@@ -156,9 +130,7 @@ class LocalState(nn.Module):
         if ndecay:
             self.query_decay = nn.Conv1d(channels, heads * ndecay, 1)
             self.query_decay.weight.data *= 0.01
-
             assert self.query_decay.bias is not None  
-
             self.query_decay.bias.data[:] = -2
 
         self.proj = nn.Conv1d(channels + heads * nfreqs, channels, 1)
@@ -168,13 +140,10 @@ class LocalState(nn.Module):
         heads = self.heads
         indexes = torch.arange(T, device=x.device, dtype=x.dtype)
         delta = indexes[:, None] - indexes[None, :]
-
         queries = self.query(x).view(B, heads, -1, T)
         keys = self.key(x).view(B, heads, -1, T)
-
         dots = torch.einsum("bhct,bhcs->bhts", keys, queries)
         dots /= keys.shape[2] ** 0.5
-
 
         if self.nfreqs:
             periods = torch.arange(1, self.nfreqs + 1, device=x.device, dtype=x.dtype)
@@ -189,10 +158,8 @@ class LocalState(nn.Module):
             decay_kernel = -decays.view(-1, 1, 1) * delta.abs() / self.ndecay**0.5
             dots += torch.einsum("fts,bhfs->bhts", decay_kernel, decay_q)
 
-
         dots.masked_fill_(torch.eye(T, device=dots.device, dtype=torch.bool), -100)
         weights = torch.softmax(dots, dim=2)
-
         content = self.content(x).view(B, heads, -1, T)
         result = torch.einsum("bhts,bhct->bhcs", weights, content)
 
@@ -218,7 +185,6 @@ class Demucs(nn.Module):
         self.normalize = normalize
         self.samplerate = samplerate
         self.segment = segment
-
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
         self.skip_scales = nn.ModuleList()
@@ -230,50 +196,38 @@ class Demucs(nn.Module):
             activation = nn.ReLU()
             ch_scale = 1
 
-
         act2 = nn.GELU if gelu else nn.ReLU
 
         in_channels = audio_channels
         padding = 0
 
-
         for index in range(depth):
             norm_fn = lambda d: nn.Identity()  
-
             if index >= norm_starts: norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  
 
             encode = []
             encode += [nn.Conv1d(in_channels, channels, kernel_size, stride), norm_fn(channels), act2()]
-
             attn = index >= dconv_attn
             lstm = index >= dconv_lstm
 
             if dconv_mode & 1: encode += [DConv(channels, depth=dconv_depth, init=dconv_init, compress=dconv_comp, attn=attn, lstm=lstm)]
             if rewrite: encode += [nn.Conv1d(channels, ch_scale * channels, 1), norm_fn(ch_scale * channels), activation]
-
             self.encoder.append(nn.Sequential(*encode))
 
             decode = []
-
             out_channels = in_channels if index > 0 else len(self.sources) * audio_channels
                 
             if rewrite: decode += [nn.Conv1d(channels, ch_scale * channels, 2 * context + 1, padding=context), norm_fn(ch_scale * channels), activation]
             if dconv_mode & 2: decode += [DConv(channels, depth=dconv_depth, init=dconv_init, compress=dconv_comp, attn=attn, lstm=lstm)]
-
             decode += [nn.ConvTranspose1d(channels, out_channels, kernel_size, stride, padding=padding)]
 
             if index > 0: decode += [norm_fn(out_channels), act2()]
-
             self.decoder.insert(0, nn.Sequential(*decode))
             in_channels = channels
             channels = int(growth * channels)
 
-
         channels = in_channels
-
         self.lstm = BLSTM(channels, lstm_layers) if lstm_layers else None
-
-
         if rescale: rescale_module(self, reference=rescale)
 
     def valid_length(self, length):
@@ -287,7 +241,6 @@ class Demucs(nn.Module):
             length = (length - 1) * self.stride + self.kernel_size
 
         if self.resample: length = math.ceil(length / 2)
-
         return int(length)
 
     def forward(self, mix):
@@ -306,8 +259,7 @@ class Demucs(nn.Module):
         delta = self.valid_length(length) - length
         x = F.pad(x, (delta // 2, delta - delta // 2))
 
-        if self.resample: x = julius.resample_frac(x, 1, 2)
-
+        if self.resample: x = resample_frac(x, 1, 2)
         saved = []
 
         for encode in self.encoder:
@@ -321,12 +273,11 @@ class Demucs(nn.Module):
             skip = center_trim(skip, x)
             x = decode(x + skip)
 
-        if self.resample: x = julius.resample_frac(x, 2, 1)
+        if self.resample: x = resample_frac(x, 2, 1)
 
         x = x * std + mean
         x = center_trim(x, length)
         x = x.view(x.size(0), len(self.sources), self.audio_channels, x.size(-1))
-
         return x
 
     def load_state_dict(self, state, strict=True):
@@ -338,3 +289,82 @@ class Demucs(nn.Module):
 
                     if old in state and new not in state: state[new] = state.pop(old)
         super().load_state_dict(state, strict=strict)
+
+class ResampleFrac(torch.nn.Module):
+    def __init__(self, old_sr, new_sr, zeros = 24, rolloff = 0.945):
+        super().__init__()
+        gcd = math.gcd(old_sr, new_sr)
+        self.old_sr = old_sr // gcd
+        self.new_sr = new_sr // gcd
+        self.zeros = zeros
+        self.rolloff = rolloff
+        self._init_kernels()
+
+    def _init_kernels(self):
+        if self.old_sr == self.new_sr: return
+
+        kernels = []
+        sr = min(self.new_sr, self.old_sr)
+        sr *= self.rolloff
+
+        self._width = math.ceil(self.zeros * self.old_sr / sr)
+        idx = torch.arange(-self._width, self._width + self.old_sr).float()
+
+        for i in range(self.new_sr):
+            t = ((-i/self.new_sr + idx/self.old_sr) * sr).clamp_(-self.zeros, self.zeros)
+            t *= math.pi
+
+            kernel = sinc(t) * (torch.cos(t/self.zeros/2)**2)
+            kernel.div_(kernel.sum())
+            kernels.append(kernel)
+
+        self.register_buffer("kernel", torch.stack(kernels).view(self.new_sr, 1, -1))
+
+    def forward(self, x, output_length = None, full = False):
+        if self.old_sr == self.new_sr: return x
+        shape = x.shape
+        length = x.shape[-1]
+        
+        x = x.reshape(-1, length)
+        y = F.conv1d(F.pad(x[:, None], (self._width, self._width + self.old_sr), mode='replicate'), self.kernel, stride=self.old_sr).transpose(1, 2).reshape(list(shape[:-1]) + [-1])
+
+        float_output_length = torch.as_tensor(self.new_sr * length / self.old_sr)
+        max_output_length = torch.ceil(float_output_length).long()
+        default_output_length = torch.floor(float_output_length).long()
+
+        if output_length is None: applied_output_length = max_output_length if full else default_output_length
+        elif output_length < 0 or output_length > max_output_length: raise ValueError("output_length < 0 or output_length > max_output_length")
+        else:
+            applied_output_length = torch.tensor(output_length)
+            if full: raise ValueError("full=True")
+
+        return y[..., :applied_output_length] 
+
+    def __repr__(self):
+        return simple_repr(self)
+
+def sinc(x):
+    return torch.where(x == 0, torch.tensor(1., device=x.device, dtype=x.dtype), torch.sin(x) / x)
+
+def simple_repr(obj, attrs = None, overrides = {}):
+    params = inspect.signature(obj.__class__).parameters
+    attrs_repr = []
+
+    if attrs is None: attrs = list(params.keys())
+    for attr in attrs:
+        display = False
+
+        if attr in overrides: value = overrides[attr]
+        elif hasattr(obj, attr): value = getattr(obj, attr)
+        else: continue
+
+        if attr in params:
+            param = params[attr]
+            if param.default is inspect._empty or value != param.default: display = True
+        else: display = True
+
+        if display: attrs_repr.append(f"{attr}={value}")
+    return f"{obj.__class__.__name__}({','.join(attrs_repr)})"
+
+def resample_frac(x, old_sr, new_sr, zeros = 24, rolloff = 0.945, output_length = None, full = False):
+    return ResampleFrac(old_sr, new_sr, zeros, rolloff).to(x)(x, output_length, full)

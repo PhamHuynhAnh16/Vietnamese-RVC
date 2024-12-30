@@ -7,13 +7,11 @@ import librosa
 import numpy as np
 import soundfile as sf
 
-from logging import Logger
 from pydub import AudioSegment
 
-now_dir = os.getcwd()
-sys.path.append(now_dir)
+sys.path.append(os.getcwd())
 
-from . import spec_utils
+from .spec_utils import normalize
 from main.configs.config import Config
 
 translations = Config().translations
@@ -51,15 +49,12 @@ class CommonSeparator:
     LEAD_VOCAL_STEM_LABEL = "Lead Vocals"
     BV_VOCAL_STEM_LABEL = "Backing Vocals"
     NO_STEM = "No "
-
     STEM_PAIR_MAPPER = {VOCAL_STEM: INST_STEM, INST_STEM: VOCAL_STEM, LEAD_VOCAL_STEM: BV_VOCAL_STEM, BV_VOCAL_STEM: LEAD_VOCAL_STEM, PRIMARY_STEM: SECONDARY_STEM}
-
     NON_ACCOM_STEMS = (VOCAL_STEM, OTHER_STEM, BASS_STEM, DRUM_STEM, GUITAR_STEM, PIANO_STEM, SYNTH_STEM, STRINGS_STEM, WOODWINDS_STEM, BRASS_STEM, WIND_INST_STEM)
 
-
     def __init__(self, config):
-        self.logger: Logger = config.get("logger")
-        self.log_level: int = config.get("log_level")
+        self.logger = config.get("logger")
+        self.log_level = config.get("log_level")
         self.torch_device = config.get("torch_device")
         self.torch_device_cpu = config.get("torch_device_cpu")
         self.torch_device_mps = config.get("torch_device_mps")
@@ -75,13 +70,11 @@ class CommonSeparator:
         self.output_single_stem = config.get("output_single_stem")
         self.invert_using_spec = config.get("invert_using_spec")
         self.sample_rate = config.get("sample_rate")
-
         self.primary_stem_name = None
         self.secondary_stem_name = None
 
         if "training" in self.model_data and "instruments" in self.model_data["training"]:
             instruments = self.model_data["training"]["instruments"]
-
             if instruments:
                 self.primary_stem_name = instruments[0]
                 self.secondary_stem_name = instruments[1] if len(instruments) > 1 else self.secondary_stem(self.primary_stem_name)
@@ -93,7 +86,6 @@ class CommonSeparator:
         self.is_karaoke = self.model_data.get("is_karaoke", False)
         self.is_bv_model = self.model_data.get("is_bv_model", False)
         self.bv_model_rebalance = self.model_data.get("is_bv_model_rebalanced", 0)
-
         self.logger.debug(translations["info"].format(model_name=self.model_name, model_path=self.model_path))
         self.logger.debug(translations["info_2"].format(output_dir=self.output_dir, output_format=self.output_format))
         self.logger.debug(translations["info_3"].format(normalization_threshold=self.normalization_threshold))
@@ -101,7 +93,6 @@ class CommonSeparator:
         self.logger.debug(translations["info_5"].format(invert_using_spec=self.invert_using_spec, sample_rate=self.sample_rate))
         self.logger.debug(translations["info_6"].format(primary_stem_name=self.primary_stem_name, secondary_stem_name=self.secondary_stem_name))
         self.logger.debug(translations["info_7"].format(is_karaoke=self.is_karaoke, is_bv_model=self.is_bv_model, bv_model_rebalance=self.bv_model_rebalance))
-
         self.audio_file_path = None
         self.audio_file_base = None
         self.primary_source = None
@@ -110,9 +101,8 @@ class CommonSeparator:
         self.secondary_stem_output_path = None
         self.cached_sources_map = {}
 
-    def secondary_stem(self, primary_stem: str):
+    def secondary_stem(self, primary_stem):
         primary_stem = primary_stem if primary_stem else self.NO_STEM
-
         return self.STEM_PAIR_MAPPER[primary_stem] if primary_stem in self.STEM_PAIR_MAPPER else primary_stem.replace(self.NO_STEM, "") if self.NO_STEM in primary_stem else f"{self.NO_STEM}{primary_stem}"
 
     def separate(self, audio_file_path):
@@ -121,7 +111,6 @@ class CommonSeparator:
     def final_process(self, stem_path, source, stem_name):
         self.logger.debug(translations["success_process"].format(stem_name=stem_name))
         self.write_audio(stem_path, source)
-
         return {stem_name: source}
 
     def cached_sources_clear(self):
@@ -130,7 +119,6 @@ class CommonSeparator:
     def cached_source_callback(self, model_architecture, model_name=None):
         model, sources = None, None
         mapper = self.cached_sources_map[model_architecture]
-
         for key, value in mapper.items():
             if model_name in key:
                 model = key
@@ -143,7 +131,6 @@ class CommonSeparator:
 
     def prepare_mix(self, mix):
         audio_path = mix
-
         if not isinstance(mix, np.ndarray):
             self.logger.debug(f"{translations['load_audio']}: {mix}")
             mix, sr = librosa.load(mix, mono=False, sr=self.sample_rate)
@@ -168,7 +155,7 @@ class CommonSeparator:
         self.logger.debug(translations["mix_success_2"])
         return mix
 
-    def write_audio(self, stem_path: str, stem_source):
+    def write_audio(self, stem_path, stem_source):
         duration_seconds = librosa.get_duration(filename=self.audio_file_path)
         duration_hours = duration_seconds / 3600
         self.logger.info(translations["duration"].format(duration_hours=f"{duration_hours:.2f}", duration_seconds=f"{duration_seconds:.2f}"))
@@ -180,10 +167,9 @@ class CommonSeparator:
             self.logger.info(translations["write"].format(name="pydub"))
             self.write_audio_pydub(stem_path, stem_source)
 
-    def write_audio_pydub(self, stem_path: str, stem_source):
+    def write_audio_pydub(self, stem_path, stem_source):
         self.logger.debug(f"{translations['write_audio'].format(name='write_audio_pydub')} {stem_path}")
-
-        stem_source = spec_utils.normalize(wave=stem_source, max_peak=self.normalization_threshold)
+        stem_source = normalize(wave=stem_source, max_peak=self.normalization_threshold)
 
         if np.max(np.abs(stem_source)) < 1e-6:
             self.logger.warning(translations["original_not_valid"])
@@ -203,7 +189,6 @@ class CommonSeparator:
         stem_source_interleaved = np.empty((2 * stem_source.shape[0],), dtype=np.int16)
         stem_source_interleaved[0::2] = stem_source[:, 0] 
         stem_source_interleaved[1::2] = stem_source[:, 1]
-
         self.logger.debug(f"{translations['shape_audio_2']}: {stem_source_interleaved.shape}")
 
         try:
@@ -218,15 +203,13 @@ class CommonSeparator:
         if file_format == "m4a": file_format = "mp4"
         elif file_format == "mka": file_format = "matroska"
 
-        bitrate = "320k" if file_format == "mp3" and self.output_bitrate is None else self.output_bitrate
-
         try:
-            audio_segment.export(stem_path, format=file_format, bitrate=bitrate)
+            audio_segment.export(stem_path, format=file_format, bitrate="320k" if file_format == "mp3" and self.output_bitrate is None else self.output_bitrate)
             self.logger.debug(f"{translations['export_success']} {stem_path}")
         except (IOError, ValueError) as e:
             self.logger.error(f"{translations['export_error']}: {e}")
 
-    def write_audio_soundfile(self, stem_path: str, stem_source):
+    def write_audio_soundfile(self, stem_path, stem_source):
         self.logger.debug(f"{translations['write_audio'].format(name='write_audio_soundfile')}: {stem_path}")
 
         if stem_source.shape[1] == 2:
@@ -234,7 +217,6 @@ class CommonSeparator:
             else:
                 stereo_interleaved = np.empty((2 * stem_source.shape[0],), dtype=np.int16)
                 stereo_interleaved[0::2] = stem_source[:, 0]
-
                 stereo_interleaved[1::2] = stem_source[:, 1]
                 stem_source = stereo_interleaved
 
@@ -262,9 +244,7 @@ class CommonSeparator:
         self.logger.info(translations["del_path"])
         self.audio_file_path = None
         self.audio_file_base = None
-        
         self.primary_source = None
         self.secondary_source = None
-
         self.primary_stem_output_path = None
         self.secondary_stem_output_path = None

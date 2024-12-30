@@ -1,8 +1,7 @@
 # Platform-specific requirements section
 pip==23.3
-wheel
-onnxruntime; sys_platform == 'darwin'
-onnxruntime-gpu; sys_platform != 'darwin'
+onnxruntime
+onnxruntime-gpu
 
 # Core dependencies
 PyYAML
@@ -13,7 +12,6 @@ torchaudio==2.3.1
 faiss-cpu==1.7.3
 
 # Machine learning, NLP and deep learning
-omegaconf>=2.0.6; sys_platform == 'darwin' 
 fairseq==0.12.2
 transformers==4.44.2
 scikit-learn
@@ -23,24 +21,19 @@ einops
 pyworld==0.3.4
 librosa==0.9.2
 pydub>=0.25.1
-noisereduce
 praat-parselmouth
 soundfile==0.12.1
 pedalboard
-torchcrepe==0.0.23
-versatile-audio-upscaler==0.0.2
-edge-tts
 
 # Data processing and calculation
 numpy==1.23.5
+numba==0.57.0
 scipy
 pandas
 matplotlib==3.7.2
-julius>=0.2
-diffq>=0.2
 
 # Implementation and web framework
-gradio==4.43.0
+gradio==5.5.0
 fastapi==0.112.0
 starlette==0.37.2
 requests
@@ -52,12 +45,6 @@ yt-dlp==2023.09.24
 ffmpy==0.3.1
 ffmpeg-python>=0.2.0
 beautifulsoup4
-wget
-
-# Jupyter notebook section and Colab interface
-ipywidgets
-jupyter-client
-ipython-genutils
 
 # Tensorboard and ONNX
 tensorboard
@@ -67,10 +54,3 @@ onnx2torch>=1.5
 
 # Cryptography section
 pycryptodome==3.9.6
-
-# Additional dependencies
-local-attention
-numba==0.57.0
-
-# Google Colab Tools
-git+https://github.com/googlecolab/colabtools.git

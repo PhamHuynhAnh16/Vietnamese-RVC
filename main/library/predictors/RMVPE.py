@@ -1,13 +1,12 @@
 import torch
+
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import List
 from librosa.filters import mel
 
-N_MELS = 128
-N_CLASS = 360
+N_MELS, N_CLASS = 128, 360
 
 
 class ConvBlockRes(nn.Module):
@@ -21,8 +20,7 @@ class ConvBlockRes(nn.Module):
         else: self.is_shortcut = False
 
     def forward(self, x):
-        if self.is_shortcut: return self.conv(x) + self.shortcut(x)
-        else: return self.conv(x) + x
+        return self.conv(x) + self.shortcut(x) if self.is_shortcut else self.conv(x) + x
 
 class ResEncoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, n_blocks=1, momentum=0.01):
@@ -35,9 +33,7 @@ class ResEncoderBlock(nn.Module):
             self.conv.append(ConvBlockRes(out_channels, out_channels, momentum))
 
         self.kernel_size = kernel_size
-
-        if self.kernel_size is not None:
-            self.pool = nn.AvgPool2d(kernel_size=kernel_size)
+        if self.kernel_size is not None: self.pool = nn.AvgPool2d(kernel_size=kernel_size)
 
     def forward(self, x):
         for i in range(self.n_blocks):
@@ -54,7 +50,7 @@ class Encoder(nn.Module):
         self.layers = nn.ModuleList()
         self.latent_channels = []
 
-        for i in range(self.n_encoders):
+        for _ in range(self.n_encoders):
             self.layers.append(ResEncoderBlock(in_channels, out_channels, kernel_size, n_blocks, momentum=momentum))
             self.latent_channels.append([out_channels, in_size])
             in_channels = out_channels
@@ -64,8 +60,8 @@ class Encoder(nn.Module):
         self.out_size = in_size
         self.out_channel = out_channels
 
-    def forward(self, x: torch.Tensor):
-        concat_tensors: List[torch.Tensor] = []
+    def forward(self, x):
+        concat_tensors = []
         x = self.bn(x)
 
         for i in range(self.n_encoders):
@@ -87,6 +83,7 @@ class Intermediate(nn.Module):
     def forward(self, x):
         for i in range(self.n_inters):
             x = self.layers[i](x)
+
         return x
 
 class ResDecoderBlock(nn.Module):
@@ -97,12 +94,13 @@ class ResDecoderBlock(nn.Module):
         self.conv1 = nn.Sequential(nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 3), stride=stride, padding=(1, 1), output_padding=out_padding, bias=False), nn.BatchNorm2d(out_channels, momentum=momentum), nn.ReLU())
         self.conv2 = nn.ModuleList()
         self.conv2.append(ConvBlockRes(out_channels * 2, out_channels, momentum))
+
         for _ in range(n_blocks - 1):
             self.conv2.append(ConvBlockRes(out_channels, out_channels, momentum))
 
     def forward(self, x, concat_tensor):
-        x = self.conv1(x)
-        x = torch.cat((x, concat_tensor), dim=1)
+        x = torch.cat((self.conv1(x), concat_tensor), dim=1)
+
         for i in range(self.n_blocks):
             x = self.conv2[i](x)
 
@@ -134,24 +132,17 @@ class DeepUnet(nn.Module):
 
     def forward(self, x):
         x, concat_tensors = self.encoder(x)
-        x = self.intermediate(x)
-        x = self.decoder(x, concat_tensors)
-        return x
+        return self.decoder(self.intermediate(x), concat_tensors)
 
 class E2E(nn.Module):
     def __init__(self, n_blocks, n_gru, kernel_size, en_de_layers=5, inter_layers=4, in_channels=1, en_out_channels=16):
         super(E2E, self).__init__()
         self.unet = DeepUnet(kernel_size, n_blocks, en_de_layers, inter_layers, in_channels, en_out_channels)
         self.cnn = nn.Conv2d(en_out_channels, 3, (3, 3), padding=(1, 1))
-
-        if n_gru: self.fc = nn.Sequential(BiGRU(3 * 128, 256, n_gru), nn.Linear(512, N_CLASS), nn.Dropout(0.25), nn.Sigmoid())
-        else: self.fc = nn.Sequential(nn.Linear(3 * N_MELS, N_CLASS), nn.Dropout(0.25), nn.Sigmoid())
+        self.fc = nn.Sequential(BiGRU(3 * 128, 256, n_gru), nn.Linear(512, N_CLASS), nn.Dropout(0.25), nn.Sigmoid()) if n_gru else nn.Sequential(nn.Linear(3 * N_MELS, N_CLASS), nn.Dropout(0.25), nn.Sigmoid())
 
     def forward(self, mel):
-        mel = mel.transpose(-1, -2).unsqueeze(1)
-        x = self.cnn(self.unet(mel)).transpose(1, 2).flatten(-2)
-        x = self.fc(x)
-        return x
+        return self.fc(self.cnn(self.unet(mel.transpose(-1, -2).unsqueeze(1))).transpose(1, 2).flatten(-2))
 
 class MelSpectrogram(torch.nn.Module):
     def __init__(self, is_half, n_mel_channels, sample_rate, win_length, hop_length, n_fft=None, mel_fmin=0, mel_fmax=None, clamp=1e-5):
@@ -171,14 +162,12 @@ class MelSpectrogram(torch.nn.Module):
 
     def forward(self, audio, keyshift=0, speed=1, center=True):
         factor = 2 ** (keyshift / 12)
-        n_fft_new = int(np.round(self.n_fft * factor))
         win_length_new = int(np.round(self.win_length * factor))
-        hop_length_new = int(np.round(self.hop_length * speed))
-        keyshift_key = str(keyshift) + "_" + str(audio.device)
 
+        keyshift_key = str(keyshift) + "_" + str(audio.device)
         if keyshift_key not in self.hann_window: self.hann_window[keyshift_key] = torch.hann_window(win_length_new).to(audio.device)
 
-        fft = torch.stft(audio, n_fft=n_fft_new, hop_length=hop_length_new, win_length=win_length_new, window=self.hann_window[keyshift_key], center=center, return_complex=True)
+        fft = torch.stft(audio, n_fft=int(np.round(self.n_fft * factor)), hop_length=int(np.round(self.hop_length * speed)), win_length=win_length_new, window=self.hann_window[keyshift_key], center=center, return_complex=True)
         magnitude = torch.sqrt(fft.real.pow(2) + fft.imag.pow(2))
 
         if keyshift != 0:
@@ -186,15 +175,11 @@ class MelSpectrogram(torch.nn.Module):
             resize = magnitude.size(1)
 
             if resize < size: magnitude = F.pad(magnitude, (0, 0, 0, size - resize))
-
             magnitude = magnitude[:, :size, :] * self.win_length / win_length_new
 
         mel_output = torch.matmul(self.mel_basis, magnitude)
-
         if self.is_half: mel_output = mel_output.half()
-
-        log_mel_spec = torch.log(torch.clamp(mel_output, min=self.clamp))
-        return log_mel_spec
+        return torch.log(torch.clamp(mel_output, min=self.clamp))
 
 class RMVPE:
     def __init__(self, model_path, is_half, device=None):
@@ -203,9 +188,7 @@ class RMVPE:
         ckpt = torch.load(model_path, map_location="cpu")
         model.load_state_dict(ckpt)
         model.eval()
-
         if is_half: model = model.half()
-
         self.model = model
         self.resample_kernel = {}
         self.is_half = is_half
@@ -218,33 +201,23 @@ class RMVPE:
     def mel2hidden(self, mel):
         with torch.no_grad():
             n_frames = mel.shape[-1]
-            mel = F.pad(mel, (0, 32 * ((n_frames - 1) // 32 + 1) - n_frames), mode="reflect")
-            hidden = self.model(mel)
-            return hidden[:, :n_frames]
+            return self.model(F.pad(mel, (0, 32 * ((n_frames - 1) // 32 + 1) - n_frames), mode="reflect"))[:, :n_frames]
 
     def decode(self, hidden, thred=0.03):
-        cents_pred = self.to_local_average_cents(hidden, thred=thred)
-        f0 = 10 * (2 ** (cents_pred / 1200))
+        f0 = 10 * (2 ** (self.to_local_average_cents(hidden, thred=thred) / 1200))
         f0[f0 == 10] = 0
         return f0
 
     def infer_from_audio(self, audio, thred=0.03):
-        audio = torch.from_numpy(audio).float().to(self.device).unsqueeze(0)
-        mel = self.mel_extractor(audio, center=True)
-        hidden = self.mel2hidden(mel)
-        hidden = hidden.squeeze(0).cpu().numpy()
-
+        hidden = self.mel2hidden(self.mel_extractor(torch.from_numpy(audio).float().to(self.device).unsqueeze(0), center=True)).squeeze(0).cpu().numpy()
         if self.is_half: hidden = hidden.astype("float32")
-
-        f0 = self.decode(hidden, thred=thred)
-        return f0
+        return self.decode(hidden, thred=thred)
 
     def to_local_average_cents(self, salience, thred=0.05):
         center = np.argmax(salience, axis=1)
         salience = np.pad(salience, ((0, 0), (4, 4)))
         center += 4
-        todo_salience = []
-        todo_cents_mapping = []
+        todo_salience, todo_cents_mapping = [], []
         starts = center - 4
         ends = center + 5
 
@@ -253,12 +226,9 @@ class RMVPE:
             todo_cents_mapping.append(self.cents_mapping[starts[idx] : ends[idx]])
 
         todo_salience = np.array(todo_salience)
-        todo_cents_mapping = np.array(todo_cents_mapping)
-        product_sum = np.sum(todo_salience * todo_cents_mapping, 1)
-        weight_sum = np.sum(todo_salience, 1)
-        devided = product_sum / weight_sum
-        maxx = np.max(salience, axis=1)
-        devided[maxx <= thred] = 0
+
+        devided = np.sum(todo_salience * np.array(todo_cents_mapping), 1) / np.sum(todo_salience, 1)
+        devided[np.max(salience, axis=1) <= thred] = 0
         return devided
 
 class BiGRU(nn.Module):

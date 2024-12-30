@@ -14,17 +14,17 @@ translations = Config().translations
 with open(os.path.join("main", "configs", "config.json"), "r") as f:
     configs = json.load(f)
 
-def launch_tensorboard_pipeline():
-    logging.getLogger("root").setLevel(logging.ERROR)
-    logging.getLogger("tensorboard").setLevel(logging.ERROR)
+def launch_tensorboard():
+    for l in ["root", "tensorboard"]:
+        logging.getLogger(l).setLevel(logging.ERROR)
 
     tb = program.TensorBoard()
     tb.configure(argv=[None, "--logdir", "assets/logs", f"--port={configs["tensorboard_port"]}"])
     url = tb.launch()
 
     print(f"{translations['tensorboard_url']}: {url}")
-    webbrowser.open(url)
+    if "--open" in sys.argv: webbrowser.open(url)
 
     return f"{translations['tensorboard_url']}: {url}"
 
-if __name__ == "__main__": launch_tensorboard_pipeline()
+if __name__ == "__main__": launch_tensorboard()

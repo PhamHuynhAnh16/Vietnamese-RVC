@@ -10,16 +10,16 @@ from distutils.util import strtobool
 from scipy.signal import butter, filtfilt
 from pedalboard import Pedalboard, Chorus, Distortion, Reverb, PitchShift, Delay, Limiter, Gain, Bitcrush, Clipping, Compressor, Phaser
 
-now_dir = os.getcwd()
-sys.path.append(now_dir)
+sys.path.append(os.getcwd())
 
 from main.configs.config import Config
 translations = Config().translations
 
-def parse_arguments() -> tuple:
+def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--output_path", type=str, default="./audios/apply_effects.wav")
+    parser.add_argument("--export_format", type=str, default="wav")
     parser.add_argument("--resample", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--resample_sr", type=int, default=0)
     parser.add_argument("--chorus", type=lambda x: bool(strtobool(x)), default=False)
@@ -71,19 +71,12 @@ def parse_arguments() -> tuple:
     parser.add_argument("--fade_in_out", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--fade_in_duration", type=float, default=2000)
     parser.add_argument("--fade_out_duration", type=float, default=2000)
-    parser.add_argument("--export_format", type=str, default="wav")
+    parser.add_argument("--audio_combination", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--audio_combination_input", type=str)
     
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
-
-def main():
-    args = parse_arguments()
-
-    process_audio(input_path=args.input_path, output_path=args.output_path, resample=args.resample, resample_sr=args.resample_sr, chorus_depth=args.chorus_depth, chorus_rate=args.chorus_rate, chorus_mix=args.chorus_mix, chorus_delay=args.chorus_delay, chorus_feedback=args.chorus_feedback, distortion_drive=args.drive_db, reverb_room_size=args.reverb_room_size, reverb_damping=args.reverb_damping, reverb_wet_level=args.reverb_wet_level, reverb_dry_level=args.reverb_dry_level, reverb_width=args.reverb_width, reverb_freeze_mode=args.reverb_freeze_mode, pitch_shift=args.pitch_shift, delay_seconds=args.delay_seconds, delay_feedback=args.delay_feedback, delay_mix=args.delay_mix, compressor_threshold=args.compressor_threshold, compressor_ratio=args.compressor_ratio, compressor_attack_ms=args.compressor_attack_ms, compressor_release_ms=args.compressor_release_ms, limiter_threshold=args.limiter_threshold, limiter_release=args.limiter_release, gain_db=args.gain_db, bitcrush_bit_depth=args.bitcrush_bit_depth, clipping_threshold=args.clipping_threshold, phaser_rate_hz=args.phaser_rate_hz, phaser_depth=args.phaser_depth, phaser_centre_frequency_hz=args.phaser_centre_frequency_hz, phaser_feedback=args.phaser_feedback, phaser_mix=args.phaser_mix, bass_boost_db=args.bass_boost_db, bass_boost_frequency=args.bass_boost_frequency, treble_boost_db=args.treble_boost_db, treble_boost_frequency=args.treble_boost_frequency, fade_in_duration=args.fade_in_duration, fade_out_duration=args.fade_out_duration, export_format=args.export_format, chorus=args.chorus, distortion=args.distortion, reverb=args.reverb, pitchshift=args.pitchshift, delay=args.delay, compressor=args.compressor, limiter=args.limiter, gain=args.gain, bitcrush=args.bitcrush, clipping=args.clipping, phaser=args.phaser, treble_bass_boost=args.treble_bass_boost, fade_in_out=args.fade_in_out)
-
-
-def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, pitchshift, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out):
+def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, chorus_rate, chorus_mix, chorus_delay, chorus_feedback, distortion_drive, reverb_room_size, reverb_damping, reverb_wet_level, reverb_dry_level, reverb_width, reverb_freeze_mode, pitch_shift, delay_seconds, delay_feedback, delay_mix, compressor_threshold, compressor_ratio, compressor_attack_ms, compressor_release_ms, limiter_threshold, limiter_release, gain_db, bitcrush_bit_depth, clipping_threshold, phaser_rate_hz, phaser_depth, phaser_centre_frequency_hz, phaser_feedback, phaser_mix, bass_boost_db, bass_boost_frequency, treble_boost_db, treble_boost_frequency, fade_in_duration, fade_out_duration, export_format, chorus, distortion, reverb, pitchshift, delay, compressor, limiter, gain, bitcrush, clipping, phaser, treble_bass_boost, fade_in_out, audio_combination, audio_combination_input):
     def bass_boost(audio, gain_db, frequency, sample_rate):
         if gain_db >= 1:
             b, a = butter(4, frequency / (0.5 * sample_rate), btype='low')
@@ -117,7 +110,7 @@ def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, 
         
         audio[start:end] = audio[start:end] * np.linspace(0.0, 1.0, length)
         return audio
-    
+
     if not input_path or not os.path.exists(input_path): 
         print(translations["input_not_valid"])
         sys.exit(1)
@@ -132,7 +125,7 @@ def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, 
         audio, sample_rate = sf.read(input_path)
     except Exception as e:
         raise RuntimeError(translations["errors_loading_audio"].format(e=e))
-    
+
     try:
         board = Pedalboard()
 
@@ -159,12 +152,19 @@ def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, 
             processed_audio = fade_out_effect(processed_audio, sample_rate, fade_out_duration)
             
         if resample_sr != sample_rate and resample_sr > 0 and resample:
-            processed_audio = librosa.resample(processed_audio, orig_sr=sample_rate, target_sr=resample_sr)
-            sample_rate = resample_sr
+            target_sr = min([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000], key=lambda x: abs(x - resample_sr))
+            processed_audio = librosa.resample(processed_audio, orig_sr=sample_rate, target_sr=target_sr)
+            sample_rate = target_sr
+
+        sf.write(output_path.replace("wav", export_format), processed_audio, sample_rate, format=export_format)
+
+        if audio_combination: 
+            from pydub import AudioSegment
+            AudioSegment.from_file(audio_combination_input).overlay(AudioSegment.from_file(output_path)).export(output_path, format=export_format)
     except Exception as e:
         raise RuntimeError(translations["apply_error"].format(e=e))
-
-    sf.write(output_path.replace(".wav", f".{export_format}"), processed_audio, sample_rate, format=export_format)
     return output_path
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    args = parse_arguments()
+    process_audio(input_path=args.input_path, output_path=args.output_path, resample=args.resample, resample_sr=args.resample_sr, chorus_depth=args.chorus_depth, chorus_rate=args.chorus_rate, chorus_mix=args.chorus_mix, chorus_delay=args.chorus_delay, chorus_feedback=args.chorus_feedback, distortion_drive=args.drive_db, reverb_room_size=args.reverb_room_size, reverb_damping=args.reverb_damping, reverb_wet_level=args.reverb_wet_level, reverb_dry_level=args.reverb_dry_level, reverb_width=args.reverb_width, reverb_freeze_mode=args.reverb_freeze_mode, pitch_shift=args.pitch_shift, delay_seconds=args.delay_seconds, delay_feedback=args.delay_feedback, delay_mix=args.delay_mix, compressor_threshold=args.compressor_threshold, compressor_ratio=args.compressor_ratio, compressor_attack_ms=args.compressor_attack_ms, compressor_release_ms=args.compressor_release_ms, limiter_threshold=args.limiter_threshold, limiter_release=args.limiter_release, gain_db=args.gain_db, bitcrush_bit_depth=args.bitcrush_bit_depth, clipping_threshold=args.clipping_threshold, phaser_rate_hz=args.phaser_rate_hz, phaser_depth=args.phaser_depth, phaser_centre_frequency_hz=args.phaser_centre_frequency_hz, phaser_feedback=args.phaser_feedback, phaser_mix=args.phaser_mix, bass_boost_db=args.bass_boost_db, bass_boost_frequency=args.bass_boost_frequency, treble_boost_db=args.treble_boost_db, treble_boost_frequency=args.treble_boost_frequency, fade_in_duration=args.fade_in_duration, fade_out_duration=args.fade_out_duration, export_format=args.export_format, chorus=args.chorus, distortion=args.distortion, reverb=args.reverb, pitchshift=args.pitchshift, delay=args.delay, compressor=args.compressor, limiter=args.limiter, gain=args.gain, bitcrush=args.bitcrush, clipping=args.clipping, phaser=args.phaser, treble_bass_boost=args.treble_bass_boost, fade_in_out=args.fade_in_out, audio_combination=args.audio_combination, audio_combination_input=args.audio_combination_input)

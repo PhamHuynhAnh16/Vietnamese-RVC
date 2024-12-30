@@ -2,11 +2,8 @@ import time
 import threading
 import subprocess
 
-from typing import List, Union
-
-
 class Channel:
-    def __init__(self, source, destination, sync_deletions=False, every=60, exclude: Union[str, List, None] = None):
+    def __init__(self, source, destination, sync_deletions=False, every=60, exclude = None):
         self.source = source
         self.destination = destination
         self.event = threading.Event()
@@ -14,18 +11,15 @@ class Channel:
         self.sync_deletions = sync_deletions
         self.every = every
 
-
         if not exclude: exclude = []
-        if isinstance(exclude,str): exclude = [exclude]
+        if isinstance(exclude, str): exclude = [exclude]
 
         self.exclude = exclude
         self.command = ['rsync', '-aP']
 
-
     def alive(self):
         if self.syncing_thread.is_alive(): return True
         else: return False
-
 
     def _sync(self):
         command = self.command
@@ -41,7 +35,6 @@ class Channel:
             subprocess.run(command)
             time.sleep(self.every)
 
-
     def copy(self):
         command = self.command
 
@@ -54,7 +47,6 @@ class Channel:
         subprocess.run(command)
 
         return True
-    
 
     def start(self):
         if self.syncing_thread.is_alive():
@@ -65,9 +57,7 @@ class Channel:
         if self.syncing_thread._started.is_set(): self.syncing_thread = threading.Thread(target=self._sync, args=())
 
         self.syncing_thread.start()
-
         return self.alive()
-
 
     def stop(self):
         if self.alive():

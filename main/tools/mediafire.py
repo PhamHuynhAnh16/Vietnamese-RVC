@@ -3,6 +3,7 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 
+
 def Mediafire_Download(url, output=None, filename=None):
     if not filename: filename = url.split('/')[-2]
     if not output: output = os.path.dirname(os.path.realpath(__file__))
@@ -15,8 +16,7 @@ def Mediafire_Download(url, output=None, filename=None):
         with requests.get(BeautifulSoup(sess.get(url).content, "html.parser").find(id="downloadButton").get("href"), stream=True) as r:
             r.raise_for_status()
             with open(output_file, "wb") as f:
-                total_length = r.headers.get('content-length')
-                total_length = int(total_length)
+                total_length = int(r.headers.get('content-length'))
                 download_progress = 0
 
                 for chunk in r.iter_content(chunk_size=1024):
