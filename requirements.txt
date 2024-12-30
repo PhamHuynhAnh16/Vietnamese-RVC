@@ -33,7 +33,7 @@ pandas
 matplotlib==3.7.2
 
 # Implementation and web framework
-gradio==5.5.0
+gradio==4.43.0
 fastapi==0.112.0
 starlette==0.37.2
 requests
