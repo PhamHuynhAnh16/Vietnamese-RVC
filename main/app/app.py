@@ -161,12 +161,11 @@ def change_download_pretrained_choices(select):
     return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
 
 def get_sid(model):
-    if model:
-        try:
-            speakers_id = torch.load(os.path.join("assets", "weights", model), map_location="cpu").get("speakers_id")
-            return {"choices": list(range(speakers_id)) if speakers_id else [0], "value": 0, "__type__": "update"} 
-        except:
-            return {"choices": [0], "value": 0, "__type__": "update"}
+    try:
+        speakers_id = torch.load(os.path.join("assets", "weights", model), map_location="cpu").get("speakers_id")
+        return {"choices": list(range(speakers_id)) if speakers_id else [0], "value": 0, "__type__": "update"} 
+    except:
+        return {"choices": [0], "value": 0, "__type__": "update"}
 
 def get_index(model):
     return {"value": next((f for f in [os.path.join(root, name) for root, _, files in os.walk(os.path.join("assets", "logs"), topdown=False) for name in files if name.endswith(".index")] if model.split(".")[0] in f), ""), "__type__": "update"}
