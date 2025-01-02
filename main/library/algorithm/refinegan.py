@@ -1,3 +1,4 @@
+import math
 import torch
 import numpy as np
 import torch.utils.checkpoint as checkpoint
@@ -6,6 +7,41 @@ from torch.nn.utils.parametrizations import weight_norm
 from torch.nn.utils.parametrize import remove_parametrizations
 
 from .commons import get_padding
+
+def kaiser_sinc_filter1d(cutoff, half_width, kernel_size): 
+    half_size = kernel_size // 2
+    A = 2.285 * (half_size - 1) * math.pi * (4 * half_width) + 7.95
+
+    if A > 50.0: beta = 0.1102 * (A - 8.7)
+    elif A >= 21.0: beta = 0.5842 * (A - 21) ** 0.4 + 0.07886 * (A - 21.0)
+    else: beta = 0.0
+
+    time = (torch.arange(-half_size, half_size) + 0.5) if kernel_size % 2 == 0 else (torch.arange(kernel_size) - half_size)
+
+    if cutoff == 0: filter_ = torch.zeros_like(time)
+    else:
+        filter_ = 2 * cutoff * torch.kaiser_window(kernel_size, beta=beta, periodic=False) * torch.sinc(2 * cutoff * time)
+        filter_ /= filter_.sum()
+        filter = filter_.view(1, 1, kernel_size)
+
+    return filter
+
+class UpSample1d(torch.nn.Module):
+    def __init__(self, ratio=2, kernel_size=None):
+        super().__init__()
+        self.ratio = ratio
+        kernel_size = int(6 * ratio // 2) * 2 if kernel_size is None else kernel_size
+        self.stride = ratio
+        self.pad = kernel_size // ratio - 1
+        self.pad_left = self.pad * self.stride + (kernel_size - self.stride) // 2
+        self.pad_right = self.pad * self.stride + (kernel_size - self.stride + 1) // 2
+        filter = kaiser_sinc_filter1d(cutoff=0.5 / ratio, half_width=0.6 / ratio, kernel_size=kernel_size)
+        self.register_buffer("filter", filter)
+
+    def forward(self, x):
+        _, C, _ = x.shape
+        x = self.ratio * torch.nn.functional.conv_transpose1d(torch.nn.functional.pad(x, (self.pad, self.pad), mode="replicate"), self.filter.expand(C, -1, -1), stride=self.stride, groups=C)
+        return x[..., self.pad_left : -self.pad_right]  
 
 class ResBlock(torch.nn.Module):
     def __init__(self, *, in_channels, out_channels, kernel_size = 7, dilation = (1, 3, 5), leaky_relu_slope = 0.2):
@@ -35,13 +71,14 @@ class ResBlock(torch.nn.Module):
             m.bias.data.fill_(0.0)
 
 class AdaIN(torch.nn.Module):
-    def __init__(self, *, channels, leaky_relu_slope = 0.2):
+    def __init__(self, *, channels, leaky_relu_slope = 0.2, use_noise_gen = False):
         super().__init__()
+        self.use_noise_gen = use_noise_gen
         self.weight = torch.nn.Parameter(torch.ones(channels))
         self.activation = torch.nn.LeakyReLU(leaky_relu_slope)
 
     def forward(self, x):
-        return self.activation(x + (torch.randn_like(x) * self.weight[None, :, None]))
+        return self.activation(x + torch.randn_like(x) * self.weight[None, :, None]) if self.use_noise_gen else self.activation(x)
 
 class ParallelResBlock(torch.nn.Module):
     def __init__(self, *, in_channels, out_channels, kernel_sizes = (3, 7, 11), dilation = (1, 3, 5), leaky_relu_slope = 0.2):
@@ -76,11 +113,14 @@ class SineGenerator(torch.nn.Module):
         rad_values = (f0_values / self.sampling_rate) % 1
         rand_ini = torch.rand(f0_values.shape[0], f0_values.shape[2], device=f0_values.device)
         rand_ini[:, 0] = 0
+        
         rad_values[:, 0, :] = rad_values[:, 0, :] + rand_ini
         tmp_over_one = torch.cumsum(rad_values, 1) % 1
         tmp_over_one_idx = (tmp_over_one[:, 1:, :] - tmp_over_one[:, :-1, :]) < 0
+
         cumsum_shift = torch.zeros_like(rad_values)
         cumsum_shift[:, 1:, :] = tmp_over_one_idx * -1.0
+
         return torch.sin(torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi)
 
     def forward(self, f0):
@@ -135,7 +175,7 @@ class RefineGANGenerator(torch.nn.Module):
 
         for rate in upsample_rates:
             new_channels = channels // 2
-            self.upsample_blocks.append(torch.nn.Upsample(scale_factor=rate, mode="linear"))
+            self.upsample_blocks.append(UpSample1d(rate))
             self.upsample_conv_blocks.append(ParallelResBlock(in_channels=channels + channels // 4, out_channels=new_channels, kernel_sizes=(3, 7, 11), dilation=(1, 3, 5), leaky_relu_slope=leaky_relu_slope))
             channels = new_channels
 

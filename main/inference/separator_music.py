@@ -45,13 +45,11 @@ def parse_arguments():
     parser.add_argument("--mdx_batch_size", type=int, default=1)
     parser.add_argument("--clean_audio", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--clean_strength", type=float, default=0.7)
-    parser.add_argument("--backing_denoise", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--model_name", type=str, default="HT-Normal")
     parser.add_argument("--kara_model", type=str, default="Version-1")
     parser.add_argument("--backing", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--mdx_denoise", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--reverb", type=lambda x: bool(strtobool(x)), default=False)
-    parser.add_argument("--reverb_denoise", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--backing_reverb", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--sample_rate", type=int, default=44100)
 
@@ -76,13 +74,11 @@ def main():
         batch_size = args.mdx_batch_size
         clean_audio = args.clean_audio
         clean_strength = args.clean_strength
-        backing_denoise = args.backing_denoise
         model_name = args.model_name
         kara_model = args.kara_model
         backing = args.backing
         mdx_denoise = args.mdx_denoise
         reverb = args.reverb
-        reverb_denoise = args.reverb_denoise
         backing_reverb = args.backing_reverb
         sample_rate = args.sample_rate
 
@@ -103,22 +99,20 @@ def main():
         if clean_audio: logger.debug(f"{translations['clear_audio']}: {clean_audio}")
         if clean_audio: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
         logger.debug(f"{translations['modelname']}: {model_name}")
-        if backing: logger.debug(f"{translations['denoise_backing']}: {backing_denoise}")
         if backing: logger.debug(f"{translations['backing_model_ver']}: {kara_model}")
         if backing: logger.debug(f"{translations['separator_backing']}: {backing}")
         logger.debug(f"{translations['denoise_mdx']}: {mdx_denoise}")
         logger.debug(f"Hop length: {hop_length}")
         logger.debug(f"{translations['batch_size']}: {batch_size}")
         if reverb: logger.debug(f"{translations['dereveb_audio']}: {reverb}")
-        if reverb: logger.debug(f"{translations['denoise_dereveb']}: {reverb_denoise}")
         if reverb: logger.debug(f"{translations['dereveb_backing']}: {backing_reverb}")
         logger.debug(f"{translations['sr']}: {sample_rate}")
 
         if model_name in ["HT-Tuned", "HT-Normal", "HD_MMI", "HT_6S"]: vocals, instruments = separator_music_demucs(input_path, output_path, export_format, shifts, overlap, segments_size, model_name, sample_rate)
         else: vocals, instruments = separator_music_mdx(input_path, output_path, export_format, segments_size, overlap, mdx_denoise, model_name, hop_length, batch_size, sample_rate)
 
-        if backing: main_vocals, backing_vocals = separator_backing(vocals, output_path, export_format, segments_size, overlap, backing_denoise, kara_model, hop_length, batch_size, sample_rate)
-        if reverb: vocals_no_reverb, main_vocals_no_reverb, backing_vocals_no_reverb = separator_reverb(output_path, export_format, segments_size, overlap, reverb_denoise, reverb, backing_reverb, hop_length, batch_size, sample_rate)
+        if backing: main_vocals, backing_vocals = separator_backing(vocals, output_path, export_format, segments_size, overlap, mdx_denoise, kara_model, hop_length, batch_size, sample_rate)
+        if reverb: vocals_no_reverb, main_vocals_no_reverb, backing_vocals_no_reverb = separator_reverb(output_path, export_format, segments_size, overlap, mdx_denoise, reverb, backing_reverb, hop_length, batch_size, sample_rate)
 
         original_output = os.path.join(output_path, f"Original_Vocals_No_Reverb.{export_format}") if reverb else os.path.join(output_path, f"Original_Vocals.{export_format}")
         main_output = os.path.join(output_path, f"Main_Vocals_No_Reverb.{export_format}") if reverb and backing_reverb else os.path.join(output_path, f"Main_Vocals.{export_format}")
@@ -142,7 +136,6 @@ def main():
             return original_output, instruments, main_output, backing_output
     except Exception as e:
         logger.error(f"{translations['separator_error']}: {e}")
-
         import traceback
         logger.debug(traceback.format_exc())
     
@@ -163,10 +156,8 @@ def separator_music_demucs(input, output, format, shifts, overlap, segments_size
     for i in [f"Original_Vocals.{format}", f"Instruments.{format}"]:
         if os.path.exists(os.path.join(output, i)): os.remove(os.path.join(output, i))
 
-    model = demucs_models.get(demucs_model)
-    segment_size = segments_size / 2
     logger.info(f"{translations['separator_process_2']}...")
-    demucs_output = separator_main(audio_file=input, model_filename=model, output_format=format, output_dir=output, demucs_segment_size=segment_size, demucs_shifts=shifts, demucs_overlap=overlap, sample_rate=sample_rate)
+    demucs_output = separator_main(audio_file=input, model_filename=demucs_models.get(demucs_model), output_format=format, output_dir=output, demucs_segment_size=(segments_size / 2), demucs_shifts=shifts, demucs_overlap=overlap, sample_rate=sample_rate)
     
     for f in demucs_output:
         path = os.path.join(output, f)
@@ -302,7 +293,6 @@ def separator_main(audio_file=None, model_filename="UVR-MDX-NET_Main_340.onnx", 
         return separator.separate(audio_file)
     except:
         logger.debug(translations["default_setting"])
-
         separator = Separator(logger=logger, log_formatter=file_formatter, log_level=logging.INFO, output_dir=output_dir, output_format=output_format, output_bitrate=None, normalization_threshold=0.9, output_single_stem=None, invert_using_spec=False, sample_rate=44100, mdx_params={"hop_length": 1024, "segment_size": 256, "overlap": 0.25, "batch_size": 1, "enable_denoise": mdx_enable_denoise}, demucs_params={"segment_size": 128, "shifts": 2, "overlap": 0.25, "segments_enabled": True})
         separator.load_model(model_filename=model_filename)
         return separator.separate(audio_file)

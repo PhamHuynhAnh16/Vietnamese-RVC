@@ -29,8 +29,7 @@ from librosa.filters import mel as librosa_mel_fn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.nn.utils.parametrizations import spectral_norm, weight_norm
 
-current_dir = os.getcwd()
-sys.path.append(current_dir)
+sys.path.append(os.getcwd())
 
 from main.configs.config import Config
 from main.library.algorithm.residuals import LRELU_SLOPE
@@ -92,7 +91,6 @@ def parse_arguments():
     parser.add_argument("--cleanup", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--cache_data_in_gpu", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--model_author", type=str)
-    parser.add_argument("--cache_data_in_gpu", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--vocoder", type=str, default="Default")
     parser.add_argument("--checkpointing", type=lambda x: bool(strtobool(x)), default=False)
 
@@ -101,7 +99,7 @@ def parse_arguments():
 args = parse_arguments()
 model_name, save_every_epoch, total_epoch, pretrainG, pretrainD, version, gpus, batch_size, sample_rate, pitch_guidance, save_only_latest, save_every_weights, cache_data_in_gpu, overtraining_detector, overtraining_threshold, cleanup, model_author, vocoder, checkpointing = args.model_name, args.save_every_epoch, args.total_epoch, args.g_pretrained_path, args.d_pretrained_path, args.rvc_version, args.gpu, args.batch_size, args.sample_rate, args.pitch_guidance, args.save_only_latest, args.save_every_weights, args.cache_data_in_gpu, args.overtraining_detector, args.overtraining_threshold, args.cleanup, args.model_author, args.vocoder, args.checkpointing
 
-experiment_dir = os.path.join(current_dir, "assets", "logs", model_name)
+experiment_dir = os.path.join("assets", "logs", model_name)
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
 os.environ["CUDA_VISIBLE_DEVICES"] = gpus.replace("-", ",")
@@ -144,10 +142,10 @@ logger.debug(f"{translations['save_every_weights']}: {save_every_weights}")
 logger.debug(f"{translations['cache_in_gpu']}: {cache_data_in_gpu}")
 logger.debug(f"{translations['overtraining_detector']}: {overtraining_detector}")
 logger.debug(f"{translations['threshold']}: {overtraining_threshold}")
-logger.debug(f"{translations['cleanup']}: {cleanup}")
+logger.debug(f"{translations['cleanup_training']}: {cleanup}")
 logger.debug(f"{translations['memory_efficient_training']}: {checkpointing}")
 if not model_author: logger.debug(translations["model_author"].format(model_author=model_author))
-if vocoder != "Default": logger.debug(f"{translations["vocoder"]}: {vocoder}")
+if vocoder != "Default": logger.debug(f"{translations['vocoder']}: {vocoder}")
 
 def main():
     global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch, model_author, vocoder, checkpointing
@@ -753,7 +751,6 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_dir, epoch, step, versio
         pth_file_old_version_path = os.path.join(model_dir_path, f"{pth_file}_old_version.pth")
 
         import hashlib
-
         opt = OrderedDict(weight={key: value.half() for key, value in ckpt.items() if "enc_q" not in key})
         opt["config"] = [
             hps.data.filter_length // 2 + 1,
@@ -807,13 +804,11 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
 
     train_dataset = TextAudioLoaderMultiNSFsid(config.data)
     train_loader = tdata.DataLoader(train_dataset, num_workers=4, shuffle=False, pin_memory=True, collate_fn=TextAudioCollateMultiNSFsid(), batch_sampler=DistributedBucketSampler(train_dataset, batch_size * n_gpus, [100, 200, 300, 400, 500, 600, 700, 800, 900], num_replicas=n_gpus, rank=rank, shuffle=True), persistent_workers=True, prefetch_factor=8)
-
     net_g = Synthesizer(config.data.filter_length // 2 + 1, config.train.segment_size // config.data.hop_length, **config.model, use_f0=pitch_guidance == True, is_half=config.train.fp16_run and device.type == "cuda", sr=sample_rate, vocoder=vocoder, checkpointing=checkpointing)
     net_d = MultiPeriodDiscriminator(version, config.model.use_spectral_norm, checkpointing=checkpointing)
 
     if torch.cuda.is_available(): net_g, net_d = net_g.cuda(rank), net_d.cuda(rank)
     else: net_g.to(device); net_d.to(device)
-
     optim_g, optim_d = torch.optim.AdamW(net_g.parameters(), config.train.learning_rate, betas=config.train.betas, eps=config.train.eps), torch.optim.AdamW(net_d.parameters(), config.train.learning_rate, betas=config.train.betas, eps=config.train.eps)
     net_g, net_d = (DDP(net_g, device_ids=[rank]), DDP(net_d, device_ids=[rank])) if torch.cuda.is_available() else (DDP(net_g), DDP(net_d))
 
@@ -874,7 +869,6 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
 
     if device.type == "cuda" and cache_data_in_gpu:
         data_iterator = cache
-
         if cache == []:
             for batch_idx, info in enumerate(train_loader):
                 cache.append((batch_idx, [tensor.cuda(rank, non_blocking=True) for tensor in info]))
@@ -922,7 +916,6 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
                     loss_fm = feature_loss(fmap_r, fmap_g)
                     loss_gen, losses_gen = generator_loss(y_d_hat_g)
                     loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
-
                     if loss_gen_all < lowest_value["value"]:
                         lowest_value["value"] = loss_gen_all
                         lowest_value["step"] = global_step
@@ -977,11 +970,9 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, loaders, writers,
 
     def check_overtraining(smoothed_loss_history, threshold, epsilon=0.004):
         if len(smoothed_loss_history) < threshold + 1: return False
-
         for i in range(-threshold, -1):
             if smoothed_loss_history[i + 1] > smoothed_loss_history[i]: return True
             if abs(smoothed_loss_history[i + 1] - smoothed_loss_history[i]) >= epsilon: return False
-
         return True
 
     def update_exponential_moving_average(smoothed_loss_history, new_value, smoothing=0.987):
@@ -1075,6 +1066,5 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         logger.error(f"{translations['training_error']} {e}")
-
         import traceback
         logger.debug(traceback.format_exc())

@@ -41,7 +41,6 @@ def parse_arguments():
     parser.add_argument("--sample_rate", type=int, default=44100)
     parser.add_argument("--clean_dataset", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--clean_strength", type=float, default=0.7)
-    parser.add_argument("--separator_music", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--separator_reverb", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--kim_vocal_version", type=int, default=2)
     parser.add_argument("--overlap", type=float, default=0.25)
@@ -61,16 +60,13 @@ def main():
         pid_file.write(str(os.getpid()))
 
     args = parse_arguments()
-    input_audio, output_dataset, sample_rate, clean_dataset, clean_strength, separator_music, separator_reverb, kim_vocal_version, overlap, segments_size, hop_length, batch_size, denoise_mdx, skip, skip_start_audios, skip_end_audios = args.input_audio, args.output_dataset, args.sample_rate, args.clean_dataset, args.clean_strength, args.separator_music, args.separator_reverb, args.kim_vocal_version, args.overlap, args.segments_size, args.mdx_hop_length, args.mdx_batch_size, args.denoise_mdx, args.skip, args.skip_start_audios, args.skip_end_audios
-
+    input_audio, output_dataset, sample_rate, clean_dataset, clean_strength, separator_reverb, kim_vocal_version, overlap, segments_size, hop_length, batch_size, denoise_mdx, skip, skip_start_audios, skip_end_audios = args.input_audio, args.output_dataset, args.sample_rate, args.clean_dataset, args.clean_strength, args.separator_reverb, args.kim_vocal_version, args.overlap, args.segments_size, args.mdx_hop_length, args.mdx_batch_size, args.denoise_mdx, args.skip, args.skip_start_audios, args.skip_end_audios
     logger.debug(f"{translations['audio_path']}: {input_audio}")
     logger.debug(f"{translations['output_path']}: {output_dataset}")
     logger.debug(f"{translations['sr']}: {sample_rate}")
     logger.debug(f"{translations['clear_dataset']}: {clean_dataset}")
     if clean_dataset: logger.debug(f"{translations['clean_strength']}: {clean_strength}")
-    logger.debug(f"{translations['separator_music']}: {separator_music}")
     logger.debug(f"{translations['dereveb_audio']}: {separator_reverb}")
-    if separator_music: logger.debug(f"{translations['training_version']}: {kim_vocal_version}")
     logger.debug(f"{translations['segments_size']}: {segments_size}")
     logger.debug(f"{translations['overlap']}: {overlap}")
     logger.debug(f"Hop length: {hop_length}")
@@ -80,7 +76,6 @@ def main():
     if skip: logger.debug(f"{translations['skip_start']}: {skip_start_audios}")
     if skip: logger.debug(f"{translations['skip_end']}: {skip_end_audios}")
     if kim_vocal_version not in [1, 2]: raise ValueError(translations["version_not_valid"])
-    if separator_reverb and not separator_music: raise ValueError(translations["create_dataset_value_not_valid"])
 
     start_time = time.time()
 
@@ -108,16 +103,14 @@ def main():
                     skip_start(audio, skip_start_audio)
                     skip_end(audio, skip_end_audio)
 
-        if separator_music:
-            separator_paths = []
+        separator_paths = []
 
-            for audio in paths:
-                vocals = separator_music_main(audio, dataset_temp, segments_size, overlap, denoise_mdx, kim_vocal_version, hop_length, batch_size, sample_rate)
-                if separator_reverb: vocals = separator_reverb_audio(vocals, dataset_temp, segments_size, overlap, denoise_mdx, hop_length, batch_size, sample_rate)
-                separator_paths.append(vocals)
-            
-            paths = separator_paths
-
+        for audio in paths:
+            vocals = separator_music_main(audio, dataset_temp, segments_size, overlap, denoise_mdx, kim_vocal_version, hop_length, batch_size, sample_rate)
+            if separator_reverb: vocals = separator_reverb_audio(vocals, dataset_temp, segments_size, overlap, denoise_mdx, hop_length, batch_size, sample_rate)
+            separator_paths.append(vocals)
+        
+        paths = separator_paths
         processed_paths = []
 
         for audio in paths:
@@ -259,8 +252,6 @@ def separator_music_main(input, output, segments_size, overlap, denoise, version
     return rename_file
 
 def separator_reverb_audio(input, output, segments_size, overlap, denoise, hop_length, batch_size, sample_rate):
-    reverb_models = "Reverb_HQ_By_FoxJoy.onnx"
-    
     if not os.path.exists(input): 
         logger.warning(translations["input_not_valid"])
         return None
@@ -270,7 +261,7 @@ def separator_reverb_audio(input, output, segments_size, overlap, denoise, hop_l
         return None
 
     logger.info(f"{translations['dereverb']}: {input}...")
-    output_dereverb = separator_main(audio_file=input, model_filename=reverb_models, output_format="wav", output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=hop_length, mdx_hop_length=batch_size, mdx_enable_denoise=denoise, sample_rate=sample_rate)
+    output_dereverb = separator_main(audio_file=input, model_filename="Reverb_HQ_By_FoxJoy.onnx", output_format="wav", output_dir=output, mdx_segment_size=segments_size, mdx_overlap=overlap, mdx_batch_size=hop_length, mdx_hop_length=batch_size, mdx_enable_denoise=denoise, sample_rate=sample_rate)
 
     for f in output_dereverb:
         path = os.path.join(output, f)
@@ -292,7 +283,6 @@ def separator_main(audio_file=None, model_filename="Kim_Vocal_1.onnx", output_fo
         return separator.separate(audio_file)
     except:
         logger.debug(translations["default_setting"])
-
         separator = Separator(logger=logger, log_formatter=file_formatter, log_level=logging.INFO, output_dir=output_dir, output_format=output_format, output_bitrate=None, normalization_threshold=0.9, output_single_stem=None, invert_using_spec=False, sample_rate=44100, mdx_params={"hop_length": 1024, "segment_size": 256, "overlap": 0.25, "batch_size": 1, "enable_denoise": mdx_enable_denoise})
         separator.load_model(model_filename=model_filename)
         return separator.separate(audio_file)
