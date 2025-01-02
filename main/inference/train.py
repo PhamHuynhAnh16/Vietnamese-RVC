@@ -147,7 +147,7 @@ logger.debug(f"{translations['threshold']}: {overtraining_threshold}")
 logger.debug(f"{translations['cleanup']}: {cleanup}")
 logger.debug(f"{translations['memory_efficient_training']}: {checkpointing}")
 if not model_author: logger.debug(translations["model_author"].format(model_author=model_author))
-if vocoder != "Default": logger.debug(f"{translations["vocoder"]}: {vocoder}")
+if vocoder != "Default": logger.debug(f"{translations['vocoder']}: {vocoder}")
 
 def main():
     global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch, model_author, vocoder, checkpointing
