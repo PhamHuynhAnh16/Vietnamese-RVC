@@ -79,8 +79,8 @@ def main():
                 sys.exit(1)
             else:
                 for audio, skip_start_audio, skip_end_audio in zip(paths, skip_start_audios, skip_end_audios):
-                    skip_start(audio, skip_start_audio)
-                    skip_end(audio, skip_end_audio)
+                    skip_start(audio, int(skip_start_audio))
+                    skip_end(audio, int(skip_end_audio))
 
         separator_paths = []
 
@@ -88,10 +88,8 @@ def main():
             vocals = separator_music_main(audio, dataset_temp, segments_size, overlap, denoise_mdx, kim_vocal_version, hop_length, batch_size, sample_rate)
             if separator_reverb: vocals = separator_reverb_audio(vocals, dataset_temp, segments_size, overlap, denoise_mdx, hop_length, batch_size, sample_rate)
             separator_paths.append(vocals)
-        
-        paths = separator_paths
 
-        for audio_path in paths:
+        for audio_path in separator_paths:
             data, sample_rate = read(audio_path)
             data = librosa.to_mono(data.T)
             
@@ -105,7 +103,7 @@ def main():
         import traceback
         logger.error(traceback.format_exc())
     finally:
-        for audio in paths:
+        for audio in separator_paths:
             shutil.move(audio, output_dataset)
 
         if os.path.exists(dataset_temp): shutil.rmtree(dataset_temp, ignore_errors=True)

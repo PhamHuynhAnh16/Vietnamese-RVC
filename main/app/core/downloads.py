@@ -119,7 +119,7 @@ def download_pretrained_model(choices, model, sample_rate):
             os.remove(file)
 
         gr_info(translations["success"])
-        return translations["success"], None
+        return translations["success"]
     elif choices == translations["download_url"]:
         pretrain_is_zip = model.endswith(".zip") or model.endswith(".zip?download=true") or sample_rate.endswith(".zip") or sample_rate.endswith(".zip?download=true")
         urls = []
