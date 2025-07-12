@@ -17,7 +17,7 @@ def f0_extract(audio, f0_method, f0_onnx):
         gr_warning(translations["input_not_valid"])
         return [None]*2
 
-    check_assets(f0_method, None, f0_onnx, None)
+    check_assets(f0_method, "", f0_onnx, "")
 
     f0_path = os.path.join(configs["f0_path"], os.path.splitext(os.path.basename(audio))[0])
     image_path = os.path.join(f0_path, "f0.png")

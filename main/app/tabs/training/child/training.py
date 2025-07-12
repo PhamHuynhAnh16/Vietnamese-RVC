@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.process import zip_file
 from main.app.core.training import preprocess, extract, create_index, training
-from main.app.variables import translations, model_name, index_path, method_f0, embedders_mode, embedders_model, pretrainedD, pretrainedG, config
+from main.app.variables import translations, model_name, index_path, method_f0, embedders_mode, embedders_model, pretrainedD, pretrainedG, config, file_types
 from main.app.core.ui import gr_warning, visible, unlock_f0, hoplength_show, change_models_choices, get_gpu_info, visible_embedders, pitch_guidance_lock, vocoders_lock, unlock_ver, unlock_vocoder, change_pretrained_choices, gpu_number_str, shutil_move
 
 def training_model_tab():
@@ -31,7 +31,7 @@ def training_model_tab():
                         clean_dataset_strength = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.7, step=0.1, interactive=True, visible=clean_dataset.value)
                 with gr.Column():
                     preprocess_button = gr.Button(translations["preprocess_button"], scale=2)
-                    upload_dataset = gr.Files(label=translations["drop_audio"], file_types=[".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"], visible=upload.value)
+                    upload_dataset = gr.Files(label=translations["drop_audio"], file_types=file_types, visible=upload.value)
                     preprocess_info = gr.Textbox(label=translations["preprocess_info"], value="", interactive=False)
         with gr.Column():
             with gr.Row():

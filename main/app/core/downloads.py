@@ -18,7 +18,10 @@ from main.app.variables import logger, translations, model_options, configs
 from main.app.core.process import move_files_from_directory, fetch_pretrained_data, extract_name_model
 
 def download_url(url):
-    if not url: return gr_warning(translations["provide_url"])
+    if not url: 
+        gr_warning(translations["provide_url"])
+        return [None]*3
+
     if not os.path.exists(configs["audios_path"]): os.makedirs(configs["audios_path"], exist_ok=True)
 
     with warnings.catch_warnings():
@@ -118,22 +121,37 @@ def download_pretrained_model(choices, model, sample_rate):
         gr_info(translations["success"])
         return translations["success"], None
     elif choices == translations["download_url"]:
-        if not model: return gr_warning(translations["provide_pretrain"].format(dg="D"))
-        if not sample_rate: return gr_warning(translations["provide_pretrain"].format(dg="G"))
+        pretrain_is_zip = model.endswith(".zip") or model.endswith(".zip?download=true") or sample_rate.endswith(".zip") or sample_rate.endswith(".zip?download=true")
+        urls = []
+
+        if not model and not pretrain_is_zip: 
+            gr_warning(translations["provide_pretrain"].format(dg="D"))
+            return [None]*2
+
+        if not sample_rate and not pretrain_is_zip: 
+            gr_warning(translations["provide_pretrain"].format(dg="G"))
+            return [None]*2
 
         gr_info(translations["download_pretrain"])
 
-        for url in [model, sample_rate]:
+        if model: urls.append(model)
+        if sample_rate: urls.append(sample_rate)
+
+        for url in urls:
             url = url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
         
-            if "huggingface.co" in url: huggingface.HF_download_file(url, pretraineds_custom_path)
-            elif "google.com" in url: gdown.gdown_download(url, pretraineds_custom_path)
-            elif "mediafire.com" in url: mediafire.Mediafire_Download(url, pretraineds_custom_path)
-            elif "pixeldrain.com" in url: pixeldrain.pixeldrain(url, pretraineds_custom_path)
-            elif "mega.nz" in url: meganz.mega_download_url(url, pretraineds_custom_path)
+            if "huggingface.co" in url: file = huggingface.HF_download_file(url, pretraineds_custom_path)
+            elif "google.com" in url: file = gdown.gdown_download(url, pretraineds_custom_path)
+            elif "mediafire.com" in url: file = mediafire.Mediafire_Download(url, pretraineds_custom_path)
+            elif "pixeldrain.com" in url: file = pixeldrain.pixeldrain(url, pretraineds_custom_path)
+            elif "mega.nz" in url: file = meganz.mega_download_url(url, pretraineds_custom_path)
             else:
                 gr_warning(translations["not_support_url"])
                 return translations["not_support_url"], translations["not_support_url"]
+            
+            if file.endswith(".zip"):
+                shutil.unpack_archive(file, pretraineds_custom_path)
+                if os.path.exists(file): os.remove(file)
 
         gr_info(translations["success"])
         return translations["success"], translations["success"]
@@ -165,7 +183,10 @@ def fetch_models_data(search):
     return all_table_data
 
 def search_models(name):
-    if not name: return gr_warning(translations["provide_name"])
+    if not name: 
+        gr_warning(translations["provide_name"])
+        return [None]*2
+
     gr_info(translations["start"].format(start=translations["search"]))
 
     tables = fetch_models_data(name)

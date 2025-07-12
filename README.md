@@ -17,11 +17,11 @@ Công cụ chuyển đổi giọng nói chất lượng và hiệu suất cao đ
 
 </div>
 
-# Mô tả
+## Mô tả
 
 Dự án này là một công cụ chuyển đổi giọng nói đơn giản, dễ sử dụng. Với mục tiêu tạo ra các sản phẩm chuyển đổi giọng nói chất lượng cao và hiệu suất tối ưu, dự án cho phép người dùng thay đổi giọng nói một cách mượt mà, tự nhiên.
 
-# Các tính năng của dự án
+## Các tính năng của dự án
 
 - Tách nhạc (MDX-Net/Demucs)
 
@@ -53,15 +53,16 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 **Các mô hình trích xuất nhúng: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin`**
 
-- **Các mô hình trích xuất cao độ đều có phiên bản tăng tốc ONNX trừ các phương thức hoạt động bằng trình bao bọc.** 
-- **Các mô hình trích xuất đều có thể kết hợp với nhau để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
 - **Các mô hình trích xuất nhúng có sẳn các chế độ nhúng như: fairseq, onnx, transformers, spin.**
+- **Các mô hình trích xuất cao độ đều có phiên bản tăng tốc ONNX trừ các phương thức hoạt động bằng trình bao bọc.** 
+- **Các mô hình trích xuất cao độ đều có thể kết hợp với nhau để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
+- **Tính năng Cao độ tự động sẽ tiêu thụ một ít tài nguyên để tính toán đặc tính mô hình và đưa ra ngưỡng để tính toán cao độ cần tăng giảm.**
 
-# Hướng dẫn sử dụng
+## Hướng dẫn sử dụng
 
 **Sẽ có nếu tôi thực sự rảnh...**
 
-# Cài đặt
+## Cài đặt
 
 Bước 1: Cài đặt các phần phụ trợ cần thiết
 
@@ -88,18 +89,31 @@ python -m venv env
 env\\Scripts\\activate
 ```
 
-Đối với CPU:
+Cài đặt đối với các thiết bị khác nhau
+
+<details>
+<summary>Đối với CPU</summary>
+
 ```
 python -m pip install -r requirements.txt
 ```
 
-Đối với CUDA (Có thể thay cu118 thành bản cu128 mới hơn nếu GPU hỗ trợ):
+</details>
+
+<details>
+<summary>Đối với CUDA</summary>
+
+Có thể thay cu118 thành bản cu128 mới hơn nếu GPU hỗ trợ:
 ```
 python -m pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
 python -m pip install -r requirements.txt
 ```
 
-Đối với AMD:
+</details>
+
+<details>
+<summary>Đối với AMD</summary>
+
 ```
 python -m pip install torch==2.6.0 torchaudio==2.6.0 torchvision
 python -m pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
@@ -108,12 +122,14 @@ python -m pip install -r requirements.txt
 ```
 
 Lưu ý đối với AMD: 
-- Chỉ cài đặt AMD trên python 3.11 vì DLPRIM không có bản cho python 3.10.
+- Chỉ cài đặt AMD trên python 3.11 vì DLPRIM không có bản cho python 3.10 với torch 2.6.0.
 - Demucs có thể gây quá tải và tràn bộ nhớ đối với GPU (nếu cần sử dụng demucs hãy mở tệp config.json trong main\configs sửa đối số demucs_cpu_mode thành true).
 - DDP không hỗ trợ huấn luyện đa GPU đối với OPENCL (AMD).
 - Một số thuật toán khác phải chạy trên cpu nên có thể hiệu suất của GPU có thể không sử dụng hết.
 
-# Sử dụng
+</details>
+
+## Sử dụng
 
 **Sử dụng với Google Colab**
 - Mở Google Colab: [Vietnamese-RVC](https://colab.research.google.com/github/PhamHuynhAnh16/Vietnamese-RVC-ipynb/blob/main/Vietnamese-RVC.ipynb)
@@ -140,18 +156,30 @@ env\\Scripts\\python.exe main/app/run_tensorboard.py
 python main\\app\\parser.py --help
 ```
 
-# Cài đặt, sử dụng đơn giản
+## Cài đặt, sử dụng đơn giản
 
 **Cài đặt phiên bản releases từ [Vietnamese_RVC](https://github.com/PhamHuynhAnh16/Vietnamese-RVC/releases)**
 - Chọn bản đúng với bạn và tải về máy.
 - Giải nén dự án.
 - Chạy tệp run_app.bat để mở giao diện hoạt động.
 
-# Cấu trúc chính của mã nguồn:
+**Sử dụng tệp run_install.bat**
+- Tải mã nguồn về máy.
+- Giải nén dự án.
+- Chạy tệp run_install.bat để bắt đầu cài đặt.
+- Chạy tệp run_app.bat để mở giao diện hoạt động.
+
+## Cấu trúc chính của mã nguồn:
+
+<details>
+<summary>Nhấn vào để xem</summary>
 
 <pre>
 Vietnamese-RVC-main
 ├── assets
+│   ├── autopitch
+│   │   ├── emb_feats.npz
+│   │   └── rvc_feats.npz
 │   ├── binary
 │   │   ├── decrypt.bin
 │   │   └── world.bin
@@ -210,6 +238,7 @@ Vietnamese-RVC-main
 ├── main
 │   ├── app
 │   │   ├── core
+│   │   │   ├── csrt.py
 │   │   │   ├── downloads.py
 │   │   │   ├── editing.py
 │   │   │   ├── f0_extract.py
@@ -234,11 +263,11 @@ Vietnamese-RVC-main
 │   │   │   ├── extra
 │   │   │   │   ├── extra.py
 │   │   │   │   └── child
+│   │   │   │       ├── create_srt.py
 │   │   │   │       ├── convert_model.py
 │   │   │   │       ├── f0_extract.py
 │   │   │   │       ├── fushion.py
 │   │   │   │       ├── read_model.py
-│   │   │   │       ├── report_bugs.py
 │   │   │   │       └── settings.py
 │   │   │   ├── inference
 │   │   │   │   ├── inference.py
@@ -259,6 +288,7 @@ Vietnamese-RVC-main
 │   ├── configs
 │   │   ├── config.json
 │   │   ├── config.py
+│   │   ├── rpc.py
 │   │   ├── v1
 │   │   │   ├── 32000.json
 │   │   │   ├── 40000.json
@@ -296,6 +326,7 @@ Vietnamese-RVC-main
 │   │   ├── utils.py
 │   │   ├── opencl.py
 │   │   ├── algorithm
+│   │   │   ├── autopitch.py
 │   │   │   ├── attentions.py
 │   │   │   ├── commons.py
 │   │   │   ├── discriminators.py
@@ -380,16 +411,20 @@ Vietnamese-RVC-main
 ├── README.md
 ├── requirements.txt
 ├── run_app.bat
+├── run_install.bat
 └── tensorboard.bat
 </pre>
 
-# LƯU Ý
+</details>
+
+## LƯU Ý
 
 - **Hiện tại các bộ mã hóa mới như MRF HIFIGAN vẫn chưa đầy đủ các bộ huấn luyện trước**
 - **Bộ mã hóa MRF HIFIGAN và REFINEGAN không hỗ trợ huấn luyện khi không không huấn luyện cao độ**
+- **Huấn luyện năng lương có thể cải thiện chất lượng mô hình nhưng chưa có mô hình huấn luyện trước dành cho tính năng này**
 - **Các mô hình trong kho lưu trữ Vietnamese-RVC được thu thập rải rác trên AI Hub, HuggingFace và các các kho lưu trữ khác. Có thể mang các giấy phép bản quyền khác nhau**
 
-# Tuyên bố miễn trừ trách nhiệm
+## Tuyên bố miễn trừ trách nhiệm
 
 - **Dự án Vietnamese-RVC được phát triển với mục đích nghiên cứu, học tập và giải trí cá nhân. Tôi không khuyến khích cũng như không chịu trách nhiệm đối với bất kỳ hành vi lạm dụng công nghệ chuyển đổi giọng nói vì mục đích lừa đảo, giả mạo danh tính, hoặc vi phạm quyền riêng tư, bản quyền của bất kỳ cá nhân hay tổ chức nào.**
 
@@ -399,7 +434,7 @@ Vietnamese-RVC-main
 
 - **Tác giả của dự án không chịu trách nhiệm pháp lý đối với bất kỳ hậu quả nào phát sinh từ việc sử dụng phần mềm này.**
 
-# Điều khoản sử dụng
+## Điều khoản sử dụng
 
 - Bạn phải đảm bảo rằng các nội dung âm thanh bạn tải lên và chuyển đổi qua dự án này không vi phạm quyền sở hữu trí tuệ của bên thứ ba.
 
@@ -409,7 +444,7 @@ Vietnamese-RVC-main
 
 - Tôi sẽ không chịu trách nhiệm với bất kỳ thiệt hại trực tiếp hoặc gián tiếp nào phát sinh từ việc sử dụng dự án này.
 
-# Dự án này được xây dựng dựa trên các dự án như sau
+## Dự án này được xây dựng dựa trên các dự án như sau
 
 |                                                            Tác Phẩm                                                            |         Tác Giả         |  Giấy Phép  |
 |--------------------------------------------------------------------------------------------------------------------------------|-------------------------|-------------|
@@ -435,11 +470,14 @@ Vietnamese-RVC-main
 | **[Codename-RVC-Fork-3](https://github.com/codename0og/codename-rvc-fork-3)**                                                  | Codename;0              | MIT License |
 | **[Penn](https://github.com/interactiveaudiolab/penn)**                                                                        | Interactive Audio Lab   | MIT License |
 
-# Kho mô hình của công cụ tìm kiếm mô hình
+## Kho mô hình của công cụ tìm kiếm mô hình
 
 - **[VOICE-MODELS.COM](https://voice-models.com/)**
 
-# Các phương pháp trích xuất F0 trong RVC
+## Các phương pháp trích xuất F0 trong RVC
+
+<details>
+<summary>Nhấn vào để xem</summary>
 
 Tài liệu này trình bày chi tiết các phương pháp trích xuất cao độ được sử dụng, thông tin về ưu, nhược điểm, sức mạnh và độ tin cậy của từng phương pháp theo trải nghiệm cá nhân.
 
@@ -451,20 +489,19 @@ Tài liệu này trình bày chi tiết các phương pháp trích xuất cao đ
 | crepe              | Deep Learning  | Chính xác cao             | Yêu cầu GPU                  | Rất cao            | Rất cao            |
 | mangio-crepe       | crepe nofilter | Tối ưu hóa cho RVC        | Đôi khi kém crepe gốc        | Trung bình đến cao | Trung bình đến cao |
 | fcpe               | Deep Learning  | Chính xác, thời gian thực | Cần GPU mạnh                 | Khá                | Trung bình         |
-| fcpe-legacy        | Old            | Chính xác, thời gian thực | Cũ hơn                       | Khá                | Trung bình         |
+| fcpe-legacy        | FCPE Old       | Chính xác, thời gian thực | Cũ hơn                       | Khá                | Trung bình         |
 | rmvpe              | Deep Learning  | Hiệu quả với giọng hát    | Tốn tài nguyên               | Rất cao            | Xuất sắc           |
-| rmvpe-legacy       | Old            | Tính toán với Fmin-max    | Cũ hơn                       | Cao                | Khá                |
+| rmvpe-legacy       | RMVPE Old      | Tính toán với Fmin-max    | Cũ hơn                       | Cao                | Khá                |
 | yin                | Librosa        | Đơn giản, hiệu quả        | Dễ lỗi bội                   | Trung bình         | Thấp               |
 | pyin               | Librosa        | Ổn định hơn YIN           | Tính toán phức tạp hơn       | Khá                | Khá                |
 | swipe              | WORLD          | Độ chính xác cao          | Nhạy cảm với nhiễu           | Cao                | Khá                |
 | piptrack           | Librosa        | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
 | fcn                | Deep Learning  | Không Rõ                  | F0 Thấp                      | Không Rõ           | Không Rõ           |
 
-# Báo cáo lỗi
+</details>
 
-- **Với trường hợp gặp lỗi khi sử dụng mã nguồn này tôi thực sự xin lỗi bạn vì trải nghiệm không tốt này, bạn có thể gửi báo cáo lỗi thông qua cách phía dưới**
-- **Bạn có thể báo cáo lỗi cho tôi thông qua hệ thống báo cáo lỗi webhook trong giao diện sử dụng**
+## Báo cáo lỗi
 - **Với trường hợp hệ thống báo cáo lỗi không hoạt động bạn có thể báo cáo lỗi cho tôi thông qua Discord `pham_huynh_anh` Hoặc [ISSUE](https://github.com/PhamHuynhAnh16/Vietnamese-RVC/issues)**
 
-# ☎️ Liên hệ tôi
+## ☎️ Liên hệ tôi
 - Discord: **pham_huynh_anh**

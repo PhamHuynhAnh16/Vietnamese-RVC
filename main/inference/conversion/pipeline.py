@@ -12,6 +12,7 @@ sys.path.append(os.getcwd())
 
 from main.app.variables import translations
 from main.library.utils import extract_features
+from main.library.algorithm.autopitch import AutoPitch
 from main.library.predictors.Generator import Generator
 from main.inference.extracting.rms import RMSEnergyExtractor
 from main.inference.conversion.utils import change_rms, clear_gpu_cache, get_onnx_argument
@@ -36,6 +37,7 @@ class Pipeline:
         self.f0_max = 1100
         self.device = config.device
         self.is_half = config.is_half
+        self.tgt_sr = tgt_sr
 
     def voice_conversion(self, model, net_g, sid, audio0, pitch, pitchf, index, big_npy, index_rate, version, protect, energy):
         pitch_guidance = pitch != None and pitchf != None
@@ -131,9 +133,9 @@ class Pipeline:
         clear_gpu_cache()
         return audio1
     
-    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, suffix, embed_suffix, f0_file=None, f0_onnx=False, pbar=None, proposal_pitch=False, proposal_pitch_threshold=255.0, energy_use=False):
-        self.suffix = suffix
+    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, suffix, embed_suffix, f0_file=None, f0_onnx=False, pbar=None, auto_pitch=False, energy_use=False, del_onnx=True):
         self.embed_suffix = embed_suffix
+        self.suffix = suffix
 
         if file_index != "" and os.path.exists(file_index) and index_rate != 0:
             try:
@@ -145,6 +147,7 @@ class Pipeline:
         else: index = big_npy = None
 
         if pbar: pbar.update(1)
+
         opt_ts, audio_opt = [], []
         audio = signal.filtfilt(bh, ah, audio)
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
@@ -179,10 +182,16 @@ class Pipeline:
             except:
                 logger.error(translations["error_readfile"])
                 inp_f0 = None
+        
+        if auto_pitch:
+            if not hasattr(self, "autopitch"): self.autopitch = AutoPitch(self, os.path.join("assets", "autopitch", "rvc_feats.npz"), os.path.join("assets", "autopitch", "emb_feats.npz"), pitch_guidance, index_rate, version, protect, energy_use, self.device)
+            proposal_pitch_threshold, proposal_pitch = self.autopitch.autopitch(model, net_g, sid, index, big_npy)
+        else: proposal_pitch_threshold, proposal_pitch = 0, False
 
         if pbar: pbar.update(1)
+
         if pitch_guidance:
-            if not hasattr(self, "f0_generator"): self.f0_generator = Generator(self.sample_rate, hop_length, self.f0_min, self.f0_max, self.is_half, self.device, f0_onnx, f0_onnx)
+            if not hasattr(self, "f0_generator"): self.f0_generator = Generator(self.sample_rate, hop_length, self.f0_min, self.f0_max, self.is_half, self.device, f0_onnx, del_onnx)
             pitch, pitchf = self.f0_generator.calculator(self.x_pad, f0_method, audio_pad, f0_up_key, p_len, filter_radius, f0_autotune, f0_autotune_strength, manual_f0=inp_f0, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold)
 
             if self.device == "mps": pitchf = pitchf.astype(np.float32)
@@ -236,9 +245,9 @@ class Pipeline:
             )[self.t_pad_tgt : -self.t_pad_tgt]
         )
 
-        audio_opt = np.concatenate(audio_opt)
         if pbar: pbar.update(1)
 
+        audio_opt = np.concatenate(audio_opt)
         if rms_mix_rate != 1: audio_opt = change_rms(audio, self.sample_rate, audio_opt, self.sample_rate, rms_mix_rate)
 
         audio_max = np.abs(audio_opt).max() / 0.99

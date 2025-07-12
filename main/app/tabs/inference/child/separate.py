@@ -8,7 +8,7 @@ sys.path.append(os.getcwd())
 from main.app.core.downloads import download_url
 from main.app.core.separate import separator_music
 from main.app.core.ui import visible, valueFalse_interactive, change_audios_choices, shutil_move
-from main.app.variables import translations, uvr_model, paths_for_files, mdx_model, sample_rate_choice, configs
+from main.app.variables import translations, uvr_model, paths_for_files, mdx_model, sample_rate_choice, configs, file_types, export_format_choices
 
 def separate_tab():
     with gr.Row(): 
@@ -44,7 +44,7 @@ def separate_tab():
                     mdx_hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=8192, value=1024, step=1, interactive=True, visible=backing.value or reverb.value or separator_model.value in mdx_model)
     with gr.Row():
         with gr.Column():
-            input = gr.File(label=translations["drop_audio"], file_types=[".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"])    
+            input = gr.File(label=translations["drop_audio"], file_types=file_types)    
             with gr.Accordion(translations["use_url"], open=False):
                 url = gr.Textbox(label=translations["url_audio"], value="", placeholder="https://www.youtube.com/...", scale=6)
                 download_button = gr.Button(translations["downloads"])
@@ -53,7 +53,7 @@ def separate_tab():
                 clean_strength = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=cleaner.value)
                 sample_rate1 = gr.Radio(choices=sample_rate_choice, value=44100, label=translations["sr"], info=translations["sr_info"], interactive=True)
             with gr.Accordion(translations["input_output"], open=False):
-                format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"], value="wav", interactive=True)
+                format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=export_format_choices, value="wav", interactive=True)
                 input_audio = gr.Dropdown(label=translations["audio_path"], value="", choices=paths_for_files, allow_custom_value=True, interactive=True)
                 refresh_separator = gr.Button(translations["refresh"])
                 output_separator = gr.Textbox(label=translations["output_folder"], value="audios", placeholder="audios", info=translations["output_folder_info"], interactive=True)

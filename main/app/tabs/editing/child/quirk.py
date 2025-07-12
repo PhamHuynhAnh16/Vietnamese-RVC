@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.editing import apply_voice_quirk
 from main.app.core.ui import change_audios_choices, shutil_move
-from main.app.variables import translations, paths_for_files, configs
+from main.app.variables import translations, paths_for_files, configs, file_types, export_format_choices
 
 def quirk_tab():
     with gr.Row():
@@ -21,9 +21,9 @@ def quirk_tab():
     with gr.Row():
         with gr.Accordion(translations["input_output"], open=False):
             with gr.Row():
-                quirk_upload_audio = gr.File(label=translations["drop_audio"], file_types=[".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"])
+                quirk_upload_audio = gr.File(label=translations["drop_audio"], file_types=file_types)
             with gr.Column():
-                quirk_export_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"], value="wav", interactive=True)
+                quirk_export_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=export_format_choices, value="wav", interactive=True)
                 quirk_input_path = gr.Dropdown(label=translations["audio_path"], value="", choices=paths_for_files, info=translations["provide_audio"], allow_custom_value=True, interactive=True)
                 quirk_output_path = gr.Textbox(label=translations["output_path"], value="audios/output.wav", placeholder="audios/output.wav", info=translations["output_path_info"], interactive=True)
             with gr.Column():

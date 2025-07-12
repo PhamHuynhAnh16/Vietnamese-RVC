@@ -10,8 +10,8 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
+from main.library.utils import load_audio
 from main.library.predictors.Generator import Generator
-from main.library.utils import load_audio, get_providers
 from main.app.variables import config, logger, translations
 from main.inference.extracting.setup_path import setup_paths
 

@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.f0_extract import f0_extract
 from main.app.core.ui import change_audios_choices, unlock_f0, shutil_move
-from main.app.variables import translations, paths_for_files, method_f0, configs
+from main.app.variables import translations, paths_for_files, method_f0, configs, file_types
 
 def f0_extract_tab():
     with gr.Row():
@@ -16,7 +16,7 @@ def f0_extract_tab():
         extractor_button = gr.Button(translations["extract_button"].replace("2. ", ""), variant="primary")
     with gr.Row():
         with gr.Column():
-            upload_audio_file = gr.File(label=translations["drop_audio"], file_types=[".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"])
+            upload_audio_file = gr.File(label=translations["drop_audio"], file_types=file_types)
             audioplay = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
         with gr.Column():
             with gr.Accordion(translations["f0_method"], open=False):

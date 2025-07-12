@@ -38,7 +38,7 @@ def check_assets(method, hubert, f0_onnx=False, embedders_mode="fairseq"):
     def download_predictor(predictor):
         model_path = os.path.join(configs["predictors_path"], predictor)
 
-        if not os.path.exists(os.path.join(configs["predictors_path"], predictor)): 
+        if not os.path.exists(model_path): 
             huggingface.HF_download_file(
                 predictors_url + predictor, 
                 model_path
@@ -89,7 +89,7 @@ def check_assets(method, hubert, f0_onnx=False, embedders_mode="fairseq"):
     results = []
     count = configs.get("num_of_restart", 5)
 
-    for i in range(count):
+    for _ in range(count):
         if "hybrid" in method:
             methods_str = re.search("hybrid\[(.+)\]", method)
             if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
@@ -152,7 +152,7 @@ def pydub_load(input_path, volume = None):
     except:
         audio = AudioSegment.from_file(input_path)
         
-    return audio if volume is None else audio + volume
+    return audio if volume is None else (audio + volume)
 
 def load_embedders_model(embedder_model, embedders_mode="fairseq"):
     if embedders_mode == "fairseq": embedder_model += ".pt"

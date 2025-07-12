@@ -15,7 +15,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from torch.distributions import Categorical
 from functools import cached_property, lru_cache
 
@@ -259,7 +259,7 @@ def mel_filters(device, n_mels):
 
 def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
     if not torch.is_tensor(audio):
-        if isinstance(audio, str): audio = load_audio(logging.getLogger(__name__), audio, sample_rate=SAMPLE_RATE).astype(np.float32)
+        if isinstance(audio, str): audio = load_audio(audio, sample_rate=SAMPLE_RATE).astype(np.float32)
         audio = torch.from_numpy(audio)
 
     if device is not None: audio = audio.to(device)
@@ -609,18 +609,18 @@ def decode_function(model, mel, options = DecodingOptions(), **kwargs):
     result = DecodingTask(model, options).run(mel)
     return result[0] if single else result
 
-@dataclass
 class ModelDimensions:
-    n_mels: int
-    n_audio_ctx: int
-    n_audio_state: int
-    n_audio_head: int
-    n_audio_layer: int
-    n_vocab: int
-    n_text_ctx: int
-    n_text_state: int
-    n_text_head: int
-    n_text_layer: int
+    def __init__(self, n_mels, n_audio_ctx, n_audio_state, n_audio_head, n_audio_layer, n_vocab, n_text_ctx, n_text_state, n_text_head, n_text_layer):
+        self.n_mels = n_mels
+        self.n_audio_ctx = n_audio_ctx
+        self.n_audio_state = n_audio_state
+        self.n_audio_head = n_audio_head
+        self.n_audio_layer = n_audio_layer
+        self.n_vocab = n_vocab
+        self.n_text_ctx = n_text_ctx
+        self.n_text_state = n_text_state
+        self.n_text_head = n_text_head
+        self.n_text_layer = n_text_layer
 
 class LayerNorm(nn.LayerNorm):
     def forward(self, x):

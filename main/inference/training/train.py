@@ -262,23 +262,21 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         epoch_str += 1
         global_step = (epoch_str - 1) * len(train_loader)
     except:
+        check = ["", "None"]
         epoch_str, global_step = 1, 0
-        verify = main_configs.get("pretrain_verify_shape", True)
         strict = main_configs.get("pretrain_strict", True)
     
-        if pretrainG != "" and pretrainG != "None":
+        if pretrainG not in check:
             if rank == 0:
-                if verify: verify_checkpoint_shapes(pretrainG, net_g)
+                if main_configs.get("pretrain_verify_shape", True): verify_checkpoint_shapes(pretrainG, net_g)
                 logger.info(translations["import_pretrain"].format(dg="G", pretrain=pretrainG))
 
             ckptG = torch.load(pretrainG, map_location="cpu", weights_only=True)["model"]
             net_g.module.load_state_dict(ckptG, strict=strict) if hasattr(net_g, "module") else net_g.load_state_dict(ckptG, strict=strict)
         else: logger.warning(translations["not_using_pretrain"].format(dg="G"))
 
-        if pretrainD != "" and pretrainD != "None":
-            if rank == 0:
-                if verify: verify_checkpoint_shapes(pretrainD, net_d)
-                logger.info(translations["import_pretrain"].format(dg="D", pretrain=pretrainD))
+        if pretrainD not in check:
+            if rank == 0: logger.info(translations["import_pretrain"].format(dg="D", pretrain=pretrainD))
 
             ckptD = torch.load(pretrainD, map_location="cpu", weights_only=True)["model"]
             net_d.module.load_state_dict(ckptD, strict=strict) if hasattr(net_d, "module") else net_d.load_state_dict(ckptD, strict=strict)

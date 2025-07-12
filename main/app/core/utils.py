@@ -44,40 +44,6 @@ def stop_pid(pid_file, model_name=None, train=False):
     except:
         pass
 
-def report_bug(error_info, provide):
-    report_path = os.path.join(configs["logs_path"], "report_bugs.log")
-    if os.path.exists(report_path): os.remove(report_path)
-
-    report_url = codecs.decode(requests.get(codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/jroubbx.gkg", "rot13")).text, "rot13")
-    if not error_info: error_info = "Không Có"
-
-    gr_info(translations["thank"])
-
-    if provide:
-        try:
-            for log in [os.path.join(root, name) for root, _, files in os.walk(os.path.join(configs["logs_path"]), topdown=False) for name in files if name.endswith(".log")]:
-                with open(log, "r", encoding="utf-8") as r:
-                    with open(report_path, "a", encoding="utf-8") as w:
-                        w.write(str(r.read()))
-                        w.write("\n")
-        except Exception as e:
-            gr_error(translations["error_read_log"])
-            logger.debug(e)
-
-        try:
-            with open(report_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            requests.post(report_url, json={"embeds": [{"title": "Báo Cáo Lỗi", "description": f"Mô tả lỗi: {error_info}", "color": 15158332, "author": {"name": "Vietnamese_RVC", "icon_url": codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/vpb.cat", "rot13"), "url": codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16/Ivrganzrfr-EIP/gerr/znva","rot13")}, "thumbnail": {"url": codecs.decode("uggcf://p.grabe.pbz/7dADJbv-36fNNNNq/grabe.tvs", "rot13")}, "fields": [{"name": "Số Lượng Gỡ Lỗi", "value": content.count("DEBUG")}, {"name": "Số Lượng Thông Tin", "value": content.count("INFO")}, {"name": "Số Lượng Cảnh Báo", "value": content.count("WARNING")}, {"name": "Số Lượng Lỗi", "value": content.count("ERROR")}], "footer": {"text": f"Tên Máy: {platform.uname().node} - Hệ Điều Hành: {platform.system()}-{platform.version()}\nThời Gian Báo Cáo Lỗi: {datetime.datetime.now()}."}}]})
-
-            with open(report_path, "rb") as f:
-                requests.post(report_url, files={"file": f})
-        except Exception as e:
-            gr_error(translations["error_send"])
-        finally:
-            if os.path.exists(report_path): os.remove(report_path)
-    else: requests.post(report_url, json={"embeds": [{"title": "Báo Cáo Lỗi", "description": error_info}]})
-
 def google_translate(text, source='auto', target='vi'):
     if text == "": return gr_warning(translations["prompt_warning"])
 

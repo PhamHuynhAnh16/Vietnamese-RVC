@@ -17,6 +17,7 @@ from main.app.tabs.editing.editing import editing_tab
 from main.app.tabs.training.training import training_tab
 from main.app.tabs.downloads.downloads import download_tab
 from main.app.tabs.inference.inference import inference_tab
+from main.configs.rpc import connect_discord_ipc, send_discord_rpc
 from main.app.variables import logger, config, translations, theme, font, configs, language, allow_disk
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -78,8 +79,17 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme, css="<style>
             sys.exit(1)
     
     sys.stdout = original_stdout
-    logger.info(f"{translations['running_local_url']}: {server_name}:{port}")
 
+    pipe = connect_discord_ipc()
+    if pipe:
+        try:
+            logger.info(translations["start_rpc"])
+            send_discord_rpc(pipe)
+        except KeyboardInterrupt:
+            logger.info(translations["stop_rpc"])
+            pipe.close()
+
+    logger.info(f"{translations['running_local_url']}: {server_name}:{port}")
     if share: logger.info(f"{translations['running_share_url']}: {share_url}")
     logger.info(f"{translations['gradio_start']}: {(time.time() - start_time):.2f}s")
 

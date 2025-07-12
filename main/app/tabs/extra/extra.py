@@ -10,7 +10,7 @@ from main.app.tabs.extra.child.fushion import fushion_tab
 from main.app.tabs.extra.child.settings import settings_tab
 from main.app.tabs.extra.child.read_model import read_model_tab
 from main.app.tabs.extra.child.f0_extract import f0_extract_tab
-from main.app.tabs.extra.child.report_bugs import report_bugs_tab
+from main.app.tabs.extra.child.create_srt import create_srt_tab
 from main.app.tabs.extra.child.convert_model import convert_model_tab
 
 def extra_tab(app):
@@ -31,10 +31,10 @@ def extra_tab(app):
             gr.Markdown(translations["f0_extractor_markdown"])
             f0_extract_tab()
 
+        with gr.TabItem(translations["create_srt_tab"], visible=True):
+            gr.Markdown(translations["create_srt_markdown"])
+            create_srt_tab()
+
         with gr.TabItem(translations["settings"], visible=configs.get("settings_tab", True)):
             gr.Markdown(translations["settings_markdown"])
             settings_tab(app)
-
-        with gr.TabItem(translations["report_bugs"], visible=configs.get("report_bug_tab", True)):
-            gr.Markdown(translations["report_bugs"])
-            report_bugs_tab()

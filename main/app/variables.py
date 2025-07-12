@@ -61,6 +61,9 @@ presets_file = sorted(list(f for f in os.listdir(configs["presets_path"]) if f.e
 audio_effect_presets_file = sorted(list(f for f in os.listdir(configs["presets_path"]) if f.endswith(".effect.json")))
 f0_file = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["f0_path"]) for f in files if f.endswith(".txt")])
 
+file_types = [".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"]
+export_format_choices = ["wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"]
+
 language = configs.get("language", "vi-VN")
 theme = configs.get("theme", "NoCrypt/miku")
 

@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.presets import load_presets, save_presets
 from main.app.core.inference import convert_audio, convert_selection
-from main.app.variables import translations, paths_for_files, sample_rate_choice, model_name, index_path, method_f0, f0_file, embedders_mode, embedders_model, presets_file, configs
+from main.app.variables import translations, paths_for_files, sample_rate_choice, model_name, index_path, method_f0, f0_file, embedders_mode, embedders_model, presets_file, configs, file_types, export_format_choices
 from main.app.core.ui import visible, valueFalse_interactive, change_audios_choices, change_f0_choices, unlock_f0, change_preset_choices, change_backing_choices, hoplength_show, change_models_choices, get_index, index_strength_show, visible_embedders, shutil_move
 
 def convert_tab():
@@ -38,7 +38,7 @@ def convert_tab():
             convert_button = gr.Button(translations["convert_audio"], variant="primary")
     with gr.Row():
         with gr.Column():
-            input0 = gr.File(label=translations["drop_audio"], file_types=[".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"])  
+            input0 = gr.File(label=translations["drop_audio"], file_types=file_types)  
             play_audio = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
         with gr.Column():
             with gr.Accordion(translations["model_accordion"], open=True):
@@ -51,7 +51,7 @@ def convert_tab():
                     index_strength = gr.Slider(label=translations["index_strength"], info=translations["index_strength_info"], minimum=0, maximum=1, value=0.5, step=0.01, interactive=True, visible=model_index.value != "")
             with gr.Accordion(translations["input_output"], open=False):
                 with gr.Column():
-                    export_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"], value="wav", interactive=True)
+                    export_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=export_format_choices, value="wav", interactive=True)
                     input_audio0 = gr.Dropdown(label=translations["audio_path"], value="", choices=paths_for_files, info=translations["provide_audio"], allow_custom_value=True, interactive=True)
                     output_audio = gr.Textbox(label=translations["output_path"], value="audios/output.wav", placeholder="audios/output.wav", info=translations["output_path_info"], interactive=True)
                 with gr.Column():
@@ -104,9 +104,8 @@ def convert_tab():
                     with gr.Row():
                         split_audio = gr.Checkbox(label=translations["split_audio"], value=False, interactive=True)
                         formant_shifting = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)
-                        proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
+                        auto_pitch = gr.Checkbox(label=translations["auto_pitch"], value=False, interactive=True)
                     resample_sr = gr.Radio(choices=[0]+sample_rate_choice, label=translations["resample"], info=translations["resample_info"], value=0, interactive=True)
-                    proposal_pitch_threshold = gr.Slider(minimum=50.0, maximum=1200.0, label=translations["proposal_pitch_threshold"], info=translations["proposal_pitch_threshold_info"], value=255.0, step=0.1, interactive=True, visible=proposal_pitch.value)
                     f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=autotune.value)
                     filter_radius = gr.Slider(minimum=0, maximum=7, label=translations["filter_radius"], info=translations["filter_radius_info"], value=3, step=1, interactive=True)
                     rms_mix_rate = gr.Slider(minimum=0, maximum=1, label=translations["rms_mix_rate"], info=translations["rms_mix_rate_info"], value=1, step=0.1, interactive=True)
@@ -144,7 +143,8 @@ def convert_tab():
                 split_audio, 
                 f0_autotune_strength, 
                 formant_qfrency, 
-                formant_timbre
+                formant_timbre,
+                auto_pitch
             ], 
             outputs=[
                 cleaner0, 
@@ -160,7 +160,8 @@ def convert_tab():
                 f0_autotune_strength, 
                 formant_shifting, 
                 formant_qfrency, 
-                formant_timbre
+                formant_timbre,
+                auto_pitch
             ]
         )
         refresh_click.click(fn=change_preset_choices, inputs=[], outputs=[presets_name])
@@ -191,7 +192,8 @@ def convert_tab():
                 formant_shifting_chbox, 
                 formant_shifting, 
                 formant_qfrency, 
-                formant_timbre
+                formant_timbre,
+                auto_pitch
             ], 
             outputs=[presets_name]
         )
@@ -224,7 +226,6 @@ def convert_tab():
         convert_button_2.click(fn=lambda: [visible(False), visible(False)], inputs=[], outputs=[audio_select, convert_button_2])
     with gr.Row():
         embed_mode.change(fn=visible_embedders, inputs=[embed_mode], outputs=[embedders])
-        proposal_pitch.change(fn=visible, inputs=[proposal_pitch], outputs=[proposal_pitch_threshold])
     with gr.Row():
         convert_button.click(
             fn=convert_selection,
@@ -262,8 +263,7 @@ def convert_tab():
                 formant_timbre,
                 f0_file_dropdown,
                 embed_mode,
-                proposal_pitch,
-                proposal_pitch_threshold
+                auto_pitch
             ],
             outputs=[audio_select, main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button, convert_button_2],
             api_name="convert_selection"
@@ -305,8 +305,7 @@ def convert_tab():
                 formant_timbre,
                 f0_file_dropdown,
                 embed_mode,
-                proposal_pitch,
-                proposal_pitch_threshold
+                auto_pitch
             ],
             outputs=[main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button],
             api_name="convert_audio"

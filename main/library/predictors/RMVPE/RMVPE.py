@@ -43,8 +43,19 @@ class RMVPE:
             n_frames = mel.shape[-1]
             n_pad = 32 * ((n_frames - 1) // 32 + 1) - n_frames
             if n_pad > 0: mel = F.pad(mel, (0, n_pad), mode="constant")
+            
+            if self.onnx:
+                hidden = self.model.run(
+                    [self.model.get_outputs()[0].name], 
+                    {
+                        self.model.get_inputs()[0].name: mel.cpu().numpy().astype(np.float32)
+                    }
+                )[0] 
+            else: 
+                hidden = self.model(
+                    mel.half() if self.is_half else mel.float()
+                )
 
-            hidden = self.model.run([self.model.get_outputs()[0].name], input_feed={self.model.get_inputs()[0].name: mel.cpu().numpy().astype(np.float32)})[0] if self.onnx else self.model(mel.half() if self.is_half else mel.float())
             return hidden[:, :n_frames]
 
     def decode(self, hidden, thred=0.03):

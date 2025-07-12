@@ -192,9 +192,9 @@ class FCPE_LEGACY(nn.Module):
         return torch.exp(-torch.square(self.cent_table[None, None, :].expand(B, N, -1) - cents) / 1250) * (cents > 0.1) & (cents < (1200.0 * np.log2(self.f0_max / 10.0))).float()
 
 class InferCFNaiveMelPE(torch.nn.Module):
-    def __init__(self, args, state_dict):
+    def __init__(self, args, state_dict, device="cpu"):
         super().__init__()
-        self.wav2mel = spawn_wav2mel(args, device="cpu")
+        self.wav2mel = spawn_wav2mel(args, device=device)
         self.model = CFNaiveMelPE(input_channels=args.mel.num_mels, out_dims=args.model.out_dims, hidden_dims=args.model.hidden_dims, n_layers=args.model.n_layers, n_heads=args.model.n_heads, f0_max=args.model.f0_max, f0_min=args.model.f0_min, use_fa_norm=args.model.use_fa_norm, conv_only=args.model.conv_only, conv_dropout=args.model.conv_dropout, atten_dropout=args.model.atten_dropout, use_harmonic_emb=False)
         self.model.load_state_dict(state_dict)
         self.model.eval()
@@ -246,6 +246,7 @@ class FCPEInfer_LEGACY:
         self.onnx = onnx
         self.f0_min = f0_min
         self.f0_max = f0_max
+        self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
 
         if self.onnx:
             sess_options = ort.SessionOptions()
@@ -263,9 +264,29 @@ class FCPEInfer_LEGACY:
     @torch.no_grad()
     def __call__(self, audio, sr, threshold=0.05, p_len=None):
         if not self.onnx: self.model.threshold = threshold
-        self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
+        if not hasattr(self, "numpy_threshold") and self.onnx: self.numpy_threshold = np.array(threshold, dtype=np.float32)
 
-        return (torch.as_tensor(self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype).detach().cpu().numpy(), self.model.get_inputs()[1].name: np.array(threshold, dtype=np.float32)})[0], dtype=self.dtype, device=self.device) if self.onnx else self.model(mel=self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype), infer=True, return_hz_f0=True, output_interp_target_length=p_len))
+        mel = self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype)
+
+        if self.onnx:
+            return torch.as_tensor(
+                self.model.run(
+                    [self.model.get_outputs()[0].name], 
+                    {
+                        self.model.get_inputs()[0].name: mel.detach().cpu().numpy(), 
+                        self.model.get_inputs()[1].name: self.numpy_threshold
+                    }
+                )[0], 
+                dtype=self.dtype, 
+                device=self.device
+            )
+        else: 
+            return self.model(
+                mel=mel, 
+                infer=True, 
+                return_hz_f0=True, 
+                output_interp_target_length=p_len
+            )
 
 class FCPEInfer:
     def __init__(self, configs, model_path, device=None, dtype=torch.float32, providers=None, onnx=False, f0_min=50, f0_max=1100):
@@ -284,15 +305,37 @@ class FCPEInfer:
             ckpt = torch.load(model_path, map_location=torch.device(device), weights_only=True)
             ckpt["config_dict"]["model"]["conv_dropout"] = ckpt["config_dict"]["model"]["atten_dropout"] = 0.0
             self.args = DotDict(ckpt["config_dict"])
-            model = InferCFNaiveMelPE(self.args, ckpt["model"])
+            model = InferCFNaiveMelPE(self.args, ckpt["model"], device)
             model = model.to(device).to(self.dtype)
             model.eval()
             self.model = model
 
     @torch.no_grad()
     def __call__(self, audio, sr, threshold=0.05, p_len=None):
-        if self.onnx: self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
-        return (torch.as_tensor(self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype).detach().cpu().numpy(), self.model.get_inputs()[1].name: np.array(threshold, dtype=np.float32)})[0], dtype=self.dtype, device=self.device) if self.onnx else self.model.infer(audio[None, :], sr, threshold=threshold, f0_min=self.f0_min, f0_max=self.f0_max, output_interp_target_length=p_len))
+        if not hasattr(self, "wav2mel") and self.onnx: self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
+        if not hasattr(self, "numpy_threshold") and self.onnx: self.numpy_threshold = np.array(threshold, dtype=np.float32)
+
+        if self.onnx:
+            return torch.as_tensor(
+                self.model.run(
+                    [self.model.get_outputs()[0].name], 
+                    {
+                        self.model.get_inputs()[0].name: self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype).detach().cpu().numpy(), 
+                        self.model.get_inputs()[1].name: self.numpy_threshold
+                    }
+                )[0], 
+                dtype=self.dtype, 
+                device=self.device
+            ) 
+        else: 
+            return self.model.infer(
+                audio[None, :], 
+                sr, 
+                threshold=threshold, 
+                f0_min=self.f0_min, 
+                f0_max=self.f0_max, 
+                output_interp_target_length=p_len
+            )
 
 class FCPE:
     def __init__(self, configs, model_path, hop_length=512, f0_min=50, f0_max=1100, dtype=torch.float32, device=None, sample_rate=16000, threshold=0.05, providers=None, onnx=False, legacy=False):

@@ -541,7 +541,6 @@
     "downloads_tab": true,
     "f0_extractor_tab": true,
     "settings_tab": true,
-    "report_bug_tab": true,
     "font": "https://fonts.googleapis.com/css2?family=Roboto&display=swap",
     "app_port": 7860,
     "tensorboard_port": 6870,
@@ -580,5 +579,6 @@
     "pretrain_verify_shape": true,
     "pretrain_strict": true,
     "cpu_mode": false,
-    "brain": false
+    "brain": false,
+    "calc_pitch": true
 }

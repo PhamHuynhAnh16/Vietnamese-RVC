@@ -8,7 +8,7 @@ sys.path.append(os.getcwd())
 from main.app.core.editing import audio_effects
 from main.app.core.presets import audio_effect_load_presets, audio_effect_save_presets
 from main.app.core.ui import visible, change_audios_choices, change_effect_preset_choices, shutil_move
-from main.app.variables import translations, paths_for_files, sample_rate_choice, audio_effect_presets_file, configs
+from main.app.variables import translations, paths_for_files, sample_rate_choice, audio_effect_presets_file, configs, file_types, export_format_choices
 
 def audio_effects_tab():
     with gr.Row():
@@ -25,7 +25,7 @@ def audio_effects_tab():
     with gr.Row():
         with gr.Accordion(translations["input_output"], open=False):
             with gr.Row():
-                upload_audio = gr.File(label=translations["drop_audio"], file_types=[".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3"])
+                upload_audio = gr.File(label=translations["drop_audio"], file_types=file_types)
             with gr.Row():
                 audio_in_path = gr.Dropdown(label=translations["input_audio"], value="", choices=paths_for_files, info=translations["provide_audio"], interactive=True, allow_custom_value=True)
                 audio_out_path = gr.Textbox(label=translations["output_audio"], value="audios/audio_effects.wav", placeholder="audios/audio_effects.wav", info=translations["provide_output"], interactive=True)
@@ -39,7 +39,7 @@ def audio_effects_tab():
             with gr.Row():
                 audio_effects_refresh = gr.Button(translations["refresh"])
             with gr.Row():
-                audio_output_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=["wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"], value="wav", interactive=True)
+                audio_output_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=export_format_choices, value="wav", interactive=True)
     with gr.Row():
         with gr.Accordion(translations["use_presets"], open=False):
             with gr.Row():
