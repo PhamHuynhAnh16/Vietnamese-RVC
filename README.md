@@ -496,7 +496,7 @@ Tài liệu này trình bày chi tiết các phương pháp trích xuất cao đ
 | pyin               | Librosa        | Ổn định hơn YIN           | Tính toán phức tạp hơn       | Khá                | Khá                |
 | swipe              | WORLD          | Độ chính xác cao          | Nhạy cảm với nhiễu           | Cao                | Khá                |
 | piptrack           | Librosa        | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
-| fcn                | Deep Learning  | Không Rõ                  | F0 Thấp                      | Không Rõ           | Không Rõ           |
+| fcn                | Deep Learning  | Không Rõ                  | F0 Thấp và chậm              | Trung bình         | Trung bình         |
 
 </details>
 

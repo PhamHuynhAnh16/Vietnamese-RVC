@@ -396,6 +396,6 @@ class Generator:
 
         f0 = f0[0].cpu().numpy()
         for index, pitch in enumerate(f0):
-            f0[index] = pitch * 2.0190475097926434038940242706786
+            f0[index] = round(pitch * 2.0190475097926434038940242706786, 1)
 
         return self._resize_f0(f0, p_len)
