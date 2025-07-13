@@ -184,7 +184,7 @@ class Pipeline:
                 inp_f0 = None
         
         if auto_pitch:
-            if not hasattr(self, "autopitch"): self.autopitch = AutoPitch(self, os.path.join("assets", "autopitch", "rvc_feats.npz"), os.path.join("assets", "autopitch", "emb_feats.npz"), pitch_guidance, 0.5, version, 0.5, energy_use, self.device)
+            if not hasattr(self, "autopitch"): self.autopitch = AutoPitch(self, os.path.join("assets", "autopitch", "rvc_feats.npz"), os.path.join("assets", "autopitch", "emb_feats.npz"), pitch_guidance, version, energy_use, self.device)
             proposal_pitch_threshold, proposal_pitch = self.autopitch.autopitch(model, net_g, sid, index, big_npy)
         else: proposal_pitch_threshold, proposal_pitch = 0, False
 

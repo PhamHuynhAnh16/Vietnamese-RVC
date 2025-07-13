@@ -541,6 +541,7 @@
     "downloads_tab": true,
     "f0_extractor_tab": true,
     "settings_tab": true,
+    "create_srt_tab": true,
     "font": "https://fonts.googleapis.com/css2?family=Roboto&display=swap",
     "app_port": 7860,
     "tensorboard_port": 6870,

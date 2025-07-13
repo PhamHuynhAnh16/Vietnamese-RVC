@@ -13,14 +13,12 @@ from main.app.variables import config, configs
 from main.library.utils import load_embedders_model, check_assets
 
 class AutoPitch:
-    def __init__(self, vc, rvc_npz_path, emb_npz_path, pitch_guidance = True, index_rate = 0.7, version = "v1", protect = 0.33, energy_use = False, device = "cpu"):
+    def __init__(self, vc, rvc_npz_path, emb_npz_path, pitch_guidance = True, version = "v1", energy_use = False, device = "cpu"):
         self.hubert_mode, self.hubert_base = "fairseq", "hubert_base"
         check_assets("", self.hubert_base, False, self.hubert_mode)
         self.vc = vc
         self.pitch_guidance = pitch_guidance
-        self.index_rate = index_rate
         self.version = version
-        self.protect = protect
         self.energy_use = energy_use
         self.device = device
         self.rvc_loaded = np.load(rvc_npz_path)
@@ -38,9 +36,9 @@ class AutoPitch:
             torch.tensor(self.rvc_loaded["pitchf"]).to(self.device) if self.pitch_guidance else None, 
             index, 
             big_npy, 
-            self.index_rate, 
+            0.5, 
             self.version, 
-            self.protect, 
+            0.5, 
             torch.tensor(self.rvc_loaded["energy"]).to(self.device) if self.energy_use else None
         )[self.vc.t_pad_tgt : -self.vc.t_pad_tgt]
 

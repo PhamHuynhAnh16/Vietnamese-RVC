@@ -31,7 +31,7 @@ def extra_tab(app):
             gr.Markdown(translations["f0_extractor_markdown"])
             f0_extract_tab()
 
-        with gr.TabItem(translations["create_srt_tab"], visible=True):
+        with gr.TabItem(translations["create_srt_tab"], visible=configs.get("create_srt_tab", True)):
             gr.Markdown(translations["create_srt_markdown"])
             create_srt_tab()
 

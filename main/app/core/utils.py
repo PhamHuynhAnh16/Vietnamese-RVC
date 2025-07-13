@@ -3,13 +3,11 @@ import sys
 import json
 import codecs
 import requests
-import platform
-import datetime
 
 sys.path.append(os.getcwd())
 
-from main.app.core.ui import gr_info, gr_warning, gr_error
-from main.app.variables import logger, translations, configs
+from main.app.core.ui import gr_info, gr_warning
+from main.app.variables import translations, configs
 
 def stop_pid(pid_file, model_name=None, train=False):
     try:
