@@ -78,7 +78,7 @@ class DemucsSeparator(common_separator.CommonSeparator):
         mix_infer = mix
 
         with torch.no_grad():
-            sources = apply.apply_model(model=self.demucs_model_instance, mix=mix_infer[None], shifts=self.shifts, split=self.segments_enabled, overlap=self.overlap, static_shifts=1 if self.shifts == 0 else self.shifts, set_progress_bar=None, device=self.torch_device, progress=True)[0]
+            sources = apply.apply_model(model=self.demucs_model_instance, mix=mix_infer[None], shifts=self.shifts, split=self.segments_enabled, overlap=self.overlap, static_shifts=max(self.shifts, 1), set_progress_bar=None, device=self.torch_device, progress=True)[0]
 
         sources = (sources * ref.std() + ref.mean()).cpu().numpy()
         sources[[0, 1]] = sources[[1, 0]]

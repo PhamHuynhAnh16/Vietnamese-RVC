@@ -221,6 +221,6 @@ def extract_features(model, feats, version):
         {
             "feats": feats.detach().cpu().numpy()
         }
-    )[0 if version == "v1" else 1]
+    )[int(version == "v1")]
 
     return torch.as_tensor(feats0, dtype=torch.float32, device=feats.device)

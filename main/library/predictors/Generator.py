@@ -290,7 +290,7 @@ class Generator:
         return self._resize_f0(f0, p_len)
     
     def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest"):
-        if not hasattr(self, "pw"): self.pw = PYWORLD(configs)
+        if not hasattr(self, "pw"): self.pw = PYWORLD(os.path.join(configs["predictors_path"], "world"), os.path.join(configs["binary_path"], "world.bin"))
 
         x = x.astype(np.double)
         pw = self.pw.harvest if model == "harvest" else self.pw.dio

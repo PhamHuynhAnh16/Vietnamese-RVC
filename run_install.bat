@@ -59,22 +59,26 @@ if not exist "runtime" (
 
     echo Hoàn tất xóa!
     echo Bắt đầu cài đặt ffmpeg...
-    
-    powershell -Command "Invoke-WebRequest -Uri '%FFMPEG%' -OutFile ffmpeg.exe"
-    powershell -Command "Invoke-WebRequest -Uri '%FFPROBE%' -OutFile ffprobe.exe"
 
     if not exist ffmpeg.exe (
-        echo Đã xảy ra lỗi khi cài tải xuống ffmpeg...
-        pause
-        exit /b 1
+        curl.exe -L "%FFMPEG%" -o ffmpeg.exe
+        if not exist ffmpeg.exe (
+            echo Đã xảy ra lỗi khi cài tải xuống ffmpeg...
+            pause
+            exit /b 1
+        )
     )
 
     if not exist ffprobe.exe (
-        echo Đã xảy ra lỗi khi cài tải xuống ffprobe...
-        pause
-        exit /b 1
-    )
+        curl.exe -L "%FFPROBE%" -o ffprobe.exe
 
+        if not exist ffprobe.exe (
+            echo Đã xảy ra lỗi khi cài tải xuống ffprobe...
+            pause
+            exit /b 1
+        )
+    )
+    
     echo Đã hoàn thành cài dặt ffmpeg. Tiến hành cài đặt môi trường chạy...
 
     if "%GPU_TYPE%"=="NVIDIA" (
@@ -88,16 +92,18 @@ if not exist "runtime" (
     set DOWNLOAD_URL=!BASE_URL!/runtime/!RUNTIME_ZIP!
     echo Đường dẫn liên kết: !DOWNLOAD_URL!
 
-    powershell -Command "Invoke-WebRequest -Uri '!DOWNLOAD_URL!' -OutFile runtime.zip"
-
     if not exist runtime.zip (
-        echo Đã xảy ra lỗi khi cài tải xuống môi trường chạy...
-        pause
-        exit /b 1
+        curl.exe -L "!DOWNLOAD_URL!" -o runtime.zip
+
+        if not exist runtime.zip (
+            echo Đã xảy ra lỗi khi cài tải xuống môi trường chạy...
+            pause
+            exit /b 1
+        )
     )
 
     echo Bắt đầu giải nén tệp runtime.zip...
-    powershell -Command "Expand-Archive -Path runtime.zip -DestinationPath . -Force"
+    tar -xf runtime.zip
     del runtime.zip
 
     echo Hoàn tất giải nén. Tiến hành tạo lại tệp khởi chạy...
@@ -120,9 +126,27 @@ if not exist "runtime" (
     echo set "scriptDir=%%~dp0" >> tensorboard.bat
     echo set "runtimeFolder=%%scriptDir%%runtime" >> tensorboard.bat
     echo. >> tensorboard.bat
-    echo runtime\\python.exe main/app/tensorboard.py --open >> tensorboard.bat
+    echo runtime\\python.exe main/app/run_tensorboard.py --open >> tensorboard.bat
     echo. >> tensorboard.bat
     echo pause >> tensorboard.bat
+
+    set PYTHON=runtime\python.exe
+
+    if not exist "%PYTHON%" (
+        echo Không tìm thấy %PYTHON%
+        exit /b 1
+    )
+
+    "%PYTHON%" -c "import packaging" 2>nul
+
+    if errorlevel 1 (
+        echo Chưa có packaging. Dang cài đặt...
+        "%PYTHON%" -m ensurepip --upgrade
+        "%PYTHON%" -m pip install --upgrade pip
+        "%PYTHON%" -m pip install packaging
+    ) else (
+        echo packaging đã được cài đặt.
+    )
 
     echo Đã cài đặt hoàn tất. Bạn có thể tiến hành sử dụng!
 ) else (

@@ -113,7 +113,7 @@ class CrossTransformerEncoder(nn.Module):
         assert dim % num_heads == 0
         hidden_dim = int(dim * hidden_scale)
         self.num_layers = num_layers
-        self.classic_parity = 1 if cross_first else 0
+        self.classic_parity = int(cross_first)
         self.emb = emb
         self.max_period = max_period
         self.weight_decay = weight_decay
