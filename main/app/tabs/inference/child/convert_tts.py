@@ -60,7 +60,7 @@ def convert_tts_tab():
                             unlock_full_method3 = gr.Checkbox(label=translations["f0_unlock"], info=translations["f0_unlock_info"], value=False, interactive=True)
                         method0 = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
                         hybrid_method0 = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=method0.value == "hybrid")
-                    hop_length0 = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                    hop_length0 = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
                 with gr.Accordion(translations["f0_file"], open=False):
                     upload_f0_file0 = gr.File(label=translations["upload_f0"], file_types=[".txt"])  
                     f0_file_dropdown0 = gr.Dropdown(label=translations["f0_file_2"], value="", choices=f0_file, allow_custom_value=True, interactive=True)
@@ -95,7 +95,7 @@ def convert_tts_tab():
                                 name_to_save_file = gr.Textbox(label=translations["filename_to_save"])
                                 save_file_button = gr.Button(translations["export_file"])
                     with gr.Row():
-                        upload_presets = gr.File(label=translations["upload_presets"], file_types=[".conversion.json"])  
+                        upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".conversion.json"])  
                 with gr.Group():
                     with gr.Row():
                         formant_shifting1 = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)  
@@ -104,9 +104,10 @@ def convert_tts_tab():
                     with gr.Row():
                         autotune3 = gr.Checkbox(label=translations["autotune"], value=False, interactive=True) 
                         checkpointing0 = gr.Checkbox(label=translations["memory_efficient_training"], value=False, interactive=True)     
-                        auto_pitch = gr.Checkbox(label=translations["auto_pitch"], value=False, interactive=True)
+                        proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
                 with gr.Column():
                     resample_sr0 = gr.Radio(choices=[0]+sample_rate_choice, label=translations["resample"], info=translations["resample_info"], value=0, interactive=True)
+                    proposal_pitch_threshold = gr.Slider(minimum=50.0, maximum=1200.0, label=translations["proposal_pitch_threshold"], info=translations["proposal_pitch_threshold_info"], value=255.0, step=0.1, interactive=True, visible=proposal_pitch.value)
                     f0_autotune_strength0 = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=autotune3.value)
                     clean_strength1 = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=cleaner1.value)
                     filter_radius0 = gr.Slider(minimum=0, maximum=7, label=translations["filter_radius"], info=translations["filter_radius_info"], value=3, step=1, interactive=True)
@@ -138,7 +139,8 @@ def convert_tts_tab():
                 f0_autotune_strength0, 
                 formant_qfrency1, 
                 formant_timbre1,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ], 
             outputs=[
                 cleaner1, 
@@ -155,7 +157,8 @@ def convert_tts_tab():
                 formant_shifting1, 
                 formant_qfrency1, 
                 formant_timbre1,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ]
         )
         refresh_click.click(fn=change_preset_choices, inputs=[], outputs=[presets_name])
@@ -187,12 +190,14 @@ def convert_tts_tab():
                 formant_shifting1, 
                 formant_qfrency1, 
                 formant_timbre1,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ], 
             outputs=[presets_name]
         )
     with gr.Row():
-        upload_presets.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["presets_path"]), inputs=[upload_presets], outputs=[presets_name])
+        proposal_pitch.change(fn=visible, inputs=[proposal_pitch], outputs=[proposal_pitch_threshold])
+        upload_presets.upload(fn=lambda presets_in: [shutil_move(preset.name, configs["presets_path"]) for preset in presets_in][0], inputs=[upload_presets], outputs=[presets_name])
         translate_button.click(fn=google_translate, inputs=[prompt, source_lang, target_lang], outputs=[prompt], api_name="google_translate")
     with gr.Row():
         unlock_full_method3.change(fn=unlock_f0, inputs=[unlock_full_method3], outputs=[method0])
@@ -209,7 +214,7 @@ def convert_tts_tab():
     with gr.Row():
         refresh1.click(fn=change_models_choices, inputs=[], outputs=[model_pth0, model_index0])
         embedders0.change(fn=lambda embedders: visible(embedders == "custom"), inputs=[embedders0], outputs=[custom_embedders0])
-        formant_shifting1.change(fn=lambda a: [visible(a)]*2, inputs=[formant_shifting1], outputs=[formant_qfrency1, formant_timbre1])
+        formant_shifting1.change(fn=lambda a: [visible(a) for _ in range(2)], inputs=[formant_shifting1], outputs=[formant_qfrency1, formant_timbre1])
     with gr.Row():
         model_index0.change(fn=index_strength_show, inputs=[model_index0], outputs=[index_strength0])
         txt_input.upload(fn=process_input, inputs=[txt_input], outputs=[prompt])
@@ -261,7 +266,8 @@ def convert_tts_tab():
                 formant_timbre1,
                 f0_file_dropdown0,
                 embed_mode1,
-                auto_pitch, 
+                proposal_pitch, 
+                proposal_pitch_threshold
             ],
             outputs=[tts_voice_convert],
             api_name="convert_tts"

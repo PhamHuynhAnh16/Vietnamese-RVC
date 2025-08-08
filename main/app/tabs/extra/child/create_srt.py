@@ -28,13 +28,13 @@ def create_srt_tab():
             with gr.Column():
                 refresh = gr.Button(translations["refresh"])
             with gr.Row():
-                input_file = gr.File(label=translations["drop_audio"], file_types=file_types)
+                input_file = gr.Files(label=translations["drop_audio"], file_types=file_types)
     with gr.Row():
         play_audio = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
     with gr.Row():
         output_srt = gr.File(label=translations["srt_output_file"], file_types=[".srt"], interactive=False, visible=False)
     with gr.Row():
-        input_file.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["audios_path"]), inputs=[input_file], outputs=[input_audio])
+        input_file.upload(fn=lambda audio_in: [shutil_move(audio.name, configs["audios_path"]) for audio in audio_in][0], inputs=[input_file], outputs=[input_audio])
         input_audio.change(fn=lambda audio: audio if os.path.isfile(audio) else None, inputs=[input_audio], outputs=[play_audio])
         refresh.click(fn=change_audios_choices, inputs=[input_audio], outputs=[input_audio])
     with gr.Row():

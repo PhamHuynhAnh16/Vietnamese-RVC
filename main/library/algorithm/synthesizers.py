@@ -74,36 +74,32 @@ class Synthesizer(torch.nn.Module):
             x_mask = x_mask[:, :, head:]
             if self.use_f0: nsff0 = nsff0[:, head:]
 
-        if self.use_f0:
-            z = self.flow(z_p, x_mask, g=g, reverse=True)
-            o = self.dec(z * x_mask, nsff0, g=g)
-        else:
-            z = self.flow(z_p, x_mask, g=g, reverse=True)
-            o = self.dec(z * x_mask, g=g)
+        z = self.flow(z_p, x_mask, g=g, reverse=True)
+        o = self.dec(z * x_mask, nsff0, g=g) if self.use_f0 else self.dec(z * x_mask, g=g)
 
         return o, x_mask, (z, z_p, m_p, logs_p)
     
 class SynthesizerONNX(Synthesizer):
     def __init__(self, spec_channels, segment_size, inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, spk_embed_dim, gin_channels, sr, use_f0, text_enc_hidden_dim=768, vocoder="Default", checkpointing=False, energy=False, **kwargs):
         super().__init__(spec_channels, segment_size, inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, spk_embed_dim, gin_channels, sr, use_f0, text_enc_hidden_dim, vocoder, checkpointing, True, energy)
-        self.speaker_map = None
 
     def remove_weight_norm(self):
         self.dec.remove_weight_norm()
         self.flow.remove_weight_norm()
         self.enc_q.remove_weight_norm()
 
-    def construct_spkmixmap(self, n_speaker):
-        self.speaker_map = torch.zeros((n_speaker, 1, 1, self.gin_channels))
-
-        for i in range(n_speaker):
-            self.speaker_map[i] = self.emb_g(torch.LongTensor([[i]]))
-
-        self.speaker_map = self.speaker_map.unsqueeze(0)
-
     def forward(self, phone, phone_lengths, g=None, rnd=None, pitch=None, nsff0=None, energy=None, max_len=None):
         g = self.emb_g(g).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths, energy)
         z_p = (m_p + torch.exp(logs_p) * rnd) * x_mask
 
-        return self.dec((self.flow(z_p, x_mask, g=g, reverse=True) * x_mask)[:, :, :max_len], nsff0, g=g) if self.use_f0 else self.dec((self.flow(z_p, x_mask, g=g, reverse=True) * x_mask)[:, :, :max_len], g=g)
+        z = self.flow(z_p, x_mask, g=g, reverse=True)
+
+        return self.dec(
+            (z * x_mask)[:, :, :max_len], 
+            nsff0, 
+            g=g
+        ) if self.use_f0 else self.dec(
+            (z * x_mask)[:, :, :max_len], 
+            g=g
+        )

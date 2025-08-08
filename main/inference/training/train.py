@@ -27,8 +27,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 sys.path.append(os.getcwd())
 
 from main.library import opencl
+from main.library.utils import clear_gpu_cache
 from main.app.variables import logger, translations
-from main.inference.conversion.utils import clear_gpu_cache
 from main.library.algorithm.synthesizers import Synthesizer
 from main.library.algorithm.discriminators import MultiPeriodDiscriminator
 from main.library.algorithm.commons import slice_segments, clip_grad_value
@@ -123,6 +123,7 @@ def main():
         def start():
             children = []
             pid_data = {"process_pids": []}
+
             with open(config_save_path, "r") as pid_file:
                 try:
                     pid_data.update(json.load(pid_file))

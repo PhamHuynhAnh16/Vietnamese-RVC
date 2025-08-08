@@ -67,12 +67,10 @@ class RMVPE:
     def infer_from_audio(self, audio, thred=0.03):
         hidden = self.mel2hidden(self.mel_extractor(torch.from_numpy(audio).float().to(self.device).unsqueeze(0), center=True))
 
-        return self.decode((hidden.squeeze(0).cpu().numpy().astype(np.float32) if self.is_half else hidden.squeeze(0).cpu().numpy()) if not self.onnx else hidden[0], thred=thred)
+        return self.decode(hidden.squeeze(0).cpu().numpy().astype(np.float32) if not self.onnx else hidden[0], thred=thred)
     
     def infer_from_audio_with_pitch(self, audio, thred=0.03, f0_min=50, f0_max=1100):
-        hidden = self.mel2hidden(self.mel_extractor(torch.from_numpy(audio).float().to(self.device).unsqueeze(0), center=True))
-
-        f0 = self.decode((hidden.squeeze(0).cpu().numpy().astype(np.float32) if self.is_half else hidden.squeeze(0).cpu().numpy()) if not self.onnx else hidden[0], thred=thred)
+        f0 = self.infer_from_audio(audio, thred)
         f0[(f0 < f0_min) | (f0 > f0_max)] = 0  
 
         return f0

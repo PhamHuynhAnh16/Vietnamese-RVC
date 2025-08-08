@@ -13,16 +13,16 @@ from librosa import yin, pyin, piptrack
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import get_providers
 from main.library.predictors.FCN.FCN import FCN
 from main.library.predictors.FCPE.FCPE import FCPE
+from main.library.predictors.DJCM.DJCM import DJCM
 from main.library.predictors.CREPE.CREPE import CREPE
 from main.library.predictors.RMVPE.RMVPE import RMVPE
 from main.library.predictors.WORLD.WORLD import PYWORLD
 from main.app.variables import configs, logger, translations
 from main.library.predictors.CREPE.filter import mean, median
 from main.library.predictors.WORLD.SWIPE import swipe, stonemask
-from main.inference.conversion.utils import autotune_f0, proposal_f0_up_key
+from main.library.utils import get_providers, autotune_f0, proposal_f0_up_key
 
 @nb.jit(nopython=True)
 def post_process(tf0, f0, f0_up_key, manual_x_pad, f0_mel_min, f0_mel_max, manual_f0 = None):
@@ -105,32 +105,30 @@ class Generator:
         )
     
     def compute_f0(self, f0_method, x, p_len, filter_radius):
-        return {
-            "pm-ac": lambda: self.get_f0_pm(x, p_len, filter_radius=filter_radius, mode="ac"), 
-            "pm-cc": lambda: self.get_f0_pm(x, p_len, filter_radius=filter_radius, mode="cc"), 
-            "pm-shs": lambda: self.get_f0_pm(x, p_len, filter_radius=filter_radius, mode="shs"), 
-            "dio": lambda: self.get_f0_pyworld(x, p_len, filter_radius, "dio"), 
-            "mangio-crepe-tiny": lambda: self.get_f0_mangio_crepe(x, p_len, "tiny"), 
-            "mangio-crepe-small": lambda: self.get_f0_mangio_crepe(x, p_len, "small"), 
-            "mangio-crepe-medium": lambda: self.get_f0_mangio_crepe(x, p_len, "medium"), 
-            "mangio-crepe-large": lambda: self.get_f0_mangio_crepe(x, p_len, "large"), 
-            "mangio-crepe-full": lambda: self.get_f0_mangio_crepe(x, p_len, "full"), 
-            "crepe-tiny": lambda: self.get_f0_crepe(x, p_len, "tiny", filter_radius=filter_radius), 
-            "crepe-small": lambda: self.get_f0_crepe(x, p_len, "small", filter_radius=filter_radius), 
-            "crepe-medium": lambda: self.get_f0_crepe(x, p_len, "medium", filter_radius=filter_radius), 
-            "crepe-large": lambda: self.get_f0_crepe(x, p_len, "large", filter_radius=filter_radius), 
-            "crepe-full": lambda: self.get_f0_crepe(x, p_len, "full", filter_radius=filter_radius), 
-            "fcpe": lambda: self.get_f0_fcpe(x, p_len, filter_radius=filter_radius), 
-            "fcpe-legacy": lambda: self.get_f0_fcpe(x, p_len, legacy=True, filter_radius=filter_radius), 
-            "rmvpe": lambda: self.get_f0_rmvpe(x, p_len, filter_radius=filter_radius), 
-            "rmvpe-legacy": lambda: self.get_f0_rmvpe(x, p_len, legacy=True, filter_radius=filter_radius), 
-            "harvest": lambda: self.get_f0_pyworld(x, p_len, filter_radius, "harvest"), 
-            "yin": lambda: self.get_f0_librosa(x, p_len, mode="yin"), 
-            "pyin": lambda: self.get_f0_librosa(x, p_len, mode="pyin"), 
-            "piptrack": lambda: self.get_f0_librosa(x, p_len, mode="piptrack"), 
-            "swipe": lambda: self.get_f0_swipe(x, p_len, filter_radius=filter_radius),
-            "fcn": lambda: self.get_f0_fcn(x, p_len, filter_radius=filter_radius)
-        }[f0_method]()
+        if "pm" in f0_method:
+            f0 = self.get_f0_pm(x, p_len, filter_radius=filter_radius, mode=f0_method.split("-")[1])
+        elif f0_method in ["harvest", "dio"]:
+            f0 = self.get_f0_pyworld(x, p_len, filter_radius, f0_method)
+        elif "crepe" in f0_method:
+            split_f0 = f0_method.split("-")
+            f0 = self.get_f0_mangio_crepe(x, p_len, split_f0[2]) if split_f0[0] == "mangio" else self.get_f0_crepe(x, p_len, split_f0[2], filter_radius=filter_radius)
+        elif "fcpe" in f0_method:
+            f0 = self.get_f0_fcpe(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
+        elif "rmvpe" in f0_method:
+            f0 = self.get_f0_rmvpe(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
+        elif f0_method in ["yin", "pyin", "piptrack"]:
+            f0 = self.get_f0_librosa(x, p_len, mode=f0_method)
+        elif "swipe" in f0_method:
+            f0 = self.get_f0_swipe(x, p_len, filter_radius=filter_radius)
+        elif "fcn" in f0_method:
+            f0 = self.get_f0_fcn(x, p_len, filter_radius=filter_radius)
+        elif "djcm" in f0_method:
+            f0 = self.get_f0_djcm(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
+        else:
+            raise ValueError(translations["option_not_valid"])
+        
+        if "medfilt" in f0_method: f0 = medfilt(f0, kernel_size=5)
+        return f0
     
     def get_f0_hybrid(self, methods_str, x, p_len, filter_radius):
         methods_str = re.search("hybrid\[(.+)\]", methods_str)
@@ -372,7 +370,7 @@ class Generator:
                     configs["predictors_path"], 
                     f"fcn.{'onnx' if self.f0_onnx_mode else 'pt'}"
                 ), 
-                hop_length=self.hop_length, 
+                hop_length=self.hop_length // 2, 
                 batch_size=self.batch_size, 
                 f0_min=self.f0_min, 
                 f0_max=self.f0_max, 
@@ -394,8 +392,24 @@ class Generator:
         f0, pd = mean(f0, filter_radius), median(pd, filter_radius)
         f0[pd < 0.1] = 0
 
-        f0 = f0[0].cpu().numpy()
-        for index, pitch in enumerate(f0):
-            f0[index] = round(pitch * 2.0190475097926434038940242706786, 1)
+        f0 = medfilt(f0[0].cpu().numpy(), filter_radius)
+        return self._resize_f0(f0, p_len)
+    
+    def get_f0_djcm(self, x, p_len, legacy=False, filter_radius=3):
+        if not hasattr(self, "djcm"): 
+            self.djcm = DJCM(
+                os.path.join(
+                    configs["predictors_path"], 
+                    "djcm" + (".onnx" if self.f0_onnx_mode else ".pt")
+                ), 
+                is_half=self.is_half, 
+                device=self.device, 
+                onnx=self.f0_onnx_mode, 
+                providers=self.providers
+            )
 
+        filter_radius = filter_radius / 100 + 0.05
+        f0 = self.djcm.infer_from_audio_with_pitch(x, thred=filter_radius, f0_min=self.f0_min, f0_max=self.f0_max) if legacy else self.djcm.infer_from_audio(x, thred=filter_radius)
+        
+        if self.f0_onnx_mode and self.del_onnx_model: del self.djcm.model, self.djcm
         return self._resize_f0(f0, p_len)

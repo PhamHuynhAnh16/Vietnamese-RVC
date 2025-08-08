@@ -37,11 +37,36 @@ def log_read(done, name):
 
     yield log
 
-def create_dataset(input_audio, output_dataset, clean_dataset, clean_strength, separator_reverb, kim_vocals_version, overlap, segments_size, denoise_mdx, skip, skip_start, skip_end, hop_length, batch_size, sample_rate):
-    version = 1 if kim_vocals_version == "Version-1" else 2
+def create_dataset(
+    input_data,
+    output_dirs,
+    skip_seconds,
+    skip_start_audios,
+    skip_end_audios,
+    separate,
+    model_name, 
+    reverb_model, 
+    denoise_model,
+    sample_rate,
+    shifts, 
+    batch_size, 
+    overlap, 
+    aggression,
+    hop_length, 
+    window_size,
+    segments_size, 
+    post_process_threshold,
+    enable_tta,
+    enable_denoise,
+    high_end_process,
+    enable_post_process,
+    separate_reverb,
+    clean_dataset,
+    clean_strength
+):
     gr_info(translations["start"].format(start=translations["create"]))
 
-    p = subprocess.Popen(f'{python} {configs["create_dataset_path"]} --input_audio "{input_audio}" --output_dataset "{output_dataset}" --clean_dataset {clean_dataset} --clean_strength {clean_strength} --separator_reverb {separator_reverb} --kim_vocal_version {version} --overlap {overlap} --segments_size {segments_size} --mdx_hop_length {hop_length} --mdx_batch_size {batch_size} --denoise_mdx {denoise_mdx} --skip {skip} --skip_start_audios "{skip_start}" --skip_end_audios "{skip_end}" --sample_rate {sample_rate}', shell=True)
+    p = subprocess.Popen(f'{python} {configs["create_dataset_path"]} --input_data "{input_data}" --output_dirs "{output_dirs}" --skip_seconds {skip_seconds} --skip_start_audios "{skip_start_audios}" --skip_end_audios "{skip_end_audios}" --separate {separate} --model_name "{model_name}" --reverb_model "{reverb_model}" --denoise_model "{denoise_model}" --sample_rate {sample_rate} --shifts {shifts} --batch_size {batch_size} --overlap {overlap} --aggression {aggression} --hop_length {hop_length} --window_size {window_size} --segments_size {segments_size} --post_process_threshold {post_process_threshold} --enable_tta {enable_tta} --enable_denoise {enable_denoise} --high_end_process {high_end_process} --enable_post_process {enable_post_process} --separate_reverb {separate_reverb} --clean_dataset {clean_dataset} --clean_strength {clean_strength}', shell=True)
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()

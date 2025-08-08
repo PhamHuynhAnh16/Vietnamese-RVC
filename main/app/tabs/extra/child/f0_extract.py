@@ -16,7 +16,7 @@ def f0_extract_tab():
         extractor_button = gr.Button(translations["extract_button"].replace("2. ", ""), variant="primary")
     with gr.Row():
         with gr.Column():
-            upload_audio_file = gr.File(label=translations["drop_audio"], file_types=file_types)
+            upload_audio_file = gr.Files(label=translations["drop_audio"], file_types=file_types)
             audioplay = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
         with gr.Column():
             with gr.Accordion(translations["f0_method"], open=False):
@@ -34,7 +34,7 @@ def f0_extract_tab():
         file_output = gr.File(label="", file_types=[".txt"], interactive=False)
         image_output = gr.Image(label="", interactive=False, show_download_button=True)
     with gr.Row():
-        upload_audio_file.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["audios_path"]), inputs=[upload_audio_file], outputs=[input_audio_path])
+        upload_audio_file.upload(fn=lambda audio_in: [shutil_move(audio.name, configs["audios_path"]) for audio in audio_in][0], inputs=[upload_audio_file], outputs=[input_audio_path])
         input_audio_path.change(fn=lambda audio: audio if os.path.isfile(audio) else None, inputs=[input_audio_path], outputs=[audioplay])
         refresh_audio_button.click(fn=change_audios_choices, inputs=[input_audio_path], outputs=[input_audio_path])
     with gr.Row():

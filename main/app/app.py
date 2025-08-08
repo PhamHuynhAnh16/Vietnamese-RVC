@@ -80,14 +80,15 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme, css="<style>
     
     sys.stdout = original_stdout
 
-    pipe = connect_discord_ipc()
-    if pipe:
-        try:
-            logger.info(translations["start_rpc"])
-            send_discord_rpc(pipe)
-        except KeyboardInterrupt:
-            logger.info(translations["stop_rpc"])
-            pipe.close()
+    if configs.get("discord_presence", True):
+        pipe = connect_discord_ipc()
+        if pipe:
+            try:
+                logger.info(translations["start_rpc"])
+                send_discord_rpc(pipe)
+            except KeyboardInterrupt:
+                logger.info(translations["stop_rpc"])
+                pipe.close()
 
     logger.info(f"{translations['running_local_url']}: {server_name}:{port}")
     if share: logger.info(f"{translations['running_share_url']}: {share_url}")

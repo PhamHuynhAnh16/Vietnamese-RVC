@@ -65,7 +65,7 @@ def extract_name_model(filename):
     match = re.search(r"_([A-Za-z0-9]+)(?=_v\d*)", filename.replace('-', '').replace('(', '').replace(')', '').replace('[', '').replace(']', '').replace(",", "").replace('"', "").replace("'", "").replace("|", "").replace("{", "").replace("}", "").strip())
     return match.group(1) if match else None
 
-def save_drop_model(dropbox):
+def save_drop_model(dropboxs):
     weight_folder = configs["weights_path"]
     logs_folder = configs["logs_path"]
     save_model_temp = "save_model_temp"
@@ -74,29 +74,29 @@ def save_drop_model(dropbox):
     if not os.path.exists(logs_folder): os.makedirs(logs_folder, exist_ok=True)
     if not os.path.exists(save_model_temp): os.makedirs(save_model_temp, exist_ok=True)
 
-    shutil.move(dropbox, save_model_temp)
-
     try:
-        file_name = os.path.basename(dropbox)
+        for dropbox in dropboxs:
+            shutil.move(dropbox, save_model_temp)
+            file_name = os.path.basename(dropbox)
 
-        if file_name.endswith(".zip"):
-            shutil.unpack_archive(os.path.join(save_model_temp, file_name), save_model_temp)
-            move_files_from_directory(save_model_temp, weight_folder, logs_folder, file_name.replace(".zip", ""))
-        elif file_name.endswith((".pth", ".onnx")): 
-            output_file = process_output(os.path.join(weight_folder, file_name))
-            
-            shutil.move(os.path.join(save_model_temp, file_name), output_file)
-        elif file_name.endswith(".index"):
-            modelname = extract_name_model(file_name)
-            if modelname is None: modelname = os.path.splitext(os.path.basename(file_name))[0]
+            if file_name.endswith(".zip"):
+                shutil.unpack_archive(os.path.join(save_model_temp, file_name), save_model_temp)
+                move_files_from_directory(save_model_temp, weight_folder, logs_folder, file_name.replace(".zip", ""))
+            elif file_name.endswith((".pth", ".onnx")): 
+                output_file = process_output(os.path.join(weight_folder, file_name))
+                
+                shutil.move(os.path.join(save_model_temp, file_name), output_file)
+            elif file_name.endswith(".index"):
+                modelname = extract_name_model(file_name)
+                if modelname is None: modelname = os.path.splitext(os.path.basename(file_name))[0]
 
-            model_logs = os.path.join(logs_folder, modelname)
-            if not os.path.exists(model_logs): os.makedirs(model_logs, exist_ok=True)
+                model_logs = os.path.join(logs_folder, modelname)
+                if not os.path.exists(model_logs): os.makedirs(model_logs, exist_ok=True)
 
-            shutil.move(os.path.join(save_model_temp, file_name), model_logs)
-        else: 
-            gr_warning(translations["unable_analyze_model"])
-            return None
+                shutil.move(os.path.join(save_model_temp, file_name), model_logs)
+            else: 
+                gr_warning(translations["unable_analyze_model"])
+                return None
         
         gr_info(translations["upload_success"].format(name=translations["model"]))
         return None

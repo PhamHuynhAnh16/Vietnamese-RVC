@@ -14,7 +14,7 @@ from scipy.signal import correlate, hilbert
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations
+from main.app.variables import translations, logger
 
 OPERATING_SYSTEM = platform.system()
 SYSTEM_ARCH = platform.platform()
@@ -138,7 +138,7 @@ def merge_artifacts(y_mask, thres=0.01, min_range=64, fade_size=32):
         mask = y_mask
     except Exception as e:
         import traceback
-        print(translations["not_success"], f'{type(e).__name__}: "{e}"\n{traceback.format_exc()}"')
+        logger.error(f'{translations["not_success"]} {type(e).__name__}: {e}\n{traceback.format_exc()}')
 
     return mask
 
@@ -147,7 +147,7 @@ def align_wave_head_and_tail(a, b):
     return a[:l, :l], b[:l, :l]
 
 def convert_channels(spec, mp, band):
-    cc = mp.param["band"][band].get("convert_channels")
+    cc = mp.param["band"][str(band)].get("convert_channels")
 
     if "mid_side_c" == cc:
         spec_left = np.add(spec[0], spec[1] * 0.25)
@@ -169,8 +169,8 @@ def combine_spectrograms(specs, mp, is_v51_model=False):
     bands_n = len(mp.param["band"])
 
     for d in range(1, bands_n + 1):
-        h = mp.param["band"][d]["crop_stop"] - mp.param["band"][d]["crop_start"]
-        spec_c[:, offset : offset + h, :l] = specs[d][:, mp.param["band"][d]["crop_start"] : mp.param["band"][d]["crop_stop"], :l]
+        h = mp.param["band"][str(d)]["crop_stop"] - mp.param["band"][str(d)]["crop_start"]
+        spec_c[:, offset : offset + h, :l] = specs[d][:, mp.param["band"][str(d)]["crop_start"] : mp.param["band"][str(d)]["crop_stop"], :l]
         offset += h
 
     if offset > mp.param["bins"]: raise ValueError("offset > mp.param['bins']")
@@ -226,7 +226,7 @@ def spectrogram_to_wave(spec, hop_length=1024, mp={}, band=0, is_v51_model=True)
     wave_right = librosa.istft(spec_right, hop_length=hop_length)
 
     if is_v51_model:
-        cc = mp.param["band"][band].get("convert_channels")
+        cc = mp.param["band"][str(band)].get("convert_channels")
 
         if "mid_side_c" == cc: return np.asfortranarray([np.subtract(wave_left / 1.0625, wave_right / 4.25), np.add(wave_right / 1.0625, wave_left / 4.25)])
         elif "mid_side" == cc: return np.asfortranarray([np.add(wave_left, wave_right / 2), np.subtract(wave_left, wave_right / 2)])
@@ -243,7 +243,7 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
     offset = 0
 
     for d in range(1, bands_n + 1):
-        bp = mp.param["band"][d]
+        bp = mp.param["band"][str(d)]
         spec_s = np.zeros(shape=(2, bp["n_fft"] // 2 + 1, spec_m.shape[2]), dtype=complex)
         h = bp["crop_stop"] - bp["crop_start"]
         spec_s[:, bp["crop_start"] : bp["crop_stop"], :] = spec_m[:, offset : offset + h, :]
@@ -260,16 +260,16 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
 
             wave = spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model) if bands_n == 1 else np.add(wave, spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model))
         else:
-            sr = mp.param["band"][d + 1]["sr"]
+            sr = mp.param["band"][str(d + 1)]["sr"]
             if d == 1: 
                 if is_v51_model: spec_s *= get_lp_filter_mask(spec_s.shape[1], bp["lpf_start"], bp["lpf_stop"])
                 else: spec_s = fft_lp_filter(spec_s, bp["lpf_start"], bp["lpf_stop"])
 
                 try:
-                    wave = librosa.resample(spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model), orig_sr=bp["sr"], target_sr=sr, res_type=wav_resolution)
+                    wave = librosa.resample(spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model), orig_sr=bp["sr"], target_sr=sr, res_type="soxr_vhq")
                 except ValueError as e:
-                    print(f"{translations['resample_error']}: {e}")
-                    print(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
+                    logger.error(f"{translations['resample_error']}: {e}")
+                    logger.error(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
             else:  
                 if is_v51_model:
                     spec_s *= get_hp_filter_mask(spec_s.shape[1], bp["hpf_start"], bp["hpf_stop"] - 1)
@@ -279,10 +279,10 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
                     spec_s = fft_lp_filter(spec_s, bp["lpf_start"], bp["lpf_stop"])
 
                 try:
-                    wave = librosa.resample(np.add(wave, spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model)), orig_sr=bp["sr"], target_sr=sr, res_type=wav_resolution)
+                    wave = librosa.resample(np.add(wave, spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model)), orig_sr=bp["sr"], target_sr=sr, res_type="soxr_vhq")
                 except ValueError as e:
-                    print(f"{translations['resample_error']}: {e}")
-                    print(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
+                    logger.error(f"{translations['resample_error']}: {e}")
+                    logger.error(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
 
     return wave
 
@@ -339,7 +339,7 @@ def adjust_aggr(mask, is_non_accom_stem, aggressiveness):
         if is_non_accom_stem:
             aggr = 1 - aggr
 
-        if np.any(aggr > 10) or np.any(aggr < -10): print(f"{translations['warnings']}: {aggr}")
+        if np.any(aggr > 10) or np.any(aggr < -10): logger.warning(f"{translations['warnings']}: {aggr}")
 
         aggr = [aggr, aggr]
 
@@ -360,7 +360,7 @@ def istft(spec, hl):
     return np.asfortranarray([librosa.istft(np.asfortranarray(spec[0]), hop_length=hl), librosa.istft(np.asfortranarray(spec[1]), hop_length=hl)])
 
 def spec_effects(wave, algorithm="Default", value=None):
-    if np.isnan(wave).any() or np.isinf(wave).any(): print(f"{translations['warnings_2']}: {wave.shape}")
+    if np.isnan(wave).any() or np.isinf(wave).any(): logger.warning(f"{translations['warnings_2']}: {wave.shape}")
     spec = [stft(wave[0], 2048, 1024), stft(wave[1], 2048, 1024)]
 
     if algorithm == "Min_Mag": wave = istft(np.where(np.abs(spec[1]) <= np.abs(spec[0]), spec[1], spec[0]), 1024)
@@ -530,7 +530,7 @@ def change_pitch_semitones(y, sr, semitone_shift):
     y_pitch_tuned = []
 
     for y_channel in y:
-        y_pitch_tuned.append(librosa.resample(y_channel, orig_sr=sr, target_sr=sr * factor, res_type=wav_resolution_float_resampling))
+        y_pitch_tuned.append(librosa.resample(y_channel, orig_sr=sr, target_sr=sr * factor, res_type="soxr_vhq"))
 
     y_pitch_tuned = np.array(y_pitch_tuned)
     new_sr = sr * factor

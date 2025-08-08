@@ -25,7 +25,7 @@ def audio_effects_tab():
     with gr.Row():
         with gr.Accordion(translations["input_output"], open=False):
             with gr.Row():
-                upload_audio = gr.File(label=translations["drop_audio"], file_types=file_types)
+                upload_audio = gr.Files(label=translations["drop_audio"], file_types=file_types)
             with gr.Row():
                 audio_in_path = gr.Dropdown(label=translations["input_audio"], value="", choices=paths_for_files, info=translations["provide_audio"], interactive=True, allow_custom_value=True)
                 audio_out_path = gr.Textbox(label=translations["output_audio"], value="audios/audio_effects.wav", placeholder="audios/audio_effects.wav", info=translations["provide_output"], interactive=True)
@@ -53,7 +53,7 @@ def audio_effects_tab():
                         name_to_save_file = gr.Textbox(label=translations["filename_to_save"])
                         save_file_button = gr.Button(translations["export_file"])
             with gr.Row():
-                upload_presets = gr.File(label=translations["upload_presets"], file_types=[".effect.json"]) 
+                upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".effect.json"]) 
     with gr.Row():
         apply_effects_button = gr.Button(translations["apply"], variant="primary", scale=2)
     with gr.Row():
@@ -150,15 +150,15 @@ def audio_effects_tab():
         clipping_checkbox.change(fn=visible, inputs=[clipping_checkbox], outputs=[clipping_threshold_db])
         bitcrush_checkbox.change(fn=visible, inputs=[bitcrush_checkbox], outputs=[bitcrush_bit_depth])
     with gr.Row():
-        upload_audio.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["audios_path"]), inputs=[upload_audio], outputs=[audio_in_path])
+        upload_audio.upload(fn=lambda audio_in: [shutil_move(audio.name, configs["audios_path"]) for audio in audio_in][0], inputs=[upload_audio], outputs=[audio_in_path])
         audio_in_path.change(fn=lambda audio: audio if audio else None, inputs=[audio_in_path], outputs=[audio_play_input])
         audio_effects_refresh.click(fn=lambda a, b: [change_audios_choices(a), change_audios_choices(b)], inputs=[audio_in_path, audio_combination_input], outputs=[audio_in_path, audio_combination_input])
     with gr.Row():
         more_options.change(fn=lambda: [False]*8, inputs=[], outputs=[fade, bass_or_treble, limiter, resample_checkbox, distortion_checkbox, gain_checkbox, clipping_checkbox, bitcrush_checkbox])
         audio_combination.change(fn=visible, inputs=[audio_combination], outputs=[audio_combination_input])
-        audio_combination.change(fn=lambda a: [visible(a)]*2, inputs=[audio_combination], outputs=[main_vol, combine_vol])
+        audio_combination.change(fn=lambda a: [visible(a) for _ in range(2)], inputs=[audio_combination], outputs=[main_vol, combine_vol])
     with gr.Row():
-        upload_presets.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["presets_path"]), inputs=[upload_presets], outputs=[presets_name])
+        upload_presets.upload(fn=lambda presets_in: [shutil_move(preset.name, configs["presets_path"]) for preset in presets_in][0], inputs=[upload_presets], outputs=[presets_name])
         refresh_click.click(fn=change_effect_preset_choices, inputs=[], outputs=[presets_name])
     with gr.Row():
         load_click.click(

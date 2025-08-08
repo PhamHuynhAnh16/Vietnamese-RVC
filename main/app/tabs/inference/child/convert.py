@@ -38,7 +38,7 @@ def convert_tab():
             convert_button = gr.Button(translations["convert_audio"], variant="primary")
     with gr.Row():
         with gr.Column():
-            input0 = gr.File(label=translations["drop_audio"], file_types=file_types)  
+            input0 = gr.Files(label=translations["drop_audio"], file_types=file_types)  
             play_audio = gr.Audio(show_download_button=True, interactive=False, label=translations["input_audio"])
         with gr.Column():
             with gr.Accordion(translations["model_accordion"], open=True):
@@ -64,7 +64,7 @@ def convert_tab():
                             unlock_full_method = gr.Checkbox(label=translations["f0_unlock"], info=translations["f0_unlock_info"], value=False, interactive=True)
                         method = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
                         hybrid_method = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=method.value == "hybrid")
-                    hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                    hop_length = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
                 with gr.Accordion(translations["f0_file"], open=False):
                     upload_f0_file = gr.File(label=translations["upload_f0"], file_types=[".txt"])  
                     f0_file_dropdown = gr.Dropdown(label=translations["f0_file_2"], value="", choices=f0_file, allow_custom_value=True, interactive=True)
@@ -99,13 +99,14 @@ def convert_tab():
                                 name_to_save_file = gr.Textbox(label=translations["filename_to_save"])
                                 save_file_button = gr.Button(translations["export_file"])
                     with gr.Row():
-                        upload_presets = gr.File(label=translations["upload_presets"], file_types=[".conversion.json"])  
+                        upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".conversion.json"])  
                 with gr.Column():
                     with gr.Row():
                         split_audio = gr.Checkbox(label=translations["split_audio"], value=False, interactive=True)
                         formant_shifting = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)
-                        auto_pitch = gr.Checkbox(label=translations["auto_pitch"], value=False, interactive=True)
+                        proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
                     resample_sr = gr.Radio(choices=[0]+sample_rate_choice, label=translations["resample"], info=translations["resample_info"], value=0, interactive=True)
+                    proposal_pitch_threshold = gr.Slider(minimum=50.0, maximum=1200.0, label=translations["proposal_pitch_threshold"], info=translations["proposal_pitch_threshold_info"], value=255.0, step=0.1, interactive=True, visible=proposal_pitch.value)
                     f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=autotune.value)
                     filter_radius = gr.Slider(minimum=0, maximum=7, label=translations["filter_radius"], info=translations["filter_radius_info"], value=3, step=1, interactive=True)
                     rms_mix_rate = gr.Slider(minimum=0, maximum=1, label=translations["rms_mix_rate"], info=translations["rms_mix_rate_info"], value=1, step=0.1, interactive=True)
@@ -144,7 +145,8 @@ def convert_tab():
                 f0_autotune_strength, 
                 formant_qfrency, 
                 formant_timbre,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ], 
             outputs=[
                 cleaner0, 
@@ -161,7 +163,8 @@ def convert_tab():
                 formant_shifting, 
                 formant_qfrency, 
                 formant_timbre,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ]
         )
         refresh_click.click(fn=change_preset_choices, inputs=[], outputs=[presets_name])
@@ -193,12 +196,13 @@ def convert_tab():
                 formant_shifting, 
                 formant_qfrency, 
                 formant_timbre,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ], 
             outputs=[presets_name]
         )
     with gr.Row():
-        upload_presets.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["presets_path"]), inputs=[upload_presets], outputs=[presets_name])
+        upload_presets.upload(fn=lambda presets_in: [shutil_move(preset.name, configs["presets_path"]) for preset in presets_in][0], inputs=[upload_presets], outputs=[presets_name])
         autotune.change(fn=visible, inputs=[autotune], outputs=[f0_autotune_strength])
         use_audio.change(fn=lambda a: [visible(a), visible(a), visible(a), visible(a), visible(a), valueFalse_interactive(a), valueFalse_interactive(a), valueFalse_interactive(a), valueFalse_interactive(a), visible(not a), visible(not a), visible(not a), visible(not a)], inputs=[use_audio], outputs=[main_backing, use_original, convert_backing, not_merge_backing, merge_instrument, use_original, convert_backing, not_merge_backing, merge_instrument, input_audio0, output_audio, input0, play_audio])
     with gr.Row():
@@ -214,9 +218,9 @@ def convert_tab():
         refresh.click(fn=change_models_choices, inputs=[], outputs=[model_pth, model_index])
         model_pth.change(fn=get_index, inputs=[model_pth], outputs=[model_index])
     with gr.Row():
-        input0.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["audios_path"]), inputs=[input0], outputs=[input_audio0])
+        input0.upload(fn=lambda audio_in: [shutil_move(audio.name, configs["audios_path"]) for audio in audio_in][0], inputs=[input0], outputs=[input_audio0])
         input_audio0.change(fn=lambda audio: audio if os.path.isfile(audio) else None, inputs=[input_audio0], outputs=[play_audio])
-        formant_shifting.change(fn=lambda a: [visible(a)]*2, inputs=[formant_shifting], outputs=[formant_qfrency, formant_timbre])
+        formant_shifting.change(fn=lambda a: [visible(a) for _ in range(2)], inputs=[formant_shifting], outputs=[formant_qfrency, formant_timbre])
     with gr.Row():
         embedders.change(fn=lambda embedders: visible(embedders == "custom"), inputs=[embedders], outputs=[custom_embedders])
         refresh0.click(fn=change_audios_choices, inputs=[input_audio0], outputs=[input_audio0])
@@ -225,6 +229,7 @@ def convert_tab():
         convert_button.click(fn=lambda: visible(False), inputs=[], outputs=[convert_button])
         convert_button_2.click(fn=lambda: [visible(False), visible(False)], inputs=[], outputs=[audio_select, convert_button_2])
     with gr.Row():
+        proposal_pitch.change(fn=visible, inputs=[proposal_pitch], outputs=[proposal_pitch_threshold])
         embed_mode.change(fn=visible_embedders, inputs=[embed_mode], outputs=[embedders])
     with gr.Row():
         convert_button.click(
@@ -263,7 +268,8 @@ def convert_tab():
                 formant_timbre,
                 f0_file_dropdown,
                 embed_mode,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ],
             outputs=[audio_select, main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button, convert_button_2],
             api_name="convert_selection"
@@ -305,7 +311,8 @@ def convert_tab():
                 formant_timbre,
                 f0_file_dropdown,
                 embed_mode,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ],
             outputs=[main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button],
             api_name="convert_audio"

@@ -49,7 +49,7 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 - Mô hình ONNX RVC cũng sẽ hỗ trợ chỉ mục để suy luận
 
-**Phương thức trích xuất cao độ: `pm-ac, pm-cc, pm-shs, dio, mangio-crepe-tiny, mangio-crepe-small, mangio-crepe-medium, mangio-crepe-large, mangio-crepe-full, crepe-tiny, crepe-small, crepe-medium, crepe-large, crepe-full, fcpe, fcpe-legacy, rmvpe, rmvpe-legacy, harvest, yin, pyin, swipe, piptrack, fcn`**
+**Phương thức trích xuất cao độ: `pm-ac, pm-cc, pm-shs, dio, mangio-crepe-tiny, mangio-crepe-small, mangio-crepe-medium, mangio-crepe-large, mangio-crepe-full, crepe-tiny, crepe-small, crepe-medium, crepe-large, crepe-full, fcpe, fcpe-legacy, rmvpe, rmvpe-legacy, rmvpe-medfilt, rmvpe-legacy-medfilt, harvest, yin, pyin, swipe, piptrack, fcn, djcm, djcm-legacy, djcm-medfilt, djcm-legacy-medfilt`**
 
 **Các mô hình trích xuất nhúng: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin`**
 
@@ -62,7 +62,7 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 **Sẽ có nếu tôi thực sự rảnh...**
 
-## Cài đặt
+## Cài đặt nâng cao
 
 Bước 1: Cài đặt các phần phụ trợ cần thiết
 
@@ -79,7 +79,7 @@ Cài đặt bằng github:
 - Vào https://github.com/PhamHuynhAnh16/Vietnamese-RVC
 - Nhấn vào `<> Code` màu xanh lá chọn `Download ZIP`
 - Giải nén `Vietnamese-RVC-main.zip`
-- Vào thư mục Vietnamese-RVC-main chọn vào thanh Path nhập `cmd` và nhấn Enter
+- Vào thư mục Vietnamese-RVC-main chọn vào thanh đường dẫn nhập `cmd` và nhấn Enter
 
 Bước 3: Cài đặt thư viện cần thiết:
 
@@ -87,6 +87,9 @@ Nhập lệnh:
 ```
 python -m venv env
 env\\Scripts\\activate
+
+python -m pip install uv
+uv pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common
 ```
 
 Cài đặt đối với các thiết bị khác nhau
@@ -95,7 +98,7 @@ Cài đặt đối với các thiết bị khác nhau
 <summary>Đối với CPU</summary>
 
 ```
-python -m pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 </details>
@@ -105,8 +108,8 @@ python -m pip install -r requirements.txt
 
 Có thể thay cu118 thành bản cu128 mới hơn nếu GPU hỗ trợ:
 ```
-python -m pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
-python -m pip install -r requirements.txt
+uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
+uv pip install -r requirements.txt
 ```
 
 </details>
@@ -115,10 +118,10 @@ python -m pip install -r requirements.txt
 <summary>Đối với AMD</summary>
 
 ```
-python -m pip install torch==2.6.0 torchaudio==2.6.0 torchvision
-python -m pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
-python -m pip install onnxruntime-directml
-python -m pip install -r requirements.txt
+uv pip install torch==2.6.0 torchaudio==2.6.0 torchvision
+uv pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
+uv pip install onnxruntime-directml
+uv pip install -r requirements.txt
 ```
 
 Lưu ý đối với AMD: 
@@ -168,254 +171,6 @@ python main\\app\\parser.py --help
 - Giải nén dự án.
 - Chạy tệp run_install.bat để bắt đầu cài đặt.
 - Chạy tệp run_app.bat để mở giao diện hoạt động.
-
-## Cấu trúc chính của mã nguồn:
-
-<details>
-<summary>Nhấn vào để xem</summary>
-
-<pre>
-Vietnamese-RVC-main
-├── assets
-│   ├── autopitch
-│   │   ├── emb_feats.npz
-│   │   └── rvc_feats.npz
-│   ├── binary
-│   │   ├── decrypt.bin
-│   │   └── world.bin
-│   ├── f0
-│   ├── languages
-│   │   ├── en-US.json
-│   │   └── vi-VN.json
-│   ├── logs
-│   │   └── mute
-│   │       ├── energy
-│   │       │   └── mute.wav.npy
-│   │       ├── f0
-│   │       │   └── mute.wav.npy
-│   │       ├── f0_voiced
-│   │       │   └── mute.wav.npy
-│   │       ├── sliced_audios
-│   │       │   ├── mute32000.wav
-│   │       │   ├── mute40000.wav
-│   │       │   └── mute48000.wav
-│   │       ├── sliced_audios_16k
-│   │       │   └── mute.wav
-│   │       ├── v1_extracted
-│   │       │   ├── mute.npy
-│   │       │   ├── mute_chinese.npy
-│   │       │   ├── mute_japanese.npy
-│   │       │   ├── mute_korean.npy
-│   │       │   ├── mute_portuguese.npy
-│   │       │   ├── mute_vietnamese.npy
-│   │       │   └── mute_spin.npy
-│   │       └── v2_extracted
-│   │           ├── mute.npy
-│   │           ├── mute_chinese.npy
-│   │           ├── mute_japanese.npy
-│   │           ├── mute_korean.npy
-│   │           ├── mute_portuguese.npy
-│   │           ├── mute_vietnamese.npy
-│   │           └── mute_spin.npy
-│   ├── models
-│   │   ├── embedders
-│   │   ├── predictors
-│   │   ├── pretrained_custom
-│   │   ├── pretrained_v1
-│   │   ├── pretrained_v2
-│   │   ├── speaker_diarization
-│   │   │   ├── assets
-│   │   │   │   ├── gpt2.tiktoken
-│   │   │   │   ├── mel_filters.npz
-│   │   │   │   └── multilingual.tiktoken
-│   │   │   └── models
-│   │   └── uvr5
-│   ├── presets
-│   ├── weights
-│   └── ico.png
-├── audios
-├── dataset
-├── main
-│   ├── app
-│   │   ├── core
-│   │   │   ├── csrt.py
-│   │   │   ├── downloads.py
-│   │   │   ├── editing.py
-│   │   │   ├── f0_extract.py
-│   │   │   ├── inference.py
-│   │   │   ├── model_utils.py
-│   │   │   ├── presets.py
-│   │   │   ├── process.py
-│   │   │   ├── restart.py
-│   │   │   ├── separate.py
-│   │   │   ├── training.py
-│   │   │   ├── tts.py
-│   │   │   ├── ui.py
-│   │   │   └── utils.py
-│   │   ├── tabs
-│   │   │   ├── downloads
-│   │   │   │   └── downloads.py
-│   │   │   ├── editing
-│   │   │   │   ├── editing.py
-│   │   │   │   └── child
-│   │   │   │       ├── audio_effects.py
-│   │   │   │       └── quirk.py
-│   │   │   ├── extra
-│   │   │   │   ├── extra.py
-│   │   │   │   └── child
-│   │   │   │       ├── create_srt.py
-│   │   │   │       ├── convert_model.py
-│   │   │   │       ├── f0_extract.py
-│   │   │   │       ├── fushion.py
-│   │   │   │       ├── read_model.py
-│   │   │   │       └── settings.py
-│   │   │   ├── inference
-│   │   │   │   ├── inference.py
-│   │   │   │   └── child
-│   │   │   │       ├── convert.py
-│   │   │   │       ├── convert_tts.py
-│   │   │   │       ├── convert_with_whisper.py
-│   │   │   │       └── separate.py
-│   │   │   └── training
-│   │   │       ├── training.py
-│   │   │       └── child
-│   │   │           ├── create_dataset.py
-│   │   │           └── training.py
-│   │   ├── app.py
-│   │   ├── parser.py
-│   │   ├── run_tensorboard.py
-│   │   └── variables.py
-│   ├── configs
-│   │   ├── config.json
-│   │   ├── config.py
-│   │   ├── rpc.py
-│   │   ├── v1
-│   │   │   ├── 32000.json
-│   │   │   ├── 40000.json
-│   │   │   └── 48000.json
-│   │   └── v2
-│   │       ├── 32000.json
-│   │       ├── 40000.json
-│   │       └── 48000.json
-│   ├── inference
-│   │   ├── audio_effects.py
-│   │   ├── create_dataset.py
-│   │   ├── create_index.py
-│   │   ├── separator_music.py
-│   │   ├── extracting
-│   │   │   ├── embedding.py
-│   │   │   ├── extract.py
-│   │   │   ├── feature.py
-│   │   │   ├── preparing_files.py
-│   │   │   ├── rms.py
-│   │   │   └── setup_path.py
-│   │   ├── training
-│   │   │   ├── train.py
-│   │   │   ├── data_utils.py
-│   │   │   ├── losses.py
-│   │   │   ├── mel_processing.py
-│   │   │   └── utils.py
-│   │   ├── conversion
-│   │   │   ├── convert.py
-│   │   │   ├── pipeline.py
-│   │   │   └── utils.py
-│   │   └── preprocess
-│   │       ├── preprocess.py
-│   │       └── slicer2.py
-│   ├── library
-│   │   ├── utils.py
-│   │   ├── opencl.py
-│   │   ├── algorithm
-│   │   │   ├── autopitch.py
-│   │   │   ├── attentions.py
-│   │   │   ├── commons.py
-│   │   │   ├── discriminators.py
-│   │   │   ├── encoders.py
-│   │   │   ├── modules.py
-│   │   │   ├── normalization.py
-│   │   │   ├── onnx_export.py
-│   │   │   ├── residuals.py
-│   │   │   ├── stftpitchshift.py
-│   │   │   └── synthesizers.py
-│   │   ├── architectures
-│   │   │   ├── demucs_separator.py
-│   │   │   ├── fairseq.py
-│   │   │   └── mdx_separator.py
-│   │   ├── generators
-│   │   │   ├── hifigan.py
-│   │   │   ├── mrf_hifigan.py
-│   │   │   ├── nsf_hifigan.py
-│   │   │   └── refinegan.py
-│   │   ├── predictors
-│   │   │   ├── CREPE
-│   │   │   │   ├── CREPE.py
-│   │   │   │   ├── filter.py
-│   │   │   │   └── model.py
-│   │   │   ├── FCN
-│   │   │   │   ├── FCN.py
-│   │   │   │   ├── convert.py
-│   │   │   │   └── model.py
-│   │   │   ├── FCPE
-│   │   │   │   ├── attentions.py
-│   │   │   │   ├── encoder.py
-│   │   │   │   ├── FCPE.py
-│   │   │   │   ├── stft.py
-│   │   │   │   ├── utils.py
-│   │   │   │   └── wav2mel.py
-│   │   │   ├── RMVPE
-│   │   │   │   ├── RMVPE.py
-│   │   │   │   ├── deepunet.py
-│   │   │   │   ├── e2e.py
-│   │   │   │   └── mel.py
-│   │   │   ├── WORLD
-│   │   │   │   ├── WORLD.py
-│   │   │   │   └── SWIPE.py
-│   │   │   └── Generator.py
-│   │   ├── speaker_diarization
-│   │   │   ├── audio.py
-│   │   │   ├── ECAPA_TDNN.py
-│   │   │   ├── embedding.py
-│   │   │   ├── encoder.py
-│   │   │   ├── features.py
-│   │   │   ├── parameter_transfer.py
-│   │   │   ├── segment.py
-│   │   │   ├── speechbrain.py
-│   │   │   └── whisper.py
-│   │   └── uvr5_lib
-│   │       ├── common_separator.py
-│   │       ├── separator.py
-│   │       ├── spec_utils.py
-│   │       └── demucs
-│   │           ├── apply.py
-│   │           ├── demucs.py
-│   │           ├── hdemucs.py
-│   │           ├── htdemucs.py
-│   │           ├── states.py
-│   │           └── utils.py
-│   └── tools
-│       ├── gdown.py
-│       ├── huggingface.py
-│       ├── mediafire.py
-│       ├── meganz.py
-│       ├── noisereduce.py
-│       └── pixeldrain.py
-├── docker-compose-amd.yaml
-├── docker-compose-cpu.yaml
-├── docker-compose-cuda118.yaml
-├── docker-compose-cuda128.yaml
-├── Dockerfile
-├── Dockerfile.amd
-├── Dockerfile.cuda118
-├── Dockerfile.cuda128
-├── LICENSE
-├── README.md
-├── requirements.txt
-├── run_app.bat
-├── run_install.bat
-└── tensorboard.bat
-</pre>
-
-</details>
 
 ## LƯU Ý
 
@@ -485,18 +240,17 @@ Tài liệu này trình bày chi tiết các phương pháp trích xuất cao đ
 |--------------------|----------------|---------------------------|------------------------------|--------------------|--------------------|
 | pm                 | Praat          | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
 | dio                | PYWORLD        | Thích hợp với Rap         | Kém chính xác với tần số cao | Trung bình         | Trung bình         |
-| harvest            | PYWORLD        | Chính xác hơn DIO         | Xử lý chậm hơn               | Cao                | Rất cao            |
+| harvest            | PYWORLD        | Chính xác hơn DIO         | Xử lý chậm                   | Cao                | Rất cao            |
 | crepe              | Deep Learning  | Chính xác cao             | Yêu cầu GPU                  | Rất cao            | Rất cao            |
 | mangio-crepe       | crepe nofilter | Tối ưu hóa cho RVC        | Đôi khi kém crepe gốc        | Trung bình đến cao | Trung bình đến cao |
 | fcpe               | Deep Learning  | Chính xác, thời gian thực | Cần GPU mạnh                 | Khá                | Trung bình         |
-| fcpe-legacy        | FCPE Old       | Chính xác, thời gian thực | Cũ hơn                       | Khá                | Trung bình         |
 | rmvpe              | Deep Learning  | Hiệu quả với giọng hát    | Tốn tài nguyên               | Rất cao            | Xuất sắc           |
-| rmvpe-legacy       | RMVPE Old      | Tính toán với Fmin-max    | Cũ hơn                       | Cao                | Khá                |
 | yin                | Librosa        | Đơn giản, hiệu quả        | Dễ lỗi bội                   | Trung bình         | Thấp               |
 | pyin               | Librosa        | Ổn định hơn YIN           | Tính toán phức tạp hơn       | Khá                | Khá                |
 | swipe              | WORLD          | Độ chính xác cao          | Nhạy cảm với nhiễu           | Cao                | Khá                |
 | piptrack           | Librosa        | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
-| fcn                | Deep Learning  | Không Rõ                  | F0 Thấp và chậm              | Trung bình         | Trung bình         |
+| fcn                | Deep Learning  | Không Rõ                  | Xử lý chậm                   | Trung bình         | Trung bình         |
+| djcm               | Deep Learning  | Phụ âm có vẻ tốt          | Yêu cầu GPU                  | Cao                | Cao                |
 
 </details>
 

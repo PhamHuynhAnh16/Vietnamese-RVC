@@ -1,5 +1,6 @@
 import os
 import re
+import gc
 import sys
 import torch
 import codecs
@@ -8,14 +9,16 @@ import logging
 import onnxruntime
 
 import numpy as np
-import torch.nn as nn
 import soundfile as sf
+import torch.nn.functional as F
 
+from torch import nn
 from pydub import AudioSegment
 from transformers import HubertModel
 
 sys.path.append(os.getcwd())
 
+from main.library import opencl
 from main.tools import huggingface
 from main.library.architectures import fairseq
 from main.app.variables import translations, configs, config, embedders_model, logger
@@ -66,7 +69,7 @@ def check_assets(method, hubert, f0_onnx=False, embedders_mode="fairseq"):
         return os.path.exists(model_path)
 
     model_dict = {
-        **dict.fromkeys(["rmvpe", "rmvpe-legacy"], "rmvpe.pt"), 
+        **dict.fromkeys(["rmvpe", "rmvpe-legacy", "rmvpe-medfilt", "rmvpe-legacy-medfilt"], "rmvpe.pt"), 
         **dict.fromkeys(["rmvpe-onnx", "rmvpe-legacy-onnx"], "rmvpe.onnx"), 
         **dict.fromkeys(["fcpe"], "fcpe.pt"), 
         **dict.fromkeys(["fcpe-legacy"], "fcpe_legacy.pt"), 
@@ -83,7 +86,9 @@ def check_assets(method, hubert, f0_onnx=False, embedders_mode="fairseq"):
         **dict.fromkeys(["crepe-tiny", "mangio-crepe-tiny"], "crepe_tiny.pth"), 
         **dict.fromkeys(["crepe-tiny-onnx", "mangio-crepe-tiny-onnx"], "crepe_tiny.onnx"),
         **dict.fromkeys(["fcn"], "fcn.pt"), 
-        **dict.fromkeys(["fcn-onnx"], "fcn.onnx")
+        **dict.fromkeys(["fcn-onnx"], "fcn.onnx"),
+        **dict.fromkeys(["djcm", "djcm-legacy", "djcm-medfilt", "djcm-legacy-medfilt"], "djcm.pt"), 
+        **dict.fromkeys(["djcm-onnx", "djcm-legacy-onnx", "djcm-medfilt-onnx", "djcm-legacy-medfilt-onnx"], "djcm.onnx"), 
     }
     
     results = []
@@ -221,6 +226,116 @@ def extract_features(model, feats, version):
         {
             "feats": feats.detach().cpu().numpy()
         }
-    )[int(version == "v1")]
+    )[int(version != "v1")]
 
     return torch.as_tensor(feats0, dtype=torch.float32, device=feats.device)
+
+def autotune_f0(note_dict, f0, f0_autotune_strength):
+    autotuned_f0 = np.zeros_like(f0)
+
+    for i, freq in enumerate(f0):
+        autotuned_f0[i] = freq + (min(note_dict, key=lambda x: abs(x - freq)) - freq) * f0_autotune_strength
+
+    return autotuned_f0
+
+def change_rms(source_audio, source_rate, target_audio, target_rate, rate):
+    rms2 = F.interpolate(
+        torch.from_numpy(
+            librosa.feature.rms(
+                y=target_audio, 
+                frame_length=target_rate // 2 * 2, 
+                hop_length=target_rate // 2
+            )
+        ).float().unsqueeze(0), 
+        size=target_audio.shape[0], 
+        mode="linear"
+    ).squeeze()
+
+    return (
+        target_audio * (
+            torch.pow(
+                F.interpolate(
+                    torch.from_numpy(
+                        librosa.feature.rms(
+                            y=source_audio, 
+                            frame_length=source_rate // 2 * 2, 
+                            hop_length=source_rate // 2
+                        )
+                    ).float().unsqueeze(0), 
+                    size=target_audio.shape[0], 
+                    mode="linear"
+                ).squeeze(), 
+                1 - rate
+            ) * torch.pow(
+                torch.maximum(
+                    rms2, 
+                    torch.zeros_like(rms2) + 1e-6
+                ), 
+                rate - 1
+            )
+        ).numpy()
+    )
+
+def clear_gpu_cache():
+    gc.collect()
+
+    if torch.cuda.is_available(): torch.cuda.empty_cache()
+    elif torch.backends.mps.is_available(): torch.mps.empty_cache()
+    elif opencl.is_available(): opencl.pytorch_ocl.empty_cache()
+
+def extract_median_f0(f0):
+    f0 = np.where(f0 == 0, np.nan, f0)
+
+    return float(
+        np.median(
+            np.interp(
+                np.arange(len(f0)), 
+                np.where(~np.isnan(f0))[0], 
+                f0[~np.isnan(f0)]
+            )
+        )
+    )
+
+def proposal_f0_up_key(f0, target_f0 = 155.0, limit = 12):
+    try:
+        return max(
+            -limit, 
+            min(
+                limit, 
+                int(np.round(
+                    12 * np.log2(
+                        target_f0 / extract_median_f0(f0)
+                    )
+                ))
+            )
+        )
+    except ValueError:
+        return 0
+
+def get_onnx_argument(net_g, feats, p_len, sid, pitch, pitchf, energy, pitch_guidance, energy_use):
+    inputs = {
+        net_g.get_inputs()[0].name: feats.cpu().numpy().astype(np.float32),
+        net_g.get_inputs()[1].name: p_len.cpu().numpy(),
+        net_g.get_inputs()[2].name: np.array([sid.cpu().item()], dtype=np.int64),
+        net_g.get_inputs()[3].name: np.random.randn(1, 192, p_len).astype(np.float32)
+    }
+
+    if energy_use:
+        if pitch_guidance:
+            inputs.update({
+                net_g.get_inputs()[4].name: pitch.cpu().numpy().astype(np.int64),
+                net_g.get_inputs()[5].name: pitchf.cpu().numpy().astype(np.float32),
+                net_g.get_inputs()[6].name: energy.cpu().numpy().astype(np.float32)
+            })
+        else:
+            inputs.update({
+                net_g.get_inputs()[4].name: energy.cpu().numpy().astype(np.float32)
+            })
+    else:
+        if pitch_guidance:
+            inputs.update({
+                net_g.get_inputs()[4].name: pitch.cpu().numpy().astype(np.int64),
+                net_g.get_inputs()[5].name: pitchf.cpu().numpy().astype(np.float32)
+            })
+
+    return inputs

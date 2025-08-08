@@ -9,7 +9,7 @@ import gradio as gr
 sys.path.append(os.getcwd())
 
 from main.library import opencl
-from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full
+from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models
 
 def gr_info(message):
     gr.Info(message, duration=2)
@@ -86,11 +86,11 @@ def change_download_choices(select):
     return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
 
 def change_download_pretrained_choices(select):
-    selects = [False]*8
+    selects = [False]*7
 
     if select == translations["download_url"]: selects[0] = selects[1] = selects[2] = True
     elif select == translations["list_model"]: selects[3] = selects[4] = selects[5] = True
-    elif select == translations["upload"]: selects[6] = selects[7] = True
+    elif select == translations["upload"]: selects[6] = True
     else: gr_warning(translations["option_not_valid"])
 
     return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
@@ -177,3 +177,56 @@ def shutil_move(input_path, output_path):
     output_path = os.path.join(output_path, os.path.basename(input_path)) if os.path.isdir(output_path) else output_path
 
     return shutil.move(input_path, process_output(output_path)) if os.path.exists(output_path) else shutil.move(input_path, output_path)
+
+def separate_change(model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise):
+    model_type = "vr" if model_name in list(vr_models.keys()) else "mdx" if model_name in list(mdx_models.keys()) else "demucs" if model_name in list(demucs_models.keys()) else ""
+    karaoke_type = ("vr" if karaoke_model.startswith("VR") else "mdx") if separate_backing else None
+    reverb_type = ("vr" if not reverb_model.startswith("MDX") else "mdx") if separate_reverb else None
+
+    all_types = {model_type, karaoke_type, reverb_type}
+
+    is_vr = "vr" in all_types
+    is_mdx = "mdx" in all_types
+    is_demucs = "demucs" in all_types
+
+    return [
+        visible(separate_backing),
+        visible(separate_reverb),
+        visible(is_mdx or is_demucs),
+        visible(is_mdx or is_demucs),
+        visible(is_mdx),
+        visible(is_mdx or is_vr),
+        visible(is_demucs),
+        visible(is_vr),
+        visible(is_vr),
+        visible(is_vr and enable_post_process),
+        visible(is_vr and enable_denoise),
+        valueFalse_interactive(is_vr),
+        valueFalse_interactive(is_vr),
+        valueFalse_interactive(is_vr)
+    ]
+
+def create_dataset_change(model_name, reverb_model, enable_post_process, separate_reverb, enable_denoise):
+    model_type = "vr" if model_name in list(vr_models.keys()) else "mdx" if model_name in list(mdx_models.keys()) else "demucs" if model_name in list(demucs_models.keys()) else ""
+    reverb_type = ("vr" if not reverb_model.startswith("MDX") else "mdx") if separate_reverb else None
+    all_types = {model_type, reverb_type}
+
+    is_vr = "vr" in all_types
+    is_mdx = "mdx" in all_types
+    is_demucs = "demucs" in all_types
+
+    return [
+        visible(separate_reverb),
+        visible(is_mdx or is_demucs),
+        visible(is_mdx or is_demucs),
+        visible(is_mdx),
+        visible(is_mdx or is_vr),
+        visible(is_demucs),
+        visible(is_vr),
+        visible(is_vr),
+        visible(is_vr and enable_post_process),
+        visible(is_vr and enable_denoise),
+        valueFalse_interactive(is_vr),
+        valueFalse_interactive(is_vr),
+        valueFalse_interactive(is_vr)
+    ]

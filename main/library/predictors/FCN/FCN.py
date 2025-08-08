@@ -12,7 +12,7 @@ sys.path.append(os.getcwd())
 from main.library.predictors.FCN.model import MODEL
 from main.library.predictors.FCN.convert import frequency_to_bins, seconds_to_samples, bins_to_frequency
 
-CENTS_PER_BIN, PITCH_BINS, SAMPLE_RATE, WINDOW_SIZE = 5, 1440, 16000, 1024
+PITCH_BINS, SAMPLE_RATE, WINDOW_SIZE = 1440, 16000, 1024
 
 class FCN:
     def __init__(self, model_path, hop_length=160, batch_size=None, f0_min=50, f0_max=1100, device=None, sample_rate=16000, providers=None, onnx=False):
@@ -126,6 +126,7 @@ class FCN:
             minidx = frequency_to_bins(torch.tensor(self.f0_min))
             maxidx = frequency_to_bins(torch.tensor(self.f0_max), torch.ceil)
 
+            logits = logits.detach()
             logits[:, :minidx] = -float('inf')
             logits[:, maxidx:] = -float('inf')
 

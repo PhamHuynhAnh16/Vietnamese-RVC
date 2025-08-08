@@ -9,6 +9,7 @@ import warnings
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import logger
 from main.library.algorithm.synthesizers import SynthesizerONNX
 
 warnings.filterwarnings("ignore")
@@ -102,5 +103,6 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
         return output_path
     except:
         import traceback
-        print(traceback.print_exc())
+        logger.error(traceback.print_exc())
+
         return None

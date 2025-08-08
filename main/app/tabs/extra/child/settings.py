@@ -31,7 +31,7 @@ def settings_tab(app):
             font_button = gr.Button(translations["change_font"])
     with gr.Row():
         with gr.Column():
-            with gr.Accordion(translations["stop"], open=False, visible=config.debug_mode):
+            with gr.Accordion(translations["stop"], open=False, visible=True):
                 separate_stop = gr.Button(translations["stop_separate"])
                 convert_stop = gr.Button(translations["stop_convert"])
                 create_dataset_stop = gr.Button(translations["stop_create_dataset"])

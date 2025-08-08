@@ -35,7 +35,7 @@ def download_tab():
                     search_dropdown = gr.Dropdown(label=translations["select_download_model"], value="", choices=[], allow_custom_value=True, interactive=False, visible=False)
                     download = gr.Button(translations["downloads"], variant="primary", visible=False)
                 with gr.Column():
-                    model_upload = gr.File(label=translations["drop_model"], file_types=[".pth", ".onnx", ".index", ".zip"], visible=False)
+                    model_upload = gr.Files(label=translations["drop_model"], file_types=[".pth", ".onnx", ".index", ".zip"], visible=False)
         with gr.Row():
             with gr.Accordion(translations["download_pretrained_2"], open=False):
                 with gr.Row():
@@ -53,8 +53,7 @@ def download_tab():
                         sample_rate_pretrain = gr.Dropdown(label=translations["pretrain_sr"], info=translations["pretrain_sr"], choices=["48k", "40k", "32k"], value="48k", interactive=True, visible=False)
                     download_pretrain_choices_button = gr.Button(translations["downloads"], scale=2, variant="primary", visible=False)
                 with gr.Row():
-                    pretrain_upload_g = gr.File(label=translations["drop_pretrain"].format(dg="G"), file_types=[".pth"], visible=False)
-                    pretrain_upload_d = gr.File(label=translations["drop_pretrain"].format(dg="D"), file_types=[".pth"], visible=False)
+                    pretrain_upload = gr.Files(label=translations["drop_pretrain"].format(dg="G, D"), file_types=[".pth"], visible=False)
         with gr.Row():
             url_download.click(
                 fn=download_model, 
@@ -82,7 +81,7 @@ def download_tab():
                 api_name="search_models"
             )
         with gr.Row():
-            pretrain_download_choices.change(fn=change_download_pretrained_choices, inputs=[pretrain_download_choices], outputs=[pretrainD, pretrainG, download_pretrain_button, pretrain_choices, sample_rate_pretrain, download_pretrain_choices_button, pretrain_upload_d, pretrain_upload_g])
+            pretrain_download_choices.change(fn=change_download_pretrained_choices, inputs=[pretrain_download_choices], outputs=[pretrainD, pretrainG, download_pretrain_button, pretrain_choices, sample_rate_pretrain, download_pretrain_choices_button, pretrain_upload])
             pretrain_choices.change(fn=update_sample_rate_dropdown, inputs=[pretrain_choices], outputs=[sample_rate_pretrain])
         with gr.Row():
             download_pretrain_button.click(
@@ -105,15 +104,9 @@ def download_tab():
                 outputs=[pretrain_choices],
                 api_name="download_pretrain_choices"
             )
-            pretrain_upload_g.upload(
-                fn=lambda pretrain_upload_g: shutil_move(pretrain_upload_g.name, configs["pretrained_custom_path"]), 
-                inputs=[pretrain_upload_g], 
+            pretrain_upload.upload(
+                fn=lambda pretrain_upload: [shutil_move(pretrain.name, configs["pretrained_custom_path"]) for pretrain in pretrain_upload], 
+                inputs=[pretrain_upload], 
                 outputs=[],
-                api_name="upload_pretrain_g"
-            )
-            pretrain_upload_d.upload(
-                fn=lambda pretrain_upload_d: shutil_move(pretrain_upload_d.name, configs["pretrained_custom_path"]), 
-                inputs=[pretrain_upload_d], 
-                outputs=[],
-                api_name="upload_pretrain_d"
+                api_name="upload_pretrain"
             )

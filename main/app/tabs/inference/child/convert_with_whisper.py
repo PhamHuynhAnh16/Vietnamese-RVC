@@ -20,7 +20,7 @@ def convert_with_whisper_tab():
                     autotune2 = gr.Checkbox(label=translations["autotune"], value=False, interactive=True)
                     checkpointing2 = gr.Checkbox(label=translations["memory_efficient_training"], value=False, interactive=True)
                     formant_shifting2 = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)
-                    auto_pitch = gr.Checkbox(label=translations["auto_pitch"], value=False, interactive=True)
+                    proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
                 with gr.Row():
                     num_spk = gr.Slider(minimum=2, maximum=8, step=1, info=translations["num_spk_info"], label=translations["num_spk"], value=2, interactive=True)
     with gr.Row():
@@ -45,7 +45,7 @@ def convert_with_whisper_tab():
                 with gr.Column():
                     refresh4 = gr.Button(translations["refresh"])
                 with gr.Row():
-                    input2 = gr.File(label=translations["drop_audio"], file_types=file_types)
+                    input2 = gr.Files(label=translations["drop_audio"], file_types=file_types)
         with gr.Column():
             with gr.Accordion(translations["model_accordion"] + " 2", open=True):
                 with gr.Row():
@@ -66,13 +66,14 @@ def convert_with_whisper_tab():
                             unlock_full_method2 = gr.Checkbox(label=translations["f0_unlock"], info=translations["f0_unlock_info"], value=False, interactive=True)
                         method3 = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
                         hybrid_method3 = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=method3.value == "hybrid")
-                    hop_length3 = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                    hop_length3 = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
                 with gr.Accordion(translations["hubert_model"], open=False):
                     embed_mode3 = gr.Radio(label=translations["embed_mode"], info=translations["embed_mode_info"], value="fairseq", choices=embedders_mode, interactive=True, visible=True)
                     embedders3 = gr.Radio(label=translations["hubert_model"], info=translations["hubert_info"], choices=embedders_model, value="hubert_base", interactive=True)
                     custom_embedders3 = gr.Textbox(label=translations["modelname"], info=translations["modelname_info"], value="", placeholder="hubert_base", interactive=True, visible=embedders3.value == "custom")
                 with gr.Column():     
                     resample_sr3 = gr.Radio(choices=[0]+sample_rate_choice, label=translations["resample"], info=translations["resample_info"], value=0, interactive=True)
+                    proposal_pitch_threshold = gr.Slider(minimum=50.0, maximum=1200.0, label=translations["proposal_pitch_threshold"], info=translations["proposal_pitch_threshold_info"], value=255.0, step=0.1, interactive=True, visible=proposal_pitch.value)
                     clean_strength3 = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.5, step=0.1, interactive=True, visible=cleaner2.value)
                     f0_autotune_strength3 = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=autotune2.value)
                     filter_radius3 = gr.Slider(minimum=0, maximum=7, label=translations["filter_radius"], info=translations["filter_radius_info"], value=3, step=1, interactive=True)
@@ -100,10 +101,10 @@ def convert_with_whisper_tab():
     with gr.Row():
         refresh3.click(fn=change_models_choices, inputs=[], outputs=[model_pth3, model_index3])
         model_pth3.change(fn=get_index, inputs=[model_pth3], outputs=[model_index3])
-        input2.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["audios_path"]), inputs=[input2], outputs=[input_audio1])
+        input2.upload(fn=lambda audio_in: [shutil_move(audio.name, configs["audios_path"]) for audio in audio_in][0], inputs=[input2], outputs=[input_audio1])
     with gr.Row():
         input_audio1.change(fn=lambda audio: audio if os.path.isfile(audio) else None, inputs=[input_audio1], outputs=[play_audio2])
-        formant_shifting2.change(fn=lambda a: [visible(a)]*4, inputs=[formant_shifting2], outputs=[formant_qfrency3, formant_timbre3, formant_qfrency4, formant_timbre4])
+        formant_shifting2.change(fn=lambda a: [visible(a) for _ in range(4)], inputs=[formant_shifting2], outputs=[formant_qfrency3, formant_timbre3, formant_qfrency4, formant_timbre4])
         embedders3.change(fn=lambda embedders: visible(embedders == "custom"), inputs=[embedders3], outputs=[custom_embedders3])
     with gr.Row():
         refresh4.click(fn=change_audios_choices, inputs=[input_audio1], outputs=[input_audio1])
@@ -112,6 +113,7 @@ def convert_with_whisper_tab():
     with gr.Row():
         unlock_full_method2.change(fn=unlock_f0, inputs=[unlock_full_method2], outputs=[method3])
         embed_mode3.change(fn=visible_embedders, inputs=[embed_mode3], outputs=[embedders3])
+        proposal_pitch.change(fn=visible, inputs=[proposal_pitch], outputs=[proposal_pitch_threshold])
     with gr.Row():
         convert_button3.click(
             fn=convert_with_whisper,
@@ -150,7 +152,8 @@ def convert_with_whisper_tab():
                 formant_timbre3,
                 formant_qfrency4,
                 formant_timbre4,
-                auto_pitch
+                proposal_pitch,
+                proposal_pitch_threshold
             ],
             outputs=[play_audio3],
             api_name="convert_with_whisper"

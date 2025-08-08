@@ -44,7 +44,7 @@ models = {}
 model_options = {}
 
 method_f0 = ["mangio-crepe-full", "crepe-full", "fcpe", "rmvpe", "harvest", "pyin", "hybrid"]
-method_f0_full = ["pm-ac", "pm-cc", "pm-shs", "dio", "mangio-crepe-tiny", "mangio-crepe-small", "mangio-crepe-medium", "mangio-crepe-large", "mangio-crepe-full", "crepe-tiny", "crepe-small", "crepe-medium", "crepe-large", "crepe-full", "fcpe", "fcpe-legacy", "rmvpe", "rmvpe-legacy", "harvest", "yin", "pyin", "swipe", "piptrack", "fcn", "hybrid"]
+method_f0_full = ["pm-ac", "pm-cc", "pm-shs", "dio", "mangio-crepe-tiny", "mangio-crepe-small", "mangio-crepe-medium", "mangio-crepe-large", "mangio-crepe-full", "crepe-tiny", "crepe-small", "crepe-medium", "crepe-large", "crepe-full", "fcpe", "fcpe-legacy", "rmvpe", "rmvpe-legacy", "rmvpe-medfilt", "rmvpe-legacy-medfilt", "harvest", "yin", "pyin", "swipe", "piptrack", "fcn", "djcm", "djcm-legacy", "djcm-medfilt", "djcm-legacy-medfilt", "hybrid"]
 
 embedders_mode = ["fairseq", "onnx", "transformers", "spin"]
 embedders_model = ["contentvec_base", "hubert_base", "vietnamese_hubert_base", "japanese_hubert_base", "korean_hubert_base", "chinese_hubert_base", "portuguese_hubert_base", "custom"]
@@ -70,8 +70,13 @@ theme = configs.get("theme", "NoCrypt/miku")
 edgetts = configs.get("edge_tts", ["vi-VN-HoaiMyNeural", "vi-VN-NamMinhNeural"])
 google_tts_voice = configs.get("google_tts_voice", ["vi", "en"])
 
-mdx_model = configs.get("mdx_model", "MDXNET_Main")
-uvr_model = configs.get("demucs_model", "HD_MMI") + mdx_model
+vr_models = configs.get("vr_models", "")
+demucs_models = configs.get("demucs_models", "")
+mdx_models = configs.get("mdx_models", "")
+karaoke_models = configs.get("karaoke_models", "")
+reverb_models = configs.get("reverb_models", "")
+denoise_models = configs.get("denoise_models", "")
+uvr_model = list(demucs_models.keys()) + list(vr_models.keys()) + list(mdx_models.keys())
 
 font = configs.get("font", "https://fonts.googleapis.com/css2?family=Courgette&display=swap")
 sample_rate_choice = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]

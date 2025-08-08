@@ -15,6 +15,7 @@ except:
     pytorch_ocl = None
 
 torch_available = pytorch_ocl != None
+if torch_available: adaptive_orig = nn.AdaptiveAvgPool2d
 
 def check_amd_gpu(gpu):
     for i in ["RX", "AMD", "Vega", "Radeon", "FirePro"]:
@@ -197,7 +198,12 @@ def script(f, *_, **__):
     f.graph = pytorch_ocl.torch._C.Graph()
     return f
 
+def AdaptiveAvgPool2d(input):
+    input = input[0] if isinstance(input, tuple) else input
+    return adaptive_orig(input)
+
 if torch_available:
     nn.GRU = GRU
+    nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
     F.group_norm = group_norm
     torch.jit.script = script

@@ -21,7 +21,7 @@ def quirk_tab():
     with gr.Row():
         with gr.Accordion(translations["input_output"], open=False):
             with gr.Row():
-                quirk_upload_audio = gr.File(label=translations["drop_audio"], file_types=file_types)
+                quirk_upload_audio = gr.Files(label=translations["drop_audio"], file_types=file_types)
             with gr.Column():
                 quirk_export_format = gr.Radio(label=translations["export_format"], info=translations["export_info"], choices=export_format_choices, value="wav", interactive=True)
                 quirk_input_path = gr.Dropdown(label=translations["audio_path"], value="", choices=paths_for_files, info=translations["provide_audio"], allow_custom_value=True, interactive=True)
@@ -31,7 +31,7 @@ def quirk_tab():
     with gr.Row():
         output_audio_play = gr.Audio(show_download_button=True, interactive=False, label=translations["output_audio"])
     with gr.Row():
-        quirk_upload_audio.upload(fn=lambda audio_in: shutil_move(audio_in.name, configs["audios_path"]), inputs=[quirk_upload_audio], outputs=[quirk_input_path])
+        quirk_upload_audio.upload(fn=lambda audio_in: [shutil_move(audio.name, configs["audios_path"]) for audio in audio_in][0], inputs=[quirk_upload_audio], outputs=[quirk_input_path])
         quirk_input_path.change(fn=lambda audio: audio if audio else None, inputs=[quirk_input_path], outputs=[input_audio_play])
         quirk_refresh.click(fn=change_audios_choices, inputs=[quirk_input_path], outputs=[quirk_input_path])
     with gr.Row():

@@ -32,7 +32,7 @@ def training_model_tab():
                 with gr.Column():
                     preprocess_button = gr.Button(translations["preprocess_button"], scale=2)
                     upload_dataset = gr.Files(label=translations["drop_audio"], file_types=file_types, visible=upload.value)
-                    preprocess_info = gr.Textbox(label=translations["preprocess_info"], value="", interactive=False)
+                    preprocess_info = gr.Textbox(label=translations["preprocess_info"], value="", interactive=False, container=True, lines=1, max_lines=5)
         with gr.Column():
             with gr.Row():
                 with gr.Column():
@@ -44,7 +44,7 @@ def training_model_tab():
                                 autotune = gr.Checkbox(label=translations["autotune"], value=False, interactive=True)
                             extract_method = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
                             extract_hybrid_method = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=extract_method.value == "hybrid")
-                        extract_hop_length = gr.Slider(label="Hop length", info=translations["hop_length_info"], minimum=1, maximum=512, value=128, step=1, interactive=True, visible=False)
+                        extract_hop_length = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
                         f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=autotune.value)
                     with gr.Accordion(label=translations["hubert_model"], open=False):
                         with gr.Group():
@@ -54,7 +54,7 @@ def training_model_tab():
                             extract_embedders_custom = gr.Textbox(label=translations["modelname"], info=translations["modelname_info"], value="", placeholder="hubert_base", interactive=True, visible=extract_embedders.value == "custom")
                 with gr.Column():
                     extract_button = gr.Button(translations["extract_button"], scale=2)
-                    extract_info = gr.Textbox(label=translations["extract_info"], value="", interactive=False)
+                    extract_info = gr.Textbox(label=translations["extract_info"], value="", interactive=False, container=True, lines=1, max_lines=5)
         with gr.Column():
             with gr.Row():
                 with gr.Column():
@@ -105,7 +105,7 @@ def training_model_tab():
                                 pretrained_G = gr.Dropdown(label=translations["pretrain_file"].format(dg="G"), choices=pretrainedG, value=pretrainedG[0] if len(pretrainedG) > 0 else '', interactive=True, allow_custom_value=True)
                                 refresh_pretrain = gr.Button(translations["refresh"], scale=2)
             with gr.Row():
-                training_info = gr.Textbox(label=translations["train_info"], value="", interactive=False)
+                training_info = gr.Textbox(label=translations["train_info"], value="", interactive=False, container=True, lines=1, max_lines=5)
             with gr.Row():
                 with gr.Column():
                     with gr.Accordion(translations["export_model"], open=False):

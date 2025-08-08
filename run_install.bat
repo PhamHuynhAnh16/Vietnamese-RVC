@@ -9,6 +9,7 @@ set FILES=requirements.txt run_app.bat tensorboard.bat docker-compose-amd.yaml d
 set BASE_URL=https://huggingface.co/AnhP/Vietnamese-RVC-Project/resolve/main
 set FFMPEG=%BASE_URL%/ffmpeg/ffmpeg.exe
 set FFPROBE=%BASE_URL%/ffmpeg/ffprobe.exe
+set DIR=%~dp0
 
 for /f "tokens=*" %%i in ('wmic path win32_VideoController get Name') do (
     echo %%i | find /i "GTX" >nul && set GPU_NVIDIA=1
@@ -130,24 +131,7 @@ if not exist "runtime" (
     echo. >> tensorboard.bat
     echo pause >> tensorboard.bat
 
-    set PYTHON=runtime\python.exe
-
-    if not exist "%PYTHON%" (
-        echo Không tìm thấy %PYTHON%
-        exit /b 1
-    )
-
-    "%PYTHON%" -c "import packaging" 2>nul
-
-    if errorlevel 1 (
-        echo Chưa có packaging. Dang cài đặt...
-        "%PYTHON%" -m ensurepip --upgrade
-        "%PYTHON%" -m pip install --upgrade pip
-        "%PYTHON%" -m pip install packaging
-    ) else (
-        echo packaging đã được cài đặt.
-    )
-
+    "%DIR%runtime\python.exe" -m pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common
     echo Đã cài đặt hoàn tất. Bạn có thể tiến hành sử dụng!
 ) else (
     echo Đã có thư mục môi trường chạy không cần cài đặt lại.

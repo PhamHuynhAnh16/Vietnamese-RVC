@@ -11,11 +11,9 @@ from scipy import signal
 sys.path.append(os.getcwd())
 
 from main.app.variables import translations
-from main.library.utils import extract_features
-from main.library.algorithm.autopitch import AutoPitch
 from main.library.predictors.Generator import Generator
 from main.inference.extracting.rms import RMSEnergyExtractor
-from main.inference.conversion.utils import change_rms, clear_gpu_cache, get_onnx_argument
+from main.library.utils import extract_features, change_rms, clear_gpu_cache, get_onnx_argument
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
@@ -133,7 +131,7 @@ class Pipeline:
         clear_gpu_cache()
         return audio1
     
-    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, suffix, embed_suffix, f0_file=None, f0_onnx=False, pbar=None, auto_pitch=False, energy_use=False, del_onnx=True):
+    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, suffix, embed_suffix, f0_file=None, f0_onnx=False, pbar=None, proposal_pitch=False, proposal_pitch_threshold=0, energy_use=False, del_onnx=True):
         self.embed_suffix = embed_suffix
         self.suffix = suffix
 
@@ -182,11 +180,6 @@ class Pipeline:
             except:
                 logger.error(translations["error_readfile"])
                 inp_f0 = None
-        
-        if auto_pitch:
-            if not hasattr(self, "autopitch"): self.autopitch = AutoPitch(self, os.path.join("assets", "autopitch", "rvc_feats.npz"), os.path.join("assets", "autopitch", "emb_feats.npz"), pitch_guidance, version, energy_use, self.device)
-            proposal_pitch_threshold, proposal_pitch = self.autopitch.autopitch(model, net_g, sid, index, big_npy)
-        else: proposal_pitch_threshold, proposal_pitch = 0, False
 
         if pbar: pbar.update(1)
 

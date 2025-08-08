@@ -11,7 +11,6 @@ from pydub import AudioSegment
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
 from main.library.uvr5_lib.spec_utils import normalize
 
 class CommonSeparator:
@@ -22,12 +21,18 @@ class CommonSeparator:
     DRUM_STEM = "Drums"
     GUITAR_STEM = "Guitar"
     PIANO_STEM = "Piano"
+    SYNTH_STEM = "Synthesizer"
+    STRINGS_STEM = "Strings"
+    WOODWINDS_STEM = "Woodwinds"
+    BRASS_STEM = "Brass"
+    WIND_INST_STEM = "Wind Inst"
     PRIMARY_STEM = "Primary Stem"
     SECONDARY_STEM = "Secondary Stem"
     LEAD_VOCAL_STEM = "lead_only"
     BV_VOCAL_STEM = "backing_only"
     NO_STEM = "No "
     STEM_PAIR_MAPPER = {VOCAL_STEM: INST_STEM, INST_STEM: VOCAL_STEM, LEAD_VOCAL_STEM: BV_VOCAL_STEM, BV_VOCAL_STEM: LEAD_VOCAL_STEM, PRIMARY_STEM: SECONDARY_STEM}
+    NON_ACCOM_STEMS = (VOCAL_STEM, OTHER_STEM, BASS_STEM, DRUM_STEM, GUITAR_STEM, PIANO_STEM, SYNTH_STEM, STRINGS_STEM, WOODWINDS_STEM, BRASS_STEM, WIND_INST_STEM)
 
     def __init__(self, config):
         self.logger = config.get("logger")
@@ -149,13 +154,6 @@ class CommonSeparator:
                 stem_source = stereo_interleaved
 
         sf.write(stem_path, stem_source, self.sample_rate)
-
-    def clear_gpu_cache(self):
-        gc.collect()
-
-        if self.torch_device == torch.device("mps"): torch.mps.empty_cache()
-        elif self.torch_device == torch.device("cuda"): torch.cuda.empty_cache()
-        elif opencl.torch_available and self.torch_device == torch.device("ocl"): opencl.pytorch_ocl.empty_cache()
 
     def clear_file_specific_paths(self):
         self.audio_file_path = None

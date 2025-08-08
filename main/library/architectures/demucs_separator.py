@@ -11,6 +11,7 @@ from hashlib import sha256
 sys.path.append(os.getcwd())
 
 from main.app.variables import config
+from main.library.utils import clear_gpu_cache
 from main.library.uvr5_lib import spec_utils, common_separator
 from main.library.uvr5_lib.demucs import hdemucs, states, apply
 
@@ -45,7 +46,7 @@ class DemucsSeparator(common_separator.CommonSeparator):
         self.demucs_model_instance.eval()
         source = self.demix_demucs(mix)
         del self.demucs_model_instance
-        self.clear_gpu_cache()
+        clear_gpu_cache()
         output_files = []
 
         if isinstance(inst_source, np.ndarray):

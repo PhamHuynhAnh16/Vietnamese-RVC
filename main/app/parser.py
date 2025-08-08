@@ -8,7 +8,7 @@ try:
 except IndexError:
     argv = None
 
-argv_is_allows = ["--audio_effects", "--convert", "--create_dataset", "--create_index", "--extract", "--preprocess", "--separator_music", "--train", "--help_audio_effects", "--help_convert", "--help_create_dataset", "--help_create_index", "--help_extract", "--help_preprocess", "--help_separator_music",  "--help_train", "--help"]
+argv_is_allows = ["--audio_effects", "--convert", "--create_dataset", "--create_index", "--extract", "--preprocess", "--separator_music", "--train", "--help_audio_effects", "--help_convert", "--help_create_dataset", "--help_create_index", "--help_extract", "--help_preprocess", "--help_separate_music",  "--help_train", "--help"]
 
 if argv not in argv_is_allows:
     print("Cú pháp không hợp lệ! Sử dụng --help để biết thêm")
@@ -20,7 +20,7 @@ elif argv_is_allows[2] in argv: from main.inference.create_dataset import main
 elif argv_is_allows[3] in argv: from main.inference.create_index import main
 elif argv_is_allows[4] in argv: from main.inference.extracting.extract import main
 elif argv_is_allows[5] in argv: from main.inference.preprocess.preprocess import main
-elif argv_is_allows[6] in argv: from main.inference.separator_music import main
+elif argv_is_allows[6] in argv: from main.inference.separate_music import main
 elif argv_is_allows[7] in argv: from main.inference.training.train import main
 elif argv_is_allows[8] in argv:
     print("""Các tham số của `--audio_effects`:
@@ -110,7 +110,8 @@ elif argv_is_allows[9] in argv:
             - `--f0_autotune_strength` (mặc định: `1`): Cường độ hiệu chỉnh tự động F0.
             - `--f0_file` (mặc định: ``): Đường dẫn tệp F0 có sẵn.
             - `--f0_onnx` (mặc định: `False`): Có sử dụng phiên bản ONNX của F0 hay không.
-            - `--auto_pitch` (mặc định: `False`): Đề xuất cao độ thay vì điều chỉnh thủ công.
+            - `--proposal_pitch` (mặc định: `False`): Đề xuất cao độ thay vì điều chỉnh thủ công.
+            - `--proposal_pitch` (mặc định: `0.0`): Ngưỡng tần số ước tính cao độ.
 
         4. Mô hình nhúng:
             - `--embedder_model` (mặc định: `contentvec_base`): Mô hình nhúng sử dụng.
@@ -143,29 +144,39 @@ elif argv_is_allows[9] in argv:
 elif argv_is_allows[10] in argv:
     print("""Các tham số của --create_dataset:
         1. Đường dẫn & cấu hình dataset:
-            - `--input_audio` (bắt buộc): Đường dẫn liên kết đến âm thanh (Liên kết Youtube, có thể dùng dấu `,` để dùng nhiều liên kết).
-            - `--output_dataset` (mặc định: `./dataset`): Thư mục xuất dữ liệu đầu ra.
-            - `--sample_rate` (mặc định: `44100`): Tần số lấy mẫu cho âm thanh.
+            - `--input_data` (bắt buộc): Đường dẫn liên kết đến âm thanh (Liên kết Youtube, có thể dùng dấu `,` để dùng nhiều liên kết).
+            - `--output_dirs` (mặc định: `./dataset`): Thư mục xuất dữ liệu đầu ra.
+            - `--sample_rate` (mặc định: `48000`): Tần số lấy mẫu cho âm thanh.
 
         2. Làm sạch dữ liệu:
             - `--clean_dataset` (mặc định: `False`): Có áp dụng làm sạch dữ liệu hay không.
             - `--clean_strength` (mặc định: `0.7`): Mức độ làm sạch dữ liệu.
 
         3. Tách giọng & hiệu ứng:
+            - `--separate` (mặc định: `True`): có tách nhạc hay không.
             - `--separator_reverb` (mặc định: `False`): Có tách vang giọng không.
-            - `--kim_vocal_version` (mặc định: `2`): Phiên bản mô hình Kim Vocal để tách (`1`, `2`).
+            - `--model_name` (mặc định: `MDXNET_Main`): Mô hình tách nhạc ('Main_340', 'Main_390', 'Main_406', 'Main_427', 'Main_438', 'Inst_full_292', 'Inst_HQ_1', 'Inst_HQ_2', 'Inst_HQ_3', 'Inst_HQ_4', 'Inst_HQ_5', 'Kim_Vocal_1', 'Kim_Vocal_2', 'Kim_Inst', 'Inst_187_beta', 'Inst_82_beta', 'Inst_90_beta', 'Voc_FT', 'Crowd_HQ', 'MDXNET_9482', 'Inst_1', 'Inst_2', 'Inst_3', 'MDXNET_1_9703', 'MDXNET_2_9682', 'MDXNET_3_9662', 'Inst_Main', 'MDXNET_Main', 'HT-Tuned', 'HT-Normal', 'HD_MMI', 'HT_6S', 'HP-1', 'HP-2', 'HP-Vocal-1', 'HP-Vocal-2', 'HP2-1', 'HP2-2', 'HP2-3', 'SP-2B-1', 'SP-2B-2', 'SP-3B-1', 'SP-4B-1', 'SP-4B-2', 'SP-MID-1', 'SP-MID-2').
+            - `--reverb_model` (mặc định: `MDX-Reverb`): Mô hình tách nhạc ("MDX-Reverb", 'VR-Reverb', 'Echo-Aggressive', 'Echo-Normal').
+            - `--denoise_model` (mặc định: `Normal`): Mô hình tách nhạc ('Lite', 'Normal').
+ 
+        4. Cấu hình xử lý âm thanh:
+            - `--shifts` (mặc định: `2`): Số lượng dự đoán.
+            - `--batch_size` (mặc định: `1`): Kích thước lô.
+            - `--overlap` (mặc định: `0.25`): Mức độ chồng lấn giữa các đoạn.
+            - `--aggression` (mặc định: `5`): Cường độ chiết xuất thân chính.
+            - `--hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lý.
+            - `--window_size` (mặc định: `512`): Kích thước cửa sổ.
+            - `--segments_size` (mặc định: `256`): Kích thước phân đoạn âm thanh.
+            - `--post_process_threshold` (mặc định: `0.2`): Mức độ xử lý hậu kỳ sau khi tách nhạc.
 
-        4. Cấu hình phân đoạn âm thanh:
-            - `--overlap` (mặc định: `0.25`): Mức độ chồng lấn giữa các đoạn khi tách.
-            - `--segments_size` (mặc định: `256`): Kích thước của từng phân đoạn.
-
-        5. Cấu hình MDX (Music Demixing):
-            - `--mdx_hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lý.
-            - `--mdx_batch_size` (mặc định: `1`): Kích thước batch khi xử lý MDX.
-            - `--denoise_mdx` (mặc định: `False`): Có áp dụng khử nhiễu khi tách bằng MDX không.
+        5. Cấu hình xử lý âm thanh khác:
+            - `--enable_tta` (mặc định: `False`): Tăng cường suy luận.
+            - `--enable_denoise` (mặc định: `False`): Khữ tách nhạc.
+            - `--high_end_process` (mặc định: `False`): Xử lý dải cao.
+            - `--enable_post_process` (mặc định: `False`): Hậu xử lý.
 
         6. Bỏ qua phần âm thanh:
-            - `--skip` (mặc định: `False`): Có bỏ qua giây âm thanh nào không.
+            - `--skip_seconds` (mặc định: `False`): Có bỏ qua giây âm thanh nào không.
             - `--skip_start_audios` (mặc định: `0`): Thời gian (giây) cần bỏ qua ở đầu audio.
             - `--skip_end_audios` (mặc định: `0`): Thời gian (giây) cần bỏ qua ở cuối audio.
     """)
@@ -223,35 +234,36 @@ elif argv_is_allows[13] in argv:
     """)
     quit()
 elif argv_is_allows[14] in argv:
-    print("""Các tham số của --separator_music:
-        1. Đường dẫn dữ liệu:
+    print("""Các tham số của --separate_music:
+        1. Cấu hình đầu vào, đầu ra:
             - `--input_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
-            - `--output_path` (mặc định: `./audios`): Thư mục lưu tệp đầu ra.
-            - `--format` (mặc định: `wav`): Định dạng xuất tệp (`wav`, `mp3`,...).
-
-        2. Cấu hình xử lý âm thanh:
-            - `--shifts` (mặc định: `2`): Số lượng dự đoán.
-            - `--segments_size` (mặc định: `256`): Kích thước phân đoạn âm thanh.
-            - `--overlap` (mặc định: `0.25`): Mức độ chồng lấn giữa các đoạn.
-            - `--mdx_hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lý.
-            - `--mdx_batch_size` (mặc định: `1`): Kích thước lô.
-
-        3. Xử lý làm sạch:
-            - `--clean_audio` (mặc định: `False`): Có làm sạch âm thanh hay không.
-            - `--clean_strength` (mặc định: `0.7`): Độ mạnh của bộ lọc làm sạch.
-
-        4. Cấu hình mô hình:
-            - `--model_name` (mặc định: `HT-Normal`): Mô hình tách nhạc (`Main_340`, `Main_390`, `Main_406`, `Main_427`, `Main_438`, `Inst_full_292`, `Inst_HQ_1`, `Inst_HQ_2`, `Inst_HQ_3`, `Inst_HQ_4`, `Inst_HQ_5`, `Kim_Vocal_1`, `Kim_Vocal_2`, `Kim_Inst`, `Inst_187_beta`, `Inst_82_beta`, `Inst_90_beta`, `Voc_FT`, `Crowd_HQ`, `Inst_1`, `Inst_2`, `Inst_3`, `MDXNET_1_9703`, `MDXNET_2_9682`, `MDXNET_3_9662`, `Inst_Main`, `MDXNET_Main`, `MDXNET_9482`, `HT-Normal`, `HT-Tuned`, `HD_MMI`,  `HT_6S`).
-            - `--kara_model` (mặc định: `Version-1`): Phiên bản mô hình tách bè (`Version-1`, `Version-2`).
-
-        5. Hiệu ứng và xử lý hậu kỳ:
-            - `--backing` (mặc định: `False`): Có tách bè hay không.
-            - `--mdx_denoise` (mặc định: `False`): Có sử dụng khử nhiễu MDX hay không.
-            - `--reverb` (mặc định: `False`): Có tách vang hay không.
-            - `--backing_reverb` (mặc định: `False`): có tách vang cho giọng bè không.
-
-        6. Tần số lấy mẫu:
+            - `--output_dirs` (mặc định: `./audios`): Thư mục lưu tệp đầu ra.
+            - `--export_format` (mặc định: `wav`): Định dạng xuất tệp (`wav`, `mp3`,...).
             - `--sample_rate` (mặc định: `44100`): Tần số lấy mẫu của âm thanh đầu ra.
+
+        2. Cấu hình mô hình:
+            - `--model_name` (mặc định: `MDXNET_Main`): Mô hình tách nhạc ('Main_340', 'Main_390', 'Main_406', 'Main_427', 'Main_438', 'Inst_full_292', 'Inst_HQ_1', 'Inst_HQ_2', 'Inst_HQ_3', 'Inst_HQ_4', 'Inst_HQ_5', 'Kim_Vocal_1', 'Kim_Vocal_2', 'Kim_Inst', 'Inst_187_beta', 'Inst_82_beta', 'Inst_90_beta', 'Voc_FT', 'Crowd_HQ', 'MDXNET_9482', 'Inst_1', 'Inst_2', 'Inst_3', 'MDXNET_1_9703', 'MDXNET_2_9682', 'MDXNET_3_9662', 'Inst_Main', 'MDXNET_Main', 'HT-Tuned', 'HT-Normal', 'HD_MMI', 'HT_6S', 'HP-1', 'HP-2', 'HP-Vocal-1', 'HP-Vocal-2', 'HP2-1', 'HP2-2', 'HP2-3', 'SP-2B-1', 'SP-2B-2', 'SP-3B-1', 'SP-4B-1', 'SP-4B-2', 'SP-MID-1', 'SP-MID-2').
+            - `--karaoke_model` (mặc định: `MDX-Version-1`): Mô hình tách nhạc ('MDX-Version-1', 'MDX-Version-2', 'VR-Version-1', 'VR-Version-2').
+            - `--reverb_model` (mặc định: `MDX-Reverb`): Mô hình tách nhạc ("MDX-Reverb", 'VR-Reverb', 'Echo-Aggressive', 'Echo-Normal').
+            - `--denoise_model` (mặc định: `Normal`): Mô hình tách nhạc ('Lite', 'Normal').
+
+        3. Cấu hình xử lý âm thanh:
+            - `--shifts` (mặc định: `2`): Số lượng dự đoán.
+            - `--batch_size` (mặc định: `1`): Kích thước lô.
+            - `--overlap` (mặc định: `0.25`): Mức độ chồng lấn giữa các đoạn.
+            - `--aggression` (mặc định: `5`): Cường độ chiết xuất thân chính.
+            - `--hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lý.
+            - `--window_size` (mặc định: `512`): Kích thước cửa sổ.
+            - `--segments_size` (mặc định: `256`): Kích thước phân đoạn âm thanh.
+            - `--post_process_threshold` (mặc định: `0.2`): Mức độ xử lý hậu kỳ sau khi tách nhạc.
+
+        4. Cấu hình xử lý âm thanh khác:
+            - `--enable_tta` (mặc định: `False`): Tăng cường suy luận.
+            - `--enable_denoise` (mặc định: `False`): Khữ tách nhạc.
+            - `--high_end_process` (mặc định: `False`): Xử lý dải cao.
+            - `--enable_post_process` (mặc định: `False`): Hậu xử lý.
+            - `--separate_backing` (mặc định: `False`): Tách bè giọng.
+            - `--separate_reverb` (mặc định: `False`): Tách vang giọng.
     """)
     quit()
 elif argv_is_allows[15] in argv:
@@ -304,7 +316,7 @@ elif argv_is_allows[16] in argv:
         4. `--help_create_index`: Trợ giúp về tạo chỉ mục.
         5. `--help_extract`: Trợ giúp về trích xuất dữ liệu huấn luyện.
         6. `--help_preprocess`: Trợ giúp về xử lý trước dữ liệu.
-        7. `--help_separator_music`: Trợ giúp về tách nhạc.
+        7. `--help_separate_music`: Trợ giúp về tách nhạc.
         8. `--help_train`: Trợ giúp về huấn luyện mô hình.
     """)
     quit()
