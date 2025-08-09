@@ -8,7 +8,7 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models
 
 def gr_info(message):

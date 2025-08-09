@@ -6,7 +6,7 @@ import torch.nn as nn
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 
 class Wav2Spec(nn.Module):
     def __init__(self, hop_length, window_size):

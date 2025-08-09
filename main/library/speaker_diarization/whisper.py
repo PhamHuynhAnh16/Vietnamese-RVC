@@ -20,7 +20,7 @@ from functools import cached_property, lru_cache
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 from main.library.utils import load_audio
 from main.app.variables import configs, logger
 

@@ -10,7 +10,7 @@ from librosa.filters import mel
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 
 class MelSpectrogram(nn.Module):
     def __init__(self, is_half, n_mel_channels, sample_rate, win_length, hop_length, n_fft=None, mel_fmin=0, mel_fmax=None, clamp=1e-5):

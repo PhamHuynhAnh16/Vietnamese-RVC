@@ -9,7 +9,7 @@ from librosa.filters import mel
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 
 class STFT:
     def __init__(self, sr=22050, n_mels=80, n_fft=1024, win_size=1024, hop_length=256, fmin=20, fmax=11025, clip_val=1e-5):

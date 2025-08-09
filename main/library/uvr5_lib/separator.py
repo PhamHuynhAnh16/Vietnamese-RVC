@@ -13,7 +13,7 @@ from importlib import import_module
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
-from main.library import opencl
+from main.library.backends import opencl
 from main.library.utils import clear_gpu_cache
 from main.tools.huggingface import HF_download_file
 from main.app.variables import config, translations

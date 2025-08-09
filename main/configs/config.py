@@ -5,7 +5,7 @@ import torch
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl, zluda
 
 version_config_paths = [os.path.join(version, size) for version in ["v1", "v2"] for size in ["32000.json", "40000.json", "48000.json"]]
 

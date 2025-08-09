@@ -26,7 +26,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 from main.library.utils import clear_gpu_cache
 from main.app.variables import logger, translations
 from main.library.algorithm.synthesizers import Synthesizer

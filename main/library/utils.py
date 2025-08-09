@@ -18,8 +18,8 @@ from transformers import HubertModel
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
 from main.tools import huggingface
+from main.library.backends import opencl
 from main.library.architectures import fairseq
 from main.app.variables import translations, configs, config, embedders_model, logger
 

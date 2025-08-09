@@ -11,6 +11,7 @@ COPY . .
 RUN python3 -m venv /app/.venv && \
     . /app/.venv/bin/activate && \
     pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir six packaging python-dateutil platformdirs pywin32 && \
     pip install --no-cache-dir -r requirements.txt
 
 VOLUME [ "/app/assets" ]

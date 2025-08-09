@@ -10,7 +10,7 @@ from torchaudio.transforms import Resample
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 from main.library.predictors.FCPE.stft import STFT
 
 def spawn_wav2mel(args, device = None):

@@ -10,7 +10,7 @@ from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
-from main.library import opencl
+from main.library.backends import opencl
 from main.library.utils import check_assets
 from main.inference.extracting.rms import run_rms_extraction
 from main.inference.extracting.feature import run_pitch_extraction

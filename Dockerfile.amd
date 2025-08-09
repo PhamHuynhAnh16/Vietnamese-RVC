@@ -11,6 +11,7 @@ COPY . .
 RUN python3 -m venv /app/.venv && \
     . /app/.venv/bin/activate && \
     pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir six packaging python-dateutil platformdirs pywin32 && \
     pip install --no-cache-dir torch==2.6.0 torchvision torchaudio==2.6.0 && \
     pip install --no-cache-dir https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl && \
     pip install --no-cache-dir onnxruntime-directml && \
