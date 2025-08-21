@@ -62,17 +62,10 @@ class Synthesizer(torch.nn.Module):
         else: return None, None, x_mask, None, (None, None, m_p, logs_p, None, None)
 
     @torch.jit.export
-    def infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None, energy = None, rate = None):
+    def infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None, energy = None):
         g = self.emb_g(sid).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths, energy)
         z_p = (m_p + torch.exp(logs_p) * torch.randn_like(m_p) * 0.66666) * x_mask
-
-        if rate is not None:
-            assert isinstance(rate, torch.Tensor)
-            head = int(z_p.shape[2] * (1.0 - rate.item()))
-            z_p = z_p[:, :, head:]
-            x_mask = x_mask[:, :, head:]
-            if self.use_f0: nsff0 = nsff0[:, head:]
 
         z = self.flow(z_p, x_mask, g=g, reverse=True)
         o = self.dec(z * x_mask, nsff0, g=g) if self.use_f0 else self.dec(z * x_mask, g=g)
@@ -88,7 +81,7 @@ class SynthesizerONNX(Synthesizer):
         self.flow.remove_weight_norm()
         self.enc_q.remove_weight_norm()
 
-    def forward(self, phone, phone_lengths, g=None, rnd=None, pitch=None, nsff0=None, energy=None, max_len=None):
+    def forward(self, phone, phone_lengths, g=None, rnd=None, pitch=None, nsff0=None, energy=None):
         g = self.emb_g(g).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths, energy)
         z_p = (m_p + torch.exp(logs_p) * rnd) * x_mask
@@ -96,10 +89,10 @@ class SynthesizerONNX(Synthesizer):
         z = self.flow(z_p, x_mask, g=g, reverse=True)
 
         return self.dec(
-            (z * x_mask)[:, :, :max_len], 
+            (z * x_mask)[:, :, :None], 
             nsff0, 
             g=g
         ) if self.use_f0 else self.dec(
-            (z * x_mask)[:, :, :max_len], 
+            (z * x_mask)[:, :, :None], 
             g=g
         )

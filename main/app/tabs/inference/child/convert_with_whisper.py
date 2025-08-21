@@ -21,6 +21,7 @@ def convert_with_whisper_tab():
                     checkpointing2 = gr.Checkbox(label=translations["memory_efficient_training"], value=False, interactive=True)
                     formant_shifting2 = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)
                     proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
+                    audio_processing = gr.Checkbox(label=translations["audio_processing"], value=False, interactive=True)
                 with gr.Row():
                     num_spk = gr.Slider(minimum=2, maximum=8, step=1, info=translations["num_spk_info"], label=translations["num_spk"], value=2, interactive=True)
     with gr.Row():
@@ -153,7 +154,8 @@ def convert_with_whisper_tab():
                 formant_qfrency4,
                 formant_timbre4,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                audio_processing
             ],
             outputs=[play_audio3],
             api_name="convert_with_whisper"

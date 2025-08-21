@@ -112,7 +112,7 @@ class MultiHeadAttention(nn.Module):
     def _attention_bias_proximal(self, length):
         r = torch.arange(length, dtype=torch.float32)
 
-        return torch.unsqueeze(torch.unsqueeze(-torch.log1p(torch.abs((torch.unsqueeze(r, 0) - torch.unsqueeze(r, 1)))), 0), 0)
+        return -torch.log1p(torch.abs(diff = r.unsqueeze(0) - r.unsqueeze(1))).unsqueeze(0).unsqueeze(0)
 
 class FFN(nn.Module):
     def __init__(self, in_channels, out_channels, filter_channels, kernel_size, p_dropout=0.0, activation=None, causal=False, onnx=False):

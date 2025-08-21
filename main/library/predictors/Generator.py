@@ -22,7 +22,7 @@ from main.library.predictors.WORLD.WORLD import PYWORLD
 from main.app.variables import configs, logger, translations
 from main.library.predictors.CREPE.filter import mean, median
 from main.library.predictors.WORLD.SWIPE import swipe, stonemask
-from main.library.utils import get_providers, autotune_f0, proposal_f0_up_key
+from main.library.utils import get_providers, autotune_f0, proposal_f0_up_key, circular_write
 
 @nb.jit(nopython=True)
 def post_process(tf0, f0, f0_up_key, manual_x_pad, f0_mel_min, f0_mel_max, manual_f0 = None):
@@ -49,6 +49,22 @@ def post_process(tf0, f0, f0_up_key, manual_x_pad, f0_mel_min, f0_mel_max, manua
 
     return np.rint(f0_mel).astype(np.int32), f0
 
+def realtime_post_process(f0, pitch, pitchf, f0_up_key = 0, f0_mel_min = 50.0, f0_mel_max = 1100.0):
+    f0 *= 2 ** (f0_up_key / 12)
+
+    f0_mel = 1127.0 * torch.log(1.0 + f0 / 700.0)
+    f0_mel = torch.clip((f0_mel - f0_mel_min) * 254 / (f0_mel_max - f0_mel_min) + 1, 1, 255, out=f0_mel)
+    f0_coarse = torch.round(f0_mel, out=f0_mel).long()
+
+    if pitch is not None and pitchf is not None:
+        circular_write(f0_coarse, pitch)
+        circular_write(f0, pitchf)
+    else:
+        pitch = f0_coarse
+        pitchf = f0
+
+    return pitch.unsqueeze(0), pitchf.unsqueeze(0)
+
 class Generator:
     def __init__(self, sample_rate = 16000, hop_length = 160, f0_min = 50, f0_max = 1100, is_half = False, device = "cpu", f0_onnx_mode = False, del_onnx_model = True):
         self.sample_rate = sample_rate
@@ -70,8 +86,6 @@ class Generator:
 
         model = self.get_f0_hybrid if "hybrid" in f0_method else self.compute_f0
         f0 = model(f0_method, x, p_len, filter_radius if filter_radius % 2 != 0 else filter_radius + 1)
-
-        if isinstance(f0, tuple): f0 = f0[0]
         
         if proposal_pitch: 
             up_key = proposal_f0_up_key(f0, proposal_pitch_threshold, configs["limit_f0"])
@@ -90,6 +104,32 @@ class Generator:
             1127 * math.log(1 + self.f0_min / 700), 
             1127 * math.log(1 + self.f0_max / 700), 
             manual_f0
+        )
+    
+    def realtime_calculator(self, audio, f0_method, pitch, pitchf, f0_up_key = 0, filter_radius = 3, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0):
+        if torch.is_tensor(audio): audio = audio.cpu().numpy()
+        p_len = audio.shape[0] // self.window
+
+        f0 = self.compute_f0(
+            f0_method,
+            audio,
+            p_len,
+            filter_radius if filter_radius % 2 != 0 else filter_radius + 1
+        )
+
+        if f0_autotune: f0 = autotune_f0(self.ref_freqs, f0, f0_autotune_strength)
+
+        if proposal_pitch: 
+            up_key = proposal_f0_up_key(f0, proposal_pitch_threshold, configs["limit_f0"])
+            f0_up_key += up_key
+
+        return realtime_post_process(
+            torch.from_numpy(f0).to(self.device), 
+            pitch, 
+            pitchf,
+            f0_up_key, 
+            self.f0_min, 
+            self.f0_max
         )
 
     def _resize_f0(self, x, target_len):
@@ -127,7 +167,9 @@ class Generator:
         else:
             raise ValueError(translations["option_not_valid"])
         
+        if isinstance(f0, tuple): f0 = f0[0]
         if "medfilt" in f0_method: f0 = medfilt(f0, kernel_size=5)
+
         return f0
     
     def get_f0_hybrid(self, methods_str, x, p_len, filter_radius):
@@ -208,7 +250,7 @@ class Generator:
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
 
-        audio = torch.unsqueeze(torch.from_numpy(x).to(self.device, copy=True), dim=0)
+        audio = torch.from_numpy(x).to(self.device, copy=True).unsqueeze(dim=0)
         if audio.ndim == 2 and audio.shape[0] > 1: audio = torch.mean(audio, dim=0, keepdim=True).detach()
 
         f0 = self.mangio_crepe.compute_f0(audio.detach(), pad=True)
@@ -264,7 +306,7 @@ class Generator:
             )
         
         f0 = self.fcpe.compute_f0(x, p_len)
-        if self.f0_onnx_mode and self.del_onnx_model: del self.fcpe.model.model, self.fcpe
+        if self.f0_onnx_mode and self.del_onnx_model: del self.fcpe.fcpe.model, self.fcpe
 
         return f0
     
@@ -383,7 +425,7 @@ class Generator:
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
 
-        audio = torch.unsqueeze(torch.from_numpy(x).to(self.device, copy=True), dim=0)
+        audio = torch.from_numpy(x).to(self.device, copy=True).unsqueeze(dim=0)
         if audio.ndim == 2 and audio.shape[0] > 1: audio = torch.mean(audio, dim=0, keepdim=True).detach()
 
         f0, pd = self.fcn.compute_f0(audio.detach())

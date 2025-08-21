@@ -2,8 +2,7 @@ import os
 import sys
 import torch
 
-import numpy as np
-import torch.nn.functional as F
+import torch.nn.utils.parametrize as parametrize
 
 from torch.nn.utils import remove_weight_norm
 from torch.nn.utils.parametrizations import weight_norm
@@ -47,16 +46,11 @@ class HiFiGANGenerator(torch.nn.Module):
             x = xs / self.num_kernels
 
         return torch.tanh(self.conv_post(torch.nn.functional.leaky_relu(x)))
-
-    def __prepare_scriptable__(self):
-        for l in self.ups_and_resblocks:
-            for hook in l._forward_pre_hooks.values():
-                if (hook.__module__ == "torch.nn.utils.parametrizations.weight_norm" and hook.__class__.__name__ == "WeightNorm"): torch.nn.utils.remove_weight_norm(l)
-
-        return self
     
     def remove_weight_norm(self):
         for l in self.ups:
-            remove_weight_norm(l)
+            if hasattr(l, "parametrizations") and "weight" in l.parametrizations: parametrize.remove_parametrizations(l, "weight", leave_parametrized=True)
+            else: remove_weight_norm(l)
+
         for l in self.resblocks:
             l.remove_weight_norm()

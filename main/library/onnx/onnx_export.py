@@ -4,7 +4,7 @@ import sys
 import onnx
 import json
 import torch
-import onnxsim
+import onnxslim
 import warnings
 
 sys.path.append(os.getcwd())
@@ -15,6 +15,8 @@ from main.library.algorithm.synthesizers import SynthesizerONNX
 warnings.filterwarnings("ignore")
 
 def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
+    if not device.startswith("cuda"): device = "cpu"
+
     cpt = (torch.load(input_path, map_location="cpu", weights_only=True) if os.path.isfile(input_path) else None)
     cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]
 
@@ -25,7 +27,7 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
     net_g = SynthesizerONNX(*cpt["config"], use_f0=f0, text_enc_hidden_dim=text_enc_hidden_dim, vocoder=vocoder, checkpointing=False, energy=energy_use)
     net_g.load_state_dict(cpt["weight"], strict=False)
     net_g.eval().to(device)
-    net_g = (net_g.half() if is_half else net_g.float())
+    net_g = net_g.to(torch.float16 if is_half else torch.float32)
 
     phone = torch.rand(1, 200, text_enc_hidden_dim).to(device)
     phone_length = torch.tensor([200]).long().to(device)
@@ -36,8 +38,7 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
         pitch = torch.randint(size=(1, 200), low=5, high=255).to(device)
         pitchf = torch.rand(1, 200).to(device)
 
-    if energy_use: 
-        energy = torch.rand(1, 200).to(device)
+    if energy_use: energy = torch.rand(1, 200).to(device)
 
     args = [phone, phone_length, ds, rnd]
     input_names = ["phone", "phone_lengths", "ds", "rnd"]
@@ -67,7 +68,7 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
                 dynamic_axes=dynamic_axes
             )
 
-            model, _ = onnxsim.simplify(onnx.load_model_from_string(model.getvalue()))
+            model = onnxslim.slim(onnx.load_model_from_string(model.getvalue()))
             model.metadata_props.append(
                 onnx.StringStringEntryProto(
                     key="model_info", 
@@ -103,6 +104,6 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
         return output_path
     except:
         import traceback
-        logger.error(traceback.print_exc())
+        logger.error(traceback.format_exc())
 
         return None

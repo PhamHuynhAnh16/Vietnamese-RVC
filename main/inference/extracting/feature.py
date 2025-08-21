@@ -50,7 +50,6 @@ class FeatureInput:
                     pbar.update(1)
 
 def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, devices, f0_onnx, is_half, f0_autotune, f0_autotune_strength):
-    num_processes = max(1, num_processes)
     input_root, *output_roots = setup_paths(exp_dir)
     output_root1, output_root2 = output_roots if len(output_roots) == 2 else (output_roots[0], None)
 

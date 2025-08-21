@@ -5,7 +5,7 @@ setlocal enabledelayedexpansion
 set GPU_NVIDIA=0
 set GPU_AMD=0
 
-set FILES=requirements.txt run_app.bat tensorboard.bat docker-compose-amd.yaml docker-compose-cpu.yaml docker-compose-cuda118.yaml docker-compose-cuda128.yaml Dockerfile Dockerfile.amd Dockerfile.cuda118 Dockerfile.cuda128
+set FILES=run_app.bat tensorboard.bat docker-compose-amd.yaml docker-compose-cpu.yaml docker-compose-cuda118.yaml docker-compose-cuda128.yaml Dockerfile Dockerfile.amd Dockerfile.cuda118 Dockerfile.cuda128
 set BASE_URL=https://huggingface.co/AnhP/Vietnamese-RVC-Project/resolve/main
 set FFMPEG=%BASE_URL%/ffmpeg/ffmpeg.exe
 set FFPROBE=%BASE_URL%/ffmpeg/ffprobe.exe
@@ -132,6 +132,8 @@ if not exist "runtime" (
     echo pause >> tensorboard.bat
 
     "%DIR%runtime\python.exe" -m pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common
+    "%DIR%runtime\python.exe" -m pip install -r requirements.txt
+
     echo Đã cài đặt hoàn tất. Bạn có thể tiến hành sử dụng!
 ) else (
     echo Đã có thư mục môi trường chạy không cần cài đặt lại.

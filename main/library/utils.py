@@ -3,6 +3,7 @@ import re
 import gc
 import sys
 import torch
+import faiss
 import codecs
 import librosa
 import logging
@@ -31,11 +32,10 @@ class HubertModelWithFinalProj(HubertModel):
         super().__init__(config)
         self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
 
-def check_assets(method, hubert, f0_onnx=False, embedders_mode="fairseq"):
+def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
     predictors_url = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cerqvpgbef/", "rot13")
     embedders_url = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/rzorqqref/", "rot13")
 
-    if f0_onnx: method += "-onnx"
     if embedders_mode == "spin": embedders_mode, hubert = "transformers", "spin"
 
     def download_predictor(predictor):
@@ -68,40 +68,38 @@ def check_assets(method, hubert, f0_onnx=False, embedders_mode="fairseq"):
 
         return os.path.exists(model_path)
 
-    model_dict = {
-        **dict.fromkeys(["rmvpe", "rmvpe-legacy", "rmvpe-medfilt", "rmvpe-legacy-medfilt"], "rmvpe.pt"), 
-        **dict.fromkeys(["rmvpe-onnx", "rmvpe-legacy-onnx"], "rmvpe.onnx"), 
-        **dict.fromkeys(["fcpe"], "fcpe.pt"), 
-        **dict.fromkeys(["fcpe-legacy"], "fcpe_legacy.pt"), 
-        **dict.fromkeys(["fcpe-onnx"], "fcpe.onnx"), 
-        **dict.fromkeys(["fcpe-legacy-onnx"], "fcpe_legacy.onnx"), 
-        **dict.fromkeys(["crepe-full", "mangio-crepe-full"], "crepe_full.pth"), 
-        **dict.fromkeys(["crepe-full-onnx", "mangio-crepe-full-onnx"], "crepe_full.onnx"), 
-        **dict.fromkeys(["crepe-large", "mangio-crepe-large"], "crepe_large.pth"), 
-        **dict.fromkeys(["crepe-large-onnx", "mangio-crepe-large-onnx"], "crepe_large.onnx"), 
-        **dict.fromkeys(["crepe-medium", "mangio-crepe-medium"], "crepe_medium.pth"), 
-        **dict.fromkeys(["crepe-medium-onnx", "mangio-crepe-medium-onnx"], "crepe_medium.onnx"), 
-        **dict.fromkeys(["crepe-small", "mangio-crepe-small"], "crepe_small.pth"), 
-        **dict.fromkeys(["crepe-small-onnx", "mangio-crepe-small-onnx"], "crepe_small.onnx"), 
-        **dict.fromkeys(["crepe-tiny", "mangio-crepe-tiny"], "crepe_tiny.pth"), 
-        **dict.fromkeys(["crepe-tiny-onnx", "mangio-crepe-tiny-onnx"], "crepe_tiny.onnx"),
-        **dict.fromkeys(["fcn"], "fcn.pt"), 
-        **dict.fromkeys(["fcn-onnx"], "fcn.onnx"),
-        **dict.fromkeys(["djcm", "djcm-legacy", "djcm-medfilt", "djcm-legacy-medfilt"], "djcm.pt"), 
-        **dict.fromkeys(["djcm-onnx", "djcm-legacy-onnx", "djcm-medfilt-onnx", "djcm-legacy-medfilt-onnx"], "djcm.onnx"), 
-    }
+    def get_modelname(f0_method, f0_onnx=False):
+        suffix = ".onnx" if f0_onnx else (".pt" if "crepe" not in f0_method else ".pth")
+
+        if "rmvpe" in f0_method:
+            modelname = "rmvpe"
+        elif "fcpe" in f0_method:
+            modelname = "fcpe" + ("_legacy" if "legacy" in f0_method else "")
+        elif "crepe" in f0_method:
+            modelname = "crepe_" + f0_method.split("-")[1]
+        elif "fcn" in f0_method:
+            modelname = "fcn"
+        elif "djcm" in f0_method:
+            modelname = "djcm"
+        else:
+            return None
+        
+        return modelname + suffix
     
     results = []
     count = configs.get("num_of_restart", 5)
 
     for _ in range(count):
-        if "hybrid" in method:
-            methods_str = re.search("hybrid\[(.+)\]", method)
-            if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
+        if "hybrid" in f0_method:
+            methods_str = re.search("hybrid\[(.+)\]", f0_method)
+            if methods_str: methods = [f0_method.strip() for f0_method in methods_str.group(1).split("+")]
 
             for method in methods:
-                if method in model_dict: results.append(download_predictor(model_dict[method]))
-        elif method in model_dict: results.append(download_predictor(model_dict[method]))
+                modelname = get_modelname(method, f0_onnx)
+                if modelname is not None: results.append(download_predictor(modelname))
+        else: 
+            modelname = get_modelname(f0_method, f0_onnx)
+            if modelname is not None: results.append(download_predictor(modelname))
 
         if hubert in embedders_model:
             if embedders_mode != "transformers": hubert += ".pt" if embedders_mode == "fairseq" else ".onnx"
@@ -213,6 +211,8 @@ def get_providers():
         providers = ["DmlExecutionProvider"]
     elif "CoreMLExecutionProvider" in ort_providers and config.device.startswith("mps"): 
         providers = ["CoreMLExecutionProvider"]
+    elif "ROCMExecutionProvider" in ort_providers and config.device.startswith("cuda") and torch.cuda.get_device_name().endswith("[ZLUDA]"):
+        providers = ["ROCMExecutionProvider"]
     else: 
         providers = ["CPUExecutionProvider"]
         logger.info(translations["running_in_cpu"])
@@ -220,15 +220,20 @@ def get_providers():
     if not providers[0].startswith("CPUExecutionProvider"): logger.debug(translations["onnx_have"].format(have=providers[0]))
     return providers
 
-def extract_features(model, feats, version):
-    feats0 = model.run(
-        [model.get_outputs()[0].name, model.get_outputs()[1].name], 
-        {
-            "feats": feats.detach().cpu().numpy()
-        }
-    )[int(version != "v1")]
+def extract_features(model, suffix, feats, version, device="cpu"):
+    with torch.no_grad():
+        if suffix == ".pt":
+            logits = model.extract_features(**{"source": feats, "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), "output_layer": 9 if version == "v1" else 12})
+            feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
+        elif suffix == ".onnx": 
+            logits = model.run([model.get_outputs()[0].name, model.get_outputs()[1].name], {"feats": feats.detach().cpu().numpy()})
+            feats = torch.as_tensor(logits[int(version != "v1")], dtype=torch.float32, device=device)
+        elif suffix == ".safetensors":
+            logits = model(feats)["last_hidden_state"]
+            feats = model.final_proj(logits[0]).unsqueeze(0) if version == "v1" else logits
+        else: raise ValueError(translations["option_not_valid"])
 
-    return torch.as_tensor(feats0, dtype=torch.float32, device=feats.device)
+    return feats
 
 def autotune_f0(note_dict, f0, f0_autotune_strength):
     autotuned_f0 = np.zeros_like(f0)
@@ -301,12 +306,7 @@ def proposal_f0_up_key(f0, target_f0 = 155.0, limit = 12):
         return max(
             -limit, 
             min(
-                limit, 
-                int(np.round(
-                    12 * np.log2(
-                        target_f0 / extract_median_f0(f0)
-                    )
-                ))
+                limit, int(np.round(12 * np.log2(target_f0 / extract_median_f0(f0))))
             )
         )
     except ValueError:
@@ -339,3 +339,23 @@ def get_onnx_argument(net_g, feats, p_len, sid, pitch, pitchf, energy, pitch_gui
             })
 
     return inputs
+
+def circular_write(new_data, target):
+    offset = new_data.shape[0]
+
+    target[: -offset] = target[offset :].detach().clone()
+    target[-offset :] = new_data
+
+    return target
+
+def load_faiss_index(index_path):
+    if index_path != "" and os.path.exists(index_path):
+        try:
+            index = faiss.read_index(index_path)
+            big_npy = index.reconstruct_n(0, index.ntotal)
+        except Exception as e:
+            logger.error(translations["read_faiss_index_error"].format(e=e))
+            index = big_npy = None
+    else: index = big_npy = None
+
+    return index, big_npy

@@ -2,8 +2,10 @@ import os
 import sys
 import math
 import torch
+
 import numpy as np
 import torch.nn.functional as F
+import torch.nn.utils.parametrize as parametrize
 
 from torch.nn.utils import remove_weight_norm
 from torch.utils.checkpoint import checkpoint
@@ -110,7 +112,8 @@ class HiFiGANNRFGenerator(torch.nn.Module):
 
     def remove_weight_norm(self):
         for l in self.ups:
-            remove_weight_norm(l)
+            if hasattr(l, "parametrizations") and "weight" in l.parametrizations: parametrize.remove_parametrizations(l, "weight", leave_parametrized=True)
+            else: remove_weight_norm(l)
 
         for l in self.resblocks:
             l.remove_weight_norm()

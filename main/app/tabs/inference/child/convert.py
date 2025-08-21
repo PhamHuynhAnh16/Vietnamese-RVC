@@ -101,10 +101,13 @@ def convert_tab():
                     with gr.Row():
                         upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".conversion.json"])  
                 with gr.Column():
-                    with gr.Row():
-                        split_audio = gr.Checkbox(label=translations["split_audio"], value=False, interactive=True)
-                        formant_shifting = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)
-                        proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
+                    with gr.Group():
+                        with gr.Row():
+                            split_audio = gr.Checkbox(label=translations["split_audio"], value=False, interactive=True)
+                            formant_shifting = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)
+                        with gr.Row():
+                            proposal_pitch = gr.Checkbox(label=translations["proposal_pitch"], value=False, interactive=True)
+                            audio_processing = gr.Checkbox(label=translations["audio_processing"], value=False, interactive=True)
                     resample_sr = gr.Radio(choices=[0]+sample_rate_choice, label=translations["resample"], info=translations["resample_info"], value=0, interactive=True)
                     proposal_pitch_threshold = gr.Slider(minimum=50.0, maximum=1200.0, label=translations["proposal_pitch_threshold"], info=translations["proposal_pitch_threshold_info"], value=255.0, step=0.1, interactive=True, visible=proposal_pitch.value)
                     f0_autotune_strength = gr.Slider(minimum=0, maximum=1, label=translations["autotune_rate"], info=translations["autotune_rate_info"], value=1, step=0.1, interactive=True, visible=autotune.value)
@@ -269,7 +272,8 @@ def convert_tab():
                 f0_file_dropdown,
                 embed_mode,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                audio_processing
             ],
             outputs=[audio_select, main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button, convert_button_2],
             api_name="convert_selection"
@@ -312,7 +316,8 @@ def convert_tab():
                 f0_file_dropdown,
                 embed_mode,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                audio_processing
             ],
             outputs=[main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button],
             api_name="convert_audio"

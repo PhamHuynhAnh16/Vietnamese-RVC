@@ -38,8 +38,8 @@ class MelSpectrogram(nn.Module):
         hop_length = int(np.round(self.hop_length * speed))
 
         if str(audio.device).startswith("ocl"):
-            stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length, win_length=win_length_new).to(audio.device)
-            magnitude = stft.transform(audio, 1e-9)
+            if not hasattr(self, "stft"): self.stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length, win_length=win_length_new).to(audio.device)
+            magnitude = self.stft.transform(audio, 1e-9)
         else:
             fft = torch.stft(audio, n_fft=n_fft, hop_length=hop_length, win_length=win_length_new, window=self.hann_window[keyshift_key], center=center, return_complex=True)
             magnitude = torch.sqrt(fft.real.pow(2) + fft.imag.pow(2))

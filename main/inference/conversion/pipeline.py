@@ -1,7 +1,6 @@
 import os
 import sys
 import torch
-import faiss
 
 import numpy as np
 import torch.nn.functional as F
@@ -13,7 +12,7 @@ sys.path.append(os.getcwd())
 from main.app.variables import translations
 from main.library.predictors.Generator import Generator
 from main.inference.extracting.rms import RMSEnergyExtractor
-from main.library.utils import extract_features, change_rms, clear_gpu_cache, get_onnx_argument
+from main.library.utils import extract_features, change_rms, clear_gpu_cache, get_onnx_argument, load_faiss_index
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
@@ -41,24 +40,12 @@ class Pipeline:
         pitch_guidance = pitch != None and pitchf != None
         energy_use = energy != None
 
-        feats = torch.from_numpy(audio0)
-        feats = feats.half() if self.is_half else feats.float()
-
+        feats = torch.from_numpy(audio0).to(self.device).to(torch.float16 if self.is_half else torch.float32)
         feats = feats.mean(-1) if feats.dim() == 2 else feats
         assert feats.dim() == 1, feats.dim()
-        feats = feats.view(1, -1)
 
         with torch.no_grad():
-            if self.embed_suffix == ".pt":
-                padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
-                logits = model.extract_features(**{"source": feats.to(self.device), "padding_mask": padding_mask, "output_layer": 9 if version == "v1" else 12})
-                feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
-            elif self.embed_suffix == ".onnx": feats = extract_features(model, feats.to(self.device), version).to(self.device)
-            elif self.embed_suffix == ".safetensors":
-                logits = model(feats.to(self.device))["last_hidden_state"]
-                feats = model.final_proj(logits[0]).unsqueeze(0) if version == "v1" else logits
-            else: raise ValueError(translations["option_not_valid"])
-
+            feats = extract_features(model, self.embed_suffix, feats.view(1, -1), version, self.device)
             feats0 = feats.clone() if protect < 0.5 and pitch_guidance else None
 
             if (not isinstance(index, type(None)) and not isinstance(big_npy, type(None)) and index_rate != 0):
@@ -77,7 +64,7 @@ class Pipeline:
             p_len = min(audio0.shape[0] // self.window, feats.shape[1])
 
             if pitch_guidance: pitch, pitchf = pitch[:, :p_len], pitchf[:, :p_len]
-            if energy_use: energy = energy[:, :p_len]
+            if energy_use: energy = energy[:p_len]
 
             if feats0 is not None:
                 pitchff = pitchf.clone()
@@ -89,12 +76,11 @@ class Pipeline:
                 feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
             p_len = torch.tensor([p_len], device=self.device).long()
-            feats = feats.half() if self.is_half else feats.float()
+            feats = feats.to(torch.float16 if self.is_half else torch.float32)
 
-            if not pitch_guidance: pitch, pitchf = None, None
-            else: pitchf = pitchf.half() if self.is_half else pitchf.float()
-            if not energy_use: energy = None
-            else: energy = energy.half() if self.is_half else energy.float()
+            pitch = pitch if pitch_guidance else None
+            pitchf = pitchf.to(torch.float16 if self.is_half else torch.float32) if pitch_guidance else None
+            energy = energy.to(torch.float16 if self.is_half else torch.float32) if energy_use else None
 
             audio1 = (
                 (
@@ -125,7 +111,6 @@ class Pipeline:
                 )[0][0, 0]
             )
 
-        if self.embed_suffix == ".pt": del padding_mask
         del feats, feats0, p_len
 
         clear_gpu_cache()
@@ -135,15 +120,7 @@ class Pipeline:
         self.embed_suffix = embed_suffix
         self.suffix = suffix
 
-        if file_index != "" and os.path.exists(file_index) and index_rate != 0:
-            try:
-                index = faiss.read_index(file_index)
-                big_npy = index.reconstruct_n(0, index.ntotal)
-            except Exception as e:
-                logger.error(translations["read_faiss_index_error"].format(e=e))
-                index = big_npy = None
-        else: index = big_npy = None
-
+        if index_rate != 0: index, big_npy = load_faiss_index(file_index)
         if pbar: pbar.update(1)
 
         opt_ts, audio_opt = [], []
@@ -194,10 +171,7 @@ class Pipeline:
 
         if energy_use:
             if not hasattr(self, "rms_extract"): self.rms_extract = RMSEnergyExtractor(frame_length=2048, hop_length=self.window, center=True, pad_mode = "reflect").to(self.device).eval()
-            energy = self.rms_extract(torch.from_numpy(audio_pad).to(self.device).unsqueeze(0)).cpu().numpy()
-            
-            if self.device == "mps": energy = energy.astype(np.float32)
-            energy = torch.tensor(energy[:p_len], device=self.device).unsqueeze(0).float()
+            energy = self.rms_extract(torch.from_numpy(audio_pad).to(self.device).unsqueeze(0))[:p_len].to(self.device).float()
 
         if pbar: pbar.update(1)
 
@@ -241,7 +215,7 @@ class Pipeline:
         if pbar: pbar.update(1)
 
         audio_opt = np.concatenate(audio_opt)
-        if rms_mix_rate != 1: audio_opt = change_rms(audio, self.sample_rate, audio_opt, self.sample_rate, rms_mix_rate)
+        if rms_mix_rate != 1: audio_opt = change_rms(audio, self.sample_rate, audio_opt, self.tgt_sr, rms_mix_rate)
 
         audio_max = np.abs(audio_opt).max() / 0.99
         if audio_max > 1: audio_opt /= audio_max

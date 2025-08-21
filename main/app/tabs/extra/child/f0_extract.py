@@ -38,7 +38,7 @@ def f0_extract_tab():
         input_audio_path.change(fn=lambda audio: audio if os.path.isfile(audio) else None, inputs=[input_audio_path], outputs=[audioplay])
         refresh_audio_button.click(fn=change_audios_choices, inputs=[input_audio_path], outputs=[input_audio_path])
     with gr.Row():
-        unlock_full_method.change(fn=lambda method: [m for m in unlock_f0(method) if m != "hybrid"], inputs=[unlock_full_method], outputs=[f0_method_extract])
+        unlock_full_method.change(fn=lambda method: {"choices": [m for m in unlock_f0(method)["choices"] if m != "hybrid"], "value": "rmvpe", "__type__": "update"}, inputs=[unlock_full_method], outputs=[f0_method_extract])
         extractor_button.click(
             fn=f0_extract,
             inputs=[

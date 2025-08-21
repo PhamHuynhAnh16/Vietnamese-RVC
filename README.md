@@ -23,7 +23,7 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 ## Các tính năng của dự án
 
-- Tách nhạc (MDX-Net/Demucs)
+- Tách nhạc (MDX-Net / Demucs / VR)
 
 - Chuyển đổi giọng nói (Chuyển đổi tệp / Chuyển đổi hàng loạt / Chuyển đổi với Whisper / Chuyển đổi văn bản)
 
@@ -31,7 +31,7 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 - Tạo dữ liệu huấn luyện (Từ đường dẫn liên kết)
 
-- Huấn luyện mô hình (v1/v2, bộ mã hóa chất lượng cao, huấn luyện năng lượng)
+- Huấn luyện mô hình (v1 / v2, bộ mã hóa chất lượng cao, huấn luyện năng lượng)
 
 - Dung hợp mô hình
 
@@ -48,6 +48,8 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 - Hỗ trợ suy luận chuyển đổi âm thanh bằng mô hình ONNX
 
 - Mô hình ONNX RVC cũng sẽ hỗ trợ chỉ mục để suy luận
+
+- Chuyển đổi giọng nói thời gian thực
 
 **Phương thức trích xuất cao độ: `pm-ac, pm-cc, pm-shs, dio, mangio-crepe-tiny, mangio-crepe-small, mangio-crepe-medium, mangio-crepe-large, mangio-crepe-full, crepe-tiny, crepe-small, crepe-medium, crepe-large, crepe-full, fcpe, fcpe-legacy, rmvpe, rmvpe-legacy, rmvpe-medfilt, rmvpe-legacy-medfilt, harvest, yin, pyin, swipe, piptrack, fcn, djcm, djcm-legacy, djcm-medfilt, djcm-legacy-medfilt`**
 
@@ -224,6 +226,7 @@ python main\\app\\parser.py --help
 | **[StftPitchShift](https://github.com/jurihock/stftPitchShift)**                                                               | Jürgen Hock             | MIT License |
 | **[Codename-RVC-Fork-3](https://github.com/codename0og/codename-rvc-fork-3)**                                                  | Codename;0              | MIT License |
 | **[Penn](https://github.com/interactiveaudiolab/penn)**                                                                        | Interactive Audio Lab   | MIT License |
+| **[Voice Changer](https://github.com/deiteris/voice-changer)**                                                                 | Yury deiteris           | MIT License |
 
 ## Kho mô hình của công cụ tìm kiếm mô hình
 
@@ -240,7 +243,7 @@ Tài liệu này trình bày chi tiết các phương pháp trích xuất cao đ
 |--------------------|----------------|---------------------------|------------------------------|--------------------|--------------------|
 | pm                 | Praat          | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
 | dio                | PYWORLD        | Thích hợp với Rap         | Kém chính xác với tần số cao | Trung bình         | Trung bình         |
-| harvest            | PYWORLD        | Chính xác hơn DIO         | Xử lý chậm                   | Cao                | Rất cao            |
+| harvest            | PYWORLD        | Chính xác hơn DIO         | Xử lí chậm                   | Cao                | Rất cao            |
 | crepe              | Deep Learning  | Chính xác cao             | Yêu cầu GPU                  | Rất cao            | Rất cao            |
 | mangio-crepe       | crepe nofilter | Tối ưu hóa cho RVC        | Đôi khi kém crepe gốc        | Trung bình đến cao | Trung bình đến cao |
 | fcpe               | Deep Learning  | Chính xác, thời gian thực | Cần GPU mạnh                 | Khá                | Trung bình         |
@@ -249,7 +252,7 @@ Tài liệu này trình bày chi tiết các phương pháp trích xuất cao đ
 | pyin               | Librosa        | Ổn định hơn YIN           | Tính toán phức tạp hơn       | Khá                | Khá                |
 | swipe              | WORLD          | Độ chính xác cao          | Nhạy cảm với nhiễu           | Cao                | Khá                |
 | piptrack           | Librosa        | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
-| fcn                | Deep Learning  | Không Rõ                  | Xử lý chậm                   | Trung bình         | Trung bình         |
+| fcn                | Deep Learning  | Không Rõ                  | Xử lí chậm                   | Trung bình         | Trung bình         |
 | djcm               | Deep Learning  | Phụ âm có vẻ tốt          | Yêu cầu GPU                  | Cao                | Cao                |
 
 </details>

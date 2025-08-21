@@ -10,7 +10,7 @@ from collections import OrderedDict
 sys.path.append(os.getcwd())
 
 from main.app.core.ui import gr_info, gr_warning, gr_error
-from main.library.algorithm.onnx_export import onnx_exporter
+from main.library.onnx.onnx_export import onnx_exporter
 from main.app.variables import config, logger, translations, configs
 
 def fushion_model_pth(name, pth_1, pth_2, ratio):

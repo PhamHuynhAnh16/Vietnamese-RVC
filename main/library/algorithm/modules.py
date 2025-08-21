@@ -2,6 +2,8 @@ import os
 import sys
 import torch
 
+import torch.nn.utils.parametrize as parametrize
+
 sys.path.append(os.getcwd())
 
 from .commons import fused_add_tanh_sigmoid_multiply
@@ -51,10 +53,14 @@ class WaveNet(torch.nn.Module):
         return output * x_mask
 
     def remove_weight_norm(self):
-        if self.gin_channels != 0: torch.nn.utils.remove_weight_norm(self.cond_layer)
+        if self.gin_channels != 0: 
+            if hasattr(self.cond_layer, "parametrizations") and "weight" in self.cond_layer.parametrizations: parametrize.remove_parametrizations(self.cond_layer, "weight", leave_parametrized=True)
+            else: torch.nn.utils.remove_weight_norm(self.cond_layer)
 
         for l in self.in_layers:
-            torch.nn.utils.remove_weight_norm(l)
+            if hasattr(l, "parametrizations") and "weight" in l.parametrizations: parametrize.remove_parametrizations(l, "weight", leave_parametrized=True)
+            else: torch.nn.utils.remove_weight_norm(l)
 
         for l in self.res_skip_layers:
-            torch.nn.utils.remove_weight_norm(l)
+            if hasattr(l, "parametrizations") and "weight" in l.parametrizations: parametrize.remove_parametrizations(l, "weight", leave_parametrized=True)
+            else: torch.nn.utils.remove_weight_norm(l)

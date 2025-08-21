@@ -9,6 +9,7 @@ import gradio as gr
 sys.path.append(os.getcwd())
 
 from main.library.backends import opencl
+from main.inference.realtime.audio import list_audio_device
 from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models
 
 def gr_info(message):
@@ -107,7 +108,7 @@ def hoplength_show(method, hybrid_method=None):
 
     for m in ["mangio-crepe", "fcpe", "yin", "piptrack", "fcn"]:
         if m in method: visible = True
-        if m in hybrid_method: visible = True
+        if hybrid_method is not None and m in hybrid_method: visible = True
 
         if visible: break
         else: visible = False
@@ -229,4 +230,43 @@ def create_dataset_change(model_name, reverb_model, enable_post_process, separat
         valueFalse_interactive(is_vr),
         valueFalse_interactive(is_vr),
         valueFalse_interactive(is_vr)
+    ]
+
+def audio_device():
+    input_devices, output_devices = list_audio_device()
+
+    input_channels_map = {f"{d.index}: {d.name} ({d.host_api})": d.max_input_channels for d in input_devices}
+    output_channels_map = {f"{d.index}: {d.name} ({d.host_api})": d.max_output_channels for d in output_devices}
+
+    return input_channels_map, output_channels_map
+
+def update_audio_device(input_device, output_device, monitor_device, monitor):
+    input_channels_map, output_channels_map = audio_device()
+
+    input_is_asio = "ASIO" in input_device if input_device else False
+    output_is_asio = "ASIO" in output_device if output_device else False
+    monitor_is_asio = "ASIO" in monitor_device if monitor_device else False
+
+    input_max_ch = input_channels_map.get(input_device, 128)
+    output_max_ch = output_channels_map.get(output_device, 128)
+    monitor_max_ch = output_channels_map.get(monitor_device, 128) if monitor else 128
+
+    return [
+        visible(monitor),
+        visible(monitor),
+        visible(monitor_is_asio),
+        visible(input_is_asio or output_is_asio or monitor_is_asio),
+        gr.update(visible=input_is_asio, maximum=input_max_ch),
+        gr.update(visible=output_is_asio, maximum=output_max_ch),
+        gr.update(visible=monitor_is_asio, maximum=monitor_max_ch)
+    ]
+
+def change_audio_device_choices():
+    input_channels_map, output_channels_map = audio_device()
+    input_channels_map, output_channels_map = list(input_channels_map.keys()), list(output_channels_map.keys())
+
+    return [
+        {"value": input_channels_map[0] if len(input_channels_map) >= 1 else "", "choices": input_channels_map, "__type__": "update"}, 
+        {"value": output_channels_map[0] if len(output_channels_map) >= 1 else "", "choices": output_channels_map, "__type__": "update"},
+        {"value": output_channels_map[0] if len(output_channels_map) >= 1 else "", "choices": output_channels_map, "__type__": "update"}
     ]

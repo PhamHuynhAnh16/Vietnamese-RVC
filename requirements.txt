@@ -14,7 +14,9 @@ tqdm>=4.63.1
 sortedcontainers
 torchvision>=0.18.1
 torchaudio>=2.3.1
-faiss-cpu==1.7.3
+
+faiss-cpu==1.7.3; python_version < "3.12"
+faiss-cpu>=1.7.3; python_version >= "3.12"
 
 # Machine learning, NLP and deep learning
 transformers>=4.49.0
@@ -42,7 +44,7 @@ pysrt
 
 # Utility section
 yt-dlp
-edge-tts
+edge-tts>=7.2.0
 ffmpy==0.3.1
 ffmpeg-python>=0.2.0
 beautifulsoup4
@@ -50,8 +52,12 @@ beautifulsoup4
 # Tensorboard and ONNX
 tensorboard
 onnx>=1.14
-onnxsim>=0.4.36
+onnxslim
 onnx2torch>=1.5.15
 
 # Cryptography section
 pycryptodome>=3.9.6,<4.0.0
+
+# Realtime and VAD
+sounddevice>=0.5.2
+webrtcvad-wheels>=2.0.14

@@ -40,7 +40,8 @@ class RMSEnergyExtractor(nn.Module):
             )
         )
 
-        return rms.squeeze(-2).to(x.device) if not str(x.device).startswith("ocl") else rms.contiguous().squeeze(-2).to(x.device)
+        if str(x.device).startswith("ocl"): rms = rms.contiguous()
+        return rms.squeeze(-2).to(x.device)
     
 def process_file_rms(files, device, threads):
     threads = max(1, threads)
@@ -55,8 +56,9 @@ def process_file_rms(files, device, threads):
             out_file_path = os.path.join(out_path, os.path.basename(file))
 
             if os.path.exists(out_file_path + ".npy"): return
+            feats = torch.from_numpy(load_audio(file, 16000)).unsqueeze(0)
+
             with torch.no_grad():
-                feats = torch.from_numpy(load_audio(file, 16000)).unsqueeze(0)
                 feats = module(feats if device.startswith("ocl") else feats.to(device))
                 
             np.save(out_file_path, feats.float().cpu().numpy(), allow_pickle=False)
@@ -71,7 +73,6 @@ def process_file_rms(files, device, threads):
 def run_rms_extraction(exp_dir, num_processes, devices, rms_extract):
     if rms_extract:
         wav_path, out_path = setup_paths(exp_dir, rms_extract=rms_extract)
-        start_time = time.time()
         paths = sorted([(os.path.join(wav_path, file), out_path) for file in os.listdir(wav_path) if file.endswith(".wav")])
 
         start_time = time.time()

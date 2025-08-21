@@ -380,7 +380,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
 
                 with autocast(autocast_device, enabled=autocast_enabled, dtype=autocast_dtype):     
                     loss_mel = F.l1_loss(y_mel, y_hat_mel) * config.train.c_mel
-                    loss_kl = (kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * config.train.c_kl)
+                    loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * config.train.c_kl
 
                     loss_fm = feature_loss(fmap_r, fmap_g)
                     loss_gen, losses_gen = generator_loss(y_d_hat_g)
@@ -400,7 +400,18 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
                 if loss_mel > 75: loss_mel = 75
                 if loss_kl > 9: loss_kl = 9
 
-                scalar_dict = {"loss/g/total": loss_gen_all, "loss/d/total": loss_disc, "learning_rate": optim_g.param_groups[0]["lr"], "grad/norm_d": grad_norm_d, "grad/norm_g": grad_norm_g, "loss/g/fm": loss_fm, "loss/g/mel": loss_mel, "loss/g/kl": loss_kl}
+                scalar_dict = {
+                    "loss/g/total": loss_gen_all, 
+                    "loss/d/adv": loss_disc, 
+                    "learning_rate": optim_g.param_groups[0]["lr"], 
+                    "grad/norm_d": grad_norm_d, 
+                    "grad/norm_g": grad_norm_g, 
+                    "loss/g/adv": loss_gen,
+                    "loss/g/fm": loss_fm, 
+                    "loss/g/mel": loss_mel, 
+                    "loss/g/kl": loss_kl
+                }
+
                 scalar_dict.update({f"loss/g/{i}": v for i, v in enumerate(losses_gen)})
                 scalar_dict.update({f"loss/d_r/{i}": v for i, v in enumerate(losses_disc_r)})
                 scalar_dict.update({f"loss/d_g/{i}": v for i, v in enumerate(losses_disc_g)})
@@ -408,7 +419,20 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
                 with torch.no_grad():
                     o, *_ = net_g.module.infer(*reference) if hasattr(net_g, "module") else net_g.infer(*reference)
 
-                summarize(writer=writer, global_step=global_step, images={"slice/mel_org": plot_spectrogram_to_numpy(y_mel[0].data.cpu().numpy()), "slice/mel_gen": plot_spectrogram_to_numpy(y_hat_mel[0].data.cpu().numpy()), "all/mel": plot_spectrogram_to_numpy(mel[0].data.cpu().numpy())}, scalars=scalar_dict, audios={f"gen/audio_{global_step:07d}": o[0, :, :]}, audio_sample_rate=config.data.sample_rate)
+                summarize(
+                    writer=writer, 
+                    global_step=global_step, 
+                    images={
+                        "slice/mel_org": plot_spectrogram_to_numpy(y_mel[0].data.cpu().numpy()), 
+                        "slice/mel_gen": plot_spectrogram_to_numpy(y_hat_mel[0].data.cpu().numpy()), 
+                        "all/mel": plot_spectrogram_to_numpy(mel[0].data.cpu().numpy())
+                    }, 
+                    scalars=scalar_dict, 
+                    audios={
+                        f"gen/audio_{global_step:07d}": o[0, :, :]
+                    }, 
+                    audio_sample_rate=config.data.sample_rate
+                )
 
             global_step += 1
             pbar.update(1)

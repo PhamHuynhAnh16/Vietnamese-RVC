@@ -15,6 +15,7 @@ start_time = time.time()
 from main.app.tabs.extra.extra import extra_tab
 from main.app.tabs.editing.editing import editing_tab
 from main.app.tabs.training.training import training_tab
+from main.app.tabs.realtime.realtime import realtime_tab
 from main.app.tabs.downloads.downloads import download_tab
 from main.app.tabs.inference.inference import inference_tab
 from main.configs.rpc import connect_discord_ipc, send_discord_rpc
@@ -33,6 +34,7 @@ with gr.Blocks(title="📱 Vietnamese-RVC GUI BY ANH", theme=theme, css="<style>
     with gr.Tabs():      
         inference_tab()
         editing_tab()
+        realtime_tab()
         training_tab()
         download_tab()
         extra_tab(app)

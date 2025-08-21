@@ -2,6 +2,8 @@ import os
 import sys
 import torch
 
+import torch.nn.utils.parametrize as parametrize
+
 from torch.nn.utils import remove_weight_norm
 from torch.nn.utils.parametrizations import weight_norm
 
@@ -37,7 +39,8 @@ class ResBlockBase(torch.nn.Module):
 
     def remove_weight_norm(self):
         for conv in self.convs1 + self.convs2:
-            remove_weight_norm(conv)
+            if hasattr(conv, "parametrizations") and "weight" in conv.parametrizations: parametrize.remove_parametrizations(conv, "weight", leave_parametrized=True)
+            else: remove_weight_norm(conv)
 
 class ResBlock(ResBlockBase):
     def __init__(self, channels, kernel_size=3, dilation=(1, 3, 5)):
@@ -97,13 +100,6 @@ class ResidualCouplingBlock(torch.nn.Module):
     def remove_weight_norm(self):
         for i in range(self.n_flows):
             self.flows[i * 2].remove_weight_norm()
-
-    def __prepare_scriptable__(self):
-        for i in range(self.n_flows):
-            for hook in self.flows[i * 2]._forward_pre_hooks.values():
-                if (hook.__module__ == "torch.nn.utils.parametrizations.weight_norm" and hook.__class__.__name__ == "WeightNorm"): torch.nn.utils.remove_weight_norm(self.flows[i * 2])
-
-        return self
 
 class ResidualCouplingLayer(torch.nn.Module):
     def __init__(self, channels, hidden_channels, kernel_size, dilation_rate, n_layers, p_dropout=0, gin_channels=0, mean_only=False):

@@ -94,17 +94,15 @@ elif argv_is_allows[8] in argv:
     quit()
 elif argv_is_allows[9] in argv:
     print("""Các tham số của --convert:
-        1. Cấu hình xử lý giọng nói:
+        1. Cấu hình xử lí giọng nói:
             - `--pitch` (mặc định: `0`): Điều chỉnh cao độ.
             - `--filter_radius` (mặc định: `3`): Độ mượt của đường F0.
             - `--index_rate` (mặc định: `0.5`): Tỷ lệ sử dụng chỉ mục giọng nói.
             - `--rms_mix_rate` (mặc định: `1`): Hệ số điều chỉnh biên độ âm lượng.
             - `--protect` (mặc định: `0.33`): Bảo vệ phụ âm.
+            - `--hop_length` (mặc định: `64`): Bước nhảy khi xử lí âm thanh.
 
-        2. Cấu hình mẫu (frame hop):
-            - `--hop_length` (mặc định: `64`): Bước nhảy khi xử lý âm thanh.
-
-        3. Cấu hình F0:
+        2. Cấu hình F0:
             - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
             - `--f0_autotune` (mặc định: `False`): Có tự động điều chỉnh F0 hay không.
             - `--f0_autotune_strength` (mặc định: `1`): Cường độ hiệu chỉnh tự động F0.
@@ -113,29 +111,30 @@ elif argv_is_allows[9] in argv:
             - `--proposal_pitch` (mặc định: `False`): Đề xuất cao độ thay vì điều chỉnh thủ công.
             - `--proposal_pitch` (mặc định: `0.0`): Ngưỡng tần số ước tính cao độ.
 
-        4. Mô hình nhúng:
+        
+        3. Mô hình nhúng:
             - `--embedder_model` (mặc định: `contentvec_base`): Mô hình nhúng sử dụng.
             - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`).
 
-        5. Đường dẫn tệp:
+        4. Đường dẫn tệp:
             - `--input_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
             - `--output_path` (mặc định: `./audios/output.wav`): Đường dẫn lưu tệp đầu ra.
             - `--export_format` (mặc định: `wav`): Định dạng xuất tệp.
             - `--pth_path` (bắt buộc): Đường dẫn đến tệp mô hình `.pth`.
             - `--index_path` (mặc định: `None`): Đường dẫn tệp chỉ mục (nếu có).
 
-        6. Làm sạch âm thanh:
+        5. Làm sạch âm thanh:
             - `--clean_audio` (mặc định: `False`): Có áp dụng làm sạch âm thanh không.
             - `--clean_strength` (mặc định: `0.7`): Mức độ làm sạch.
 
-        7. Resampling & chia nhỏ âm thanh:
+        6. Resampling & chia nhỏ âm thanh:
             - `--resample_sr` (mặc định: `0`): Tần số lấy mẫu mới (0 nghĩa là giữ nguyên).
-            - `--split_audio` (mặc định: `False`): Có chia nhỏ audio trước khi xử lý không.
+            - `--split_audio` (mặc định: `False`): Có chia nhỏ audio trước khi xử lí không.
 
-        8. Kiểm tra & tối ưu hóa:
+        7. Kiểm tra & tối ưu hóa:
             - `--checkpointing` (mặc định: `False`): Bật/tắt checkpointing để tiết kiệm RAM.
 
-        9. Dịch formant:
+        8. Dịch formant:
             - `--formant_shifting` (mặc định: `False`): Có bật hiệu ứng dịch formant không.
             - `--formant_qfrency` (mặc định: `0.8`): Hệ số dịch formant theo tần số.
             - `--formant_timbre` (mặc định: `0.8`): Hệ số thay đổi màu sắc giọng.
@@ -159,21 +158,21 @@ elif argv_is_allows[10] in argv:
             - `--reverb_model` (mặc định: `MDX-Reverb`): Mô hình tách nhạc ("MDX-Reverb", 'VR-Reverb', 'Echo-Aggressive', 'Echo-Normal').
             - `--denoise_model` (mặc định: `Normal`): Mô hình tách nhạc ('Lite', 'Normal').
  
-        4. Cấu hình xử lý âm thanh:
+        4. Cấu hình xử lí âm thanh:
             - `--shifts` (mặc định: `2`): Số lượng dự đoán.
             - `--batch_size` (mặc định: `1`): Kích thước lô.
             - `--overlap` (mặc định: `0.25`): Mức độ chồng lấn giữa các đoạn.
             - `--aggression` (mặc định: `5`): Cường độ chiết xuất thân chính.
-            - `--hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lý.
+            - `--hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lí.
             - `--window_size` (mặc định: `512`): Kích thước cửa sổ.
             - `--segments_size` (mặc định: `256`): Kích thước phân đoạn âm thanh.
-            - `--post_process_threshold` (mặc định: `0.2`): Mức độ xử lý hậu kỳ sau khi tách nhạc.
+            - `--post_process_threshold` (mặc định: `0.2`): Mức độ xử lí hậu kỳ sau khi tách nhạc.
 
-        5. Cấu hình xử lý âm thanh khác:
+        5. Cấu hình xử lí âm thanh khác:
             - `--enable_tta` (mặc định: `False`): Tăng cường suy luận.
             - `--enable_denoise` (mặc định: `False`): Khữ tách nhạc.
-            - `--high_end_process` (mặc định: `False`): Xử lý dải cao.
-            - `--enable_post_process` (mặc định: `False`): Hậu xử lý.
+            - `--high_end_process` (mặc định: `False`): Xử lí dải cao.
+            - `--enable_post_process` (mặc định: `False`): Hậu xử lí.
 
         6. Bỏ qua phần âm thanh:
             - `--skip_seconds` (mặc định: `False`): Có bỏ qua giây âm thanh nào không.
@@ -201,8 +200,8 @@ elif argv_is_allows[12] in argv:
             - `--f0_autotune` (mặc định: `False`): Có tự động điều chỉnh F0 hay không.
             - `--f0_autotune_strength` (mặc định: `1`): Cường độ hiệu chỉnh tự động F0.
 
-        3. Cấu hình xử lý:
-            - `--hop_length` (mặc định: `128`): Độ dài bước nhảy trong quá trình xử lý.
+        3. Cấu hình xử lí:
+            - `--hop_length` (mặc định: `128`): Độ dài bước nhảy trong quá trình xử lí.
             - `--cpu_cores` (mặc định: `2`): Số lượng luồng CPU sử dụng.
             - `--gpu` (mặc định: `-`): Chỉ định GPU sử dụng (ví dụ: `0` cho GPU đầu tiên, `-` để tắt GPU).
             - `--sample_rate` (bắt buộc): Tần số lấy mẫu của âm thanh đầu vào.
@@ -225,10 +224,10 @@ elif argv_is_allows[13] in argv:
             - `--dataset_path` (mặc định: `./dataset`): Đường dẫn thư mục chứa tệp dữ liệu.
             - `--sample_rate` (bắt buộc): Tần số lấy mẫu của dữ liệu âm thanh.
 
-        3. Cấu hình xử lý:
+        3. Cấu hình xử lí:
             - `--cpu_cores` (mặc định: `2`): Số lượng luồng CPU sử dụng.
             - `--cut_preprocess` (mặc định: `True`): Có cắt tệp dữ liệu hay không.
-            - `--process_effects` (mặc định: `False`): Có áp dụng tiền xử lý hay không.
+            - `--process_effects` (mặc định: `False`): Có áp dụng tiền xử lí hay không.
             - `--clean_dataset` (mặc định: `False`): Có làm sạch tệp dữ liệu hay không.
             - `--clean_strength` (mặc định: `0.7`): Độ mạnh của quá trình làm sạch dữ liệu.
     """)
@@ -247,21 +246,21 @@ elif argv_is_allows[14] in argv:
             - `--reverb_model` (mặc định: `MDX-Reverb`): Mô hình tách nhạc ("MDX-Reverb", 'VR-Reverb', 'Echo-Aggressive', 'Echo-Normal').
             - `--denoise_model` (mặc định: `Normal`): Mô hình tách nhạc ('Lite', 'Normal').
 
-        3. Cấu hình xử lý âm thanh:
+        3. Cấu hình xử lí âm thanh:
             - `--shifts` (mặc định: `2`): Số lượng dự đoán.
             - `--batch_size` (mặc định: `1`): Kích thước lô.
             - `--overlap` (mặc định: `0.25`): Mức độ chồng lấn giữa các đoạn.
             - `--aggression` (mặc định: `5`): Cường độ chiết xuất thân chính.
-            - `--hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lý.
+            - `--hop_length` (mặc định: `1024`): Bước nhảy MDX khi xử lí.
             - `--window_size` (mặc định: `512`): Kích thước cửa sổ.
             - `--segments_size` (mặc định: `256`): Kích thước phân đoạn âm thanh.
-            - `--post_process_threshold` (mặc định: `0.2`): Mức độ xử lý hậu kỳ sau khi tách nhạc.
+            - `--post_process_threshold` (mặc định: `0.2`): Mức độ xử lí hậu kỳ sau khi tách nhạc.
 
-        4. Cấu hình xử lý âm thanh khác:
+        4. Cấu hình xử lí âm thanh khác:
             - `--enable_tta` (mặc định: `False`): Tăng cường suy luận.
             - `--enable_denoise` (mặc định: `False`): Khữ tách nhạc.
-            - `--high_end_process` (mặc định: `False`): Xử lý dải cao.
-            - `--enable_post_process` (mặc định: `False`): Hậu xử lý.
+            - `--high_end_process` (mặc định: `False`): Xử lí dải cao.
+            - `--enable_post_process` (mặc định: `False`): Hậu xử lí.
             - `--separate_backing` (mặc định: `False`): Tách bè giọng.
             - `--separate_reverb` (mặc định: `False`): Tách vang giọng.
     """)
@@ -298,7 +297,7 @@ elif argv_is_allows[15] in argv:
             - `--overtraining_detector` (mặc định: `False`): Bật/tắt chế độ phát hiện huấn luyện quá mức.
             - `--overtraining_threshold` (mặc định: `50`): Ngưỡng để xác định huấn luyện quá mức.
 
-        7. Xử lý dữ liệu:
+        7. Xử lí dữ liệu:
             - `--cleanup` (mặc định: `False`): Dọn dẹp tệp huấn luyện cũ để tiến hành huấn luyện lại từ đầu.
 
         8. Tối ưu:
@@ -315,7 +314,7 @@ elif argv_is_allows[16] in argv:
         3. `--help_create_dataset`: Trợ giúp về tạo dữ liệu huấn luyện.
         4. `--help_create_index`: Trợ giúp về tạo chỉ mục.
         5. `--help_extract`: Trợ giúp về trích xuất dữ liệu huấn luyện.
-        6. `--help_preprocess`: Trợ giúp về xử lý trước dữ liệu.
+        6. `--help_preprocess`: Trợ giúp về xử lí trước dữ liệu.
         7. `--help_separate_music`: Trợ giúp về tách nhạc.
         8. `--help_train`: Trợ giúp về huấn luyện mô hình.
     """)

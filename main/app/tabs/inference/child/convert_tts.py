@@ -98,6 +98,8 @@ def convert_tts_tab():
                         upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".conversion.json"])  
                 with gr.Group():
                     with gr.Row():
+                        audio_processing = gr.Checkbox(label=translations["audio_processing"], value=False, interactive=True)
+                    with gr.Row():
                         formant_shifting1 = gr.Checkbox(label=translations["formantshift"], value=False, interactive=True)  
                         split_audio0 = gr.Checkbox(label=translations["split_audio"], value=False, interactive=True)   
                         cleaner1 = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)  
@@ -267,7 +269,8 @@ def convert_tts_tab():
                 f0_file_dropdown0,
                 embed_mode1,
                 proposal_pitch, 
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                audio_processing
             ],
             outputs=[tts_voice_convert],
             api_name="convert_tts"

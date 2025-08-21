@@ -1,11 +1,12 @@
 import os
 import sys
-import math
 import torch
+import torchaudio
 
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.utils.parametrize as parametrize
 
 from torch.utils.checkpoint import checkpoint
 from torch.nn.utils import remove_weight_norm
@@ -33,13 +34,16 @@ class ResBlock(nn.Module):
 
     def remove_weight_norm(self):
         for c1, c2 in zip(self.convs1, self.convs2):
-            remove_weight_norm(c1)
-            remove_weight_norm(c2)
+            if hasattr(c1, "parametrizations") and "weight" in c1.parametrizations: parametrize.remove_parametrizations(c1, "weight", leave_parametrized=True)
+            else: remove_weight_norm(c1)
+
+            if hasattr(c2, "parametrizations") and "weight" in c2.parametrizations: parametrize.remove_parametrizations(c2, "weight", leave_parametrized=True)
+            else: remove_weight_norm(c2)
 
 class AdaIN(nn.Module):
     def __init__(self, *, channels, leaky_relu_slope = 0.2):
         super().__init__()
-        self.weight = nn.Parameter(torch.ones(channels))
+        self.weight = nn.Parameter(torch.ones(channels) * 1e-4)
         self.activation = nn.LeakyReLU(leaky_relu_slope)
 
     def forward(self, x):
@@ -107,25 +111,29 @@ class SineGenerator(nn.Module):
         return self.merge(sine_waves)
     
 class RefineGANGenerator(nn.Module):
-    def __init__(self, *, sample_rate = 44100, upsample_rates = (8, 8, 2, 2), leaky_relu_slope = 0.2, num_mels = 128, gin_channels = 256, checkpointing = False, upsample_initial_channel = 512):
+    def __init__(self, *, sample_rate = 44100, upsample_rates = (8, 8, 2, 2), leaky_relu_slope = 0.2, num_mels = 128, start_channels = 16, gin_channels = 256, checkpointing = False, upsample_initial_channel = 512):
         super().__init__()
         self.upsample_rates = upsample_rates
         self.checkpointing = checkpointing
         self.leaky_relu_slope = leaky_relu_slope
         self.upp = np.prod(upsample_rates)
         self.m_source = SineGenerator(sample_rate)
-        self.pre_conv = weight_norm(nn.Conv1d(1, upsample_initial_channel // 2, 7, 1, padding=3))
-        stride_f0s = [math.prod(upsample_rates[i + 1 :]) if i + 1 < len(upsample_rates) else 1 for i in range(len(upsample_rates))]
-
-        channels = upsample_initial_channel
+        self.pre_conv = weight_norm(nn.Conv1d(1, 16, 7, 1, padding=3))
+        channels = start_channels
+        size = self.upp
         self.downsample_blocks = nn.ModuleList([])
+        self.df0 = []
 
         for i, _ in enumerate(upsample_rates):
-            stride = stride_f0s[i]
-            kernel = 1 if stride == 1 else stride * 2 - stride % 2
+            new_size = int(size / upsample_rates[-i - 1])
+            self.df0.append([size, new_size])
+            size = new_size
 
-            self.downsample_blocks.append(weight_norm(nn.Conv1d(1, channels // 2 ** (i + 2), kernel, stride, padding=0 if stride == 1 else (kernel - stride) // 2)))
+            new_channels = channels * 2
+            self.downsample_blocks.append(weight_norm(nn.Conv1d(channels, new_channels, 7, 1, padding=3)))
+            channels = new_channels
 
+        channels = upsample_initial_channel
         self.mel_conv = weight_norm(nn.Conv1d(num_mels, channels // 2, 7, 1, padding=3))
         self.mel_conv.apply(init_weights)
 
@@ -144,24 +152,36 @@ class RefineGANGenerator(nn.Module):
         self.conv_post.apply(init_weights)
 
     def forward(self, mel, f0, g = None):
-        har_source = self.m_source(F.interpolate(f0.unsqueeze(1), size=mel.shape[-1] * self.upp, mode="linear").transpose(1, 2)).transpose(1, 2)
-        x = F.interpolate(self.pre_conv(har_source), size=mel.shape[-1], mode="linear")
+        f0_size = mel.shape[-1]
+        har_source = self.m_source(F.interpolate(f0.unsqueeze(1), size=f0_size * self.upp, mode="linear").transpose(1, 2)).transpose(1, 2)
+        x = self.pre_conv(har_source)
+        downs = []
+
+        for block, (old_size, new_size) in zip(self.downsample_blocks, self.df0):
+            x = F.leaky_relu(x, self.leaky_relu_slope)
+            downs.append(x)
+            x = torchaudio.functional.resample(x.contiguous(), orig_freq=int(f0_size * old_size), new_freq=int(f0_size * new_size), lowpass_filter_width=64, rolloff=0.9475937167399596, resampling_method="sinc_interp_kaiser", beta=14.769656459379492)
+            x = block(x)
 
         mel = self.mel_conv(mel)
         if g is not None: mel += self.cond(g)
 
         x = torch.cat([mel, x], dim=1)
-
-        for ups, res, down in zip(self.upsample_blocks, self.upsample_conv_blocks, self.downsample_blocks):
+        for ups, res, down in zip(self.upsample_blocks, self.upsample_conv_blocks, reversed(downs)):
             x = F.leaky_relu(x, self.leaky_relu_slope)
-            x = checkpoint(res, torch.cat([checkpoint(ups, x, use_reentrant=False), down(har_source)], dim=1), use_reentrant=False) if self.training and self.checkpointing else res(torch.cat([ups(x), down(har_source)], dim=1))
+            x = checkpoint(res, torch.cat([checkpoint(ups, x, use_reentrant=False), down], dim=1), use_reentrant=False) if self.training and self.checkpointing else res(torch.cat([ups(x), down], dim=1))
 
         return torch.tanh(self.conv_post(F.leaky_relu(x, self.leaky_relu_slope)))
 
     def remove_weight_norm(self):
-        remove_weight_norm(self.pre_conv)
-        remove_weight_norm(self.mel_conv)
-        remove_weight_norm(self.conv_post)
+        if hasattr(self.pre_conv, "parametrizations") and "weight" in self.pre_conv.parametrizations: parametrize.remove_parametrizations(self.pre_conv, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.pre_conv)
+
+        if hasattr(self.mel_conv, "parametrizations") and "weight" in self.mel_conv.parametrizations: parametrize.remove_parametrizations(self.mel_conv, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.mel_conv)
+
+        if hasattr(self.conv_post, "parametrizations") and "weight" in self.conv_post.parametrizations: parametrize.remove_parametrizations(self.conv_post, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.conv_post)
 
         for block in self.downsample_blocks:
             block.remove_weight_norm()

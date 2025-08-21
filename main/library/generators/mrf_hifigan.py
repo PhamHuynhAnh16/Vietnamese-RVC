@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.utils.parametrize as parametrize
 
 from torch.nn.utils import remove_weight_norm
 from torch.utils.checkpoint import checkpoint
@@ -139,12 +140,15 @@ class HiFiGANMRFGenerator(nn.Module):
         return torch.tanh(self.conv_post(F.leaky_relu(x)))
 
     def remove_weight_norm(self):
-        remove_weight_norm(self.conv_pre)
+        if hasattr(self.conv_pre, "parametrizations") and "weight" in self.conv_pre.parametrizations: parametrize.remove_parametrizations(self.conv_pre, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.conv_pre)
 
         for up in self.upsamples:
-            remove_weight_norm(up)
+            if hasattr(up, "parametrizations") and "weight" in up.parametrizations: parametrize.remove_parametrizations(up, "weight", leave_parametrized=True)
+            else: remove_weight_norm(up)
 
         for mrf in self.mrfs:
             mrf.remove_weight_norm()
 
-        remove_weight_norm(self.conv_post)
+        if hasattr(self.conv_post, "parametrizations") and "weight" in self.conv_post.parametrizations: parametrize.remove_parametrizations(self.conv_post, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.conv_post)

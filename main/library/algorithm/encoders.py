@@ -66,8 +66,8 @@ class TextEncoder(torch.nn.Module):
         if pitch is not None: x += self.emb_pitch(pitch)
         if energy is not None: x += self.emb_energy(energy.unsqueeze(-1))
 
-        x = torch.transpose(self.lrelu(x * math.sqrt(self.hidden_channels)), 1, -1) 
-        x_mask = torch.unsqueeze(sequence_mask(lengths, x.size(2)), 1).to(x.dtype)
+        x = self.lrelu(x * math.sqrt(self.hidden_channels)).transpose(1, -1)
+        x_mask = sequence_mask(lengths, x.size(2)).unsqueeze(1).to(x.dtype)
         m, logs = torch.split((self.proj(self.encoder(x * x_mask, x_mask)) * x_mask), self.out_channels, dim=1)
 
         return m, logs, x_mask
@@ -87,7 +87,7 @@ class PosteriorEncoder(torch.nn.Module):
         self.proj = torch.nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
     def forward(self, x, x_lengths, g = None):
-        x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(2)), 1).to(x.dtype)
+        x_mask = sequence_mask(x_lengths, x.size(2)).unsqueeze(1).to(x.dtype)
         m, logs = torch.split((self.proj(self.enc((self.pre(x) * x_mask), x_mask, g=g)) * x_mask), self.out_channels, dim=1)
 
         return ((m + torch.randn_like(m) * torch.exp(logs)) * x_mask), m, logs, x_mask

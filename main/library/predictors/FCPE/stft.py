@@ -47,8 +47,8 @@ class STFT:
         n_fft = int(np.round(n_fft * factor))
 
         if str(y.device).startswith("ocl"):
-            stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length_new, win_length=win_size_new).to(y.device)
-            spec = stft.transform(pad, 1e-9)
+            if not hasattr(self, "stft"): self.stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length_new, win_length=win_size_new).to(y.device)
+            spec = self.stft.transform(pad, 1e-9)
         else:
             spec = torch.stft(pad, n_fft, hop_length=hop_length_new, win_length=win_size_new, window=hann_window[keyshift_key], center=center, pad_mode="reflect", normalized=False, onesided=True, return_complex=True)
             spec = torch.sqrt(spec.real.pow(2) + spec.imag.pow(2) + 1e-9)
