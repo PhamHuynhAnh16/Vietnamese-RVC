@@ -10,7 +10,7 @@ import xml.etree.ElementTree
 sys.path.append(os.getcwd())
 
 from main.app.variables import logger, translations, configs
-from main.app.core.ui import gr_info, gr_warning, gr_error, process_output
+from main.app.core.ui import gr_info, gr_warning, gr_error, process_output, replace_punctuation
 
 def read_docx_text(path):
     with zipfile.ZipFile(path) as docx:
@@ -49,7 +49,7 @@ def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
                 model_log_dir = os.path.join(dest_logs, model_name)
                 os.makedirs(model_log_dir, exist_ok=True)
 
-                filepath = process_output(os.path.join(model_log_dir, file.replace(' ', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '').replace(",", "").replace('"', "").replace("'", "").replace("|", "").replace("{", "").replace("}", "").strip()))
+                filepath = process_output(os.path.join(model_log_dir, replace_punctuation(file)))
 
                 shutil.move(file_path, filepath)
             elif file.endswith(".pth") and not file.startswith("D_") and not file.startswith("G_"):
@@ -62,7 +62,7 @@ def move_files_from_directory(src_dir, dest_weights, dest_logs, model_name):
                 shutil.move(file_path, pth_path)
 
 def extract_name_model(filename):
-    match = re.search(r"_([A-Za-z0-9]+)(?=_v\d*)", filename.replace('-', '').replace('(', '').replace(')', '').replace('[', '').replace(']', '').replace(",", "").replace('"', "").replace("'", "").replace("|", "").replace("{", "").replace("}", "").strip())
+    match = re.search(r"_([A-Za-z0-9]+)(?=_v\d*)", replace_punctuation(filename))
     return match.group(1) if match else None
 
 def save_drop_model(dropboxs):

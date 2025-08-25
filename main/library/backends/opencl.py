@@ -83,20 +83,8 @@ class STFT(torch.nn.Module):
         if return_phase:
             phase = torch.atan2(imag_part.data, real_part.data)
             return magnitude, phase
-        else: return magnitude
 
-    def inverse(self, magnitude, phase):
-        cat = torch.cat([magnitude * torch.cos(phase), magnitude * torch.sin(phase)], dim=1)
-        fold = torch.nn.Fold(output_size=(1, (cat.size(-1) - 1) * self.hop_length + self.filter_length), kernel_size=(1, self.filter_length), stride=(1, self.hop_length))
-
-        inverse_transform = torch.matmul(self.inverse_basis, cat)
-        inverse_transform = fold(inverse_transform)[:, 0, 0, self.pad_amount : -self.pad_amount]
-
-        window_square_sum = self.fft_window.pow(2).repeat(cat.size(-1), 1).T.unsqueeze(0)
-        window_square_sum = fold(window_square_sum)[:, 0, 0, self.pad_amount : -self.pad_amount]
-
-        inverse_transform /= window_square_sum
-        return inverse_transform
+        return magnitude
 
 class GRU(nn.RNNBase):
     def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0.0, bidirectional=False, device=None, dtype=None):

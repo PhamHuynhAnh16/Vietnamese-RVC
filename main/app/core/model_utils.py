@@ -94,13 +94,13 @@ def fushion_model(name, path_1, path_2, ratio):
         gr_warning(translations["provide_name_is_save"]) 
         return [translations["provide_name_is_save"], None]
 
-    if path_1.endswith(".pth") and path_2.endswith(".pth"): return fushion_model_pth(name.replace(".onnx", ".pth"), path_1, path_2, ratio)
+    if path_1.endswith(".pth") and path_2.endswith(".pth"): return fushion_model_pth(name, path_1, path_2, ratio)
     else:
         gr_warning(translations["format_not_valid"])
         return [None, None]
     
 def onnx_export(model_path):    
-    if not model_path.endswith(".pth"): model_path + ".pth"
+    if not model_path.endswith(".pth"): model_path += ".pth"
     if not model_path or not os.path.exists(model_path) or not model_path.endswith(".pth"): return gr_warning(translations["provide_file"].format(filename=translations["model"]))
     
     try:

@@ -13,9 +13,9 @@ from bs4 import BeautifulSoup
 sys.path.append(os.getcwd())
 
 from main.tools import huggingface, gdown, meganz, mediafire, pixeldrain
-from main.app.core.ui import gr_info, gr_warning, gr_error, process_output
 from main.app.variables import logger, translations, model_options, configs
 from main.app.core.process import move_files_from_directory, fetch_pretrained_data, extract_name_model
+from main.app.core.ui import gr_info, gr_warning, gr_error, process_output, replace_url, replace_modelname
 
 def download_url(url):
     if not url: 
@@ -68,7 +68,7 @@ def move_file(file, download_dir, model):
 def download_model(url=None, model=None):
     if not url: return gr_warning(translations["provide_url"])
 
-    url = url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
+    url = replace_url(url)
     download_dir = "download_model"
 
     os.makedirs(download_dir, exist_ok=True)
@@ -90,7 +90,7 @@ def download_model(url=None, model=None):
             model = extract_name_model(modelname) if modelname.endswith(".index") else os.path.splitext(modelname)[0]
             if model is None: model = os.path.splitext(modelname)[0]
 
-        model = model.replace(".onnx", "").replace(".pth", "").replace(".index", "").replace(".zip", "").replace(" ", "_").replace("(", "").replace(")", "").replace("[", "").replace("]", "").replace("{", "").replace("}", "").replace(",", "").replace('"', "").replace("'", "").replace("|", "").strip()
+        model = replace_modelname(model)
 
         move_file(file, download_dir, model)
         gr_info(translations["success"])
@@ -112,7 +112,7 @@ def download_pretrained_model(choices, model, sample_rate):
         url = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cergenvarq_phfgbz/", "rot13") + paths
 
         gr_info(translations["download_pretrain"])
-        file = huggingface.HF_download_file(url.replace("/blob/", "/resolve/").replace("?download=true", "").strip(), os.path.join(pretraineds_custom_path, paths))
+        file = huggingface.HF_download_file(replace_url(url), os.path.join(pretraineds_custom_path, paths))
 
         if file.endswith(".zip"): 
             shutil.unpack_archive(file, pretraineds_custom_path)
@@ -138,7 +138,7 @@ def download_pretrained_model(choices, model, sample_rate):
         if sample_rate: urls.append(sample_rate)
 
         for url in urls:
-            url = url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
+            url = replace_url(url)
         
             if "huggingface.co" in url: file = huggingface.HF_download_file(url, pretraineds_custom_path)
             elif "google.com" in url: file = gdown.gdown_download(url, pretraineds_custom_path)
@@ -202,7 +202,7 @@ def search_models(name):
                 name_tag, url_tag = row.find("a", {"class": "fs-5"}), row.find("a", {"class": "btn btn-sm fw-bold btn-light ms-0 p-1 ps-2 pe-2"})
                 url = url_tag["href"].replace("https://easyaivoice.com/run?url=", "")
                 if "huggingface" in url:
-                    if name_tag and url_tag: model_options[name_tag.text.replace(".onnx", "").replace(".pth", "").replace(".index", "").replace(".zip", "").replace(" ", "_").replace("(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").replace('"', "").replace("'", "").replace("|", "_").replace("-_-", "_").replace("_-_", "_").replace("-", "_").replace("---", "_").replace("___", "_").strip()] = url
+                    if name_tag and url_tag: model_options[replace_modelname(name_tag.text)] = url
 
         gr_info(translations["found"].format(results=len(model_options)))
         return [{"value": "", "choices": model_options, "interactive": True, "visible": True, "__type__": "update"}, {"value": translations["downloads"], "visible": True, "__type__": "update"}]

@@ -14,6 +14,8 @@ from main.library.algorithm.synthesizers import SynthesizerONNX
 
 warnings.filterwarnings("ignore")
 
+FEATS_LENGTH = 200
+
 def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
     if not device.startswith("cuda"): device = "cpu"
 
@@ -26,31 +28,30 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
 
     net_g = SynthesizerONNX(*cpt["config"], use_f0=f0, text_enc_hidden_dim=text_enc_hidden_dim, vocoder=vocoder, checkpointing=False, energy=energy_use)
     net_g.load_state_dict(cpt["weight"], strict=False)
-    net_g.eval().to(device)
-    net_g = net_g.to(torch.float16 if is_half else torch.float32)
+    net_g.eval().to(device).to(torch.float16 if is_half else torch.float32)
+    net_g.remove_weight_norm()
 
-    phone = torch.rand(1, 200, text_enc_hidden_dim).to(device)
-    phone_length = torch.tensor([200]).long().to(device)
+    phone = torch.rand(1, FEATS_LENGTH, text_enc_hidden_dim).to(device)
+    phone_length = torch.tensor([FEATS_LENGTH]).long().to(device)
     ds = torch.LongTensor([0]).to(device)
-    rnd = torch.rand(1, 192, 200).to(device)
-
-    if f0:
-        pitch = torch.randint(size=(1, 200), low=5, high=255).to(device)
-        pitchf = torch.rand(1, 200).to(device)
-
-    if energy_use: energy = torch.rand(1, 200).to(device)
+    rnd = torch.rand(1, 192, FEATS_LENGTH).to(device)
 
     args = [phone, phone_length, ds, rnd]
     input_names = ["phone", "phone_lengths", "ds", "rnd"]
     dynamic_axes = {"phone": [1], "rnd": [2]}
 
     if f0:
+        pitch = torch.randint(size=(1, FEATS_LENGTH), low=5, high=255).to(device)
+        pitchf = torch.rand(1, FEATS_LENGTH).to(device)
+
         args += [pitch, pitchf]
         input_names += ["pitch", "pitchf"]
         dynamic_axes.update({"pitch": [1], "pitchf": [1]})
 
     if energy_use:
+        energy = torch.rand(1, FEATS_LENGTH).to(device)
         args.append(energy)
+
         input_names.append("energy")
         dynamic_axes.update({"energy": [1]})
 

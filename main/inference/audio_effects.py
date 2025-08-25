@@ -13,6 +13,7 @@ from pedalboard import Pedalboard, Chorus, Distortion, Reverb, PitchShift, Delay
 sys.path.append(os.getcwd())
 
 from main.library.utils import pydub_load
+from main.app.core.ui import replace_export_format
 from main.app.variables import translations, logger
 
 def parse_arguments():
@@ -170,8 +171,8 @@ def process_audio(input_path, output_path, resample, resample_sr, chorus_depth, 
             processed_audio = librosa.resample(processed_audio, orig_sr=sample_rate, target_sr=resample_sr, res_type="soxr_vhq")
             sample_rate = resample_sr
 
-        sf.write(output_path.replace("wav", export_format), processed_audio, sample_rate, format=export_format)
-        if audio_combination: pydub_load(audio_combination_input, combination_volume).overlay(pydub_load(output_path.replace("wav", export_format), main_volume)).export(output_path.replace("wav", export_format), format=export_format)
+        sf.write(replace_export_format(output_path, export_format), processed_audio, sample_rate, format=export_format)
+        if audio_combination: pydub_load(audio_combination_input, combination_volume).overlay(pydub_load(replace_export_format(output_path, export_format), main_volume)).export(replace_export_format(output_path, export_format), format=export_format)
     except Exception as e:
         import traceback
         logger.debug(traceback.format_exc())

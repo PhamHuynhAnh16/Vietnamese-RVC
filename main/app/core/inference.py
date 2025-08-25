@@ -10,8 +10,8 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
-from main.app.core.ui import gr_info, gr_warning, gr_error, process_output
 from main.app.variables import logger, config, configs, translations, python
+from main.app.core.ui import gr_info, gr_warning, gr_error, process_output, replace_export_format
 
 def convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, clean_audio, clean_strength, export_format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, f0_onnx, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing=False):    
     subprocess.run([
@@ -173,7 +173,7 @@ def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not
             gr_warning(translations["output_not_valid"])
             return return_none
         
-        output = output.replace("wav", format)
+        output = replace_export_format(output, format)
 
         if os.path.isdir(input):
             gr_info(translations["is_folder"])
@@ -361,7 +361,7 @@ def convert_with_whisper(num_spk, model_size, cleaner, clean_strength, autotune,
         convert(pitch_2, filter_radius, index_strength_2, rms_mix_rate, protect, hop_length, f0method, os.path.join(output_folder, "2"), output_folder, model_pth_2, model_index_2, autotune, cleaner, clean_strength, "wav", embedder_model, resample_sr, False, f0_autotune_strength, checkpointing, onnx_f0_mode, embed_mode, formant_shifting, formant_qfrency_2, formant_timbre_2, "", proposal_pitch, proposal_pitch_threshold, audio_processing)
 
         gr_info(translations["convert_success"])
-        return merge_audio(processed_segments, time_stamps, input_audio, output_audio.replace("wav", export_format), export_format)
+        return merge_audio(processed_segments, time_stamps, input_audio, replace_export_format(output_audio, export_format), export_format)
     except Exception as e:
         gr_error(translations["error_occurred"].format(e=e))
         import traceback
@@ -394,7 +394,7 @@ def convert_tts(clean, autotune, pitch, clean_strength, model, index, index_rate
         gr_warning(translations["output_not_valid"])
         return None
     
-    output = output.replace("wav", format)
+    output = replace_export_format(output, format)
     if os.path.isdir(output): output = os.path.join(output, f"tts.{format}")
 
     output_dir = os.path.dirname(output)

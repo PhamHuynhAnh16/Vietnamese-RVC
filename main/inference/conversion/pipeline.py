@@ -64,7 +64,7 @@ class Pipeline:
             p_len = min(audio0.shape[0] // self.window, feats.shape[1])
 
             if pitch_guidance: pitch, pitchf = pitch[:, :p_len], pitchf[:, :p_len]
-            if energy_use: energy = energy[:p_len]
+            if energy_use: energy = energy[:p_len].unsqueeze(0)
 
             if feats0 is not None:
                 pitchff = pitchf.clone()

@@ -270,3 +270,17 @@ def change_audio_device_choices():
         {"value": output_channels_map[0] if len(output_channels_map) >= 1 else "", "choices": output_channels_map, "__type__": "update"},
         {"value": output_channels_map[0] if len(output_channels_map) >= 1 else "", "choices": output_channels_map, "__type__": "update"}
     ]
+
+def replace_punctuation(filename):
+    return filename.replace(" ", "_").replace("-", "").replace("(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").replace('"', "").replace("'", "").replace("|", "_").replace("{", "").replace("}", "").replace("-_-", "_").replace("_-_", "_").replace("-", "_").replace("---", "_").replace("___", "_").strip()
+
+def replace_url(url):
+    return url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
+
+def replace_modelname(modelname):
+    return replace_punctuation(modelname.replace(".onnx", "").replace(".pth", "").replace(".index", "").replace(".zip", ""))
+
+def replace_export_format(audio_path, export_format = "wav"):
+    export_format = f".{export_format}"
+
+    return audio_path if audio_path.endswith(export_format) else audio_path.replace(f".{os.path.basename(audio_path).split('.')[-1]}", export_format)

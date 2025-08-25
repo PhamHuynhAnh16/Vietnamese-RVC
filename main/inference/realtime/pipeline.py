@@ -3,7 +3,6 @@ import sys
 import onnx
 import json
 import torch
-import onnxruntime
 
 import numpy as np
 import torch.nn.functional as F
@@ -11,34 +10,15 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import config, logger
+from main.app.variables import config
 from main.library.predictors.Generator import Generator
 from main.library.algorithm.synthesizers import Synthesizer
 from main.inference.extracting.rms import RMSEnergyExtractor
-from main.library.utils import get_providers, get_onnx_argument, load_embedders_model, extract_features, change_rms, load_faiss_index
+from main.library.utils import get_onnx_argument, load_embedders_model, extract_features, change_rms, load_faiss_index, load_model
 
 class Inference:
-    def load_model(self, model_path, weights_only=True, log_severity_level=3):
-        if not os.path.isfile(model_path): return None
-
-        if model_path.endswith(".pth"):
-            return torch.load(
-                model_path, 
-                map_location="cpu", 
-                weights_only=weights_only
-            )
-        else: 
-            sess_options = onnxruntime.SessionOptions()
-            sess_options.log_severity_level = log_severity_level
-            
-            return onnxruntime.InferenceSession(
-                model_path, 
-                sess_options=sess_options, 
-                providers=get_providers()
-            )
-    
     def get_synthesizer(self, model_path):
-        model = self.load_model(model_path)
+        model = load_model(model_path)
 
         if model_path.endswith(".pth"):
             self.tgt_sr = model["config"][-1]
@@ -182,17 +162,17 @@ class Pipeline:
         pitchf = pitchf.to(self.dtype) if self.use_f0 else None
         energy = energy.to(self.dtype) if self.energy else None
 
+        audio_feats_len = min(audio_feats_len, feats.size(1))
+        if self.use_f0: audio_feats_len = min(audio_feats_len, pitch.size(1), pitchf.size(1))
+        if self.energy: audio_feats_len = min(audio_feats_len, energy.size(0))
+
+        feats = feats[:, :audio_feats_len, :].to(self.dtype)
+        if self.use_f0: pitch, pitchf = pitch[:, :audio_feats_len], pitchf[:, :audio_feats_len]
+        if self.energy: energy = energy[:audio_feats_len].unsqueeze(0)
+
         p_len = torch.tensor([audio_feats_len], device=self.device, dtype=torch.int64)
 
-        min_len = feats.size(1)
-        if self.use_f0: min_len = min(min_len, pitch.size(1), pitchf.size(1))
-        if self.energy: min_len = min(min_len, energy.size(0))
-
-        feats = feats[:, :min_len, :]
-        if self.use_f0: pitch, pitchf = pitch[:, :min_len], pitchf[:, :min_len]
-        if self.energy: energy = energy[:min_len]
-        
-        out_audio = self.inference.inference(feats.to(self.dtype), p_len, self.sid, pitch, pitchf, energy).float()
+        out_audio = self.inference.inference(feats, p_len, self.sid, pitch, pitchf, energy).float()
         if rms_mix_rate != 1: out_audio = change_rms(audio, self.predictor.sample_rate, out_audio, self.tgt_sr, rms_mix_rate)
 
         scaled_window = int(np.floor(1.0 * self.model_window))
@@ -210,7 +190,7 @@ def create_pipeline(model_path=None, index_path=None, f0_method="rmvpe", f0_onnx
     predictor = Generator(sample_rate=sample_rate, hop_length=hop_length, f0_min=50.0, f0_max=1100.0, is_half=config.is_half, device=config.device, f0_onnx_mode=f0_onnx, del_onnx_model=False) if inference.use_f0 else None
     rms = RMSEnergyExtractor(frame_length=2048, hop_length=160, center=True, pad_mode="reflect").to(config.device).eval() if inference.energy else None
 
-    index, index_reconstruct = load_faiss_index(index_path)
+    index, index_reconstruct = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"))
     embedder, embed_suffix = load_embedders_model(embedder_model, embedders_mode=embedders_mode)
     if embed_suffix != ".onnx": embedder = embedder.to(config.device).to(torch.float16 if config.is_half else torch.float32)  
 

@@ -207,12 +207,12 @@ def get_providers():
 
     if "CUDAExecutionProvider" in ort_providers and config.device.startswith("cuda"): 
         providers = ["CUDAExecutionProvider"]
+    elif "ROCMExecutionProvider" in ort_providers and config.device.startswith("cuda"):
+        providers = ["ROCMExecutionProvider"]
     elif "DmlExecutionProvider" in ort_providers and config.device.startswith("ocl"): 
         providers = ["DmlExecutionProvider"]
     elif "CoreMLExecutionProvider" in ort_providers and config.device.startswith("mps"): 
         providers = ["CoreMLExecutionProvider"]
-    elif "ROCMExecutionProvider" in ort_providers and config.device.startswith("cuda") and torch.cuda.get_device_name().endswith("[ZLUDA]"):
-        providers = ["ROCMExecutionProvider"]
     else: 
         providers = ["CPUExecutionProvider"]
         logger.info(translations["running_in_cpu"])
@@ -359,3 +359,22 @@ def load_faiss_index(index_path):
     else: index = big_npy = None
 
     return index, big_npy
+
+def load_model(model_path, weights_only=True, log_severity_level=3):
+    if not os.path.isfile(model_path): return None
+
+    if model_path.endswith(".pth"):
+        return torch.load(
+            model_path, 
+            map_location="cpu", 
+            weights_only=weights_only
+        )
+    else: 
+        sess_options = onnxruntime.SessionOptions()
+        sess_options.log_severity_level = log_severity_level
+        
+        return onnxruntime.InferenceSession(
+            model_path, 
+            sess_options=sess_options, 
+            providers=get_providers()
+        )

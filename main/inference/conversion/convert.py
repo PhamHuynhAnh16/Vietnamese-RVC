@@ -8,7 +8,6 @@ import librosa
 import logging
 import argparse
 import warnings
-import onnxruntime
 
 import numpy as np
 import soundfile as sf
@@ -20,11 +19,12 @@ from distutils.util import strtobool
 warnings.filterwarnings("ignore")
 sys.path.append(os.getcwd())
 
+from main.app.core.ui import replace_export_format
 from main.inference.conversion.pipeline import Pipeline
 from main.library.algorithm.synthesizers import Synthesizer
 from main.app.variables import config, logger, translations
 from main.inference.conversion.audio_processing import preprocess, postprocess
-from main.library.utils import check_assets, load_audio, load_embedders_model, cut, restore, get_providers, clear_gpu_cache
+from main.library.utils import check_assets, load_audio, load_embedders_model, cut, restore, clear_gpu_cache, load_model
 
 for l in ["torch", "faiss", "omegaconf", "httpx", "httpcore", "faiss.loader", "numba.core", "urllib3", "transformers", "matplotlib"]:
     logging.getLogger(l).setLevel(logging.ERROR)
@@ -102,7 +102,7 @@ def run_convert_script(
     audio_processing=False
 ):
     check_assets(f0_method, embedder_model, f0_onnx=f0_onnx, embedders_mode=embedders_mode)
-    log_data = {translations['pitch']: pitch, translations['filter_radius']: filter_radius, translations['index_strength']: index_rate, translations['rms_mix_rate']: rms_mix_rate, translations['protect']: protect, translations['hop_length']: hop_length, translations['f0_method']: f0_method, translations['audio_path']: input_path, translations['output_path']: output_path.replace('wav', export_format), translations['model_path']: pth_path, translations['indexpath']: index_path, translations['autotune']: f0_autotune, translations['clear_audio']: clean_audio, translations['export_format']: export_format, translations['hubert_model']: embedder_model, translations['split_audio']: split_audio, translations['memory_efficient_training']: checkpointing, translations["f0_onnx_mode"]: f0_onnx, translations["embed_mode"]: embedders_mode, translations["proposal_pitch"]: proposal_pitch, translations["audio_processing"]: audio_processing}
+    log_data = {translations['pitch']: pitch, translations['filter_radius']: filter_radius, translations['index_strength']: index_rate, translations['rms_mix_rate']: rms_mix_rate, translations['protect']: protect, translations['hop_length']: hop_length, translations['f0_method']: f0_method, translations['audio_path']: input_path, translations['output_path']: replace_export_format(output_path, export_format), translations['model_path']: pth_path, translations['indexpath']: index_path, translations['autotune']: f0_autotune, translations['clear_audio']: clean_audio, translations['export_format']: export_format, translations['hubert_model']: embedder_model, translations['split_audio']: split_audio, translations['memory_efficient_training']: checkpointing, translations["f0_onnx_mode"]: f0_onnx, translations["embed_mode"]: embedders_mode, translations["proposal_pitch"]: proposal_pitch, translations["audio_processing"]: audio_processing}
 
     if clean_audio: log_data[translations['clean_strength']] = clean_strength
     if resample_sr != 0: log_data[translations['sample_rate']] = resample_sr
@@ -177,7 +177,7 @@ def run_convert_script(
 
             convert_audio(audio_path, output_audio)
 
-        logger.info(translations["convert_batch_success"].format(elapsed_time=f"{(time.time() - start_time):.2f}", output_path=output_path.replace('wav', export_format)))
+        logger.info(translations["convert_batch_success"].format(elapsed_time=f"{(time.time() - start_time):.2f}", output_path=replace_export_format(output_path, export_format)))
     else:
         if not os.path.exists(input_path):
             logger.warning(translations["not_found_audio"])
@@ -187,7 +187,7 @@ def run_convert_script(
         if os.path.exists(output_path): os.remove(output_path)
 
         convert_audio(input_path, output_path)
-        logger.info(translations["convert_audio_success"].format(input_path=input_path, elapsed_time=f"{(time.time() - start_time):.2f}", output_path=output_path.replace('wav', export_format)))
+        logger.info(translations["convert_audio_success"].format(input_path=input_path, elapsed_time=f"{(time.time() - start_time):.2f}", output_path=replace_export_format(output_path, export_format)))
 
     if os.path.exists(pid_path): os.remove(pid_path)
 
@@ -249,7 +249,7 @@ class VoiceConverter:
                         audio=waveform, 
                         f0_up_key=pitch, 
                         f0_method=f0_method, 
-                        file_index=(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added")), 
+                        file_index=index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"), 
                         index_rate=index_rate, 
                         pitch_guidance=self.use_f0, 
                         filter_radius=filter_radius, 
@@ -309,7 +309,7 @@ class VoiceConverter:
 
         if not self.loaded_model or self.loaded_model != weight_root:
             self.loaded_model = weight_root
-            self.load_model()
+            self.cpt = load_model(weight_root)
             if self.cpt is not None: self.setup()
 
     def cleanup(self):
@@ -321,15 +321,6 @@ class VoiceConverter:
         del self.net_g, self.cpt
         clear_gpu_cache()
         self.cpt = None
-
-    def load_model(self):
-        if os.path.isfile(self.loaded_model):
-            if self.loaded_model.endswith(".pth"): self.cpt = torch.load(self.loaded_model, map_location="cpu", weights_only=True)  
-            else: 
-                sess_options = onnxruntime.SessionOptions()
-                sess_options.log_severity_level = 3
-                self.cpt = onnxruntime.InferenceSession(self.loaded_model, sess_options=sess_options, providers=get_providers())
-        else: self.cpt = None
 
     def setup(self):
         if self.cpt is not None:
