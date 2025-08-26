@@ -58,7 +58,6 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 - **Các mô hình trích xuất nhúng có sẳn các chế độ nhúng như: fairseq, onnx, transformers, spin.**
 - **Các mô hình trích xuất cao độ đều có phiên bản tăng tốc ONNX trừ các phương thức hoạt động bằng trình bao bọc.** 
 - **Các mô hình trích xuất cao độ đều có thể kết hợp với nhau để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
-- **Tính năng Cao độ tự động sẽ tiêu thụ một ít tài nguyên để tính toán đặc tính mô hình và đưa ra ngưỡng để tính toán cao độ cần tăng giảm.**
 
 ## Hướng dẫn sử dụng
 
