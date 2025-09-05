@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import torch
 
 sys.path.append(os.getcwd())
 
@@ -85,7 +84,7 @@ def realtime_start(
     monitor_audio_gan /= 10
     output_monitor_id = int(monitor_output_device.split(":")[0]) if monitor else None
 
-    chunk_size = chunk_size * DEVICE_SAMPLE_RATE / 1000 / 128
+    chunk_size = int(chunk_size * DEVICE_SAMPLE_RATE / 1000 / 128)
 
     callbacks = AudioCallbacks(
         pass_through=False, 
@@ -156,10 +155,9 @@ def realtime_stop():
         del audio_manager, callbacks
 
         audio_manager = callbacks = None
-        gr_info(translations["realtime_has_stop"])
 
-        with torch.no_grad():
-            clear_gpu_cache()
+        gr_info(translations["realtime_has_stop"])
+        clear_gpu_cache()
 
         return translations["realtime_has_stop"], interactive_true, interactive_false
     else:

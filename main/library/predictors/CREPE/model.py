@@ -37,7 +37,7 @@ class MODEL(torch.nn.Module):
     def forward(self, x, embed=False):
         x = self.embed(x)
         if embed: return x
-        return torch.sigmoid(self.classifier(self.layer(x, self.conv6, self.conv6_BN).permute(0, 2, 1, 3).reshape(-1, self.in_features)))
+        return self.classifier(self.layer(x, self.conv6, self.conv6_BN).permute(0, 2, 1, 3).reshape(-1, self.in_features)).sigmoid()
 
     def embed(self, x):
         x = x[:, None, :, None]

@@ -12,9 +12,6 @@ from main.app.variables import logger, translations
 from main.inference.realtime.realtime import VoiceChanger, RVC_Realtime
 
 class AudioCallbacks:
-    def on_audio(self, unpacked_data, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0):
-        return self.change_voice(unpacked_data, f0_up_key, index_rate, protect, filter_radius, rms_mix_rate, f0_autotune, f0_autotune_strength, proposal_pitch, proposal_pitch_threshold)
-    
     def emit_to(self, performance):
         self.latency = performance[1]
     

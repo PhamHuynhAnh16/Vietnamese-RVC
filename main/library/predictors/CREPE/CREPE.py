@@ -43,7 +43,7 @@ class CREPE:
         return 10 * 2 ** ((cents + cents.new_tensor(scipy.stats.triang.rvs(c=0.5, loc=-CENTS_PER_BIN, scale=2 * CENTS_PER_BIN, size=cents.size()))) / 1200)
 
     def frequency_to_bins(self, frequency, quantize_fn=torch.floor):
-        return quantize_fn(((1200 * torch.log2(frequency / 10)) - 1997.3794084376191) / CENTS_PER_BIN).int()
+        return quantize_fn(((1200 * (frequency / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).int()
 
     def viterbi(self, logits):
         if not hasattr(self, 'transition'):

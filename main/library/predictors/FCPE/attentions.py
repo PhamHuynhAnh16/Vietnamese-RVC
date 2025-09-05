@@ -75,9 +75,9 @@ def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, ep
     data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.0
     ratio = projection_matrix.shape[0] ** -0.5
     data_dash = torch.einsum("...id,...jd->...ij", (data_normalizer * data), repeat(projection_matrix, "j d -> b h j d", b=b, h=h).type_as(data))
-    diag_data = ((torch.sum(data**2, dim=-1) / 2.0) * (data_normalizer**2)).unsqueeze(dim=-1)
+    diag_data = (((data**2).sum(dim=-1) / 2.0) * (data_normalizer**2)).unsqueeze(dim=-1)
 
-    return (ratio * (torch.exp(data_dash - diag_data - torch.max(data_dash, dim=-1, keepdim=True).values) + eps) if is_query else ratio * (torch.exp(data_dash - diag_data + eps))).type_as(data)
+    return (ratio * ((data_dash - diag_data - torch.max(data_dash, dim=-1, keepdim=True).values).exp() + eps) if is_query else ratio * ((data_dash - diag_data + eps).exp())).type_as(data)
 
 class SinusoidalEmbeddings(nn.Module):
     def __init__(self, dim, scale_base = None, use_xpos = False, theta = 10000):
@@ -226,7 +226,7 @@ class FastAttention(nn.Module):
         del projections
 
     def forward(self, q, k, v):
-        if self.no_projection: q, k = q.softmax(dim=-1), (torch.exp(k) if self.causal else k.softmax(dim=-2)) 
+        if self.no_projection: q, k = q.softmax(dim=-1), (k.exp() if self.causal else k.softmax(dim=-2)) 
         else:
             create_kernel = partial(softmax_kernel, projection_matrix=self.projection_matrix, device=q.device)
             q, k = create_kernel(q, is_query=True), create_kernel(k, is_query=False)

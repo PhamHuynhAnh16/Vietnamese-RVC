@@ -19,6 +19,7 @@ from distutils.util import strtobool
 warnings.filterwarnings("ignore")
 sys.path.append(os.getcwd())
 
+from main.tools.noisereduce import TG
 from main.app.core.ui import replace_export_format
 from main.inference.conversion.pipeline import Pipeline
 from main.library.algorithm.synthesizers import Synthesizer
@@ -283,8 +284,10 @@ class VoiceConverter:
 
                 pbar.update(1)
                 if clean_audio:
-                    from main.tools.noisereduce import reduce_noise
-                    audio_output = reduce_noise(y=audio_output, sr=self.tgt_sr, prop_decrease=clean_strength, device=self.device) 
+                    device = self.device if not self.device.startswith("ocl") else "cpu"
+
+                    if not hasattr(self, "tg"): self.tg = TG(self.tgt_sr, prop_decrease=clean_strength).to(device)
+                    audio_output = self.tg(torch.from_numpy(audio_output).unsqueeze(0).to(device).float()).squeeze(0).cpu().detach().numpy()
 
                 if len(audio) / self.sample_rate > len(audio_output) / self.tgt_sr:
                     padding = np.zeros(int(np.round(len(audio) / self.sample_rate * self.tgt_sr) - len(audio_output)), dtype=audio_output.dtype)

@@ -168,18 +168,18 @@ def spectral_subtract_denoise(audio, sr, noise_seconds=0.4, alpha=1.0, n_fft=102
 
     if stft is None:
         fft = torch.stft(x, n_fft=n_fft, hop_length=hop_length, win_length=n_fft, window=window, return_complex=True)
-        mag, phase = torch.sqrt(fft.real.pow(2) + fft.imag.pow(2)), torch.atan2(fft.imag, fft.real)
+        mag, phase = (fft.real.pow(2) + fft.imag.pow(2)).sqrt(), torch.atan2(fft.imag, fft.real)
     else:
         mag, phase = stft.transform(x.unsqueeze(0), eps=1e-9, return_phase=True)
         mag, phase, window = mag.squeeze(0).cpu(), phase.squeeze(0).cpu(), window.cpu()
 
     n_frames_est = max(1, min(int((noise_seconds * sr - n_fft) // hop_length) + 1, mag.shape[-1]))
-    noise_mag = torch.mean(mag[:, :n_frames_est], dim=-1, keepdim=True)
+    noise_mag = mag[:, :n_frames_est].mean(dim=-1, keepdim=True)
 
     noise_floor = noise_mag * 1.0
     clean_mag = torch.maximum(mag - alpha * noise_mag, noise_floor * 0.1)
 
-    s_clean = clean_mag * torch.exp(1j * phase)
+    s_clean = clean_mag * (1j * phase).exp()
     xrec = torch.istft(s_clean, n_fft=n_fft, hop_length=hop_length, win_length=n_fft, window=window, length=x.shape[0])
 
     return xrec.cpu().numpy()

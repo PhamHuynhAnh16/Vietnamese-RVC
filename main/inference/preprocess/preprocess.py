@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import torch
 import logging
 import librosa
 import argparse
@@ -16,6 +17,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 sys.path.append(os.getcwd())
 
+from main.tools.noisereduce import TG
 from main.library.utils import load_audio
 from main.inference.preprocess.slicer2 import Slicer
 from main.app.variables import config, logger, translations, configs
@@ -74,8 +76,10 @@ class PreProcess:
                 audio = self._normalize_audio(audio)
 
             if clean_dataset: 
-                from main.tools.noisereduce import reduce_noise
-                audio = reduce_noise(y=audio, sr=self.sr, prop_decrease=clean_strength, device=config.device)
+                device = self.device if not self.device.startswith("ocl") else "cpu"
+
+                if not hasattr(self, "tg"): self.tg = TG(self.sr, prop_decrease=clean_strength).to(device)
+                audio = self.tg(torch.from_numpy(audio).unsqueeze(0).to(device).float()).squeeze(0).cpu().detach().numpy()
 
             idx1 = 0
             if cut_preprocess:

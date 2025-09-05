@@ -197,7 +197,7 @@ class AttentiveStatisticsPooling(nn.Module):
 
         def _compute_statistics(x, m, dim=2, eps=self.eps):
             mean = (m * x).sum(dim)
-            return mean, torch.sqrt((m * (x - mean.unsqueeze(dim)).pow(2)).sum(dim).clamp(eps))
+            return mean, ((m * (x - mean.unsqueeze(dim)).pow(2)).sum(dim).clamp(eps)).sqrt()
 
         if lengths is None: lengths = torch.ones(x.shape[0], device=x.device)
         mask = length_to_mask(lengths * L, max_len=L, device=x.device).unsqueeze(1)

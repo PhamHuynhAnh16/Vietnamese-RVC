@@ -45,7 +45,7 @@ class HiFiGANGenerator(torch.nn.Module):
                 else: xs += self.resblocks[i * self.num_kernels + j](x)
             x = xs / self.num_kernels
 
-        return torch.tanh(self.conv_post(torch.nn.functional.leaky_relu(x)))
+        return self.conv_post(torch.nn.functional.leaky_relu(x)).tanh()
     
     def remove_weight_norm(self):
         for l in self.ups:

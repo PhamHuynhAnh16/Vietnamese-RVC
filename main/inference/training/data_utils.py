@@ -85,10 +85,10 @@ class TextAudioLoaderMultiNSFsid(tdata.Dataset):
             try:
                 spec = torch.load(spec_filename, weights_only=True)
             except Exception:
-                spec = torch.squeeze(spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False), 0)
+                spec = spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False).squeeze(0)
                 torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
         else: 
-            spec = torch.squeeze(spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False), 0)
+            spec = spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False).squeeze(0)
             torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
 
         return spec, audio_norm
@@ -222,10 +222,10 @@ class TextAudioLoader(tdata.Dataset):
             try:
                 spec = torch.load(spec_filename, weights_only=True)
             except Exception:
-                spec = torch.squeeze(spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False), 0)
+                spec = spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False).squeeze(0)
                 torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
         else:
-            spec = torch.squeeze(spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False), 0)
+            spec = spectrogram_torch(audio_norm, self.filter_length, self.hop_length, self.win_length, center=False).squeeze(0)
             torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
 
         return spec, audio_norm

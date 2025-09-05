@@ -25,6 +25,6 @@ class Wav2Spec(nn.Module):
             magnitude = self.stft.transform(audio, 1e-9)
         else:
             fft = torch.stft(audio, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.window_size, window=self.window, center=True, return_complex=True, pad_mode='reflect')
-            magnitude = torch.sqrt(fft.real.pow(2) + fft.imag.pow(2))
+            magnitude = (fft.real.pow(2) + fft.imag.pow(2)).sqrt()
 
         return magnitude.unsqueeze(1).transpose(2, 3)

@@ -96,12 +96,31 @@ class RVC_Realtime:
         audio_in_16k = self.resample_in(torch.as_tensor(audio_in, dtype=torch.float32, device=config.device)).to(self.dtype)
         circular_write(audio_in_16k, self.audio_buffer)
 
-        vol_t = torch.sqrt(torch.square(self.audio_buffer).mean())
+        vol_t = self.audio_buffer.square().mean().sqrt()
         vol = max(vol_t.item(), 0)
 
         if self.vad is not None:
             is_speech = self.vad.is_speech(audio_in_16k.cpu().numpy().copy())
-            if not is_speech: return None, vol
+            if not is_speech: 
+                self.pipeline.execute(
+                    self.convert_buffer,
+                    self.pitch_buffer,
+                    self.pitchf_buffer,
+                    f0_up_key,
+                    index_rate,
+                    self.convert_feature_size_16k,
+                    self.silence_front,
+                    self.skip_head,
+                    self.return_length,
+                    protect,
+                    filter_radius,
+                    rms_mix_rate,
+                    f0_autotune, 
+                    f0_autotune_strength, 
+                    proposal_pitch, 
+                    proposal_pitch_threshold
+                )
+                return None, vol
 
         if vol < self.input_sensitivity:
             self.pipeline.execute(
@@ -138,10 +157,15 @@ class RVC_Realtime:
             self.skip_head,
             self.return_length,
             protect,
-            filter_radius
+            filter_radius,
+            rms_mix_rate,
+            f0_autotune, 
+            f0_autotune_strength, 
+            proposal_pitch, 
+            proposal_pitch_threshold
         )
 
-        audio_out = self.resample_out(audio_model * torch.sqrt(vol_t))
+        audio_out = self.resample_out(audio_model * vol_t.sqrt())
         return audio_out, vol
     
 class VoiceChanger:
@@ -172,8 +196,8 @@ class VoiceChanger:
 
         conv_input = audio[None, None, : self.crossfade_frame + self.sola_search_frame]
         cor_nom = F.conv1d(conv_input, self.sola_buffer[None, None, :])
-        cor_den = torch.sqrt(F.conv1d(conv_input ** 2, torch.ones(1, 1, self.crossfade_frame, device=config.device)) + 1e-8)
-        sola_offset = torch.argmax(cor_nom[0, 0] / cor_den[0, 0])
+        cor_den = (F.conv1d(conv_input ** 2, torch.ones(1, 1, self.crossfade_frame, device=config.device)) + 1e-8).sqrt()
+        sola_offset = (cor_nom[0, 0] / cor_den[0, 0]).argmax()
 
         audio = audio[sola_offset:]
         audio[: self.crossfade_frame] *= self.fade_in_window

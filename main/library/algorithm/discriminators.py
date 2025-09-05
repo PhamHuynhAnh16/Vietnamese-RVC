@@ -60,12 +60,12 @@ class DiscriminatorS(torch.nn.Module):
         return torch.flatten(x, 1, -1), fmap
 
 class DiscriminatorP(torch.nn.Module):
-    def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False, checkpointing=False):
+    def __init__(self, period, kernel_size=5, use_spectral_norm=False, checkpointing=False):
         super(DiscriminatorP, self).__init__()
         self.period = period
         self.checkpointing = checkpointing
         norm_f = spectral_norm if use_spectral_norm else weight_norm
-        self.convs = torch.nn.ModuleList([norm_f(torch.nn.Conv2d(in_ch, out_ch, (kernel_size, 1), (stride, 1), padding=(get_padding(kernel_size, 1), 0))) for in_ch, out_ch in zip([1, 32, 128, 512, 1024], [32, 128, 512, 1024, 1024])])
+        self.convs = torch.nn.ModuleList([norm_f(torch.nn.Conv2d(in_ch, out_ch, (kernel_size, 1), (stride, 1), padding=(get_padding(kernel_size, 1), 0))) for in_ch, out_ch, stride in zip([1, 32, 128, 512, 1024], [32, 128, 512, 1024, 1024], [3, 3, 3, 3, 1])])
         self.conv_post = norm_f(torch.nn.Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
         self.lrelu = torch.nn.LeakyReLU(LRELU_SLOPE)
 

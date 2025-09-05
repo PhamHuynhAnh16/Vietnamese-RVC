@@ -39,7 +39,7 @@ class FCN:
     
     def entropy(self, logits):
         distribution = torch.nn.functional.softmax(logits, dim=1)
-        return (1 + 1 / math.log(PITCH_BINS) * (distribution * torch.log(distribution + 1e-7)).sum(dim=1))
+        return (1 + 1 / math.log(PITCH_BINS) * (distribution * (distribution + 1e-7).log()).sum(dim=1))
     
     def expected_frames(self, samples, center):
         hopsize_resampled = seconds_to_samples(self.hopsize, self.sample_rate)

@@ -59,7 +59,7 @@ class MultiHeadAttention(nn.Module):
         b, d, t_s, t_t = (*key.size(), query.size(2))
         query = query.view(b, self.n_heads, self.k_channels, t_t).transpose(2, 3)
         key = key.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
-        scores = torch.matmul(query / math.sqrt(self.k_channels), key.transpose(-2, -1))
+        scores = (query / math.sqrt(self.k_channels)) @ key.transpose(-2, -1)
     
         if self.window_size is not None:
             assert (t_s == t_t)
@@ -76,16 +76,16 @@ class MultiHeadAttention(nn.Module):
                 scores = scores.masked_fill((torch.ones_like(scores).triu(-self.block_length).tril(self.block_length)) == 0, -1e4)
 
         p_attn = self.drop(F.softmax(scores, dim=-1))
-        output = torch.matmul(p_attn, value.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3))
+        output = p_attn @ value.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
 
         if self.window_size is not None: output += self._matmul_with_relative_values(self._absolute_position_to_relative_position(p_attn, onnx=self.onnx), self._get_relative_embeddings(self.emb_rel_v, t_s, onnx=self.onnx))
         return (output.transpose(2, 3).contiguous().view(b, d, t_t)), p_attn
 
     def _matmul_with_relative_values(self, x, y):
-        return torch.matmul(x, y.unsqueeze(0))
+        return x @ y.unsqueeze(0)
 
     def _matmul_with_relative_keys(self, x, y):
-        return torch.matmul(x, y.unsqueeze(0).transpose(-2, -1))
+        return x @ y.unsqueeze(0).transpose(-2, -1)
 
     def _get_relative_embeddings(self, relative_embeddings, length, onnx=False):
         if onnx:
@@ -112,7 +112,7 @@ class MultiHeadAttention(nn.Module):
     def _attention_bias_proximal(self, length):
         r = torch.arange(length, dtype=torch.float32)
 
-        return -torch.log1p(torch.abs(diff = r.unsqueeze(0) - r.unsqueeze(1))).unsqueeze(0).unsqueeze(0)
+        return -(r.unsqueeze(0) - r.unsqueeze(1)).abs().log1p().unsqueeze(0).unsqueeze(0)
 
 class FFN(nn.Module):
     def __init__(self, in_channels, out_channels, filter_channels, kernel_size, p_dropout=0.0, activation=None, causal=False, onnx=False):
@@ -133,7 +133,7 @@ class FFN(nn.Module):
     def forward(self, x, x_mask):
         x = self.conv_1(self.padding(x * x_mask))
 
-        return self.conv_2(self.padding(self.drop(((x * torch.sigmoid(1.702 * x)) if self.activation == "gelu" else torch.relu(x))) * x_mask)) * x_mask
+        return self.conv_2(self.padding(self.drop(((x * (1.702 * x).sigmoid()) if self.activation == "gelu" else x.relu())) * x_mask)) * x_mask
 
     def _causal_padding(self, x):
         if self.kernel_size == 1: return x

@@ -52,7 +52,7 @@ def post_process(tf0, f0, f0_up_key, manual_x_pad, f0_mel_min, f0_mel_max, manua
 def realtime_post_process(f0, pitch, pitchf, f0_up_key = 0, f0_mel_min = 50.0, f0_mel_max = 1100.0):
     f0 *= 2 ** (f0_up_key / 12)
 
-    f0_mel = 1127.0 * torch.log(1.0 + f0 / 700.0)
+    f0_mel = 1127.0 * (1.0 + f0 / 700.0).log()
     f0_mel = torch.clip((f0_mel - f0_mel_min) * 254 / (f0_mel_max - f0_mel_min) + 1, 1, 255, out=f0_mel)
     f0_coarse = torch.round(f0_mel, out=f0_mel).long()
 
@@ -251,7 +251,7 @@ class Generator:
         x /= np.quantile(np.abs(x), 0.999)
 
         audio = torch.from_numpy(x).to(self.device, copy=True).unsqueeze(dim=0)
-        if audio.ndim == 2 and audio.shape[0] > 1: audio = torch.mean(audio, dim=0, keepdim=True).detach()
+        if audio.ndim == 2 and audio.shape[0] > 1: audio = audio.mean(dim=0, keepdim=True).detach()
 
         f0 = self.mangio_crepe.compute_f0(audio.detach(), pad=True)
         if self.f0_onnx_mode and self.del_onnx_model: del self.mangio_crepe.model, self.mangio_crepe
@@ -426,7 +426,7 @@ class Generator:
         x /= np.quantile(np.abs(x), 0.999)
 
         audio = torch.from_numpy(x).to(self.device, copy=True).unsqueeze(dim=0)
-        if audio.ndim == 2 and audio.shape[0] > 1: audio = torch.mean(audio, dim=0, keepdim=True).detach()
+        if audio.ndim == 2 and audio.shape[0] > 1: audio = audio.mean(dim=0, keepdim=True).detach()
 
         f0, pd = self.fcn.compute_f0(audio.detach())
         if self.f0_onnx_mode and self.del_onnx_model: del self.fcn.model, self.fcn

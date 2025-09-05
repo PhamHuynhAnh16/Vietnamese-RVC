@@ -171,7 +171,7 @@ class RefineGANGenerator(nn.Module):
             x = F.leaky_relu(x, self.leaky_relu_slope)
             x = checkpoint(res, torch.cat([checkpoint(ups, x, use_reentrant=False), down], dim=1), use_reentrant=False) if self.training and self.checkpointing else res(torch.cat([ups(x), down], dim=1))
 
-        return torch.tanh(self.conv_post(F.leaky_relu(x, self.leaky_relu_slope)))
+        return self.conv_post(F.leaky_relu(x, self.leaky_relu_slope)).tanh()
 
     def remove_weight_norm(self):
         if hasattr(self.pre_conv, "parametrizations") and "weight" in self.pre_conv.parametrizations: parametrize.remove_parametrizations(self.pre_conv, "weight", leave_parametrized=True)

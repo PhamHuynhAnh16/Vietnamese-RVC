@@ -48,7 +48,7 @@ def atan2(y, x):
     return out
 
 def _norm(x):
-    return torch.abs(x[..., 0]) ** 2 + torch.abs(x[..., 1]) ** 2
+    return x[..., 0].abs() ** 2 + x[..., 1].abs() ** 2
 
 def _mul_add(a, b, out = None):
     target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape)])
@@ -115,13 +115,13 @@ def expectation_maximization(y, x, iterations = 2, eps = 1e-10, batch_size = 200
     (nb_frames, nb_bins, nb_channels) = x.shape[:-1]
     nb_sources = y.shape[-1]
     regularization = torch.cat((torch.eye(nb_channels, dtype=x.dtype, device=x.device)[..., None], torch.zeros((nb_channels, nb_channels, 1), dtype=x.dtype, device=x.device)), dim=2)
-    regularization = torch.sqrt(torch.as_tensor(eps)) * (regularization[None, None, ...].expand((-1, nb_bins, -1, -1, -1)))
+    regularization = (torch.as_tensor(eps)).sqrt() * (regularization[None, None, ...].expand((-1, nb_bins, -1, -1, -1)))
     R = [torch.zeros((nb_bins, nb_channels, nb_channels, 2), dtype=x.dtype, device=x.device) for j in range(nb_sources)]
     weight = torch.zeros((nb_bins,), dtype=x.dtype, device=x.device)
     v = torch.zeros((nb_frames, nb_bins, nb_sources), dtype=x.dtype, device=x.device)
 
     for _ in range(iterations):
-        v = torch.mean(torch.abs(y[..., 0, :]) ** 2 + torch.abs(y[..., 1, :]) ** 2, dim=-2)
+        v = torch.mean(y[..., 0, :].abs() ** 2 + y[..., 1, :].abs() ** 2, dim=-2)
         for j in range(nb_sources):
             R[j] = torch.tensor(0.0, device=x.device)
 
@@ -133,8 +133,8 @@ def expectation_maximization(y, x, iterations = 2, eps = 1e-10, batch_size = 200
                 t = torch.arange(pos, min(nb_frames, pos + batch_size))
                 pos = int(t[-1]) + 1
 
-                R[j] = R[j] + torch.sum(_covariance(y[t, ..., j]), dim=0)
-                weight = weight + torch.sum(v[t, ..., j], dim=0)
+                R[j] = R[j] + _covariance(y[t, ..., j]).sum(dim=0)
+                weight = weight + v[t, ..., j].sum(dim=0)
 
             R[j] = R[j] / weight[..., None, None, None]
             weight = torch.zeros_like(weight)
@@ -171,7 +171,7 @@ def expectation_maximization(y, x, iterations = 2, eps = 1e-10, batch_size = 200
     return y, v, R
 
 def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, residual = False, scale_factor = 10.0, eps = 1e-10):
-    if softmask: y = mix_stft[..., None] * (targets_spectrograms / (eps + torch.sum(targets_spectrograms, dim=-1, keepdim=True).to(mix_stft.dtype)))[..., None, :]
+    if softmask: y = mix_stft[..., None] * (targets_spectrograms / (eps + targets_spectrograms.sum(dim=-1, keepdim=True).to(mix_stft.dtype)))[..., None, :]
     else:
         angle = atan2(mix_stft[..., 1], mix_stft[..., 0])[..., None]
         nb_sources = targets_spectrograms.shape[-1]
@@ -182,7 +182,7 @@ def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, res
     if residual: y = torch.cat([y, mix_stft[..., None] - y.sum(dim=-1, keepdim=True)], dim=-1)
     if iterations == 0: return y
 
-    max_abs = torch.max(torch.as_tensor(1.0, dtype=mix_stft.dtype, device=mix_stft.device), torch.sqrt(_norm(mix_stft)).max() / scale_factor)
+    max_abs = torch.max(torch.as_tensor(1.0, dtype=mix_stft.dtype, device=mix_stft.device), _norm(mix_stft).sqrt().max() / scale_factor)
     mix_stft = mix_stft / max_abs
     y = y / max_abs
     y = expectation_maximization(y, mix_stft, iterations, eps=eps)[0]

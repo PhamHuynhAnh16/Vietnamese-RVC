@@ -155,12 +155,12 @@ class LocalState(nn.Module):
         if self.ndecay:
             decays = torch.arange(1, self.ndecay + 1, device=x.device, dtype=x.dtype)
             decay_q = self.query_decay(x).view(B, heads, -1, T)
-            decay_q = torch.sigmoid(decay_q) / 2
+            decay_q = decay_q.sigmoid() / 2
             decay_kernel = -decays.view(-1, 1, 1) * delta.abs() / self.ndecay**0.5
             dots += torch.einsum("fts,bhfs->bhts", decay_kernel, decay_q)
 
         dots.masked_fill_(torch.eye(T, device=dots.device, dtype=torch.bool), -100)
-        weights = torch.softmax(dots, dim=2)
+        weights = dots.softmax(dim=2)
         content = self.content(x).view(B, heads, -1, T)
         result = torch.einsum("bhts,bhct->bhcs", weights, content)
 

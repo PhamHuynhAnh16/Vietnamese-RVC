@@ -42,7 +42,7 @@ class MelSpectrogram(nn.Module):
             magnitude = self.stft.transform(audio, 1e-9)
         else:
             fft = torch.stft(audio, n_fft=n_fft, hop_length=hop_length, win_length=win_length_new, window=self.hann_window[keyshift_key], center=center, return_complex=True)
-            magnitude = torch.sqrt(fft.real.pow(2) + fft.imag.pow(2))
+            magnitude = (fft.real.pow(2) + fft.imag.pow(2)).sqrt()
 
         if keyshift != 0:
             size = self.n_fft // 2 + 1
@@ -50,7 +50,7 @@ class MelSpectrogram(nn.Module):
             if resize < size: magnitude = F.pad(magnitude, (0, 0, 0, size - resize))
             magnitude = magnitude[:, :size, :] * self.win_length / win_length_new
 
-        mel_output = torch.matmul(self.mel_basis, magnitude)
+        mel_output = self.mel_basis @ magnitude
         if self.is_half: mel_output = mel_output.half()
 
-        return torch.log(torch.clamp(mel_output, min=self.clamp))
+        return torch.clamp(mel_output, min=self.clamp).log()

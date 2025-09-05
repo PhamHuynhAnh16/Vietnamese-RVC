@@ -256,30 +256,16 @@ def change_rms(source_audio, source_rate, target_audio, target_rate, rate):
         mode="linear"
     ).squeeze()
 
-    return (
-        target_audio * (
-            torch.pow(
-                F.interpolate(
-                    torch.from_numpy(
-                        librosa.feature.rms(
-                            y=source_audio, 
-                            frame_length=source_rate // 2 * 2, 
-                            hop_length=source_rate // 2
-                        )
-                    ).float().unsqueeze(0), 
-                    size=target_audio.shape[0], 
-                    mode="linear"
-                ).squeeze(), 
-                1 - rate
-            ) * torch.pow(
-                torch.maximum(
-                    rms2, 
-                    torch.zeros_like(rms2) + 1e-6
-                ), 
-                rate - 1
-            )
-        ).numpy()
-    )
+    return target_audio * (
+        F.interpolate(
+            torch.from_numpy(librosa.feature.rms(y=source_audio, frame_length=source_rate // 2 * 2, hop_length=source_rate // 2)).float().unsqueeze(0), 
+            size=target_audio.shape[0], 
+            mode="linear"
+        ).squeeze().pow(1 - rate) * torch.maximum(
+            rms2, 
+            torch.zeros_like(rms2) + 1e-6
+        ).pow(rate - 1)
+    ).numpy()
 
 def clear_gpu_cache():
     gc.collect()

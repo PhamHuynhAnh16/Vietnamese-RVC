@@ -73,12 +73,12 @@ class STFT(torch.nn.Module):
 
     def transform(self, input_data, eps, return_phase=False):
         input_data = F.pad(input_data, (self.pad_amount, self.pad_amount), mode="reflect")
-        forward_transform = torch.matmul(self.forward_basis, input_data.unfold(1, self.filter_length, self.hop_length).permute(0, 2, 1))
+        forward_transform = (self.forward_basis @ input_data.unfold(1, self.filter_length, self.hop_length).permute(0, 2, 1))
         cutoff = int(self.filter_length / 2 + 1)
 
         real_part = forward_transform[:, :cutoff, :]
         imag_part = forward_transform[:, cutoff:, :]
-        magnitude = torch.sqrt(real_part**2 + imag_part**2 + eps)
+        magnitude = (real_part**2 + imag_part**2 + eps).sqrt()
 
         if return_phase:
             phase = torch.atan2(imag_part.data, real_part.data)
@@ -98,9 +98,9 @@ class GRU(nn.RNNBase):
         i_r, i_i, i_n = gate_x.chunk(3, 1)
         h_r, h_i, h_n = gate_h.chunk(3, 1)
 
-        resetgate = torch.sigmoid(i_r + h_r)
-        inputgate = torch.sigmoid(i_i + h_i)
-        newgate = torch.tanh(i_n + resetgate * h_n)
+        resetgate = (i_r + h_r).sigmoid()
+        inputgate = (i_i + h_i).sigmoid()
+        newgate = (i_n + resetgate * h_n).tanh()
 
         hy = newgate + inputgate * (hx - newgate)
         return hy
@@ -189,7 +189,7 @@ def group_norm(x, num_groups, weight=None, bias=None, eps=1e-5):
     mean = x_reshaped.mean(dim=dims, keepdim=True)
     var = x_reshaped.var(dim=dims, keepdim=True, unbiased=False)
 
-    x_norm = (x_reshaped - mean) / torch.sqrt(var + eps)
+    x_norm = (x_reshaped - mean) / (var + eps).sqrt()
     x_norm = x_norm.view_as(x)
 
     if weight is not None:

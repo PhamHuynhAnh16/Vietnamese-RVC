@@ -72,11 +72,11 @@ class CascadedNet(nn.Module):
         f3_in = torch.cat([input_tensor, aux1, aux2], dim=1)
         f3 = self.stg3_full_band_net(f3_in)
 
-        mask = torch.sigmoid(self.out(f3))
+        mask = self.out(f3).sigmoid()
         mask = F.pad(input=mask, pad=(0, 0, 0, self.output_bin - mask.size()[2]), mode="replicate")
 
         if self.training:
-            aux = torch.sigmoid(self.aux_out(torch.cat([aux1, aux2], dim=1)))
+            aux = self.aux_out(torch.cat([aux1, aux2], dim=1)).sigmoid()
             aux = F.pad(input=aux, pad=(0, 0, 0, self.output_bin - aux.size()[2]), mode="replicate")
 
             return mask, aux

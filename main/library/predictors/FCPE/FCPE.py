@@ -13,9 +13,9 @@ from torch.nn.utils.parametrizations import weight_norm
 sys.path.append(os.getcwd())
 os.environ["LRU_CACHE_CAPACITY"] = "3"
 
-from main.library.predictors.FCPE.wav2mel import spawn_wav2mel, Wav2Mel
+from main.library.predictors.FCPE.wav2mel import Wav2Mel
 from main.library.predictors.FCPE.encoder import EncoderLayer, ConformerNaiveEncoder
-from main.library.predictors.FCPE.utils import l2_regularization, ensemble_f0, batch_interp_with_replacement_detach, decrypt_model, DotDict
+from main.library.predictors.FCPE.utils import l2_regularization, batch_interp_with_replacement_detach, decrypt_model, DotDict
 
 class PCmer(nn.Module):
     def __init__(self, num_layers, num_heads, dim_model, dim_keys, dim_values, residual_dropout, attention_dropout):
@@ -55,19 +55,19 @@ class CFNaiveMelPE(nn.Module):
         self.output_proj = weight_norm(nn.Linear(hidden_dims, out_dims))
         self.cent_table_b = torch.linspace(self.f0_to_cent(torch.Tensor([f0_min]))[0], self.f0_to_cent(torch.Tensor([f0_max]))[0], out_dims).detach()
         self.register_buffer("cent_table", self.cent_table_b)
-        self.gaussian_blurred_cent_mask_b = (1200 * torch.log2(torch.Tensor([self.f0_max / 10.])))[0].detach()
+        self.gaussian_blurred_cent_mask_b = (1200 * torch.Tensor([self.f0_max / 10.]).log2())[0].detach()
         self.register_buffer("gaussian_blurred_cent_mask", self.gaussian_blurred_cent_mask_b)
 
     def forward(self, x, _h_emb=None):
         x = self.input_stack(x.transpose(-1, -2)).transpose(-1, -2)
         if self.harmonic_emb is not None: x = x + self.harmonic_emb(torch.LongTensor([0]).to(x.device)) if _h_emb is None else x + self.harmonic_emb(torch.LongTensor([int(_h_emb)]).to(x.device))
-        return torch.sigmoid(self.output_proj(self.norm(self.net(x))))
+        return self.output_proj(self.norm(self.net(x))).sigmoid()
 
     @torch.no_grad()
     def latent2cents_decoder(self, y, threshold = 0.05, mask = True):
         B, N, _ = y.size()
         ci = self.cent_table[None, None, :].expand(B, N, -1)
-        rtn = torch.sum(ci * y, dim=-1, keepdim=True) / torch.sum(y, dim=-1, keepdim=True)  
+        rtn = (ci * y).sum(dim=-1, keepdim=True) / y.sum(dim=-1, keepdim=True)  
 
         if mask:
             confident = torch.max(y, dim=-1, keepdim=True)[0]
@@ -88,7 +88,7 @@ class CFNaiveMelPE(nn.Module):
         local_argmax_index[local_argmax_index >= self.out_dims] = self.out_dims - 1
 
         y_l = torch.gather(y, -1, local_argmax_index)
-        rtn = torch.sum(torch.gather(ci, -1, local_argmax_index) * y_l, dim=-1, keepdim=True) / torch.sum(y_l, dim=-1, keepdim=True) 
+        rtn = (torch.gather(ci, -1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True) 
 
         if mask:
             confident_mask = torch.ones_like(confident)
@@ -106,12 +106,12 @@ class CFNaiveMelPE(nn.Module):
         return self.cent_to_f0(cents(latent, threshold=threshold))  
 
     @torch.no_grad()
-    def cent_to_f0(self, cent: torch.Tensor) -> torch.Tensor:
+    def cent_to_f0(self, cent):
         return 10 * 2 ** (cent / 1200)
 
     @torch.no_grad()
     def f0_to_cent(self, f0):
-        return 1200 * torch.log2(f0 / 10)
+        return 1200 * (f0 / 10).log2()
 
 class FCPE_LEGACY(nn.Module):
     def __init__(self, input_channel=128, out_dims=360, n_layers=12, n_chans=512, loss_mse_scale=10, loss_l2_regularization=False, loss_l2_regularization_scale=1, loss_grad1_mse=False, loss_grad1_mse_scale=1, f0_max=1975.5, f0_min=32.70, confidence=False, threshold=0.05, use_input_conv=True):
@@ -138,7 +138,7 @@ class FCPE_LEGACY(nn.Module):
         if cdecoder == "argmax": self.cdecoder = self.cents_decoder
         elif cdecoder == "local_argmax": self.cdecoder = self.cents_local_decoder
 
-        x = torch.sigmoid(self.dense_out(self.norm(self.decoder((self.stack(mel.transpose(1, 2)).transpose(1, 2) if self.use_input_conv else mel)))))
+        x = self.dense_out(self.norm(self.decoder((self.stack(mel.transpose(1, 2)).transpose(1, 2) if self.use_input_conv else mel)))).sigmoid()
 
         if not infer:
             loss_all = self.loss_mse_scale * F.binary_cross_entropy(x, self.gaussian_blurred_cent(self.f0_to_cent(gt_f0)))
@@ -156,7 +156,7 @@ class FCPE_LEGACY(nn.Module):
 
     def cents_decoder(self, y, mask=True):
         B, N, _ = y.size()
-        rtn = torch.sum(self.cent_table[None, None, :].expand(B, N, -1) * y, dim=-1, keepdim=True) / torch.sum(y, dim=-1, keepdim=True)
+        rtn = (self.cent_table[None, None, :].expand(B, N, -1) * y).sum(dim=-1, keepdim=True) / y.sum(dim=-1, keepdim=True)
 
         if mask:
             confident = torch.max(y, dim=-1, keepdim=True)[0]
@@ -172,7 +172,7 @@ class FCPE_LEGACY(nn.Module):
         confident, max_index = torch.max(y, dim=-1, keepdim=True)
         local_argmax_index = torch.clamp(torch.arange(0, 9).to(max_index.device) + (max_index - 4), 0, self.n_out - 1)
         y_l = torch.gather(y, -1, local_argmax_index)
-        rtn = torch.sum(torch.gather(self.cent_table[None, None, :].expand(B, N, -1), -1, local_argmax_index) * y_l, dim=-1, keepdim=True) / torch.sum(y_l, dim=-1, keepdim=True)
+        rtn = (torch.gather(self.cent_table[None, None, :].expand(B, N, -1), -1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True)
 
         if mask:
             confident_mask = torch.ones_like(confident)
@@ -185,47 +185,31 @@ class FCPE_LEGACY(nn.Module):
         return 10.0 * 2 ** (cent / 1200.0)
 
     def f0_to_cent(self, f0):
-        return 1200.0 * torch.log2(f0 / 10.0)
+        return 1200.0 * (f0 / 10.0).log2()
 
     def gaussian_blurred_cent(self, cents):
         B, N, _ = cents.size()
-        return torch.exp(-torch.square(self.cent_table[None, None, :].expand(B, N, -1) - cents) / 1250) * (cents > 0.1) & (cents < (1200.0 * np.log2(self.f0_max / 10.0))).float()
+        return (-(self.cent_table[None, None, :].expand(B, N, -1) - cents).square() / 1250).exp() * (cents > 0.1) & (cents < (1200.0 * np.log2(self.f0_max / 10.0))).float()
 
 class InferCFNaiveMelPE(torch.nn.Module):
-    def __init__(self, args, state_dict, device="cpu"):
+    def __init__(self, args, state_dict):
         super().__init__()
-        self.wav2mel = spawn_wav2mel(args, device=device)
         self.model = CFNaiveMelPE(input_channels=args.mel.num_mels, out_dims=args.model.out_dims, hidden_dims=args.model.hidden_dims, n_layers=args.model.n_layers, n_heads=args.model.n_heads, f0_max=args.model.f0_max, f0_min=args.model.f0_min, use_fa_norm=args.model.use_fa_norm, conv_only=args.model.conv_only, conv_dropout=args.model.conv_dropout, atten_dropout=args.model.atten_dropout, use_harmonic_emb=False)
         self.model.load_state_dict(state_dict)
         self.model.eval()
-        self.args_dict = dict(args)
         self.register_buffer("tensor_device_marker", torch.tensor(1.0).float(), persistent=False)
 
-    def forward(self, wav, sr, decoder_mode = "local_argmax", threshold = 0.006, key_shifts = [0]):
+    def forward(self, mel, decoder_mode = "local_argmax", threshold = 0.006):
         with torch.no_grad():
-            mels = rearrange(torch.stack([self.wav2mel(wav.to(self.tensor_device_marker.device), sr, keyshift=keyshift) for keyshift in key_shifts], -1), "B T C K -> (B K) T C")
-            f0s = rearrange(self.model.infer(mels, decoder=decoder_mode, threshold=threshold), "(B K) T 1 -> B T (K 1)", K=len(key_shifts))
+            mels = rearrange(torch.stack([mel], -1), "B T C K -> (B K) T C")
+            f0s = rearrange(self.model.infer(mels, decoder=decoder_mode, threshold=threshold), "(B K) T 1 -> B T (K 1)", K=1)
 
         return f0s 
 
-    def infer(self, wav, sr, decoder_mode = "local_argmax", threshold = 0.006, f0_min = None, f0_max = None, interp_uv = False, output_interp_target_length = None, return_uv = False, test_time_augmentation = False, tta_uv_penalty = 12.0, tta_key_shifts = [0, -12, 12], tta_use_origin_uv=False):
-        if test_time_augmentation:
-            assert len(tta_key_shifts) > 0
-            flag = 0
-            if tta_use_origin_uv:
-                if 0 not in tta_key_shifts:
-                    flag = 1
-                    tta_key_shifts.append(0)
+    def infer(self, mel, decoder_mode = "local_argmax", threshold = 0.006, f0_min = None, f0_max = None, interp_uv = False, output_interp_target_length = None, return_uv = False):
+        f0 = self.__call__(mel, decoder_mode, threshold)
+        f0_for_uv = f0
 
-            tta_key_shifts.sort(key=lambda x: (x if x >= 0 else -x / 2))
-            f0s = self.__call__(wav, sr, decoder_mode, threshold, tta_key_shifts)
-            f0 = ensemble_f0(f0s[:, :, flag:], tta_key_shifts[flag:], tta_uv_penalty)
-            f0_for_uv = f0s[:, :, [0]] if tta_use_origin_uv else f0
-        else:
-            f0 = self.__call__(wav, sr, decoder_mode, threshold)
-            f0_for_uv = f0
-
-        if f0_min is None: f0_min = self.args_dict["model"]["f0_min"]
         uv = (f0_for_uv < f0_min).type(f0_for_uv.dtype)
         f0 = f0 * (1 - uv)
 
@@ -296,6 +280,7 @@ class FCPEInfer:
         self.onnx = onnx
         self.f0_min = f0_min
         self.f0_max = f0_max
+        self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
 
         if self.onnx:
             sess_options = ort.SessionOptions()
@@ -305,22 +290,20 @@ class FCPEInfer:
             ckpt = torch.load(model_path, map_location=torch.device(device), weights_only=True)
             ckpt["config_dict"]["model"]["conv_dropout"] = ckpt["config_dict"]["model"]["atten_dropout"] = 0.0
             self.args = DotDict(ckpt["config_dict"])
-            model = InferCFNaiveMelPE(self.args, ckpt["model"], device)
-            model = model.to(device).to(self.dtype)
-            model.eval()
-            self.model = model
+            model = InferCFNaiveMelPE(self.args, ckpt["model"])
+            self.model = model.to(device).to(self.dtype).eval()
 
     @torch.no_grad()
     def __call__(self, audio, sr, threshold=0.05, p_len=None):
-        if not hasattr(self, "wav2mel") and self.onnx: self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
         if not hasattr(self, "numpy_threshold") and self.onnx: self.numpy_threshold = np.array(threshold, dtype=np.float32)
+        mel = self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype)
 
         if self.onnx:
             return torch.as_tensor(
                 self.model.run(
                     [self.model.get_outputs()[0].name], 
                     {
-                        self.model.get_inputs()[0].name: self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype).detach().cpu().numpy(), 
+                        self.model.get_inputs()[0].name: mel.detach().cpu().numpy(), 
                         self.model.get_inputs()[1].name: self.numpy_threshold
                     }
                 )[0], 
@@ -329,8 +312,7 @@ class FCPEInfer:
             ) 
         else: 
             return self.model.infer(
-                audio[None, :], 
-                sr, 
+                mel, 
                 threshold=threshold, 
                 f0_min=self.f0_min, 
                 f0_max=self.f0_max, 

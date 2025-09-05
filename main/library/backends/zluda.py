@@ -32,7 +32,7 @@ if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"
             )
 
             input_frames = input.unfold(1, n_fft, hop_length).permute(0, 2, 1)
-            fourier_transform = torch.matmul(fourier_basis, input_frames)
+            fourier_transform = fourier_basis @ input_frames
             cutoff = n_fft // 2 + 1
 
             return torch.complex(

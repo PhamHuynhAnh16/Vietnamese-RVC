@@ -51,11 +51,11 @@ class STFT:
             spec = self.stft.transform(pad, 1e-9)
         else:
             spec = torch.stft(pad, n_fft, hop_length=hop_length_new, win_length=win_size_new, window=hann_window[keyshift_key], center=center, pad_mode="reflect", normalized=False, onesided=True, return_complex=True)
-            spec = torch.sqrt(spec.real.pow(2) + spec.imag.pow(2) + 1e-9)
+            spec = (spec.real.pow(2) + spec.imag.pow(2) + 1e-9).sqrt()
 
         if keyshift != 0:
             size = n_fft // 2 + 1
             resize = spec.size(1)
             spec = (F.pad(spec, (0, 0, 0, size - resize)) if resize < size else spec[:, :size, :]) * win_size / win_size_new
 
-        return torch.log(torch.clamp(torch.matmul(mel_basis[mel_basis_key], spec), min=self.clip_val) * 1)
+        return (torch.clamp(mel_basis[mel_basis_key] @ spec, min=self.clip_val) * 1).log()

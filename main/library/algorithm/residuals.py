@@ -49,9 +49,9 @@ class ResBlock(ResBlockBase):
 class Log(torch.nn.Module):
     def forward(self, x, x_mask, reverse=False, **kwargs):
         if not reverse:
-            y = torch.log(torch.clamp_min(x, 1e-5)) * x_mask
-            return y, torch.sum(-y, [1, 2])
-        else: return torch.exp(x) * x_mask
+            y = torch.clamp_min(x, 1e-5).log() * x_mask
+            return y, (-y).sum(dim=[1, 2])
+        else: return x.exp() * x_mask
 
 class Flip(torch.nn.Module):
     def forward(self, x, *args, reverse=False, **kwargs):
@@ -68,8 +68,8 @@ class ElementwiseAffine(torch.nn.Module):
         self.logs = torch.nn.Parameter(torch.zeros(channels, 1))
 
     def forward(self, x, x_mask, reverse=False, **kwargs):
-        if not reverse: return ((self.m + torch.exp(self.logs) * x) * x_mask), torch.sum(self.logs * x_mask, [1, 2])
-        else: return (x - self.m) * torch.exp(-self.logs) * x_mask
+        if not reverse: return ((self.m + self.logs.exp() * x) * x_mask), (self.logs * x_mask).sum(dim=[1, 2])
+        else: return (x - self.m) * (-self.logs).exp() * x_mask
 
 class ResidualCouplingBlock(torch.nn.Module):
     def __init__(self, channels, hidden_channels, kernel_size, dilation_rate, n_layers, n_flows=4, gin_channels=0):
@@ -129,8 +129,8 @@ class ResidualCouplingLayer(torch.nn.Module):
             m = stats
             logs = torch.zeros_like(m)
 
-        if not reverse: return torch.cat([x0, (m + x1 * torch.exp(logs) * x_mask)], 1), torch.sum(logs, [1, 2])
-        else: return torch.cat([x0, ((x1 - m) * torch.exp(-logs) * x_mask)], 1)
+        if not reverse: return torch.cat([x0, (m + x1 * logs.exp() * x_mask)], 1), logs.sum(dim=[1, 2])
+        else: return torch.cat([x0, ((x1 - m) * (-logs).exp() * x_mask)], 1)
 
     def remove_weight_norm(self):
         self.enc.remove_weight_norm()

@@ -42,7 +42,7 @@ def realtime_tab():
             start_realtime = gr.Button(value=translations["start_realtime_button"], variant="primary", interactive=True)
             stop_realtime = gr.Button(value=translations["stop_realtime_button"], variant="stop", interactive=False)
         with gr.Row():
-            chunk_size = gr.Slider(minimum=2.7, maximum=2730.7, step=0.1, label=translations["chunk_size"], info=translations["chunk_size_info"], value=256, interactive=True)
+            chunk_size = gr.Slider(minimum=2.7, maximum=2730.7, step=0.1, label=translations["chunk_size"], info=translations["chunk_size_info"], value=1024, interactive=True)
             pitch = gr.Slider(minimum=-20, maximum=20, step=1, info=translations["pitch_info"], label=translations["pitch"], value=0, interactive=True)
         with gr.Row():
             with gr.Column():

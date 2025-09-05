@@ -95,13 +95,13 @@ class CascadedASPPNet(nn.Module):
         hidden_state = torch.cat([input_tensor, aux1, aux2], dim=1)
         hidden_state = self.stg3_full_band_net(self.stg3_bridge(hidden_state))
 
-        mask = torch.sigmoid(self.out(hidden_state))
+        mask = self.out(hidden_state).sigmoid()
         mask = F.pad(input=mask, pad=(0, 0, 0, self.output_bin - mask.size()[2]), mode="replicate")
 
         if self.training:
-            aux1 = torch.sigmoid(self.aux1_out(aux1))
+            aux1 = self.aux1_out(aux1).sigmoid()
             aux1 = F.pad(input=aux1, pad=(0, 0, 0, self.output_bin - aux1.size()[2]), mode="replicate")
-            aux2 = torch.sigmoid(self.aux2_out(aux2))
+            aux2 = self.aux2_out(aux2).sigmoid()
             aux2 = F.pad(input=aux2, pad=(0, 0, 0, self.output_bin - aux2.size()[2]), mode="replicate")
             return mask * mix, aux1 * mix, aux2 * mix
         else:

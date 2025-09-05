@@ -137,7 +137,7 @@ class HiFiGANMRFGenerator(nn.Module):
 
             x = xs / self.num_kernels
 
-        return torch.tanh(self.conv_post(F.leaky_relu(x)))
+        return self.conv_post(F.leaky_relu(x)).tanh()
 
     def remove_weight_norm(self):
         if hasattr(self.conv_pre, "parametrizations") and "weight" in self.conv_pre.parametrizations: parametrize.remove_parametrizations(self.conv_pre, "weight", leave_parametrized=True)

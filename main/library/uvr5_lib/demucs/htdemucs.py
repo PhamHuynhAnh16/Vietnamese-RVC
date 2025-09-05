@@ -30,7 +30,7 @@ def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=100
     if d_model % 4 != 0: raise ValueError(translations["dims"].format(dims=d_model))
     pe = torch.zeros(d_model, height, width)
     d_model = int(d_model / 2)
-    div_term = torch.exp(torch.arange(0.0, d_model, 2) * -(math.log(max_period) / d_model))
+    div_term = (torch.arange(0.0, d_model, 2) * -(math.log(max_period) / d_model)).exp()
     pos_w = torch.arange(0.0, width).unsqueeze(1)
     pos_h = torch.arange(0.0, height).unsqueeze(1)
     pe[0:d_model:2, :, :] = torch.sin(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)

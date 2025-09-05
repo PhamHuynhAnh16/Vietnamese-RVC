@@ -35,7 +35,7 @@ def fused_add_tanh_sigmoid_multiply(input_a, input_b, n_channels):
     n_channels_int = n_channels[0]
     in_act = input_a + input_b
 
-    return torch.tanh(in_act[:, :n_channels_int, :]) * torch.sigmoid(in_act[:, n_channels_int:, :])
+    return in_act[:, :n_channels_int, :].tanh() * in_act[:, n_channels_int:, :].sigmoid()
 
 def sequence_mask(length, max_length = None):
     if max_length is None: max_length = length.max()

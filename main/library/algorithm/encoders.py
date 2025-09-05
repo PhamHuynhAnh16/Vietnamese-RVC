@@ -90,7 +90,7 @@ class PosteriorEncoder(torch.nn.Module):
         x_mask = sequence_mask(x_lengths, x.size(2)).unsqueeze(1).to(x.dtype)
         m, logs = torch.split((self.proj(self.enc((self.pre(x) * x_mask), x_mask, g=g)) * x_mask), self.out_channels, dim=1)
 
-        return ((m + torch.randn_like(m) * torch.exp(logs)) * x_mask), m, logs, x_mask
+        return ((m + torch.randn_like(m) * logs.exp()) * x_mask), m, logs, x_mask
 
     def remove_weight_norm(self):
         self.enc.remove_weight_norm()

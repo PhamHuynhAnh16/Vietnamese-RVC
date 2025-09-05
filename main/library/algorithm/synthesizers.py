@@ -65,7 +65,7 @@ class Synthesizer(torch.nn.Module):
     def infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None, energy = None):
         g = self.emb_g(sid).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths, energy)
-        z_p = (m_p + torch.exp(logs_p) * torch.randn_like(m_p) * 0.66666) * x_mask
+        z_p = (m_p + logs_p.exp() * torch.randn_like(m_p) * 0.66666) * x_mask
 
         z = self.flow(z_p, x_mask, g=g, reverse=True)
         o = self.dec(z * x_mask, nsff0, g=g) if self.use_f0 else self.dec(z * x_mask, g=g)
@@ -84,7 +84,7 @@ class SynthesizerONNX(Synthesizer):
     def forward(self, phone, phone_lengths, g=None, rnd=None, pitch=None, nsff0=None, energy=None):
         g = self.emb_g(g).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths, energy)
-        z_p = (m_p + torch.exp(logs_p) * rnd) * x_mask
+        z_p = (m_p + logs_p.exp() * rnd) * x_mask
 
         z = self.flow(z_p, x_mask, g=g, reverse=True)
 

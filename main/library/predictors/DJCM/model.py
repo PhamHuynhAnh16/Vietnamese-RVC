@@ -1,6 +1,5 @@
 import os
 import sys
-import torch
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -42,7 +41,7 @@ class DJCMM(nn.Module):
     def spec(self, x, spec_m):
         bs, c, time_steps, freqs_steps = x.shape
         x = x.reshape(bs, c // 4, 4, time_steps, freqs_steps)
-        mask_spec = torch.sigmoid(x[:, :, 0, :, :])
+        mask_spec = x[:, :, 0, :, :].sigmoid()
         linear_spec = x[:, :, 3, :, :]
 
         out_spec = F.relu(spec_m.detach() * mask_spec + linear_spec)

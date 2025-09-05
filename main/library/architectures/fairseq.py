@@ -251,9 +251,9 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         for i in range(self.num_heads):
             start_idx = i * self.head_dim
             end_idx = (i + 1) * self.head_dim
-            k_proj_heads_norm.append(torch.sum(torch.abs(self.k_proj.weight[start_idx:end_idx])).tolist() + torch.sum(torch.abs(self.k_proj.bias[start_idx:end_idx])).tolist())
-            q_proj_heads_norm.append(torch.sum(torch.abs(self.q_proj.weight[start_idx:end_idx])).tolist() + torch.sum(torch.abs(self.q_proj.bias[start_idx:end_idx])).tolist())
-            v_proj_heads_norm.append(torch.sum(torch.abs(self.v_proj.weight[start_idx:end_idx])).tolist() + torch.sum(torch.abs(self.v_proj.bias[start_idx:end_idx])).tolist())
+            k_proj_heads_norm.append((self.k_proj.weight[start_idx:end_idx]).abs().sum().tolist() + (self.k_proj.bias[start_idx:end_idx]).abs().sum().tolist())
+            q_proj_heads_norm.append((self.q_proj.weight[start_idx:end_idx]).abs().sum().tolist() + (self.q_proj.bias[start_idx:end_idx]).abs().sum().tolist())
+            v_proj_heads_norm.append((self.v_proj.weight[start_idx:end_idx]).abs().sum().tolist() + (self.v_proj.bias[start_idx:end_idx]).abs().sum().tolist())
 
         heads_norm = []
         for i in range(self.num_heads):
@@ -569,7 +569,7 @@ def index_put(tensor, indices, value):
             indices = indices.unsqueeze(-1)
 
         if indices.size(-1) < tensor.size(-1): indices = indices.expand_as(tensor)
-        tensor = torch.mul(tensor, ~indices) + torch.mul(value, indices)
+        tensor = tensor.mul(~indices).add(value.mul(indices))
     else: tensor[indices] = value
 
     return tensor
@@ -713,7 +713,7 @@ def get_activation_fn(activation):
     def gelu_accurate(x):
         if not hasattr(gelu_accurate, "_a"):
             gelu_accurate._a = math.sqrt(2 / math.pi)
-            return (0.5 * x * (1 + torch.tanh(gelu_accurate._a * (x + 0.044715 * torch.pow(x, 3)))))
+            return (0.5 * x * (1 + (gelu_accurate._a * (x + 0.044715 * x.pow(3))).tanh()))
 
     if activation == "relu": return F.relu
     elif activation == "relu_squared": return relu_squared
@@ -890,14 +890,14 @@ class ESPNETMultiHeadedAttention(nn.Module):
         n_batch = value.size(0)
         if mask is not None:
             scores = scores.masked_fill(mask.unsqueeze(1).unsqueeze(2).to(bool), float("-inf"))
-            self.attn = torch.softmax(scores, dim=-1)
-        else: self.attn = torch.softmax(scores, dim=-1)
+            self.attn = scores.softmax(dim=-1)
+        else: self.attn = scores.softmax(dim=-1)
 
-        return self.linear_out((torch.matmul(self.dropout(self.attn), value).transpose(1, 2).contiguous().view(n_batch, -1, self.h * self.d_k))) 
+        return self.linear_out(((self.dropout(self.attn) @ value).transpose(1, 2).contiguous().view(n_batch, -1, self.h * self.d_k))) 
 
     def forward(self, query, key, value, key_padding_mask=None, **kwargs):
         q, k, v = self.forward_qkv(query.transpose(0, 1), key.transpose(0, 1), value.transpose(0, 1))
-        return self.forward_attention(v, torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
+        return self.forward_attention(v, (q @ k.transpose(-2, -1)) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
 
 class RelPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
     def __init__(self, n_feat, n_head, dropout, zero_triu=False):
@@ -919,7 +919,7 @@ class RelPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
         q, k, v = self.forward_qkv(query.transpose(0, 1), key.transpose(0, 1), value.transpose(0, 1))
         q = q.transpose(1, 2)
 
-        return self.forward_attention(v, (torch.matmul((q + self.pos_bias_u).transpose(1, 2), k.transpose(-2, -1)) + self.rel_shift(torch.matmul((q + self.pos_bias_v).transpose(1, 2), self.linear_pos(pos_emb).view(pos_emb.size(0), -1, self.h, self.d_k).transpose(1, 2).transpose(-2, -1)))) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
+        return self.forward_attention(v, (((q + self.pos_bias_u).transpose(1, 2) @ k.transpose(-2, -1)) + self.rel_shift(((q + self.pos_bias_v).transpose(1, 2) @ self.linear_pos(pos_emb).view(pos_emb.size(0), -1, self.h, self.d_k).transpose(1, 2).transpose(-2, -1)))) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
 
 class RotaryPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
     def __init__(self, n_feat, n_head, dropout, precision, rotary_emd_base=10000):
@@ -940,7 +940,7 @@ class RotaryPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
         key = key.view(T, B, self.h * self.d_k)
         value = value.view(T, B, self.h * self.d_k)
         q, k, v = self.forward_qkv(query.transpose(0, 1), key.transpose(0, 1), value.transpose(0, 1))
-        return self.forward_attention(v, torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
+        return self.forward_attention(v, (q @ k.transpose(-2, -1)) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
 
 class ConformerEncoderLayer(nn.Module):
     def __init__(self, embed_dim, ffn_embed_dim, attention_heads, dropout, use_fp16, depthwise_conv_kernel_size=31, activation_fn="swish", attn_type=None, pos_enc_type="abs"):

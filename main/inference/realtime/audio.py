@@ -73,9 +73,6 @@ def list_audio_device():
 class Audio:
     def __init__(self, callbacks, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0, input_audio_gan = 1.0, output_audio_gan = 1.0, monitor_audio_gan = 1.0, monitor = False):
         self.callbacks = callbacks
-        self.mon_wav = None
-        self.audio_input_device = None
-        self.audio_output_device = None
         self.mon_queue = Queue()
         self.performance = [0, 0, 0]
         self.stream = None
@@ -111,7 +108,7 @@ class Audio:
         indata = indata * self.input_audio_gan
         unpacked_data = librosa.to_mono(indata.T)
 
-        return self.callbacks.on_audio(unpacked_data, self.f0_up_key, self.index_rate, self.protect, self.filter_radius, self.rms_mix_rate, self.f0_autotune, self.f0_autotune_strength, self.proposal_pitch, self.proposal_pitch_threshold)
+        return self.callbacks.change_voice(unpacked_data, self.f0_up_key, self.index_rate, self.protect, self.filter_radius, self.rms_mix_rate, self.f0_autotune, self.f0_autotune_strength, self.proposal_pitch, self.proposal_pitch_threshold)
     
     def process_data_with_time(self, indata):
         out_wav, _, perf, _ = self.process_data(indata)

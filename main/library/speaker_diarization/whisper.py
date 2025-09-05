@@ -517,7 +517,7 @@ def compression_ratio(text):
 def sinusoids(length, channels, max_timescale=10000):
     assert channels % 2 == 0
 
-    scaled_time = torch.arange(length)[:, np.newaxis] * torch.exp(-(np.log(max_timescale) / (channels // 2 - 1)) * torch.arange(channels // 2))[np.newaxis, :]
+    scaled_time = torch.arange(length)[:, np.newaxis] * (-(np.log(max_timescale) / (channels // 2 - 1)) * torch.arange(channels // 2)).exp()[np.newaxis, :]
     return torch.cat([torch.sin(scaled_time), torch.cos(scaled_time)], dim=1)
 
 @torch.no_grad()
@@ -652,7 +652,7 @@ class TextDecoder(nn.Module):
             x = block(x, xa, mask=self.mask, kv_cache=kv_cache)
 
         x = self.ln(x)
-        return (x @ torch.transpose(self.token_embedding.weight.to(x.dtype), 0, 1)).float()
+        return x @ self.token_embedding.weight.to(x.dtype).transpose(0, 1).float()
 
 class AudioEncoder(nn.Module):
     def __init__(self, n_mels, n_ctx, n_state, n_head, n_layer):

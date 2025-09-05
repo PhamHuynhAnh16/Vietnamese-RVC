@@ -144,31 +144,23 @@ class Pipeline:
 
             feats[0][skip_offset :] = (torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate + (1 - index_rate) * feats[0][skip_offset :])
 
-        feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
+        feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)[:, :audio_feats_len, :]
+
+        if self.use_f0: pitch, pitchf = pitch[:, -audio_feats_len:], pitchf[:, -audio_feats_len:] * (formant_length / return_length)
+        if self.energy: energy = energy[:audio_feats_len].unsqueeze(0)
 
         if feats0 is not None:
-            pitch = pitch[:, -audio_feats_len:]
-            pitchf = pitchf[:, -audio_feats_len:] * (formant_length / return_length)
-
             pitchff = pitchf.detach().clone()
             pitchff[pitchf > 0] = 1
             pitchff[pitchf < 1] = protect
             pitchff = pitchff.unsqueeze(-1)
 
-            feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
+            feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)[:, :audio_feats_len, :]
             feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
         pitch = pitch if self.use_f0 else None
         pitchf = pitchf.to(self.dtype) if self.use_f0 else None
         energy = energy.to(self.dtype) if self.energy else None
-
-        audio_feats_len = min(audio_feats_len, feats.size(1))
-        if self.use_f0: audio_feats_len = min(audio_feats_len, pitch.size(1), pitchf.size(1))
-        if self.energy: audio_feats_len = min(audio_feats_len, energy.size(0))
-
-        feats = feats[:, :audio_feats_len, :].to(self.dtype)
-        if self.use_f0: pitch, pitchf = pitch[:, :audio_feats_len], pitchf[:, :audio_feats_len]
-        if self.energy: energy = energy[:audio_feats_len].unsqueeze(0)
 
         p_len = torch.tensor([audio_feats_len], device=self.device, dtype=torch.int64)
 

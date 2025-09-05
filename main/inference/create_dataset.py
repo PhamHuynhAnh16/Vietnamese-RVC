@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import torch
 import yt_dlp
 import shutil
 import librosa
@@ -15,7 +16,7 @@ from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
-from main.tools.noisereduce import reduce_noise
+from main.tools.noisereduce import TG
 from main.app.variables import config, logger, translations
 from main.inference.separate_music import _separate, vr_models
 
@@ -211,20 +212,17 @@ def create_dataset(
                 )
                 for audio in audio_path
             ]
+
+        if clean_dataset: tg = TG(sr, prop_decrease=clean_strength).to(config.device if not config.device.startswith("ocl") else "cpu")
         
         for audio in audio_path:
             data, sr = read_file(audio)
 
             if len(data.shape) > 1: data = librosa.to_mono(data.T)
             if sr != sample_rate: data = librosa.resample(data, orig_sr=sr, target_sr=sample_rate, res_type="soxr_vhq")
-
-            if clean_dataset:
-                data = reduce_noise(
-                    y=data, sr=sr, prop_decrease=clean_strength, device=config.device
-                )
+            if clean_dataset: data = tg(torch.from_numpy(data).unsqueeze(0).to(config.device if not config.device.startswith("ocl") else "cpu").float()).squeeze(0).cpu().detach().numpy()
 
             sf.write(audio, data, sr)
-
             output_path = os.path.join(output_dirs, os.path.basename(audio))
 
             if os.path.exists(output_path): os.remove(output_path)

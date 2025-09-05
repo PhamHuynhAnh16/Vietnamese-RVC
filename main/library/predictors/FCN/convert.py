@@ -24,7 +24,7 @@ def cents_to_bins(cents, quantize_fn=torch.floor):
     return bins
 
 def frequency_to_cents(frequency):
-    return 1200 * torch.log2(frequency / 60)
+    return 1200 * (frequency / 60).log2()
 
 def seconds_to_samples(seconds, sample_rate):
     return seconds * sample_rate

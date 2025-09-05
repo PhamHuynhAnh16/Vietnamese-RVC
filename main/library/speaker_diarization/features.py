@@ -136,7 +136,7 @@ def spectral_magnitude(stft, power = 1, log = False, eps = 1e-14):
     if power < 1: spectr = spectr + eps
     spectr = spectr.pow(power)
 
-    if log: return torch.log(spectr + eps)
+    if log: return (spectr + eps).log()
     return spectr
 
 class Filterbank(torch.nn.Module):
@@ -189,7 +189,7 @@ class Filterbank(torch.nn.Module):
         sp_shape = spectrogram.shape
         if len(sp_shape) == 4: spectrogram = spectrogram.permute(0, 3, 1, 2).reshape(sp_shape[0] * sp_shape[3], sp_shape[1], sp_shape[2])
 
-        fbanks = torch.matmul(spectrogram, fbank_matrix)
+        fbanks = spectrogram @ fbank_matrix
         if self.log_mel: fbanks = self._amplitude_to_DB(fbanks)
 
         if len(sp_shape) == 4:
@@ -217,7 +217,7 @@ class Filterbank(torch.nn.Module):
         return (left_side * right_size).float().transpose(0, 1)
 
     def _gaussian_filters(self, all_freqs, f_central, band, smooth_factor=torch.tensor(2)):
-        return torch.exp(-0.5 * ((all_freqs - f_central) / (band / smooth_factor)) ** 2).transpose(0, 1)
+        return (-0.5 * ((all_freqs - f_central) / (band / smooth_factor)) ** 2).exp().transpose(0, 1)
 
     def _create_fbank_matrix(self, f_central_mat, band_mat):
         if self.filter_shape == "triangular": fbank_matrix = self._triangular_filters(self.all_freqs_mat, f_central_mat, band_mat)
@@ -227,7 +227,7 @@ class Filterbank(torch.nn.Module):
         return fbank_matrix
 
     def _amplitude_to_DB(self, x):
-        x_db = self.multiplier * torch.log10(torch.clamp(x, min=self.amin))
+        x_db = self.multiplier * torch.clamp(x, min=self.amin).log10()
         x_db -= self.multiplier * self.db_multiplier
 
         return torch.max(x_db, (x_db.amax(dim=(-2, -1)) - self.top_db).view(x_db.shape[0], 1, 1))
@@ -441,8 +441,8 @@ class InputNormalization(torch.nn.Module):
                 out[snt_id] = (x[snt_id] - speaker_mean) / speaker_std
 
         if self.norm_type == "batch" or self.norm_type == "global":
-            current_mean = ddp_all_reduce(torch.mean(torch.stack(current_means), dim=0), torch.distributed.ReduceOp.AVG)
-            current_std = ddp_all_reduce(torch.mean(torch.stack(current_stds), dim=0), torch.distributed.ReduceOp.AVG)
+            current_mean = ddp_all_reduce(torch.stack(current_means).mean(dim=0), torch.distributed.ReduceOp.AVG)
+            current_std = ddp_all_reduce(torch.stack(current_stds).mean(dim=0), torch.distributed.ReduceOp.AVG)
 
             if self.norm_type == "batch": out = (x - current_mean.data) / (current_std.data)
 
@@ -465,8 +465,8 @@ class InputNormalization(torch.nn.Module):
         return out
 
     def _compute_current_stats(self, x):
-        current_std = torch.std(x, dim=0).detach().data if self.std_norm else torch.tensor([1.0], device=x.device)
-        return torch.mean(x, dim=0).detach().data if self.mean_norm else torch.tensor([0.0], device=x.device), torch.max(current_std, self.eps * torch.ones_like(current_std))
+        current_std = x.std(dim=0).detach().data if self.std_norm else torch.tensor([1.0], device=x.device)
+        return x.mean(dim=0).detach().data if self.mean_norm else torch.tensor([0.0], device=x.device), torch.max(current_std, self.eps * torch.ones_like(current_std))
 
     def _statistics_dict(self):
         state = {}
