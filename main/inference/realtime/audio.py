@@ -71,16 +71,16 @@ def list_audio_device():
     return audio_input_device, audio_output_device
 
 class Audio:
-    def __init__(self, callbacks, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0, input_audio_gan = 1.0, output_audio_gan = 1.0, monitor_audio_gan = 1.0, monitor = False):
+    def __init__(self, callbacks, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0, input_audio_gain = 1.0, output_audio_gain = 1.0, monitor_audio_gain = 1.0, monitor = False):
         self.callbacks = callbacks
         self.mon_queue = Queue()
         self.performance = [0, 0, 0]
         self.stream = None
         self.monitor = None
         self.running = False
-        self.input_audio_gan = input_audio_gan
-        self.output_audio_gan = output_audio_gan
-        self.monitor_audio_gan = monitor_audio_gan
+        self.input_audio_gain = input_audio_gain
+        self.output_audio_gain = output_audio_gain
+        self.monitor_audio_gain = monitor_audio_gain
         self.use_monitor = monitor
         self.f0_up_key = f0_up_key
         self.index_rate = index_rate
@@ -105,7 +105,7 @@ class Audio:
         return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
     
     def process_data(self, indata):
-        indata = indata * self.input_audio_gan
+        indata = indata * self.input_audio_gain
         unpacked_data = librosa.to_mono(indata.T)
 
         return self.callbacks.change_voice(unpacked_data, self.f0_up_key, self.index_rate, self.protect, self.filter_radius, self.rms_mix_rate, self.f0_autotune, self.f0_autotune_strength, self.proposal_pitch, self.proposal_pitch_threshold)
@@ -124,7 +124,7 @@ class Audio:
             output_channels = outdata.shape[1]
             if self.use_monitor: self.mon_queue.put(out_wav)
 
-            outdata[:] = (np.repeat(out_wav, output_channels).reshape(-1, output_channels) * self.output_audio_gan)
+            outdata[:] = (np.repeat(out_wav, output_channels).reshape(-1, output_channels) * self.output_audio_gain)
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
@@ -137,7 +137,7 @@ class Audio:
                 self.mon_queue.get()
 
             output_channels = outdata.shape[1]
-            outdata[:] = (np.repeat(mon_wav, output_channels).reshape(-1, output_channels) * self.monitor_audio_gan)
+            outdata[:] = (np.repeat(mon_wav, output_channels).reshape(-1, output_channels) * self.monitor_audio_gain)
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())

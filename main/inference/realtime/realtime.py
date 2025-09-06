@@ -9,13 +9,14 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
+from main.tools.noisereduce import TG
 from main.library.utils import circular_write
 from main.app.variables import config, translations
 from main.inference.realtime.vad_utils import VADProcessor
 from main.inference.realtime.pipeline import create_pipeline
 
 class RVC_Realtime:
-    def __init__(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = 0, input_sample_rate = 48000, output_sample_rate = 48000, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30):
+    def __init__(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = 0, input_sample_rate = 48000, output_sample_rate = 48000, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio=False, clean_strength=0.7):
         self.model_path = model_path
         self.index_path = index_path
         self.f0_method = f0_method
@@ -34,17 +35,21 @@ class RVC_Realtime:
         self.resample_in = None
         self.resample_out = None
         self.vad = None
+        self.tg = None
         self.input_sample_rate = input_sample_rate
         self.output_sample_rate = output_sample_rate
         self.vad_enabled = vad_enabled
         self.vad_sensitivity = vad_sensitivity
         self.vad_frame_ms = vad_frame_ms
+        self.clean_audio = clean_audio
+        self.clean_strength = clean_strength
         self.input_sensitivity = 10 ** (silent_threshold / 20)
         self.window_size = sample_rate // 100
         self.dtype = torch.float16 if config.is_half else torch.float32
 
     def initialize(self):
         self.vad = VADProcessor(sensitivity_mode=self.vad_sensitivity, sample_rate=self.sample_rate, frame_duration_ms=self.vad_frame_ms) if self.vad_enabled else None
+        self.tg = TG(self.sample_rate, prop_decrease=self.clean_strength).to(config.device if not config.device.startswith("ocl") else "cpu") if self.clean_audio else None
 
         self.pipeline = create_pipeline(
             model_path=self.model_path, 
@@ -94,6 +99,8 @@ class RVC_Realtime:
             raise RuntimeError(translations["create_pipeline_error"])
 
         audio_in_16k = self.resample_in(torch.as_tensor(audio_in, dtype=torch.float32, device=config.device)).to(self.dtype)
+        if self.tg is not None: audio_in_16k = self.tg(audio_in_16k.to(config.device if not config.device.startswith("ocl") else "cpu")).to(config.device)
+
         circular_write(audio_in_16k, self.audio_buffer)
 
         vol_t = self.audio_buffer.square().mean().sqrt()

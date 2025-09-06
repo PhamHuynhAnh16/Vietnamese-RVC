@@ -24,9 +24,9 @@ def realtime_start(
     input_audio_device,
     output_audio_device,
     monitor_output_device,
-    input_audio_gan,
-    output_audio_gan,
-    monitor_audio_gan,
+    input_audio_gain,
+    output_audio_gain,
+    monitor_audio_gain,
     input_asio_channels,
     output_asio_channels,
     monitor_asio_channels,
@@ -52,7 +52,9 @@ def realtime_start(
     extra_convert_size,
     cross_fade_overlap_size,
     vad_sensitivity,
-    vad_frame_ms
+    vad_frame_ms,
+    clean_audio, 
+    clean_strength
 ):
     global running, callbacks, audio_manager
     running = True
@@ -75,13 +77,13 @@ def realtime_start(
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
         return translations["provide_file"].format(filename=translations["model"]), interactive_true, interactive_false
 
-    input_audio_gan /= 10
+    input_audio_gain /= 100.0
     input_device_id = int(input_audio_device.split(":")[0])
 
-    output_audio_gan /= 10
+    output_audio_gain /= 100.0
     output_device_id = int(output_audio_device.split(":")[0])
 
-    monitor_audio_gan /= 10
+    monitor_audio_gain /= 100.0
     output_monitor_id = int(monitor_output_device.split(":")[0]) if monitor else None
 
     chunk_size = int(chunk_size * DEVICE_SAMPLE_RATE / 1000 / 128)
@@ -111,13 +113,15 @@ def realtime_start(
         f0_autotune_strength=f0_autotune_strength, 
         proposal_pitch=proposal_pitch, 
         proposal_pitch_threshold=proposal_pitch_threshold,
-        input_audio_gan=input_audio_gan, 
-        output_audio_gan=output_audio_gan,
-        monitor_audio_gan=monitor_audio_gan,
+        input_audio_gain=input_audio_gain, 
+        output_audio_gain=output_audio_gain,
+        monitor_audio_gain=monitor_audio_gain,
         monitor=monitor,
         vad_enabled=vad_enabled,
         vad_sensitivity=vad_sensitivity,
-        vad_frame_ms=vad_frame_ms
+        vad_frame_ms=vad_frame_ms,
+        clean_audio=clean_audio,
+        clean_strength=clean_strength
     )
 
     audio_manager = callbacks.audio
