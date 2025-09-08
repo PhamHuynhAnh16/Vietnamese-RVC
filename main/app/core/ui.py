@@ -101,7 +101,7 @@ def get_index(model):
     return {"value": next((f for f in [os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name] if model.split(".")[0] in f), ""), "__type__": "update"} if model else None
 
 def index_strength_show(index):
-    return {"visible": index != "" and os.path.exists(index), "value": 0.5, "__type__": "update"}
+    return {"visible": index and os.path.exists(index), "value": 0.5, "__type__": "update"}
 
 def hoplength_show(method, hybrid_method=None):
     visible = False
@@ -233,12 +233,32 @@ def create_dataset_change(model_name, reverb_model, enable_post_process, separat
     ]
 
 def audio_device():
-    input_devices, output_devices = list_audio_device()
+    try:
+        input_devices, output_devices = list_audio_device()
 
-    input_channels_map = {f"{d.index}: {d.name} ({d.host_api})": d.max_input_channels for d in input_devices}
-    output_channels_map = {f"{d.index}: {d.name} ({d.host_api})": d.max_output_channels for d in output_devices}
+        def priority(name):
+            n = name.lower()
+            if "virtual" in n:
+                return 0
+            if "vb" in n:
+                return 1
+            return 2
 
-    return input_channels_map, output_channels_map
+        output_sorted = sorted(output_devices, key=lambda d: priority(d.name))
+        input_sorted = sorted(
+            input_devices, key=lambda d: priority(d.name), reverse=True
+        )
+
+        input_device_list = {
+            f"{input_sorted.index(d)+1}: {d.name} ({d.host_api})": [d.index, d.max_input_channels] for d in input_sorted
+        }
+        output_device_list = {
+            f"{output_sorted.index(d)+1}: {d.name} ({d.host_api})": [d.index, d.max_output_channels] for d in output_sorted
+        }
+
+        return input_device_list, output_device_list
+    except Exception:
+        return [], []
 
 def update_audio_device(input_device, output_device, monitor_device, monitor):
     input_channels_map, output_channels_map = audio_device()
@@ -247,9 +267,9 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
     output_is_asio = "ASIO" in output_device if output_device else False
     monitor_is_asio = "ASIO" in monitor_device if monitor_device else False
 
-    input_max_ch = input_channels_map.get(input_device, 128)
-    output_max_ch = output_channels_map.get(output_device, 128)
-    monitor_max_ch = output_channels_map.get(monitor_device, 128) if monitor else 128
+    input_max_ch = input_channels_map.get(input_device, [])[1]
+    output_max_ch = output_channels_map.get(output_device, [])[1]
+    monitor_max_ch = output_channels_map.get(monitor_device, [])[1] if monitor else 128
 
     return [
         visible(monitor),

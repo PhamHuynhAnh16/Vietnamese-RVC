@@ -57,7 +57,7 @@ class DiscriminatorS(torch.nn.Module):
         x = self.conv_post(x)
         fmap.append(x)
 
-        return torch.flatten(x, 1, -1), fmap
+        return x.flatten(1, -1), fmap
 
 class DiscriminatorP(torch.nn.Module):
     def __init__(self, period, kernel_size=5, use_spectral_norm=False, checkpointing=False):
@@ -81,4 +81,4 @@ class DiscriminatorP(torch.nn.Module):
 
         x = self.conv_post(x)
         fmap.append(x)
-        return torch.flatten(x, 1, -1), fmap
+        return x.flatten(1, -1), fmap

@@ -151,7 +151,7 @@ class Generator:
             f0 = self.get_f0_pyworld(x, p_len, filter_radius, f0_method)
         elif "crepe" in f0_method:
             split_f0 = f0_method.split("-")
-            f0 = self.get_f0_mangio_crepe(x, p_len, split_f0[2]) if split_f0[0] == "mangio" else self.get_f0_crepe(x, p_len, split_f0[2], filter_radius=filter_radius)
+            f0 = self.get_f0_mangio_crepe(x, p_len, split_f0[2]) if split_f0[0] == "mangio" else self.get_f0_crepe(x, p_len, split_f0[1], filter_radius=filter_radius)
         elif "fcpe" in f0_method:
             f0 = self.get_f0_fcpe(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
         elif "rmvpe" in f0_method:

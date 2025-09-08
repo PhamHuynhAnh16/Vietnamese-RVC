@@ -264,7 +264,7 @@ def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
     if device is not None: audio = audio.to(device)
     if padding > 0: audio = F.pad(audio, (0, padding))
 
-    log_spec = torch.clamp(mel_filters(audio.device, n_mels) @ torch.stft(audio, N_FFT, HOP_LENGTH, window=torch.hann_window(N_FFT).to(audio.device), return_complex=True)[..., :-1].abs() ** 2, min=1e-10).log10()
+    log_spec = (mel_filters(audio.device, n_mels) @ torch.stft(audio, N_FFT, HOP_LENGTH, window=torch.hann_window(N_FFT).to(audio.device), return_complex=True)[..., :-1].abs() ** 2).clamp(min=1e-10).log10()
     return (torch.maximum(log_spec, log_spec.max() - 8.0) + 4.0) / 4.0
 
 def pad_or_trim(array, length = N_SAMPLES, *, axis = -1):
@@ -518,7 +518,7 @@ def sinusoids(length, channels, max_timescale=10000):
     assert channels % 2 == 0
 
     scaled_time = torch.arange(length)[:, np.newaxis] * (-(np.log(max_timescale) / (channels // 2 - 1)) * torch.arange(channels // 2)).exp()[np.newaxis, :]
-    return torch.cat([torch.sin(scaled_time), torch.cos(scaled_time)], dim=1)
+    return torch.cat([scaled_time.sin(), scaled_time.cos()], dim=1)
 
 @torch.no_grad()
 def detect_language_function(model, mel, tokenizer = None):

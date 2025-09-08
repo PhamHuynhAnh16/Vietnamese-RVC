@@ -21,6 +21,15 @@ class ServerAudioDevice:
         self.max_output_channels = max_output_channels
         self.default_samplerate = default_samplerate
 
+def check_the_device(device, type = "input"):
+    stream_device = sd.InputStream if type == "input" else sd.OutputStream
+    try:
+        with stream_device(device=device["index"], dtype=np.float32, samplerate=device["default_samplerate"]) as stream:
+            stream.close()
+        return True
+    except Exception:
+        return False
+
 def list_audio_device():
     try:
         audio_device_list = sd.query_devices()
@@ -31,9 +40,12 @@ def list_audio_device():
         logger.debug(translations["error_occurred"].format(e=e))
         audio_device_list = []
 
-    input_audio_device_list = [d for d in audio_device_list if d["max_input_channels"] > 0]
-    output_audio_device_list = [d for d in audio_device_list if d["max_output_channels"] > 0]
-    
+    input_audio_device_list = [
+        d for d in audio_device_list if d["max_input_channels"] > 0 and check_the_device(d, "input")
+    ]
+    output_audio_device_list = [
+        d for d in audio_device_list if d["max_output_channels"] > 0 and check_the_device(d, "output")
+    ]
     
     try:
         hostapis = sd.query_hostapis()

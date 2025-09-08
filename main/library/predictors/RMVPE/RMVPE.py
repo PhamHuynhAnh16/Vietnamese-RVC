@@ -14,7 +14,6 @@ N_MELS, N_CLASS = 128, 360
 
 class RMVPE:
     def __init__(self, model_path, is_half, device=None, providers=None, onnx=False):
-        self.resample_kernel = {}
         self.onnx = onnx
 
         if self.onnx:
@@ -31,7 +30,6 @@ class RMVPE:
             if is_half: model = model.half()
             self.model = model.to(device)
 
-        self.resample_kernel = {}
         self.is_half = is_half
         self.device = device
         self.mel_extractor = MelSpectrogram(is_half, N_MELS, 16000, 1024, 160, None, 30, 8000).to(device)

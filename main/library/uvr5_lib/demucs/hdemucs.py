@@ -176,8 +176,8 @@ def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, res
         angle = atan2(mix_stft[..., 1], mix_stft[..., 0])[..., None]
         nb_sources = targets_spectrograms.shape[-1]
         y = torch.zeros(mix_stft.shape + (nb_sources,), dtype=mix_stft.dtype, device=mix_stft.device)
-        y[..., 0, :] = targets_spectrograms * torch.cos(angle)
-        y[..., 1, :] = targets_spectrograms * torch.sin(angle)
+        y[..., 0, :] = targets_spectrograms * angle.cos()
+        y[..., 1, :] = targets_spectrograms * angle.sin()
 
     if residual: y = torch.cat([y, mix_stft[..., None] - y.sum(dim=-1, keepdim=True)], dim=-1)
     if iterations == 0: return y

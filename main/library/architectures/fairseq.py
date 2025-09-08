@@ -435,7 +435,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         if self.encoder_decoder_attention and bsz != kv_bsz:
             attn_weights = torch.einsum("bxhtd,bhsd->bxhts", q.view((kv_bsz, -1, self.num_heads) + q.size()[1:]), k.view((kv_bsz, self.num_heads) + k.size()[1:]))
             attn_weights = attn_weights.reshape((-1,) + attn_weights.size()[-2:])
-        else: attn_weights = torch.bmm(q, k.transpose(1, 2))
+        else: attn_weights = q.bmm(k.transpose(1, 2))
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
 
@@ -459,7 +459,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         if self.encoder_decoder_attention and bsz != kv_bsz:
             attn = torch.einsum("bxhts,bhsd->bxhtd", attn_probs.view((kv_bsz, -1, self.num_heads) + attn_probs.size()[1:]), v.view((kv_bsz, self.num_heads) + v.size()[1:]))
             attn = attn.reshape((-1,) + attn.size()[-2:])
-        else: attn = torch.bmm(attn_probs, v)
+        else: attn = attn_probs.bmm(v)
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
 
         attn = attn.contiguous().view(tgt_len, bsz, self.embed_dim) if self.onnx_trace and attn.size(1) == 1 else attn.transpose(0, 1).contiguous().view(tgt_len, bsz, self.embed_dim)
@@ -911,7 +911,7 @@ class RelPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
 
     def rel_shift(self, x):
         x = torch.cat([torch.zeros((*x.size()[:3], 1), device=x.device, dtype=x.dtype), x], dim=-1).view(*x.size()[:2], x.size(3) + 1, x.size(2))[:, :, 1:].view_as(x)[:, :, :, : x.size(-1) // 2 + 1]
-        if self.zero_triu: x = x * torch.tril(torch.ones((x.size(2), x.size(3)), device=x.device), x.size(3) - x.size(2))[None, None, :, :]
+        if self.zero_triu: x = x * torch.ones((x.size(2), x.size(3)), device=x.device).tril(x.size(3) - x.size(2))[None, None, :, :]
         return x
 
     def forward(self, query, key, value, pos_emb, key_padding_mask=None, **kwargs):

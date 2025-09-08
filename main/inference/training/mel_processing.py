@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from librosa.filters import mel as librosa_mel_fn
 
 def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
-    return (torch.clamp(x, min=clip_val) * C).log()
+    return (x.clamp(min=clip_val) * C).log()
 
 def dynamic_range_decompression_torch(x, C=1):
     return x.exp() / C

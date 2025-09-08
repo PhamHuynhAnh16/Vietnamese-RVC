@@ -47,7 +47,7 @@ def orthogonal_matrix_chunk(cols, qr_uniform_q=False, device=None):
     q, r = torch.linalg.qr(unstructured_block.cpu(), mode="reduced")
     q, r = map(lambda t: t.to(device), (q, r))
     if qr_uniform_q:
-        d = torch.diag(r, 0)
+        d = r.diag(0)
         q *= d.sign()
 
     return q.t()
@@ -64,7 +64,7 @@ def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform
     elif scaling == 1: multiplier = math.sqrt((float(nb_columns))) * torch.ones((nb_rows,), device=device)
     else: raise ValueError(f"{scaling} != 0, 1")
 
-    return torch.diag(multiplier) @ torch.cat(block_list)
+    return multiplier.diag() @ torch.cat(block_list)
 
 def linear_attention(q, k, v):
     return einsum("...ed,...nd->...ne", k, q) if v is None else einsum("...de,...nd,...n->...ne", einsum("...nd,...ne->...de", k, v), q, 1.0 / (einsum("...nd,...d->...n", q, k.sum(dim=-2).type_as(q)) + 1e-8))

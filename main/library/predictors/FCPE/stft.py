@@ -58,4 +58,4 @@ class STFT:
             resize = spec.size(1)
             spec = (F.pad(spec, (0, 0, 0, size - resize)) if resize < size else spec[:, :size, :]) * win_size / win_size_new
 
-        return (torch.clamp(mel_basis[mel_basis_key] @ spec, min=self.clip_val) * 1).log()
+        return ((mel_basis[mel_basis_key] @ spec).clamp(min=self.clip_val) * 1).log()

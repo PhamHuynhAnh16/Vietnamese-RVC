@@ -89,8 +89,8 @@ class MultiHeadAttention(nn.Module):
 
     def _get_relative_embeddings(self, relative_embeddings, length, onnx=False):
         if onnx:
-            pad_length = torch.clamp(length - (self.window_size + 1), min=0)
-            slice_start_position = torch.clamp((self.window_size + 1) - length, min=0)
+            pad_length = (length - (self.window_size + 1)).clamp(min=0)
+            slice_start_position = ((self.window_size + 1) - length).clamp(min=0)
 
             return (F.pad(relative_embeddings, [0, 0, pad_length, pad_length, 0, 0]) if pad_length > 0 else relative_embeddings)[:, slice_start_position:(slice_start_position + 2 * length - 1)]
         else:

@@ -49,7 +49,7 @@ class ResBlock(ResBlockBase):
 class Log(torch.nn.Module):
     def forward(self, x, x_mask, reverse=False, **kwargs):
         if not reverse:
-            y = torch.clamp_min(x, 1e-5).log() * x_mask
+            y = x.clamp_min(1e-5).log() * x_mask
             return y, (-y).sum(dim=[1, 2])
         else: return x.exp() * x_mask
 
@@ -121,10 +121,10 @@ class ResidualCouplingLayer(torch.nn.Module):
         self.post.bias.data.zero_()
 
     def forward(self, x, x_mask, g=None, reverse=False):
-        x0, x1 = torch.split(x, [self.half_channels] * 2, 1)
+        x0, x1 = x.split([self.half_channels] * 2, 1)
         stats = self.post(self.enc((self.pre(x0) * x_mask), x_mask, g=g)) * x_mask
 
-        if not self.mean_only: m, logs = torch.split(stats, [self.half_channels] * 2, 1)
+        if not self.mean_only: m, logs = stats.split([self.half_channels] * 2, 1)
         else:
             m = stats
             logs = torch.zeros_like(m)

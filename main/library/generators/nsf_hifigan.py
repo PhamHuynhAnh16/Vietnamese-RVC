@@ -38,7 +38,7 @@ class SineGen(torch.nn.Module):
         rand_ini[..., 0] = 0
         rad += rand_ini
 
-        return torch.sin(2 * np.pi * rad)
+        return (2 * np.pi * rad).sin()
         
     def forward(self, f0, upp):
         with torch.no_grad():

@@ -5,9 +5,9 @@ import time
 sys.path.append(os.getcwd())
 
 from main.library.utils import clear_gpu_cache
-from main.app.core.ui import gr_info, gr_warning
 from main.app.variables import translations, configs
 from main.inference.realtime.callbacks import AudioCallbacks
+from main.app.core.ui import gr_info, gr_warning, audio_device
 
 running, callbacks, audio_manager = False, None, None
 
@@ -64,27 +64,30 @@ def realtime_start(
 
     if not input_audio_device or not output_audio_device:
         gr_warning(translations["provide_audio_device"])
-        return translations["provide_audio_device"], interactive_true, interactive_false
+        yield translations["provide_audio_device"], interactive_true, interactive_false
+        return
 
     if monitor and not monitor_output_device:
         gr_warning(translations["provide_monitor_device"])
-        return translations["provide_monitor_device"], interactive_true, interactive_false
+        yield translations["provide_monitor_device"], interactive_true, interactive_false
+        return
 
     model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
     embedder_model = (embedders if embedders != "custom" else custom_embedders)
 
     if not model_pth or not os.path.exists(model_pth) or os.path.isdir(model_pth) or not model_pth.endswith((".pth", ".onnx")):
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
-        return translations["provide_file"].format(filename=translations["model"]), interactive_true, interactive_false
+        yield translations["provide_file"].format(filename=translations["model"]), interactive_true, interactive_false
+        return
+
+    input_devices, output_devices = audio_device()
+    input_device_id = input_devices[input_audio_device][0]
+    output_device_id = output_devices[output_audio_device][0]
+    output_monitor_id = output_devices[monitor_output_device][0] if monitor else None
 
     input_audio_gain /= 100.0
-    input_device_id = int(input_audio_device.split(":")[0])
-
     output_audio_gain /= 100.0
-    output_device_id = int(output_audio_device.split(":")[0])
-
     monitor_audio_gain /= 100.0
-    output_monitor_id = int(monitor_output_device.split(":")[0]) if monitor else None
 
     chunk_size = int(chunk_size * DEVICE_SAMPLE_RATE / 1000 / 128)
 

@@ -155,7 +155,7 @@ class Res2NetBlock(torch.nn.Module):
     def forward(self, x):
         y = []
 
-        for i, x_i in enumerate(torch.chunk(x, self.scale, dim=1)):
+        for i, x_i in enumerate(x.chunk(self.scale, dim=1)):
             if i == 0: y_i = x_i
             elif i == 1: y_i = self.blocks[i - 1](x_i)
             else: y_i = self.blocks[i - 1](x_i + y_i)

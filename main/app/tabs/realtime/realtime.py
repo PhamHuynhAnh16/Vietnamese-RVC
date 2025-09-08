@@ -30,9 +30,9 @@ def realtime_tab():
                     output_audio_device = gr.Dropdown(label=translations["output_audio_device_label"], info=translations["output_audio_device_info"], choices=list(output_channels_map.keys()), value=list(output_channels_map.keys())[0] if len(list(output_channels_map.keys())) >= 1 else "", interactive=True)
                     monitor_output_device = gr.Dropdown(label=translations["monitor_output_device_label"], info=translations["monitor_output_device_info"], choices=list(output_channels_map.keys()), value=list(output_channels_map.keys())[0] if len(list(output_channels_map.keys())) >= 1 else "", interactive=True, visible=False)
                 with gr.Row():
-                    input_audio_gain = gr.Slider(minimum=100, maximum=2500, label=translations["input_audio_gain_label"], info=translations["input_audio_gain_info"], value=100, step=1, interactive=True)
-                    output_audio_gain = gr.Slider(minimum=100, maximum=4000, label=translations["output_audio_gain_label"], info=translations["output_audio_gain_info"], value=100, step=1, interactive=True)
-                    monitor_audio_gain = gr.Slider(minimum=100, maximum=4000, label=translations["monitor_audio_gain_label"], info=translations["monitor_audio_gain_info"], value=100, step=1, interactive=True, visible=False)
+                    input_audio_gain = gr.Slider(minimum=0, maximum=2500, label=translations["input_audio_gain_label"], info=translations["input_audio_gain_info"], value=100, step=1, interactive=True)
+                    output_audio_gain = gr.Slider(minimum=0, maximum=4000, label=translations["output_audio_gain_label"], info=translations["output_audio_gain_info"], value=100, step=1, interactive=True)
+                    monitor_audio_gain = gr.Slider(minimum=0, maximum=4000, label=translations["monitor_audio_gain_label"], info=translations["monitor_audio_gain_info"], value=100, step=1, interactive=True, visible=False)
                 with gr.Row(visible=False) as asio_row:
                     input_asio_channels = gr.Slider(minimum=-1, maximum=128, label=translations["input_asio_channels_label"], info=translations["input_asio_channels_info"], value=-1, step=1, interactive=True, visible=False)
                     output_asio_channels = gr.Slider(minimum=-1, maximum=128, label=translations["output_asio_channels_label"], info=translations["output_asio_channels_info"], value=-1, step=1, interactive=True, visible=False)

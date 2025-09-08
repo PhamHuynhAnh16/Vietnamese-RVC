@@ -227,7 +227,7 @@ class Filterbank(torch.nn.Module):
         return fbank_matrix
 
     def _amplitude_to_DB(self, x):
-        x_db = self.multiplier * torch.clamp(x, min=self.amin).log10()
+        x_db = self.multiplier * x.clamp(min=self.amin).log10()
         x_db -= self.multiplier * self.db_multiplier
 
         return torch.max(x_db, (x_db.amax(dim=(-2, -1)) - self.top_db).view(x_db.shape[0], 1, 1))

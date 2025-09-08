@@ -24,7 +24,7 @@ def create_sin_embedding(length, dim, shift = 0, device="cpu", max_period=10000)
     half_dim = dim // 2
     adim = torch.arange(dim // 2, device=device).view(1, 1, -1)
     phase = pos / (max_period ** ((adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)) if str(device).startswith("ocl") else (adim / (half_dim - 1))))
-    return torch.cat([torch.cos(phase), torch.sin(phase)], dim=-1)
+    return torch.cat([phase.cos(), phase.sin()], dim=-1)
 
 def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=10000):
     if d_model % 4 != 0: raise ValueError(translations["dims"].format(dims=d_model))
@@ -33,10 +33,10 @@ def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=100
     div_term = (torch.arange(0.0, d_model, 2) * -(math.log(max_period) / d_model)).exp()
     pos_w = torch.arange(0.0, width).unsqueeze(1)
     pos_h = torch.arange(0.0, height).unsqueeze(1)
-    pe[0:d_model:2, :, :] = torch.sin(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
-    pe[1:d_model:2, :, :] = torch.cos(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
-    pe[d_model::2, :, :] = torch.sin(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
-    pe[d_model + 1 :: 2, :, :] = torch.cos(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
+    pe[0:d_model:2, :, :] = (pos_w * div_term).sin().transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
+    pe[1:d_model:2, :, :] = (pos_w * div_term).cos().transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
+    pe[d_model::2, :, :] = (pos_h * div_term).sin().transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
+    pe[d_model + 1 :: 2, :, :] = (pos_h * div_term).cos().transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
 
     return pe[None, :].to(device)
 
@@ -56,7 +56,7 @@ def create_sin_embedding_cape(length, dim, batch_size, mean_normalize, augment, 
     half_dim = dim // 2
     adim = torch.arange(dim // 2, device=device).view(1, 1, -1)
     phase = pos / (max_period ** ((adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)) if str(device).startswith("ocl") else (adim / (half_dim - 1))))
-    return torch.cat([torch.cos(phase), torch.sin(phase)], dim=-1).float()
+    return torch.cat([phase.cos(), phase.sin()], dim=-1).float()
 
 class MyGroupNorm(nn.GroupNorm):
     def __init__(self, *args, **kwargs):

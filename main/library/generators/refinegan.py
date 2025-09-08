@@ -94,7 +94,7 @@ class SineGenerator(nn.Module):
         cumsum_shift = torch.zeros_like(rad_values)
         cumsum_shift[:, 1:, :] = tmp_over_one_idx * -1.0
 
-        return torch.sin(torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi)
+        return (torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi).sin()
     
     def forward(self, f0):
         with torch.no_grad():

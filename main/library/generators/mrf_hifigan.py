@@ -22,8 +22,11 @@ class MRFLayer(nn.Module):
         return x + self.conv2(F.leaky_relu(self.conv1(F.leaky_relu(x, LRELU_SLOPE)), LRELU_SLOPE))
 
     def remove_weight_norm(self):
-        remove_weight_norm(self.conv1)
-        remove_weight_norm(self.conv2)
+        if hasattr(self.conv1, "parametrizations") and "weight" in self.conv1.parametrizations: parametrize.remove_parametrizations(self.conv1, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.conv1)
+
+        if hasattr(self.conv2, "parametrizations") and "weight" in self.conv2.parametrizations: parametrize.remove_parametrizations(self.conv2, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.conv2)
 
 class MRFBlock(nn.Module):
     def __init__(self, channels, kernel_size, dilations):
@@ -66,7 +69,7 @@ class SineGenerator(nn.Module):
         cumsum_shift = torch.zeros_like(rad_values)
         cumsum_shift[:, 1:, :] = tmp_over_one_idx * -1.0
 
-        return torch.sin(torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi)
+        return (torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi).sin()
 
     def forward(self, f0):
         with torch.no_grad():

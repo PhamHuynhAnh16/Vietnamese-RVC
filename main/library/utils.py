@@ -76,7 +76,7 @@ def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
         elif "fcpe" in f0_method:
             modelname = "fcpe" + ("_legacy" if "legacy" in f0_method else "")
         elif "crepe" in f0_method:
-            modelname = "crepe_" + f0_method.split("-")[1]
+            modelname = "crepe_" + f0_method.replace("mangio-", "").split("-")[1]
         elif "fcn" in f0_method:
             modelname = "fcn"
         elif "djcm" in f0_method:

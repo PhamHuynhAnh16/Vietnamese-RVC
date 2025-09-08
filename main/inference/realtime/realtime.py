@@ -191,7 +191,7 @@ class VoiceChanger:
         self.vc_model.initialize()
 
     def generate_strength(self):
-        self.fade_in_window = torch.sin(0.5 * np.pi * torch.linspace(0.0, 1.0, steps=self.crossfade_frame, device=config.device, dtype=torch.float32)) ** 2
+        self.fade_in_window = (0.5 * np.pi * torch.linspace(0.0, 1.0, steps=self.crossfade_frame, device=config.device, dtype=torch.float32)).sin() ** 2
         self.fade_out_window = 1 - self.fade_in_window
         self.sola_buffer = torch.zeros(self.crossfade_frame, device=config.device, dtype=torch.float32)
 

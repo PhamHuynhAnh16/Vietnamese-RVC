@@ -170,7 +170,7 @@ class FCPE_LEGACY(nn.Module):
         B, N, _ = y.size()
 
         confident, max_index = torch.max(y, dim=-1, keepdim=True)
-        local_argmax_index = torch.clamp(torch.arange(0, 9).to(max_index.device) + (max_index - 4), 0, self.n_out - 1)
+        local_argmax_index = (torch.arange(0, 9).to(max_index.device) + (max_index - 4)).clamp(0, self.n_out - 1)
         y_l = torch.gather(y, -1, local_argmax_index)
         rtn = (torch.gather(self.cent_table[None, None, :].expand(B, N, -1), -1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True)
 

@@ -148,7 +148,7 @@ class LocalState(nn.Module):
 
         if self.nfreqs:
             periods = torch.arange(1, self.nfreqs + 1, device=x.device, dtype=x.dtype)
-            freq_kernel = torch.cos(2 * math.pi * delta / periods.view(-1, 1, 1))
+            freq_kernel = (2 * math.pi * delta / periods.view(-1, 1, 1)).cos()
             freq_q = self.query_freqs(x).view(B, heads, -1, T) / self.nfreqs**0.5
             dots += torch.einsum("fts,bhfs->bhts", freq_kernel, freq_q)
 
@@ -312,10 +312,10 @@ class ResampleFrac(torch.nn.Module):
         idx = torch.arange(-self._width, self._width + self.old_sr).float()
 
         for i in range(self.new_sr):
-            t = ((-i/self.new_sr + idx/self.old_sr) * sr).clamp_(-self.zeros, self.zeros)
+            t = ((-i / self.new_sr + idx / self.old_sr) * sr).clamp_(-self.zeros, self.zeros)
             t *= math.pi
 
-            kernel = sinc(t) * (torch.cos(t/self.zeros/2)**2)
+            kernel = sinc(t) * ((t / self.zeros / 2).cos()**2)
             kernel.div_(kernel.sum())
             kernels.append(kernel)
 
@@ -330,8 +330,8 @@ class ResampleFrac(torch.nn.Module):
         y = F.conv1d(F.pad(x[:, None], (self._width, self._width + self.old_sr), mode='replicate'), self.kernel, stride=self.old_sr).transpose(1, 2).reshape(list(shape[:-1]) + [-1])
 
         float_output_length = torch.as_tensor(self.new_sr * length / self.old_sr)
-        max_output_length = torch.ceil(float_output_length).long()
-        default_output_length = torch.floor(float_output_length).long()
+        max_output_length = float_output_length.ceil().long()
+        default_output_length = float_output_length.floor().long()
 
         if output_length is None: applied_output_length = max_output_length if full else default_output_length
         elif output_length < 0 or output_length > max_output_length: raise ValueError("output_length < 0 or output_length > max_output_length")
@@ -345,7 +345,7 @@ class ResampleFrac(torch.nn.Module):
         return simple_repr(self)
 
 def sinc(x):
-    return torch.where(x == 0, torch.tensor(1., device=x.device, dtype=x.dtype), torch.sin(x) / x)
+    return torch.where(x == 0, torch.tensor(1., device=x.device, dtype=x.dtype), x.sin() / x)
 
 def simple_repr(obj, attrs = None, overrides = {}):
     params = inspect.signature(obj.__class__).parameters

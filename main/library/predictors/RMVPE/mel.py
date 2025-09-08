@@ -53,4 +53,4 @@ class MelSpectrogram(nn.Module):
         mel_output = self.mel_basis @ magnitude
         if self.is_half: mel_output = mel_output.half()
 
-        return torch.clamp(mel_output, min=self.clamp).log()
+        return mel_output.clamp(min=self.clamp).log()
