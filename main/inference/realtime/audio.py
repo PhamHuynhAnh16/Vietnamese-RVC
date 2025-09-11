@@ -110,7 +110,7 @@ class Audio:
 
         return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
 
-    def get_ourput_audio_device(self, index):
+    def get_output_audio_device(self, index):
         _, audiooutput = list_audio_device()
         serverAudioDevice = [x for x in audiooutput if x.index == index]
 
@@ -196,7 +196,7 @@ class Audio:
         sd._terminate()
         sd._initialize()
 
-        input_audio_device, output_audio_device = self.get_input_audio_device(input_device_id), self.get_ourput_audio_device(output_device_id)
+        input_audio_device, output_audio_device = self.get_input_audio_device(input_device_id), self.get_output_audio_device(output_device_id)
         input_channels, output_channels = input_audio_device.max_input_channels, output_audio_device.max_output_channels
     
         input_extra_setting, output_extra_setting, output_monitor_extra_setting, monitor_channels = None, None, None, None
@@ -215,7 +215,7 @@ class Audio:
             output_channels = 1
 
         if self.use_monitor:
-            output_monitor_device = self.get_ourput_audio_device(output_monitor_id)
+            output_monitor_device = self.get_output_audio_device(output_monitor_id)
             monitor_channels = output_monitor_device.max_output_channels
 
             if output_monitor_device and "WASAPI" in output_monitor_device.host_api:
