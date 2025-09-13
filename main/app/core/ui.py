@@ -5,6 +5,7 @@ import torch
 import shutil
 
 import gradio as gr
+import sounddevice as sd
 
 sys.path.append(os.getcwd())
 
@@ -101,7 +102,7 @@ def get_index(model):
     return {"value": next((f for f in [os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name] if model.split(".")[0] in f), ""), "__type__": "update"} if model else None
 
 def index_strength_show(index):
-    return {"visible": index and os.path.exists(index), "value": 0.5, "__type__": "update"}
+    return {"visible": index and os.path.exists(index) and os.path.isfile(index), "value": 0.5, "__type__": "update"}
 
 def hoplength_show(method, hybrid_method=None):
     visible = False
@@ -162,7 +163,7 @@ def change_fp(fp):
     
 def process_output(file_path):
     if config.configs.get("delete_exists_file", True):
-        if os.path.exists(file_path): os.remove(file_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path): os.remove(file_path)
         return file_path
     else:
         if not os.path.exists(file_path): return file_path
@@ -282,6 +283,9 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
     ]
 
 def change_audio_device_choices():
+    sd._terminate()
+    sd._initialize()
+
     input_channels_map, output_channels_map = audio_device()
     input_channels_map, output_channels_map = list(input_channels_map.keys()), list(output_channels_map.keys())
 

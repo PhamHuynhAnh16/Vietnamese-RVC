@@ -24,9 +24,8 @@ class ServerAudioDevice:
 def check_the_device(device, type = "input"):
     stream_device = sd.InputStream if type == "input" else sd.OutputStream
     try:
-        with stream_device(device=device["index"], dtype=np.float32, samplerate=device["default_samplerate"]) as stream:
-            stream.close()
-        return True
+        with stream_device(device=device["index"], dtype=np.float32, samplerate=device["default_samplerate"]):
+            return True
     except Exception:
         return False
 
