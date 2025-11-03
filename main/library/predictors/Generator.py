@@ -172,7 +172,7 @@ class Generator:
         return f0
     
     def get_f0_hybrid(self, methods_str, x, p_len, filter_radius):
-        methods_str = re.search("hybrid\[(.+)\]", methods_str)
+        methods_str = re.search(r"hybrid\[(.+)\]", methods_str)
         if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
 
         n = len(methods)

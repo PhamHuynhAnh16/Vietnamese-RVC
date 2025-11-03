@@ -95,7 +95,7 @@ class Config:
         if not self.cpu_mode:
             if torch.cuda.is_available():
                 device = "cuda:0"
-                self.gpu_mem = torch.cuda.get_device_properties(int(self.device.split(":")[-1])).total_memory // (1024**3)
+                self.gpu_mem = torch.cuda.get_device_properties(int(device.split(":")[-1])).total_memory // (1024**3)
             elif directml.is_available(): 
                 device = "privateuseone:0"
             elif opencl.is_available(): 

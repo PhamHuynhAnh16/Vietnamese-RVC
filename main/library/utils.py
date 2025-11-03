@@ -86,7 +86,7 @@ def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
 
     for _ in range(count):
         if "hybrid" in f0_method:
-            methods_str = re.search("hybrid\[(.+)\]", f0_method)
+            methods_str = re.search(r"hybrid\[(.+)\]", f0_method)
             if methods_str: methods = [f0_method.strip() for f0_method in methods_str.group(1).split("+")]
 
             for method in methods:
