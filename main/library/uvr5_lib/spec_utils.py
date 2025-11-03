@@ -41,7 +41,6 @@ else:
     wav_resolution = "sinc_fastest"
     wav_resolution_float_resampling = wav_resolution
 
-
 def crop_center(h1, h2):
     h1_shape = h1.size()
     h2_shape = h2.size()

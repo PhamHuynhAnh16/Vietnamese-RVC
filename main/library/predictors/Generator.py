@@ -13,16 +13,10 @@ from librosa import yin, pyin, piptrack
 
 sys.path.append(os.getcwd())
 
-from main.library.predictors.FCN.FCN import FCN
-from main.library.predictors.FCPE.FCPE import FCPE
-from main.library.predictors.DJCM.DJCM import DJCM
-from main.library.predictors.CREPE.CREPE import CREPE
-from main.library.predictors.RMVPE.RMVPE import RMVPE
-from main.library.predictors.WORLD.WORLD import PYWORLD
-from main.app.variables import configs, logger, translations
 from main.library.predictors.CREPE.filter import mean, median
 from main.library.predictors.WORLD.SWIPE import swipe, stonemask
-from main.library.utils import get_providers, autotune_f0, proposal_f0_up_key, circular_write
+from main.app.variables import config, configs, logger, translations
+from main.library.utils import autotune_f0, proposal_f0_up_key, circular_write
 
 @nb.jit(nopython=True)
 def post_process(tf0, f0, f0_up_key, manual_x_pad, f0_mel_min, f0_mel_max, manual_f0 = None):
@@ -66,18 +60,19 @@ def realtime_post_process(f0, pitch, pitchf, f0_up_key = 0, f0_mel_min = 50.0, f
     return pitch.unsqueeze(0), pitchf.unsqueeze(0)
 
 class Generator:
-    def __init__(self, sample_rate = 16000, hop_length = 160, f0_min = 50, f0_max = 1100, is_half = False, device = "cpu", f0_onnx_mode = False, del_onnx_model = True):
+    def __init__(self, sample_rate = 16000, hop_length = 160, f0_min = 50, f0_max = 1100, alpha = 0.5, is_half = False, device = "cpu", f0_onnx_mode = False, del_onnx_model = True):
         self.sample_rate = sample_rate
         self.hop_length = hop_length
         self.f0_min = f0_min
         self.f0_max = f0_max
         self.is_half = is_half
         self.device = device
-        self.providers = get_providers() if f0_onnx_mode else None
+        self.providers = config.providers
         self.f0_onnx_mode = f0_onnx_mode
         self.del_onnx_model = del_onnx_model
         self.window = 160
         self.batch_size = 512
+        self.alpha = alpha
         self.ref_freqs = [49.00, 51.91, 55.00, 58.27, 61.74, 65.41, 69.30, 73.42, 77.78, 82.41, 87.31, 92.50, 98.00, 103.83, 110.00, 116.54, 123.47, 130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185.00, 196.00,  207.65, 220.00, 233.08, 246.94, 261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25, 554.37, 587.33, 622.25, 659.25, 698.46, 739.99, 783.99, 830.61, 880.00, 932.33, 987.77, 1046.50]
 
     def calculator(self, x_pad, f0_method, x, f0_up_key = 0, p_len = None, filter_radius = 3, f0_autotune = False, f0_autotune_strength = 1, manual_f0 = None, proposal_pitch = False, proposal_pitch_threshold = 255.0):
@@ -124,7 +119,7 @@ class Generator:
             f0_up_key += up_key
 
         return realtime_post_process(
-            torch.from_numpy(f0).to(self.device), 
+            torch.from_numpy(f0).float().to(self.device), 
             pitch, 
             pitchf,
             f0_up_key, 
@@ -153,17 +148,21 @@ class Generator:
             split_f0 = f0_method.split("-")
             f0 = self.get_f0_mangio_crepe(x, p_len, split_f0[2]) if split_f0[0] == "mangio" else self.get_f0_crepe(x, p_len, split_f0[1], filter_radius=filter_radius)
         elif "fcpe" in f0_method:
-            f0 = self.get_f0_fcpe(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
+            f0 = self.get_f0_fcpe(x, p_len, legacy="legacy" in f0_method and "previous" not in f0_method, previous="previous" in f0_method, filter_radius=filter_radius)
         elif "rmvpe" in f0_method:
-            f0 = self.get_f0_rmvpe(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
+            f0 = self.get_f0_rmvpe(x, p_len, clipping="clipping" in f0_method, filter_radius=filter_radius)
         elif f0_method in ["yin", "pyin", "piptrack"]:
             f0 = self.get_f0_librosa(x, p_len, mode=f0_method)
         elif "swipe" in f0_method:
             f0 = self.get_f0_swipe(x, p_len, filter_radius=filter_radius)
-        elif "fcn" in f0_method:
-            f0 = self.get_f0_fcn(x, p_len, filter_radius=filter_radius)
+        elif "penn" in f0_method:
+            f0 = self.get_f0_mangio_penn(x, p_len) if f0_method.split("-")[0] == "mangio" else self.get_f0_penn(x, p_len, filter_radius=filter_radius)
         elif "djcm" in f0_method:
-            f0 = self.get_f0_djcm(x, p_len, legacy="legacy" in f0_method, filter_radius=filter_radius)
+            f0 = self.get_f0_djcm(x, p_len, clipping="clipping" in f0_method, filter_radius=filter_radius)
+        elif "pesto" in f0_method:
+            f0 = self.get_f0_pesto(x, p_len)
+        elif "swift" in f0_method:
+            f0 = self.get_f0_swift(x, p_len, filter_radius=filter_radius)
         else:
             raise ValueError(translations["option_not_valid"])
         
@@ -175,27 +174,32 @@ class Generator:
     def get_f0_hybrid(self, methods_str, x, p_len, filter_radius):
         methods_str = re.search("hybrid\[(.+)\]", methods_str)
         if methods_str: methods = [method.strip() for method in methods_str.group(1).split("+")]
-        f0_computation_stack, resampled_stack = [], []
 
-        x = x.astype(np.float32)
-        x /= np.quantile(np.abs(x), 0.999)
+        n = len(methods)
+        f0_stack = []
 
         for method in methods:
-            f0 = None
-            f0 = self.compute_f0(method, x, p_len, filter_radius)
-            f0_computation_stack.append(f0) 
-
-        for f0 in f0_computation_stack:
-            resampled_stack.append(
-                np.interp(
-                    np.linspace(0, len(f0), p_len), 
-                    np.arange(len(f0)), 
-                    f0
+            f0_stack.append(
+                self._resize_f0(
+                    self.compute_f0(method, x, p_len, filter_radius),
+                    p_len
                 )
             )
+        
+        f0_mix = np.zeros(p_len)
 
-        return resampled_stack[0] if len(resampled_stack) == 1 else np.nanmedian(np.vstack(resampled_stack), axis=0)
-    
+        if not f0_stack: return f0_mix
+        if len(f0_stack) == 1: return f0_stack[0]
+
+        weights = (1 - np.abs(np.arange(n) / (n - 1) - (1 - self.alpha))) ** 2
+        weights /= weights.sum()
+
+        stacked = np.vstack(f0_stack)
+        voiced_mask = np.any(stacked > 0, axis=0)
+        f0_mix[voiced_mask] = np.exp(np.nansum(np.log(stacked + 1e-6) * weights[:, None], axis=0)[voiced_mask])
+
+        return f0_mix
+
     def get_f0_pm(self, x, p_len, filter_radius=3, mode="ac"):
         model = parselmouth.Sound(
             x, 
@@ -230,6 +234,8 @@ class Generator:
     
     def get_f0_mangio_crepe(self, x, p_len, model="full"):
         if not hasattr(self, "mangio_crepe"):
+            from main.library.predictors.CREPE.CREPE import CREPE
+
             self.mangio_crepe = CREPE(
                 os.path.join(
                     configs["predictors_path"], 
@@ -260,13 +266,15 @@ class Generator:
     
     def get_f0_crepe(self, x, p_len, model="full", filter_radius=3):
         if not hasattr(self, "crepe"):
+            from main.library.predictors.CREPE.CREPE import CREPE
+
             self.crepe = CREPE(
                 os.path.join(
                     configs["predictors_path"], 
                     f"crepe_{model}.{'onnx' if self.f0_onnx_mode else 'pth'}"
                 ), 
                 model_size=model, 
-                hop_length=self.hop_length, 
+                hop_length=self.window, 
                 batch_size=self.batch_size, 
                 f0_min=self.f0_min, 
                 f0_max=self.f0_max, 
@@ -285,13 +293,15 @@ class Generator:
 
         return self._resize_f0(f0[0].cpu().numpy(), p_len)
     
-    def get_f0_fcpe(self, x, p_len, legacy=False, filter_radius=3):
+    def get_f0_fcpe(self, x, p_len, legacy=False, previous=False, filter_radius=3):
         if not hasattr(self, "fcpe"): 
+            from main.library.predictors.FCPE.FCPE import FCPE
+
             self.fcpe = FCPE(
                 configs, 
                 os.path.join(
                     configs["predictors_path"], 
-                    ("fcpe_legacy" if legacy else "fcpe") + (".onnx" if self.f0_onnx_mode else ".pt")
+                    ("fcpe_legacy" if legacy else ("fcpe" if previous else "ddsp_200k")) + (".onnx" if self.f0_onnx_mode else ".pt")
                 ), 
                 hop_length=self.hop_length, 
                 f0_min=self.f0_min, 
@@ -310,8 +320,10 @@ class Generator:
 
         return f0
     
-    def get_f0_rmvpe(self, x, p_len, legacy=False, filter_radius=3):
+    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3):
         if not hasattr(self, "rmvpe"): 
+            from main.library.predictors.RMVPE.RMVPE import RMVPE
+
             self.rmvpe = RMVPE(
                 os.path.join(
                     configs["predictors_path"], 
@@ -324,13 +336,16 @@ class Generator:
             )
 
         filter_radius = filter_radius / 100
-        f0 = self.rmvpe.infer_from_audio_with_pitch(x, thred=filter_radius, f0_min=self.f0_min, f0_max=self.f0_max) if legacy else self.rmvpe.infer_from_audio(x, thred=filter_radius)
+        f0 = self.rmvpe.infer_from_audio_with_pitch(x, thred=filter_radius, f0_min=self.f0_min, f0_max=self.f0_max) if clipping else self.rmvpe.infer_from_audio(x, thred=filter_radius)
         
         if self.f0_onnx_mode and self.del_onnx_model: del self.rmvpe.model, self.rmvpe
         return self._resize_f0(f0, p_len)
     
     def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest"):
-        if not hasattr(self, "pw"): self.pw = PYWORLD(os.path.join(configs["predictors_path"], "world"), os.path.join(configs["binary_path"], "world.bin"))
+        if not hasattr(self, "pw"): 
+            from main.library.predictors.WORLD.WORLD import PYWORLD
+
+            self.pw = PYWORLD(os.path.join(configs["predictors_path"], "world"), os.path.join(configs["binary_path"], "world.bin"))
 
         x = x.astype(np.double)
         pw = self.pw.harvest if model == "harvest" else self.pw.dio
@@ -404,22 +419,52 @@ class Generator:
             f0 = pitches[max_indexes, range(magnitudes.shape[1])]
 
         return self._resize_f0(f0, p_len)
-    
-    def get_f0_fcn(self, x, p_len, filter_radius=3):
-        if not hasattr(self, "fcn"):
-            self.fcn = FCN(
+
+    def get_f0_penn(self, x, p_len, filter_radius=3):
+        if not hasattr(self, "penn"):
+            from main.library.predictors.PENN.PENN import PENN
+
+            self.penn = PENN(
+                os.path.join(
+                    configs["predictors_path"], 
+                    f"fcn.{'onnx' if self.f0_onnx_mode else 'pt'}"
+                ), 
+                hop_length=self.window // 2, 
+                batch_size=self.batch_size // 2, 
+                f0_min=self.f0_min, 
+                f0_max=self.f0_max, 
+                sample_rate=self.sample_rate, 
+                device=self.device, 
+                providers=self.providers, 
+                onnx=self.f0_onnx_mode, 
+            )
+
+        f0, pd = self.penn.compute_f0(torch.tensor(np.copy((x)))[None].float())
+        if self.f0_onnx_mode and self.del_onnx_model: del self.penn.model, self.penn.decoder, self.penn.resample_audio, self.penn
+
+        f0, pd = mean(f0, filter_radius), median(pd, filter_radius)
+        f0[pd < 0.1] = 0
+
+        return self._resize_f0(f0[0].cpu().numpy(), p_len)
+
+    def get_f0_mangio_penn(self, x, p_len):
+        if not hasattr(self, "mangio_penn"):
+            from main.library.predictors.PENN.PENN import PENN
+
+            self.mangio_penn = PENN(
                 os.path.join(
                     configs["predictors_path"], 
                     f"fcn.{'onnx' if self.f0_onnx_mode else 'pt'}"
                 ), 
                 hop_length=self.hop_length // 2, 
-                batch_size=self.batch_size, 
+                batch_size=self.hop_length, 
                 f0_min=self.f0_min, 
                 f0_max=self.f0_max, 
-                device=self.device, 
                 sample_rate=self.sample_rate, 
+                device=self.device, 
                 providers=self.providers, 
                 onnx=self.f0_onnx_mode, 
+                interp_unvoiced_at=0.1
             )
 
         x = x.astype(np.float32)
@@ -428,17 +473,15 @@ class Generator:
         audio = torch.from_numpy(x).to(self.device, copy=True).unsqueeze(dim=0)
         if audio.ndim == 2 and audio.shape[0] > 1: audio = audio.mean(dim=0, keepdim=True).detach()
 
-        f0, pd = self.fcn.compute_f0(audio.detach())
-        if self.f0_onnx_mode and self.del_onnx_model: del self.fcn.model, self.fcn
+        f0 = self.mangio_penn.compute_f0(audio.detach())
+        if self.f0_onnx_mode and self.del_onnx_model: del self.mangio_penn.model, self.mangio_penn.decoder, self.mangio_penn.resample_audio, self.mangio_penn
 
-        f0, pd = mean(f0, filter_radius), median(pd, filter_radius)
-        f0[pd < 0.1] = 0
+        return self._resize_f0(f0.squeeze(0).cpu().float().numpy(), p_len)
 
-        f0 = medfilt(f0[0].cpu().numpy(), filter_radius)
-        return self._resize_f0(f0, p_len)
-    
-    def get_f0_djcm(self, x, p_len, legacy=False, filter_radius=3):
+    def get_f0_djcm(self, x, p_len, clipping=False, filter_radius=3):
         if not hasattr(self, "djcm"): 
+            from main.library.predictors.DJCM.DJCM import DJCM
+            
             self.djcm = DJCM(
                 os.path.join(
                     configs["predictors_path"], 
@@ -450,8 +493,60 @@ class Generator:
                 providers=self.providers
             )
 
-        filter_radius = filter_radius / 100 + 0.05
-        f0 = self.djcm.infer_from_audio_with_pitch(x, thred=filter_radius, f0_min=self.f0_min, f0_max=self.f0_max) if legacy else self.djcm.infer_from_audio(x, thred=filter_radius)
+        filter_radius /= 10
+        f0 = self.djcm.infer_from_audio_with_pitch(x, thred=filter_radius, f0_min=self.f0_min, f0_max=self.f0_max) if clipping else self.djcm.infer_from_audio(x, thred=filter_radius)
         
         if self.f0_onnx_mode and self.del_onnx_model: del self.djcm.model, self.djcm
         return self._resize_f0(f0, p_len)
+    
+    def get_f0_swift(self, x, p_len, filter_radius=3):
+        if not hasattr(self, "swift"): 
+            from main.library.predictors.SWIFT.SWIFT import SWIFT
+
+            self.swift = SWIFT(
+                os.path.join(
+                    configs["predictors_path"], 
+                    "swift.onnx"
+                ), 
+                fmin=self.f0_min, 
+                fmax=self.f0_max, 
+                confidence_threshold=filter_radius / 4 + 0.137
+            )
+
+        pitch_hz, voicing, timestamps = self.swift.detect_from_array(x, self.sample_rate)
+        if len(timestamps) == 0: return np.zeros(p_len)
+
+        pitch = np.nan_to_num(pitch_hz, nan=0.0)
+        pitch[~voicing] = 0.0
+
+        f0 = np.interp((np.arange(p_len) * self.window + self.window / 2) / self.sample_rate, timestamps, pitch, left=0.0, right=0.0)
+        return self._resize_f0(f0, p_len)
+
+    def get_f0_pesto(self, x, p_len):
+        if not hasattr(self, "pesto"):
+            from main.library.predictors.PESTO.PESTO import PESTO
+
+            self.pesto = PESTO(
+                os.path.join(
+                    configs["predictors_path"], 
+                    f"pesto.{'onnx' if self.f0_onnx_mode else 'pt'}"
+                ), 
+                step_size=1000 * self.window / self.sample_rate, 
+                reduction = "alwa", 
+                num_chunks=1, 
+                sample_rate=self.sample_rate, 
+                device=self.device, 
+                providers=self.providers, 
+                onnx=self.f0_onnx_mode
+            )
+
+        x = x.astype(np.float32)
+        x /= np.quantile(np.abs(x), 0.999)
+
+        audio = torch.from_numpy(x).to(self.device, copy=True).unsqueeze(dim=0)
+        if audio.ndim == 2 and audio.shape[0] > 1: audio = audio.mean(dim=0, keepdim=True).detach()
+
+        f0 = self.pesto.compute_f0(audio.detach())[0]
+        if self.f0_onnx_mode and self.del_onnx_model: del self.pesto.model, self.pesto
+
+        return self._resize_f0(f0.squeeze(0).cpu().float().numpy(), p_len)

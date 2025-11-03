@@ -18,7 +18,12 @@ from main.library.uvr5_lib.demucs import hdemucs, states, apply
 warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.join(os.getcwd(), "main", "library", "uvr5_lib"))
 
-DEMUCS_4_SOURCE_MAPPER = {common_separator.CommonSeparator.BASS_STEM: 0, common_separator.CommonSeparator.DRUM_STEM: 1, common_separator.CommonSeparator.OTHER_STEM: 2, common_separator.CommonSeparator.VOCAL_STEM: 3}
+DEMUCS_4_SOURCE_MAPPER = {
+    common_separator.CommonSeparator.BASS_STEM: 0, 
+    common_separator.CommonSeparator.DRUM_STEM: 1, 
+    common_separator.CommonSeparator.OTHER_STEM: 2, 
+    common_separator.CommonSeparator.VOCAL_STEM: 3
+}
 
 class DemucsSeparator(common_separator.CommonSeparator):
     def __init__(self, common_config, arch_config):
@@ -56,8 +61,20 @@ class DemucsSeparator(common_separator.CommonSeparator):
         if isinstance(source, np.ndarray):
             source_length = len(source)
 
-            if source_length == 2: self.demucs_source_map = {common_separator.CommonSeparator.INST_STEM: 0, common_separator.CommonSeparator.VOCAL_STEM: 1}
-            elif source_length == 6: self.demucs_source_map = {common_separator.CommonSeparator.BASS_STEM: 0, common_separator.CommonSeparator.DRUM_STEM: 1, common_separator.CommonSeparator.OTHER_STEM: 2, common_separator.CommonSeparator.VOCAL_STEM: 3, common_separator.CommonSeparator.GUITAR_STEM: 4, common_separator.CommonSeparator.PIANO_STEM: 5}
+            if source_length == 2: 
+                self.demucs_source_map = {
+                    common_separator.CommonSeparator.INST_STEM: 0, 
+                    common_separator.CommonSeparator.VOCAL_STEM: 1
+                }
+            elif source_length == 6: 
+                self.demucs_source_map = {
+                    common_separator.CommonSeparator.BASS_STEM: 0, 
+                    common_separator.CommonSeparator.DRUM_STEM: 1, 
+                    common_separator.CommonSeparator.OTHER_STEM: 2, 
+                    common_separator.CommonSeparator.VOCAL_STEM: 3, 
+                    common_separator.CommonSeparator.GUITAR_STEM: 4, 
+                    common_separator.CommonSeparator.PIANO_STEM: 5
+                }
             else: self.demucs_source_map = DEMUCS_4_SOURCE_MAPPER
 
         for stem_name, stem_value in self.demucs_source_map.items():
@@ -152,7 +169,7 @@ def check_checksum(path, checksum):
 
     with open(path, "rb") as file:
         while 1:
-            buf = file.read(2**20)
+            buf = file.read(2 ** 20)
             if not buf: break
             sha.update(buf)
 

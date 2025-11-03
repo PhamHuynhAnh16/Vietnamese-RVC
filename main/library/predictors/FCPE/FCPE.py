@@ -17,6 +17,90 @@ from main.library.predictors.FCPE.wav2mel import Wav2Mel
 from main.library.predictors.FCPE.encoder import EncoderLayer, ConformerNaiveEncoder
 from main.library.predictors.FCPE.utils import l2_regularization, batch_interp_with_replacement_detach, decrypt_model, DotDict
 
+@torch.no_grad()
+def cent_to_f0(cent):
+    return 10 * 2 ** (cent / 1200)
+
+@torch.no_grad()
+def f0_to_cent(f0):
+    return 1200 * (f0 / 10).log2()
+
+@torch.no_grad()
+def latent2cents_decoder(cent_table, y, threshold = 0.05, mask = True):
+    if str(y.device).startswith("privateuseone"): 
+        cent_table = cent_table.cpu()
+        y = y.cpu()
+
+    B, N, _ = y.size()
+    ci = cent_table[None, None, :].expand(B, N, -1)
+    rtn = (ci * y).sum(dim=-1, keepdim=True) / y.sum(dim=-1, keepdim=True)  
+
+    if mask:
+        confident = y.max(dim=-1, keepdim=True)[0]
+        confident_mask = torch.ones_like(confident)
+        confident_mask[confident <= threshold] = float("-INF")
+        rtn = rtn * confident_mask
+
+    return rtn
+
+@torch.no_grad()
+def latent2cents_local_decoder(cent_table, out_dims, y, threshold = 0.05, mask = True):
+    if str(y.device).startswith("privateuseone"): 
+        cent_table = cent_table.cpu()
+        y = y.cpu()
+
+    B, N, _ = y.size()
+    ci = cent_table[None, None, :].expand(B, N, -1)
+    confident, max_index = y.max(dim=-1, keepdim=True)
+
+    local_argmax_index = torch.arange(0, 9).to(max_index.device) + (max_index - 4)
+    local_argmax_index[local_argmax_index < 0] = 0
+    local_argmax_index[local_argmax_index >= out_dims] = out_dims - 1
+
+    y_l = y.gather(-1, local_argmax_index)
+    rtn = (ci.gather(-1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True) 
+
+    if mask:
+        confident_mask = torch.ones_like(confident)
+        confident_mask[confident <= threshold] = float("-INF")
+        rtn = rtn * confident_mask
+
+    return rtn
+
+def cents_decoder(cent_table, y, confidence, threshold = 0.05, mask=True):
+    if str(y.device).startswith("privateuseone"): 
+        cent_table = cent_table.cpu()
+        y = y.cpu()
+
+    B, N, _ = y.size()
+    rtn = (cent_table[None, None, :].expand(B, N, -1) * y).sum(dim=-1, keepdim=True) / y.sum(dim=-1, keepdim=True)
+
+    if mask:
+        confident = y.max(dim=-1, keepdim=True)[0]
+        confident_mask = torch.ones_like(confident)
+        confident_mask[confident <= threshold] = float("-INF")
+        rtn = rtn * confident_mask
+
+    return (rtn, confident) if confidence else rtn
+
+def cents_local_decoder(cent_table, y, n_out, confidence, threshold = 0.05, mask=True):
+    if str(y.device).startswith("privateuseone"): 
+        cent_table = cent_table.cpu()
+        y = y.cpu()
+
+    B, N, _ = y.size()
+    confident, max_index = y.max(dim=-1, keepdim=True)
+    local_argmax_index = (torch.arange(0, 9).to(max_index.device) + (max_index - 4)).clamp(0, n_out - 1)
+    y_l = y.gather(-1, local_argmax_index)
+    rtn = (cent_table[None, None, :].expand(B, N, -1).gather(-1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True)
+
+    if mask:
+        confident_mask = torch.ones_like(confident)
+        confident_mask[confident <= threshold] = float("-INF")
+        rtn = rtn * confident_mask
+
+    return (rtn, confident) if confidence else rtn
+
 class PCmer(nn.Module):
     def __init__(self, num_layers, num_heads, dim_model, dim_keys, dim_values, residual_dropout, attention_dropout):
         super().__init__()
@@ -53,7 +137,7 @@ class CFNaiveMelPE(nn.Module):
         self.net = ConformerNaiveEncoder(num_layers=n_layers, num_heads=n_heads, dim_model=hidden_dims, use_norm=use_fa_norm, conv_only=conv_only, conv_dropout=conv_dropout, atten_dropout=atten_dropout)
         self.norm = nn.LayerNorm(hidden_dims)
         self.output_proj = weight_norm(nn.Linear(hidden_dims, out_dims))
-        self.cent_table_b = torch.linspace(self.f0_to_cent(torch.Tensor([f0_min]))[0], self.f0_to_cent(torch.Tensor([f0_max]))[0], out_dims).detach()
+        self.cent_table_b = torch.linspace(f0_to_cent(torch.Tensor([f0_min]))[0], f0_to_cent(torch.Tensor([f0_max]))[0], out_dims).detach()
         self.register_buffer("cent_table", self.cent_table_b)
         self.gaussian_blurred_cent_mask_b = (1200 * torch.Tensor([self.f0_max / 10.]).log2())[0].detach()
         self.register_buffer("gaussian_blurred_cent_mask", self.gaussian_blurred_cent_mask_b)
@@ -64,54 +148,9 @@ class CFNaiveMelPE(nn.Module):
         return self.output_proj(self.norm(self.net(x))).sigmoid()
 
     @torch.no_grad()
-    def latent2cents_decoder(self, y, threshold = 0.05, mask = True):
-        B, N, _ = y.size()
-        ci = self.cent_table[None, None, :].expand(B, N, -1)
-        rtn = (ci * y).sum(dim=-1, keepdim=True) / y.sum(dim=-1, keepdim=True)  
-
-        if mask:
-            confident = torch.max(y, dim=-1, keepdim=True)[0]
-            confident_mask = torch.ones_like(confident)
-            confident_mask[confident <= threshold] = float("-INF")
-            rtn = rtn * confident_mask
-
-        return rtn  
-
-    @torch.no_grad()
-    def latent2cents_local_decoder(self, y, threshold = 0.05, mask = True):
-        B, N, _ = y.size()
-        ci = self.cent_table[None, None, :].expand(B, N, -1)
-        confident, max_index = torch.max(y, dim=-1, keepdim=True)
-
-        local_argmax_index = torch.arange(0, 9).to(max_index.device) + (max_index - 4)
-        local_argmax_index[local_argmax_index < 0] = 0
-        local_argmax_index[local_argmax_index >= self.out_dims] = self.out_dims - 1
-
-        y_l = torch.gather(y, -1, local_argmax_index)
-        rtn = (torch.gather(ci, -1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True) 
-
-        if mask:
-            confident_mask = torch.ones_like(confident)
-            confident_mask[confident <= threshold] = float("-INF")
-            rtn = rtn * confident_mask
-
-        return rtn  
-
-    @torch.no_grad()
     def infer(self, mel, decoder = "local_argmax", threshold = 0.05):
         latent = self.forward(mel)
-        if decoder == "argmax": cents = self.latent2cents_local_decoder
-        elif decoder == "local_argmax": cents = self.latent2cents_local_decoder
-
-        return self.cent_to_f0(cents(latent, threshold=threshold))  
-
-    @torch.no_grad()
-    def cent_to_f0(self, cent):
-        return 10 * 2 ** (cent / 1200)
-
-    @torch.no_grad()
-    def f0_to_cent(self, f0):
-        return 1200 * (f0 / 10).log2()
+        return cent_to_f0(latent2cents_decoder(self.cent_table, latent, threshold=threshold) if decoder == "argmax" else latent2cents_local_decoder(self.cent_table, self.out_dims, latent, threshold=threshold))
 
 class FCPE_LEGACY(nn.Module):
     def __init__(self, input_channel=128, out_dims=360, n_layers=12, n_chans=512, loss_mse_scale=10, loss_l2_regularization=False, loss_l2_regularization_scale=1, loss_grad1_mse=False, loss_grad1_mse_scale=1, f0_max=1975.5, f0_min=32.70, confidence=False, threshold=0.05, use_input_conv=True):
@@ -126,7 +165,7 @@ class FCPE_LEGACY(nn.Module):
         self.confidence = confidence
         self.threshold = threshold
         self.use_input_conv = use_input_conv
-        self.cent_table_b = torch.Tensor(np.linspace(self.f0_to_cent(torch.Tensor([f0_min]))[0], self.f0_to_cent(torch.Tensor([f0_max]))[0], out_dims))
+        self.cent_table_b = torch.Tensor(np.linspace(f0_to_cent(torch.Tensor([f0_min]))[0], f0_to_cent(torch.Tensor([f0_max]))[0], out_dims))
         self.register_buffer("cent_table", self.cent_table_b)
         self.stack = nn.Sequential(nn.Conv1d(input_channel, n_chans, 3, 1, 1), nn.GroupNorm(4, n_chans), nn.LeakyReLU(), nn.Conv1d(n_chans, n_chans, 3, 1, 1))
         self.decoder = PCmer(num_layers=n_layers, num_heads=8, dim_model=n_chans, dim_keys=n_chans, dim_values=n_chans, residual_dropout=0.1, attention_dropout=0.1)
@@ -135,17 +174,14 @@ class FCPE_LEGACY(nn.Module):
         self.dense_out = weight_norm(nn.Linear(n_chans, self.n_out))
 
     def forward(self, mel, infer=True, gt_f0=None, return_hz_f0=False, cdecoder="local_argmax", output_interp_target_length=None):
-        if cdecoder == "argmax": self.cdecoder = self.cents_decoder
-        elif cdecoder == "local_argmax": self.cdecoder = self.cents_local_decoder
-
         x = self.dense_out(self.norm(self.decoder((self.stack(mel.transpose(1, 2)).transpose(1, 2) if self.use_input_conv else mel)))).sigmoid()
 
         if not infer:
-            loss_all = self.loss_mse_scale * F.binary_cross_entropy(x, self.gaussian_blurred_cent(self.f0_to_cent(gt_f0)))
+            loss_all = self.loss_mse_scale * F.binary_cross_entropy(x, self.gaussian_blurred_cent(f0_to_cent(gt_f0)))
             if self.loss_l2_regularization: loss_all = loss_all + l2_regularization(model=self, l2_alpha=self.loss_l2_regularization_scale)
             x = loss_all
         else:
-            x = self.cent_to_f0(self.cdecoder(x))
+            x = cent_to_f0(cents_decoder(self.cent_table, x, self.confidence, threshold=self.threshold, mask=True) if cdecoder == "argmax" else cents_local_decoder(self.cent_table, x, self.n_out, self.confidence, threshold=self.threshold, mask=True))
             x = (1 + x / 700).log() if not return_hz_f0 else x
 
         if output_interp_target_length is not None: 
@@ -153,39 +189,6 @@ class FCPE_LEGACY(nn.Module):
             x = torch.where(x.isnan(), float(0.0), x)
 
         return x
-
-    def cents_decoder(self, y, mask=True):
-        B, N, _ = y.size()
-        rtn = (self.cent_table[None, None, :].expand(B, N, -1) * y).sum(dim=-1, keepdim=True) / y.sum(dim=-1, keepdim=True)
-
-        if mask:
-            confident = torch.max(y, dim=-1, keepdim=True)[0]
-            confident_mask = torch.ones_like(confident)
-            confident_mask[confident <= self.threshold] = float("-INF")
-            rtn = rtn * confident_mask
-
-        return (rtn, confident) if self.confidence else rtn
-
-    def cents_local_decoder(self, y, mask=True):
-        B, N, _ = y.size()
-
-        confident, max_index = torch.max(y, dim=-1, keepdim=True)
-        local_argmax_index = (torch.arange(0, 9).to(max_index.device) + (max_index - 4)).clamp(0, self.n_out - 1)
-        y_l = torch.gather(y, -1, local_argmax_index)
-        rtn = (torch.gather(self.cent_table[None, None, :].expand(B, N, -1), -1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True)
-
-        if mask:
-            confident_mask = torch.ones_like(confident)
-            confident_mask[confident <= self.threshold] = float("-INF")
-            rtn = rtn * confident_mask
-
-        return (rtn, confident) if self.confidence else rtn
-
-    def cent_to_f0(self, cent):
-        return 10.0 * 2 ** (cent / 1200.0)
-
-    def f0_to_cent(self, f0):
-        return 1200.0 * (f0 / 10.0).log2()
 
     def gaussian_blurred_cent(self, cents):
         B, N, _ = cents.size()
@@ -237,7 +240,7 @@ class FCPEInfer_LEGACY:
             sess_options.log_severity_level = 3
             self.model = ort.InferenceSession(decrypt_model(configs, model_path), sess_options=sess_options, providers=providers)
         else:
-            ckpt = torch.load(model_path, map_location=torch.device(self.device), weights_only=True)
+            ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             self.args = DotDict(ckpt["config"])
             model = FCPE_LEGACY(input_channel=self.args.model.input_channel, out_dims=self.args.model.out_dims, n_layers=self.args.model.n_layers, n_chans=self.args.model.n_chans, loss_mse_scale=self.args.loss.loss_mse_scale, loss_l2_regularization=self.args.loss.loss_l2_regularization, loss_l2_regularization_scale=self.args.loss.loss_l2_regularization_scale, loss_grad1_mse=self.args.loss.loss_grad1_mse, loss_grad1_mse_scale=self.args.loss.loss_grad1_mse_scale, f0_max=self.f0_max, f0_min=self.f0_min, confidence=self.args.model.confidence)
             model.to(self.device).to(self.dtype)
@@ -287,7 +290,7 @@ class FCPEInfer:
             sess_options.log_severity_level = 3
             self.model = ort.InferenceSession(decrypt_model(configs, model_path), sess_options=sess_options, providers=providers)
         else:
-            ckpt = torch.load(model_path, map_location=torch.device(device), weights_only=True)
+            ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             ckpt["config_dict"]["model"]["conv_dropout"] = ckpt["config_dict"]["model"]["atten_dropout"] = 0.0
             self.args = DotDict(ckpt["config_dict"])
             model = InferCFNaiveMelPE(self.args, ckpt["model"])
@@ -337,5 +340,5 @@ class FCPE:
         f0 = self.fcpe(x, sr=self.sample_rate, threshold=self.threshold, p_len=p_len)
         f0 = f0[:] if f0.dim() == 1 else f0[0, :, 0]
 
-        if torch.all(f0 == 0): return f0.cpu().numpy() if p_len is None else np.zeros(p_len), (f0.cpu().numpy() if p_len is None else np.zeros(p_len))
+        if torch.all(f0 == 0): return f0.cpu().numpy() if p_len is None else np.zeros(p_len)
         return f0.cpu().numpy()

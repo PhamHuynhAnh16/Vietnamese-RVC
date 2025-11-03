@@ -7,18 +7,15 @@ import asyncio
 import requests
 import tempfile
 
-import numpy as np
-import soundfile as sf
-
-from edge_tts import Communicate
-
 sys.path.append(os.getcwd())
 
 from main.app.variables import translations
 from main.app.core.ui import gr_info, gr_warning, gr_error
 
 def synthesize_tts(prompt, voice, speed, output, pitch, google):
-    if not google:  asyncio.run(Communicate(text=prompt, voice=voice, rate=f"+{speed}%" if speed >= 0 else f"{speed}%", pitch=f"+{pitch}Hz" if pitch >= 0 else f"{pitch}Hz").save(output))
+    if not google: 
+        from edge_tts import Communicate
+        asyncio.run(Communicate(text=prompt, voice=voice, rate=f"+{speed}%" if speed >= 0 else f"{speed}%", pitch=f"+{pitch}Hz" if pitch >= 0 else f"{pitch}Hz").save(output))
     else: 
         response = requests.get(codecs.decode("uggcf://genafyngr.tbbtyr.pbz/genafyngr_ggf", "rot13"), params={"ie": "UTF-8", "q": prompt, "tl": voice, "ttsspeed": speed, "client": "tw-ob"}, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"})
 
@@ -32,20 +29,24 @@ def synthesize_tts(prompt, voice, speed, output, pitch, google):
                 if pitch != 0: y = librosa.effects.pitch_shift(y, sr=sr, n_steps=pitch)
                 if speed != 0: y = librosa.effects.time_stretch(y, rate=speed)
 
+                import soundfile as sf
                 sf.write(file=output, data=y, samplerate=sr, format=os.path.splitext(os.path.basename(output))[-1].lower().replace('.', ''))
         else: gr_error(f"{response.status_code}, {response.text}")
 
-def time_stretch(y, sr, target_duration):
-    rate = (len(y) / sr) / target_duration
-    if rate != 1.0: y = librosa.effects.time_stretch(y=y.astype(np.float32), rate=rate)
-
-    n_target = int(round(target_duration * sr))
-    return np.pad(y, (0, n_target - len(y))) if len(y) < n_target else y[:n_target]
-
-def pysrttime_to_seconds(t):
-    return (t.hours * 60 + t.minutes) * 60 + t.seconds + t.milliseconds / 1000
-
 def srt_tts(srt_file, out_file, voice, rate = 0, sr = 24000, google = False):
+    import numpy as np
+    import soundfile as sf
+
+    def time_stretch(y, sr, target_duration):
+        rate = (len(y) / sr) / target_duration
+        if rate != 1.0: y = librosa.effects.time_stretch(y=y.astype(np.float32), rate=rate)
+
+        n_target = int(round(target_duration * sr))
+        return np.pad(y, (0, n_target - len(y))) if len(y) < n_target else y[:n_target]
+
+    def pysrttime_to_seconds(t):
+        return (t.hours * 60 + t.minutes) * 60 + t.seconds + t.milliseconds / 1000
+
     subs = pysrt.open(srt_file)
     if not subs: raise ValueError(translations["srt"])
 

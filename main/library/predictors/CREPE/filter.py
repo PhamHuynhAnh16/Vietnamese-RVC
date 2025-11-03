@@ -29,7 +29,7 @@ def median(signals, win_length):
     x = x.contiguous().view(x.size()[:3] + (-1,))
     mask = mask.contiguous().view(mask.size()[:3] + (-1,))
 
-    x_sorted, _ = torch.sort(torch.where(mask.bool(), x.float(), float("inf")).to(x), dim=-1)
+    x_sorted, _ = torch.where(mask.bool(), x.float(), float("inf")).to(x).sort(dim=-1)
 
     median_pooled = x_sorted.gather(-1, ((mask.sum(dim=-1) - 1) // 2).clamp(min=0).unsqueeze(-1).long()).squeeze(-1)
     median_pooled[torch.isinf(median_pooled)] = float("nan")

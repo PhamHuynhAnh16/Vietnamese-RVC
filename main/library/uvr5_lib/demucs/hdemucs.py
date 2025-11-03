@@ -182,7 +182,7 @@ def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, res
     if residual: y = torch.cat([y, mix_stft[..., None] - y.sum(dim=-1, keepdim=True)], dim=-1)
     if iterations == 0: return y
 
-    max_abs = torch.max(torch.as_tensor(1.0, dtype=mix_stft.dtype, device=mix_stft.device), _norm(mix_stft).sqrt().max() / scale_factor)
+    max_abs = torch.as_tensor(1.0, dtype=mix_stft.dtype, device=mix_stft.device).max(_norm(mix_stft).sqrt().max() / scale_factor)
     mix_stft = mix_stft / max_abs
     y = y / max_abs
     y = expectation_maximization(y, mix_stft, iterations, eps=eps)[0]

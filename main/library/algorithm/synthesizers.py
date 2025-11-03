@@ -4,11 +4,7 @@ import torch
 
 sys.path.append(os.getcwd())
 
-from main.library.generators.hifigan import HiFiGANGenerator
-from main.library.generators.refinegan import RefineGANGenerator
 from main.library.algorithm.residuals import ResidualCouplingBlock
-from main.library.generators.mrf_hifigan import HiFiGANMRFGenerator
-from main.library.generators.nsf_hifigan import HiFiGANNRFGenerator
 from main.library.algorithm.encoders import TextEncoder, PosteriorEncoder
 from main.library.algorithm.commons import slice_segments, rand_slice_segments
 
@@ -35,19 +31,26 @@ class Synthesizer(torch.nn.Module):
         self.enc_p = TextEncoder(inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, float(p_dropout), text_enc_hidden_dim, f0=use_f0, energy=energy, onnx=onnx)
 
         if use_f0:
-            if vocoder == "RefineGAN": self.dec = RefineGANGenerator(sample_rate=sr, upsample_rates=upsample_rates, num_mels=inter_channels, checkpointing=checkpointing)
-            elif vocoder in ["MRF-HiFi-GAN", "MRF HiFi-GAN"]: self.dec = HiFiGANMRFGenerator(in_channel=inter_channels, upsample_initial_channel=upsample_initial_channel, upsample_rates=upsample_rates, upsample_kernel_sizes=upsample_kernel_sizes, resblock_kernel_sizes=resblock_kernel_sizes, resblock_dilations=resblock_dilation_sizes, gin_channels=gin_channels, sample_rate=sr, harmonic_num=8, checkpointing=checkpointing)
-            else: self.dec = HiFiGANNRFGenerator(inter_channels, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels, sr=sr, checkpointing=checkpointing)
-        else: self.dec = HiFiGANGenerator(inter_channels, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
+            if vocoder == "RefineGAN": 
+                from main.library.generators.refinegan import RefineGANGenerator
+                self.dec = RefineGANGenerator(sample_rate=sr, upsample_rates=upsample_rates, num_mels=inter_channels, checkpointing=checkpointing)
+            elif vocoder in ["MRF-HiFi-GAN", "MRF HiFi-GAN"]: 
+                from main.library.generators.mrf_hifigan import HiFiGANMRFGenerator
+                self.dec = HiFiGANMRFGenerator(in_channel=inter_channels, upsample_initial_channel=upsample_initial_channel, upsample_rates=upsample_rates, upsample_kernel_sizes=upsample_kernel_sizes, resblock_kernel_sizes=resblock_kernel_sizes, resblock_dilations=resblock_dilation_sizes, gin_channels=gin_channels, sample_rate=sr, harmonic_num=8, checkpointing=checkpointing)
+            else: 
+                from main.library.generators.nsf_hifigan import HiFiGANNRFGenerator
+                self.dec = HiFiGANNRFGenerator(inter_channels, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels, sr=sr, checkpointing=checkpointing)
+        else: 
+            from main.library.generators.hifigan import HiFiGANGenerator
+            self.dec = HiFiGANGenerator(inter_channels, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, gin_channels=gin_channels)
 
         self.enc_q = PosteriorEncoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=gin_channels)
         self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 3, gin_channels=gin_channels)
         self.emb_g = torch.nn.Embedding(self.spk_embed_dim, gin_channels)
 
     def remove_weight_norm(self):
-        self.dec.remove_weight_norm()
-        self.flow.remove_weight_norm()
-        self.enc_q.remove_weight_norm()
+        for module in [self.dec, self.flow, self.enc_q]:
+            module.remove_weight_norm()
 
     @torch.jit.ignore
     def forward(self, phone, phone_lengths, pitch = None, pitchf = None, y = None, y_lengths = None, ds = None, energy = None):
@@ -75,11 +78,6 @@ class Synthesizer(torch.nn.Module):
 class SynthesizerONNX(Synthesizer):
     def __init__(self, spec_channels, segment_size, inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, spk_embed_dim, gin_channels, sr, use_f0, text_enc_hidden_dim=768, vocoder="Default", checkpointing=False, energy=False, **kwargs):
         super().__init__(spec_channels, segment_size, inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, spk_embed_dim, gin_channels, sr, use_f0, text_enc_hidden_dim, vocoder, checkpointing, True, energy)
-
-    def remove_weight_norm(self):
-        self.dec.remove_weight_norm()
-        self.flow.remove_weight_norm()
-        self.enc_q.remove_weight_norm()
 
     def forward(self, phone, phone_lengths, g=None, rnd=None, pitch=None, nsff0=None, energy=None):
         g = self.emb_g(g).unsqueeze(-1)

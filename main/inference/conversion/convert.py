@@ -1,7 +1,5 @@
 import os
 import sys
-import json
-import onnx
 import time
 import torch
 import librosa
@@ -13,16 +11,13 @@ import numpy as np
 import soundfile as sf
 
 from tqdm import tqdm
-from scipy.io import wavfile
 from distutils.util import strtobool
 
 warnings.filterwarnings("ignore")
 sys.path.append(os.getcwd())
 
-from main.tools.noisereduce import TG
 from main.app.core.ui import replace_export_format
 from main.inference.conversion.pipeline import Pipeline
-from main.library.algorithm.synthesizers import Synthesizer
 from main.app.variables import config, logger, translations
 from main.inference.conversion.audio_processing import preprocess, postprocess
 from main.library.utils import check_assets, load_audio, load_embedders_model, cut, restore, clear_gpu_cache, load_model
@@ -40,7 +35,7 @@ def parse_arguments():
     parser.add_argument("--protect", type=float, default=0.33)
     parser.add_argument("--hop_length", type=int, default=64)
     parser.add_argument("--f0_method", type=str, default="rmvpe")
-    parser.add_argument("--embedder_model", type=str, default="contentvec_base")
+    parser.add_argument("--embedder_model", type=str, default="hubert_base")
     parser.add_argument("--input_path", type=str, required=True)
     parser.add_argument("--output_path", type=str, default="./audios/output.wav")
     parser.add_argument("--export_format", type=str, default="wav")
@@ -60,16 +55,17 @@ def parse_arguments():
     parser.add_argument("--formant_qfrency", type=float, default=0.8)
     parser.add_argument("--formant_timbre", type=float, default=0.8)
     parser.add_argument("--proposal_pitch", type=lambda x: bool(strtobool(x)), default=False)
-    parser.add_argument("--proposal_pitch_threshold", type=float, default=0.0)
+    parser.add_argument("--proposal_pitch_threshold", type=float, default=255.0)
     parser.add_argument("--audio_processing", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--alpha", type=float, default=0.5)
 
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
-    pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, embedder_model, resample_sr, split_audio, checkpointing, f0_file, f0_onnx, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, proposal_pitch, proposal_pitch_threshold, audio_processing = args.pitch, args.filter_radius, args.index_rate, args.rms_mix_rate,args.protect, args.hop_length, args.f0_method, args.input_path, args.output_path, args.pth_path, args.index_path, args.f0_autotune, args.f0_autotune_strength, args.clean_audio, args.clean_strength, args.export_format, args.embedder_model, args.resample_sr, args.split_audio, args.checkpointing, args.f0_file, args.f0_onnx, args.embedders_mode, args.formant_shifting, args.formant_qfrency, args.formant_timbre, args.proposal_pitch, args.proposal_pitch_threshold, args.audio_processing
+    pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, embedder_model, resample_sr, split_audio, checkpointing, f0_file, f0_onnx, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha = args.pitch, args.filter_radius, args.index_rate, args.rms_mix_rate,args.protect, args.hop_length, args.f0_method, args.input_path, args.output_path, args.pth_path, args.index_path, args.f0_autotune, args.f0_autotune_strength, args.clean_audio, args.clean_strength, args.export_format, args.embedder_model, args.resample_sr, args.split_audio, args.checkpointing, args.f0_file, args.f0_onnx, args.embedders_mode, args.formant_shifting, args.formant_qfrency, args.formant_timbre, args.proposal_pitch, args.proposal_pitch_threshold, args.audio_processing, args.alpha
     
-    run_convert_script(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, rms_mix_rate=rms_mix_rate, protect=protect, hop_length=hop_length, f0_method=f0_method, input_path=input_path, output_path=output_path, pth_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, embedder_model=embedder_model, resample_sr=resample_sr, split_audio=split_audio, checkpointing=checkpointing, f0_file=f0_file, f0_onnx=f0_onnx, embedders_mode=embedders_mode, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold, audio_processing=audio_processing)
+    run_convert_script(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, rms_mix_rate=rms_mix_rate, protect=protect, hop_length=hop_length, f0_method=f0_method, input_path=input_path, output_path=output_path, pth_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, embedder_model=embedder_model, resample_sr=resample_sr, split_audio=split_audio, checkpointing=checkpointing, f0_file=f0_file, f0_onnx=f0_onnx, embedders_mode=embedders_mode, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold, audio_processing=audio_processing, alpha=alpha)
 
 def run_convert_script(
     pitch=0, 
@@ -88,7 +84,7 @@ def run_convert_script(
     clean_audio=False, 
     clean_strength=0.7, 
     export_format="wav", 
-    embedder_model="contentvec_base", 
+    embedder_model="hubert_base", 
     resample_sr=0, 
     split_audio=False, 
     checkpointing=False, 
@@ -99,11 +95,35 @@ def run_convert_script(
     formant_qfrency=0.8, 
     formant_timbre=0.8, 
     proposal_pitch=False, 
-    proposal_pitch_threshold=0, 
-    audio_processing=False
+    proposal_pitch_threshold=255.0, 
+    audio_processing=False,
+    alpha=0.5
 ):
     check_assets(f0_method, embedder_model, f0_onnx=f0_onnx, embedders_mode=embedders_mode)
-    log_data = {translations['pitch']: pitch, translations['filter_radius']: filter_radius, translations['index_strength']: index_rate, translations['rms_mix_rate']: rms_mix_rate, translations['protect']: protect, translations['hop_length']: hop_length, translations['f0_method']: f0_method, translations['audio_path']: input_path, translations['output_path']: replace_export_format(output_path, export_format), translations['model_path']: pth_path, translations['indexpath']: index_path, translations['autotune']: f0_autotune, translations['clear_audio']: clean_audio, translations['export_format']: export_format, translations['hubert_model']: embedder_model, translations['split_audio']: split_audio, translations['memory_efficient_training']: checkpointing, translations["f0_onnx_mode"]: f0_onnx, translations["embed_mode"]: embedders_mode, translations["proposal_pitch"]: proposal_pitch, translations["audio_processing"]: audio_processing}
+    log_data = {
+        translations['pitch']: pitch, 
+        translations['filter_radius']: filter_radius, 
+        translations['index_strength']: index_rate, 
+        translations['rms_mix_rate']: rms_mix_rate, 
+        translations['protect']: protect, 
+        translations['hop_length']: hop_length, 
+        translations['f0_method']: f0_method, 
+        translations['audio_path']: input_path, 
+        translations['output_path']: replace_export_format(output_path, export_format), 
+        translations['model_path']: pth_path, 
+        translations['indexpath']: index_path, 
+        translations['autotune']: f0_autotune, 
+        translations['clear_audio']: clean_audio, 
+        translations['export_format']: export_format, 
+        translations['hubert_model']: embedder_model, 
+        translations['split_audio']: split_audio, 
+        translations['memory_efficient_training']: checkpointing, 
+        translations["f0_onnx_mode"]: f0_onnx, 
+        translations["embed_mode"]: embedders_mode, 
+        translations["proposal_pitch"]: proposal_pitch, 
+        translations["audio_processing"]: audio_processing,
+        translations["alpha_label"]: alpha
+    }
 
     if clean_audio: log_data[translations['clean_strength']] = clean_strength
     if resample_sr != 0: log_data[translations['sample_rate']] = resample_sr
@@ -156,7 +176,8 @@ def run_convert_script(
             split_audio=split_audio, 
             proposal_pitch=proposal_pitch, 
             proposal_pitch_threshold=proposal_pitch_threshold,
-            audio_processing=audio_processing
+            audio_processing=audio_processing,
+            alpha=alpha
         )
 
     if os.path.isdir(input_path):
@@ -211,7 +232,7 @@ class VoiceConverter:
         self.sid = sid
         self.get_vc(model_path, sid)
 
-    def convert_audio(self, audio_input_path, audio_output_path, index_path, embedder_model, pitch, f0_method, index_rate, rms_mix_rate, protect, hop_length, f0_autotune, f0_autotune_strength, filter_radius, clean_audio, clean_strength, export_format, resample_sr = 0, checkpointing = False, f0_file = None, f0_onnx = False, embedders_mode = "fairseq", formant_shifting = False, formant_qfrency = 0.8, formant_timbre = 0.8, split_audio = False, proposal_pitch = False, proposal_pitch_threshold = 0, audio_processing = False):
+    def convert_audio(self, audio_input_path, audio_output_path, index_path, embedder_model, pitch, f0_method, index_rate, rms_mix_rate, protect, hop_length, f0_autotune, f0_autotune_strength, filter_radius, clean_audio, clean_strength, export_format, resample_sr = 0, checkpointing = False, f0_file = None, f0_onnx = False, embedders_mode = "fairseq", formant_shifting = False, formant_qfrency = 0.8, formant_timbre = 0.8, split_audio = False, proposal_pitch = False, proposal_pitch_threshold = 0, audio_processing = False, alpha = 0.5):
         self.checkpointing = checkpointing
 
         try:
@@ -219,15 +240,18 @@ class VoiceConverter:
                 audio = load_audio(audio_input_path, self.sample_rate, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre)
                 if audio_processing: audio = preprocess(audio, self.sample_rate, device=self.device)
 
-                audio_max = np.abs(audio).max() / 0.95
-                if audio_max > 1: audio /= audio_max
+                try:
+                    audio_max = np.abs(audio).max() / 0.95
+                    if audio_max > 1: audio /= audio_max
+                except:
+                    import shutil
+                    shutil.copy(audio_input_path, audio_output_path)
+                    return
 
                 if not self.hubert_model:
-                    models, embed_suffix = load_embedders_model(embedder_model, embedders_mode)
-                    if embed_suffix != ".onnx": models = models.to(torch.float16 if self.config.is_half else torch.float32).eval().to(self.device)
-
+                    models = load_embedders_model(embedder_model, embedders_mode)
+                    if isinstance(models, torch.nn.Module): models = models.to(torch.float16 if self.config.is_half else torch.float32).eval().to(self.device)
                     self.hubert_model = models
-                    self.embed_suffix = embed_suffix
 
                 pbar.update(1)
                 if split_audio:
@@ -260,21 +284,18 @@ class VoiceConverter:
                         hop_length=hop_length, 
                         f0_autotune=f0_autotune, 
                         f0_autotune_strength=f0_autotune_strength, 
-                        suffix=self.suffix, 
-                        embed_suffix=self.embed_suffix, 
                         f0_file=f0_file, 
                         f0_onnx=f0_onnx, 
                         pbar=pbar, 
                         proposal_pitch=proposal_pitch,
                         proposal_pitch_threshold=proposal_pitch_threshold,
                         energy_use=self.energy,
-                        del_onnx=not split_audio
+                        del_onnx=not split_audio,
+                        alpha=alpha
                     )
                 ) for waveform, start, end in chunks]
 
                 pbar.update(1)
-
-                del self.net_g, self.hubert_model
                 audio_output = restore(converted_chunks, total_len=len(audio), dtype=converted_chunks[0][2].dtype) if split_audio else converted_chunks[0][2]
                 
                 if audio_processing: audio_output = postprocess(audio_output, self.tgt_sr, audio, self.sample_rate, device=self.device)
@@ -284,18 +305,16 @@ class VoiceConverter:
 
                 pbar.update(1)
                 if clean_audio:
-                    device = self.device if not self.device.startswith("ocl") else "cpu"
-
-                    if not hasattr(self, "tg"): self.tg = TG(self.tgt_sr, prop_decrease=clean_strength).to(device)
-                    audio_output = self.tg(torch.from_numpy(audio_output).unsqueeze(0).to(device).float()).squeeze(0).cpu().detach().numpy()
+                    from main.tools.noisereduce import TorchGate
+                    if not hasattr(self, "tg"): self.tg = TorchGate(self.tgt_sr, prop_decrease=clean_strength).to(self.device)
+                    audio_output = self.tg(torch.from_numpy(audio_output).unsqueeze(0).to(self.device).float()).squeeze(0).cpu().detach().numpy()
 
                 if len(audio) / self.sample_rate > len(audio_output) / self.tgt_sr:
                     padding = np.zeros(int(np.round(len(audio) / self.sample_rate * self.tgt_sr) - len(audio_output)), dtype=audio_output.dtype)
                     audio_output = np.concatenate([audio_output, padding])
 
                 try:
-                    if export_format.endswith("wav"): wavfile.write(audio_output_path, self.tgt_sr, audio_output.astype(np.float32))
-                    else: sf.write(audio_output_path, audio_output, self.tgt_sr, format=export_format)
+                    sf.write(audio_output_path, audio_output, self.tgt_sr, format=export_format)
                 except:
                     sf.write(audio_output_path, librosa.resample(audio_output, orig_sr=self.tgt_sr, target_sr=48000, res_type="soxr_vhq"), 48000, format=export_format)
 
@@ -328,6 +347,8 @@ class VoiceConverter:
     def setup(self):
         if self.cpt is not None:
             if self.loaded_model.endswith(".pth"):
+                from main.library.algorithm.synthesizers import Synthesizer
+
                 self.tgt_sr = self.cpt["config"][-1]
                 self.cpt["config"][-3] = self.cpt["weight"]["emb_g.weight"].shape[0]
 
@@ -344,20 +365,12 @@ class VoiceConverter:
                 self.net_g.eval().to(self.device)
                 self.net_g = self.net_g.to(torch.float16 if self.config.is_half else torch.float32)
                 self.n_spk = self.cpt["config"][-3]
-                self.suffix = ".pth"
             else:
-                metadata_dict = None
-                for prop in onnx.load(self.loaded_model).metadata_props:
-                    if prop.key == "model_info":
-                        metadata_dict = json.loads(prop.value)
-                        break
-
-                self.net_g = self.cpt
-                self.tgt_sr = metadata_dict.get("sr", 32000)
-                self.use_f0 = metadata_dict.get("f0", 1)
-                self.version = metadata_dict.get("version", "v1")
-                self.energy = metadata_dict.get("energy", False)
-                self.suffix = ".onnx"
+                self.net_g = self.cpt.to(config.device)
+                self.tgt_sr = self.cpt.cpt.get("tgt_sr", 32000)
+                self.use_f0 = self.cpt.cpt.get("f0", 1)
+                self.version = self.cpt.cpt.get("version", "v1")
+                self.energy = self.cpt.cpt.get("energy", False)
 
             self.vc = Pipeline(self.tgt_sr, self.config)
 

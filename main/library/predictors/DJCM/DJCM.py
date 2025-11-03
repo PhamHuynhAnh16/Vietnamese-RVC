@@ -9,10 +9,11 @@ from scipy.signal import medfilt
 sys.path.append(os.getcwd())
 
 from main.library.predictors.DJCM.model import DJCMM
-from main.library.predictors.DJCM.utils import N_CLASS, SAMPLE_RATE, HOP_SIZE
+from main.library.predictors.DJCM.spec import Spectrogram
+from main.library.predictors.DJCM.utils import WINDOW_LENGTH, SAMPLE_RATE, N_CLASS
 
 class DJCM:
-    def __init__(self, model_path, device = "cpu", is_half = False, onnx = False, providers = ["CPUExecutionProvider"], batch_size = 1, segment_len = 5.12):
+    def __init__(self, model_path, device = "cpu", is_half = False, onnx = False, providers = ["CPUExecutionProvider"], batch_size = 1, segment_len = 5.12, kernel_size = 3):
         super(DJCM, self).__init__()
         self.onnx = onnx
 
@@ -30,32 +31,38 @@ class DJCM:
 
         self.batch_size = batch_size
         self.seg_len = int(segment_len * SAMPLE_RATE)
-        self.seg_frames = int(self.seg_len // HOP_SIZE)
-        self.is_half = is_half
-        self.device = device
+        self.seg_frames = int(self.seg_len // int(SAMPLE_RATE // 100))
 
+        self.device = device
+        self.is_half = is_half
+        self.kernel_size = kernel_size
+
+        self.spec_extractor = Spectrogram(int(SAMPLE_RATE // 100), WINDOW_LENGTH).to(device)
         cents_mapping = 20 * np.arange(N_CLASS) + 1997.3794084376191
         self.cents_mapping = np.pad(cents_mapping, (4, 4))
 
-    def audio2hidden(self, audio):
+    def spec2hidden(self, spec):
         if self.onnx:
             hidden = torch.as_tensor(
-                self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: audio.cpu().numpy().astype(np.float32)})[0], device=self.device
+                self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: spec.cpu().numpy().astype(np.float32)})[0], device=self.device
             )
         else:
             hidden = self.model(
-                audio.half() if self.is_half else audio.float()
+                spec.half() if self.is_half else spec.float()
             )
 
         return hidden
 
     def infer_from_audio(self, audio, thred=0.03):
-        with torch.inference_mode():
+        if torch.is_tensor(audio): audio = audio.cpu().numpy()
+        if audio.ndim > 1: audio = audio.squeeze()
+
+        with torch.no_grad():
             padded_audio = self.pad_audio(audio)
-            hidden = self.inference(padded_audio)[:(audio.shape[-1] // HOP_SIZE + 1)]
+            hidden = self.inference(padded_audio)[:(audio.shape[-1] // int(SAMPLE_RATE // 100) + 1)]
 
             f0 = self.decode(hidden.squeeze(0).cpu().numpy(), thred)
-            f0 = medfilt(f0, kernel_size=3)
+            if self.kernel_size is not None: f0 = medfilt(f0, kernel_size=self.kernel_size)
 
             return f0
         
@@ -106,7 +113,7 @@ class DJCM:
 
     def inference(self, segments):
         hidden_segments = torch.cat([
-            self.audio2hidden(segments[i:i + self.batch_size]) 
+            self.spec2hidden(self.spec_extractor(segments[i:i + self.batch_size].float()))
             for i in range(0, len(segments), self.batch_size)
         ], dim=0)
 

@@ -9,10 +9,8 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
-from main.tools.noisereduce import TG
 from main.library.utils import circular_write
 from main.app.variables import config, translations
-from main.inference.realtime.vad_utils import VADProcessor
 from main.inference.realtime.pipeline import create_pipeline
 
 class RVC_Realtime:
@@ -48,8 +46,15 @@ class RVC_Realtime:
         self.dtype = torch.float16 if config.is_half else torch.float32
 
     def initialize(self):
-        self.vad = VADProcessor(sensitivity_mode=self.vad_sensitivity, sample_rate=self.sample_rate, frame_duration_ms=self.vad_frame_ms) if self.vad_enabled else None
-        self.tg = TG(self.sample_rate, prop_decrease=self.clean_strength).to(config.device if not config.device.startswith("ocl") else "cpu") if self.clean_audio else None
+        if self.vad_enabled:
+            from main.inference.realtime.vad_utils import VADProcessor
+            self.vad = VADProcessor(sensitivity_mode=self.vad_sensitivity, sample_rate=self.sample_rate, frame_duration_ms=self.vad_frame_ms)
+        else: self.vad = None
+
+        if self.clean_audio:
+            from main.tools.noisereduce import TorchGate
+            self.tg = TorchGate(self.sample_rate, prop_decrease=self.clean_strength).to(config.device)
+        else: self.tg = None
 
         self.pipeline = create_pipeline(
             model_path=self.model_path, 
@@ -99,8 +104,6 @@ class RVC_Realtime:
             raise RuntimeError(translations["create_pipeline_error"])
 
         audio_in_16k = self.resample_in(torch.as_tensor(audio_in, dtype=torch.float32, device=config.device)).to(self.dtype)
-        if self.tg is not None: audio_in_16k = self.tg(audio_in_16k.to(config.device if not config.device.startswith("ocl") else "cpu")).to(config.device)
-
         circular_write(audio_in_16k, self.audio_buffer)
 
         vol_t = self.audio_buffer.square().mean().sqrt()
@@ -172,7 +175,9 @@ class RVC_Realtime:
             proposal_pitch_threshold
         )
 
+        if self.tg is not None: audio_model = self.tg(audio_model.unsqueeze(0)).squeeze(0)
         audio_out = self.resample_out(audio_model * vol_t.sqrt())
+
         return audio_out, vol
     
 class VoiceChanger:

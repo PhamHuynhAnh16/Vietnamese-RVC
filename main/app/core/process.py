@@ -5,7 +5,6 @@ import shutil
 import codecs
 import zipfile
 import requests
-import xml.etree.ElementTree
 
 sys.path.append(os.getcwd())
 
@@ -13,6 +12,8 @@ from main.app.variables import logger, translations, configs
 from main.app.core.ui import gr_info, gr_warning, gr_error, process_output, replace_punctuation
 
 def read_docx_text(path):
+    import xml.etree.ElementTree
+
     with zipfile.ZipFile(path) as docx:
         with docx.open("word/document.xml") as document_xml:
             xml_content = document_xml.read()

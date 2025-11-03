@@ -3,11 +3,14 @@ import sys
 
 sys.path.append(os.getcwd())
 
-from main.library.speaker_diarization.whisper import load_model
+from main.app.core.inference import whisper_process
+from main.library.utils import check_spk_diarization
 from main.app.core.ui import gr_info, gr_warning, process_output
 from main.app.variables import config, translations, configs, logger
 
 def create_srt(model_size, input_audio, output_file, word_timestamps):
+    import multiprocessing as mp
+
     if not input_audio or not os.path.exists(input_audio) or os.path.isdir(input_audio): 
         gr_warning(translations["input_not_valid"])
         return [None]*2
@@ -24,13 +27,22 @@ def create_srt(model_size, input_audio, output_file, word_timestamps):
     info = ""
     output_file = process_output(output_file)
 
+    check_spk_diarization(model_size, speechbrain=False)
     gr_info(translations["csrt"])
 
-    model = load_model(model_size, device=config.device)
-    result = model.transcribe(input_audio, fp16=configs.get("fp16", False), word_timestamps=word_timestamps)
+    try:
+        mp.set_start_method("spawn")
+    except:
+        pass
+
+    whisper_queue = mp.Queue()
+    whisperprocess = mp.Process(target=whisper_process, args=(model_size, input_audio, configs, config.device, whisper_queue, word_timestamps))
+    whisperprocess.start()
+
+    segments = whisper_queue.get()
 
     with open(output_file, "w", encoding="utf-8") as f:
-        for i, segment in enumerate(result["segments"]):
+        for i, segment in enumerate(segments):
             start = segment["start"]
             end = segment["end"]
             text = segment["text"].strip()
@@ -44,7 +56,7 @@ def create_srt(model_size, input_audio, output_file, word_timestamps):
             f.write(text1)
 
             info = info + index + timestamp + text1
-            logger.info(info)
+        logger.info(info)
     
     gr_info(translations["success"])
 

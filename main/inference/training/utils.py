@@ -11,9 +11,16 @@ from collections import OrderedDict
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations
+from main.app.variables import config, translations
 
 MATPLOTLIB_FLAG = False
+
+def optimizer_device(optimizer, device="cpu"):
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if torch.is_tensor(v): state[k] = v.to(device)
+
+    return optimizer
 
 def replace_keys_in_dict(d, old_key_part, new_key_part):
     updated_dict = OrderedDict() if isinstance(d, OrderedDict) else {}
@@ -33,11 +40,25 @@ def load_checkpoint(logger, checkpoint_path, model, optimizer=None, load_opt=1):
     if optimizer and load_opt == 1: optimizer.load_state_dict(checkpoint_dict.get("optimizer", {}))
     logger.debug(translations["save_checkpoint"].format(checkpoint_path=checkpoint_path, checkpoint_dict=checkpoint_dict['iteration']))
 
-    return (model, optimizer, checkpoint_dict.get("learning_rate", 0), checkpoint_dict["iteration"])
+    return (model, optimizer, checkpoint_dict.get("learning_rate", 0), checkpoint_dict["iteration"], checkpoint_dict.get("scaler", {}))
 
-def save_checkpoint(logger, model, optimizer, learning_rate, iteration, checkpoint_path):
+def save_checkpoint(logger, model, optimizer, learning_rate, iteration, checkpoint_path, scaler):
     state_dict = (model.module.state_dict() if hasattr(model, "module") else model.state_dict())
-    torch.save(replace_keys_in_dict(replace_keys_in_dict({"model": state_dict, "iteration": iteration, "optimizer": optimizer.state_dict(), "learning_rate": learning_rate}, ".parametrizations.weight.original1", ".weight_v"), ".parametrizations.weight.original0", ".weight_g"), checkpoint_path)
+    torch.save(
+        replace_keys_in_dict(
+            replace_keys_in_dict({
+                "model": state_dict if not config.device.startswith("privateuseone") else {key: value.detach().cpu() for key, value in state_dict.items()}, 
+                "iteration": iteration, 
+                "optimizer": (optimizer if not config.device.startswith("privateuseone") else optimizer_device(optimizer)).state_dict(), 
+                "learning_rate": learning_rate, 
+                "scaler": scaler.state_dict()
+            }, ".parametrizations.weight.original1", ".weight_v"), 
+            ".parametrizations.weight.original0", ".weight_g"
+        ), 
+        checkpoint_path
+    )
+
+    if config.device.startswith("privateuseone"): optimizer_device(optimizer, config.device)
     logger.info(translations["save_model"].format(checkpoint_path=checkpoint_path, iteration=iteration))
 
 def summarize(writer, global_step, scalars={}, histograms={}, images={}, audios={}, audio_sample_rate=22050):

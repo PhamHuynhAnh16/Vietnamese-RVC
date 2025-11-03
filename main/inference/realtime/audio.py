@@ -86,7 +86,8 @@ class Audio:
         self.callbacks = callbacks
         self.mon_queue = Queue()
         self.performance = [0, 0, 0]
-        self.stream = None
+        self.input_stream = None
+        self.output_stream = None
         self.monitor = None
         self.running = False
         self.input_audio_gain = input_audio_gain
@@ -128,19 +129,15 @@ class Audio:
         self.callbacks.emit_to(self.performance)
         return out_wav
     
-    def audio_stream_callback(self, indata, outdata, frames, times, status):
+    def audio_stream_callback(self, indata, frames, times, status):
         try:
             out_wav = self.process_data_with_time(indata)
-
-            output_channels = outdata.shape[1]
-            if self.use_monitor: self.mon_queue.put(out_wav)
-
-            outdata[:] = (np.repeat(out_wav, output_channels).reshape(-1, output_channels) * self.output_audio_gain)
+            self.mon_queue.put(out_wav)
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
 
-    def audio_queue(self, outdata, frames, times, status):
+    def audio_queue(self, outdata, gain):
         try:
             mon_wav = self.mon_queue.get()
 
@@ -148,27 +145,39 @@ class Audio:
                 self.mon_queue.get()
 
             output_channels = outdata.shape[1]
-            outdata[:] = (np.repeat(mon_wav, output_channels).reshape(-1, output_channels) * self.monitor_audio_gain)
+            outdata[:] = (np.repeat(mon_wav, output_channels).reshape(-1, output_channels) * gain)
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
 
     def run_audio_stream(self, block_frame, input_device_id, output_device_id, output_monitor_id, input_audio_sample_rate, output_monitor_sample_rate, input_max_channel, output_max_channel, output_monitor_max_channel, input_extra_setting, output_extra_setting, output_monitor_extra_setting):
-        self.stream = sd.Stream(
+        self.input_stream = sd.InputStream(
             callback=self.audio_stream_callback,
             latency="low",
             dtype=np.float32,
-            device=(input_device_id, output_device_id),
+            device=input_device_id,
             blocksize=block_frame,
             samplerate=input_audio_sample_rate,
-            channels=(input_max_channel, output_max_channel),
-            extra_settings=(input_extra_setting, output_extra_setting)
+            channels=input_max_channel,
+            extra_settings=input_extra_setting
         )
-        self.stream.start()
+        self.output_stream = sd.OutputStream(
+            callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.output_audio_gain),
+            latency="low",
+            dtype=np.float32,
+            device=output_device_id,
+            blocksize=block_frame,
+            samplerate=input_audio_sample_rate,
+            channels=output_max_channel,
+            extra_settings=output_extra_setting
+        )
+        self.input_stream.start()
+        self.output_stream.start()
 
         if self.use_monitor:
             self.monitor = sd.OutputStream(
-                callback=self.audio_queue,
+                callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.monitor_audio_gain),
+                latency="low",
                 dtype=np.float32,
                 device=output_monitor_id,
                 blocksize=block_frame,
@@ -181,9 +190,13 @@ class Audio:
     def stop(self):
         self.running = False
 
-        if self.stream is not None:
-            self.stream.close()
-            self.stream = None
+        if self.input_stream is not None:
+            self.input_stream.close()
+            self.input_stream = None
+
+        if self.output_stream is not None:
+            self.output_stream.close()
+            self.output_stream = None
 
         if self.monitor is not None:
             self.monitor.close()
@@ -191,9 +204,6 @@ class Audio:
 
     def start(self, input_device_id, output_device_id, output_monitor_id, exclusive_mode, asio_input_channel, asio_output_channel, asio_output_monitor_channel, read_chunk_size, input_audio_sample_rate, output_monitor_sample_rate):
         self.stop()
-
-        sd._terminate()
-        sd._initialize()
 
         input_audio_device, output_audio_device = self.get_input_audio_device(input_device_id), self.get_output_audio_device(output_device_id)
         input_channels, output_channels = input_audio_device.max_input_channels, output_audio_device.max_output_channels

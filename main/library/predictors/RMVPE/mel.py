@@ -10,10 +10,8 @@ from librosa.filters import mel
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl
-
 class MelSpectrogram(nn.Module):
-    def __init__(self, is_half, n_mel_channels, sample_rate, win_length, hop_length, n_fft=None, mel_fmin=0, mel_fmax=None, clamp=1e-5):
+    def __init__(self, n_mel_channels, sample_rate, win_length, hop_length, n_fft=None, mel_fmin=0, mel_fmax=None, clamp=1e-5):
         super().__init__()
         n_fft = win_length if n_fft is None else n_fft
         self.hann_window = {}
@@ -26,7 +24,6 @@ class MelSpectrogram(nn.Module):
         self.sample_rate = sample_rate
         self.n_mel_channels = n_mel_channels
         self.clamp = clamp
-        self.is_half = is_half 
 
     def forward(self, audio, keyshift=0, speed=1, center=True):
         factor = 2 ** (keyshift / 12)
@@ -37,8 +34,10 @@ class MelSpectrogram(nn.Module):
         n_fft = int(np.round(self.n_fft * factor))
         hop_length = int(np.round(self.hop_length * speed))
 
-        if str(audio.device).startswith("ocl"):
-            if not hasattr(self, "stft"): self.stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length, win_length=win_length_new).to(audio.device)
+        if str(audio.device).startswith(("ocl", "privateuseone")):
+            if not hasattr(self, "stft"): 
+                from main.library.backends.utils import STFT
+                self.stft = STFT(filter_length=n_fft, hop_length=hop_length, win_length=win_length_new).to(audio.device)
             magnitude = self.stft.transform(audio, 1e-9)
         else:
             fft = torch.stft(audio, n_fft=n_fft, hop_length=hop_length, win_length=win_length_new, window=self.hann_window[keyshift_key], center=center, return_complex=True)
@@ -51,6 +50,4 @@ class MelSpectrogram(nn.Module):
             magnitude = magnitude[:, :size, :] * self.win_length / win_length_new
 
         mel_output = self.mel_basis @ magnitude
-        if self.is_half: mel_output = mel_output.half()
-
         return mel_output.clamp(min=self.clamp).log()

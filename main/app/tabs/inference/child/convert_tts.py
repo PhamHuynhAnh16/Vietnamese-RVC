@@ -10,8 +10,8 @@ from main.app.core.process import process_input
 from main.app.core.inference import convert_tts
 from main.app.core.utils import google_translate
 from main.app.core.presets import save_presets, load_presets
-from main.app.variables import translations, sample_rate_choice, model_name, index_path, method_f0, f0_file, embedders_mode, embedders_model, edgetts, google_tts_voice, configs, presets_file, export_format_choices
-from main.app.core.ui import visible, change_f0_choices, unlock_f0, hoplength_show, change_models_choices, get_index, index_strength_show, visible_embedders, change_tts_voice_choices, shutil_move, change_preset_choices
+from main.app.core.ui import visible, change_f0_choices, unlock_f0, hoplength_show, change_models_choices, get_index, index_strength_show, change_embedders_mode, change_tts_voice_choices, shutil_move, change_preset_choices
+from main.app.variables import translations, sample_rate_choice, model_name, index_path, method_f0, f0_file, embedders_mode, embedders_model, edgetts, google_tts_voice, configs, presets_file, export_format_choices, hybrid_f0_method
 
 def convert_tts_tab():
     with gr.Row():
@@ -59,8 +59,9 @@ def convert_tts_tab():
                             onnx_f0_mode1 = gr.Checkbox(label=translations["f0_onnx_mode"], info=translations["f0_onnx_mode_info"], value=False, interactive=True)
                             unlock_full_method3 = gr.Checkbox(label=translations["f0_unlock"], info=translations["f0_unlock_info"], value=False, interactive=True)
                         method0 = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
-                        hybrid_method0 = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=method0.value == "hybrid")
+                        hybrid_method0 = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=hybrid_f0_method, value=hybrid_f0_method[0], interactive=True, allow_custom_value=True, visible=method0.value == "hybrid")
                     hop_length0 = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
+                    alpha = gr.Slider(label=translations["alpha_label"], info=translations["alpha_info"], minimum=0.1, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
                 with gr.Accordion(translations["f0_file"], open=False):
                     upload_f0_file0 = gr.File(label=translations["upload_f0"], file_types=[".txt"])  
                     f0_file_dropdown0 = gr.Dropdown(label=translations["f0_file_2"], value="", choices=f0_file, allow_custom_value=True, interactive=True)
@@ -139,6 +140,7 @@ def convert_tts_tab():
                 protect0, 
                 split_audio0, 
                 f0_autotune_strength0, 
+                formant_shifting1,
                 formant_qfrency1, 
                 formant_timbre1,
                 proposal_pitch,
@@ -206,12 +208,12 @@ def convert_tts_tab():
         upload_f0_file0.upload(fn=lambda inp: shutil_move(inp.name, configs["f0_path"]), inputs=[upload_f0_file0], outputs=[f0_file_dropdown0])
         refresh_f0_file0.click(fn=change_f0_choices, inputs=[], outputs=[f0_file_dropdown0])
     with gr.Row():
-        embed_mode1.change(fn=visible_embedders, inputs=[embed_mode1], outputs=[embedders0])
+        embed_mode1.change(fn=change_embedders_mode, inputs=[embed_mode1], outputs=[embedders0])
         autotune3.change(fn=visible, inputs=[autotune3], outputs=[f0_autotune_strength0])
         model_pth0.change(fn=get_index, inputs=[model_pth0], outputs=[model_index0])
     with gr.Row():
         cleaner1.change(fn=visible, inputs=[cleaner1], outputs=[clean_strength1])
-        method0.change(fn=lambda method, hybrid: [visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method0, hybrid_method0], outputs=[hybrid_method0, hop_length0])
+        method0.change(fn=lambda method, hybrid: [visible(method == "hybrid"), visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method0, hybrid_method0], outputs=[hybrid_method0, alpha, hop_length0])
         hybrid_method0.change(fn=hoplength_show, inputs=[method0, hybrid_method0], outputs=[hop_length0])
     with gr.Row():
         refresh1.click(fn=change_models_choices, inputs=[], outputs=[model_pth0, model_index0])
@@ -270,7 +272,8 @@ def convert_tts_tab():
                 embed_mode1,
                 proposal_pitch, 
                 proposal_pitch_threshold,
-                audio_processing
+                audio_processing, 
+                alpha
             ],
             outputs=[tts_voice_convert],
             api_name="convert_tts"

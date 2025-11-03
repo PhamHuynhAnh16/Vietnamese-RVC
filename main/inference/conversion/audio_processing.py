@@ -8,7 +8,7 @@ import scipy.signal as signal
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl
+stft = None
 
 def rms(x, eps=1e-9):
     return np.sqrt(np.mean(x ** 2) + eps)
@@ -161,28 +161,27 @@ def best_multiband_eq(audio, sr, original_audio=None, sr_ref=16000, n_bands=6, t
     return out
 
 def spectral_subtract_denoise(audio, sr, noise_seconds=0.4, alpha=1.0, n_fft=1024, hop_length=160, device="cpu"):
-    stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length, win_length=None, window="hann").to(device) if device.startswith("ocl") else None
+    global stft
 
-    x = torch.from_numpy(audio.astype(np.float32)).to(device)
+    if stft is None and device.startswith(("ocl", "privateuseone")):
+        from main.library.backends.utils import STFT
+        stft = STFT(filter_length=n_fft, hop_length=hop_length, win_length=None, window="hann").to(device) 
+    else: stft = None
+
+    x = torch.from_numpy(audio.astype(np.float32)).float().unsqueeze(0).to(device)
     window = torch.hann_window(n_fft).to(device)
 
     if stft is None:
         fft = torch.stft(x, n_fft=n_fft, hop_length=hop_length, win_length=n_fft, window=window, return_complex=True)
-        mag, phase = (fft.real.pow(2) + fft.imag.pow(2)).sqrt(), torch.atan2(fft.imag, fft.real)
+        mag, phase = (fft.real.pow(2) + fft.imag.pow(2)).sqrt(), fft.imag.data.atan2(fft.real.data)
     else:
-        mag, phase = stft.transform(x.unsqueeze(0), eps=1e-9, return_phase=True)
-        mag, phase, window = mag.squeeze(0).cpu(), phase.squeeze(0).cpu(), window.cpu()
+        mag, phase = stft.transform(x, eps=1e-9, return_phase=True)
 
-    n_frames_est = max(1, min(int((noise_seconds * sr - n_fft) // hop_length) + 1, mag.shape[-1]))
-    noise_mag = mag[:, :n_frames_est].mean(dim=-1, keepdim=True)
+    noise_mag = mag[:, :, :max(1, min(int((noise_seconds * sr - n_fft) // hop_length) + 1, mag.shape[-1]))].mean(dim=-1, keepdim=True)
+    clean_mag = (mag - alpha * noise_mag).maximum((noise_mag * 1.0) * 0.1)
 
-    noise_floor = noise_mag * 1.0
-    clean_mag = torch.maximum(mag - alpha * noise_mag, noise_floor * 0.1)
-
-    s_clean = clean_mag * (1j * phase).exp()
-    xrec = torch.istft(s_clean, n_fft=n_fft, hop_length=hop_length, win_length=n_fft, window=window, length=x.shape[0])
-
-    return xrec.cpu().numpy()
+    xrec = torch.istft(clean_mag * (1j * phase).exp(), n_fft=n_fft, hop_length=hop_length, win_length=n_fft, window=window, length=x.shape[0]) if stft is None else stft.inverse(clean_mag, phase)
+    return xrec.squeeze(0).cpu().numpy()
 
 def repair_bad_frames(audio, sr, frame_ms=20, energy_thresh=0.02):
     frame_len = int(sr * frame_ms / 1000)
@@ -216,7 +215,7 @@ def repair_bad_frames(audio, sr, frame_ms=20, energy_thresh=0.02):
 
 def harmonic_enrich_and_compress(audio, drive=0.02, comp_ratio=3.0, frame_length=1024, hop_length=160):
     exc = np.abs(audio)
-    exc = exc - np.mean(exc)
+    exc -= np.mean(exc)
     audio2 = audio + drive * exc
 
     env_rms = librosa.feature.rms(y=audio2.astype(np.float32), frame_length=frame_length, hop_length=hop_length)[0]

@@ -10,9 +10,7 @@ from scipy import signal
 sys.path.append(os.getcwd())
 
 from main.app.variables import translations
-from main.library.predictors.Generator import Generator
-from main.inference.extracting.rms import RMSEnergyExtractor
-from main.library.utils import extract_features, change_rms, clear_gpu_cache, get_onnx_argument, load_faiss_index
+from main.library.utils import extract_features, change_rms, clear_gpu_cache, load_faiss_index
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
@@ -45,7 +43,7 @@ class Pipeline:
         assert feats.dim() == 1, feats.dim()
 
         with torch.no_grad():
-            feats = extract_features(model, self.embed_suffix, feats.view(1, -1), version, self.device)
+            feats = extract_features(model, feats.view(1, -1), version, self.device)
             feats0 = feats.clone() if protect < 0.5 and pitch_guidance else None
 
             if (not isinstance(index, type(None)) and not isinstance(big_npy, type(None)) and index_rate != 0):
@@ -76,39 +74,19 @@ class Pipeline:
                 feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
             p_len = torch.tensor([p_len], device=self.device).long()
-            feats = feats.to(torch.float16 if self.is_half else torch.float32)
-
-            pitch = pitch if pitch_guidance else None
-            pitchf = pitchf.to(torch.float16 if self.is_half else torch.float32) if pitch_guidance else None
-            energy = energy.to(torch.float16 if self.is_half else torch.float32) if energy_use else None
+            feats = feats.to(torch.float16 if self.is_half else torch.float32) 
 
             audio1 = (
                 (
                     net_g.infer(
                         feats, 
                         p_len, 
-                        pitch, 
-                        pitchf,
+                        pitch if pitch_guidance else None, 
+                        pitchf.to(torch.float16 if self.is_half else torch.float32) if pitch_guidance else None,
                         sid,
-                        energy
+                        energy.to(torch.float16 if self.is_half else torch.float32) if energy_use else None
                     )[0][0, 0]
                 ).data.cpu().float().numpy()
-            ) if self.suffix == ".pth" else (
-                net_g.run(
-                    [net_g.get_outputs()[0].name], (
-                        get_onnx_argument(
-                            net_g, 
-                            feats, 
-                            p_len, 
-                            sid, 
-                            pitch, 
-                            pitchf, 
-                            energy, 
-                            pitch_guidance, 
-                            energy_use
-                        )
-                    )
-                )[0][0, 0]
             )
 
         del feats, feats0, p_len
@@ -116,11 +94,8 @@ class Pipeline:
         clear_gpu_cache()
         return audio1
     
-    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, suffix, embed_suffix, f0_file=None, f0_onnx=False, pbar=None, proposal_pitch=False, proposal_pitch_threshold=0, energy_use=False, del_onnx=True):
-        self.embed_suffix = embed_suffix
-        self.suffix = suffix
-
-        if index_rate != 0: index, big_npy = load_faiss_index(file_index)
+    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, f0_file=None, f0_onnx=False, pbar=None, proposal_pitch=False, proposal_pitch_threshold=255.0, energy_use=False, del_onnx=True, alpha = 0.5):
+        index, big_npy = load_faiss_index(file_index) if index_rate != 0 else None, None
         if pbar: pbar.update(1)
 
         opt_ts, audio_opt = [], []
@@ -161,16 +136,21 @@ class Pipeline:
         if pbar: pbar.update(1)
 
         if pitch_guidance:
-            if not hasattr(self, "f0_generator"): self.f0_generator = Generator(self.sample_rate, hop_length, self.f0_min, self.f0_max, self.is_half, self.device, f0_onnx, del_onnx)
-            pitch, pitchf = self.f0_generator.calculator(self.x_pad, f0_method, audio_pad, f0_up_key, p_len, filter_radius, f0_autotune, f0_autotune_strength, manual_f0=inp_f0, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold)
+            if not hasattr(self, "f0_generator"): 
+                from main.library.predictors.Generator import Generator
+                self.f0_generator = Generator(self.sample_rate, hop_length, self.f0_min, self.f0_max, alpha, self.is_half, self.device, f0_onnx, del_onnx)
 
+            pitch, pitchf = self.f0_generator.calculator(self.x_pad, f0_method, audio_pad, f0_up_key, p_len, filter_radius, f0_autotune, f0_autotune_strength, manual_f0=inp_f0, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold)
             if self.device == "mps": pitchf = pitchf.astype(np.float32)
             pitch, pitchf = torch.tensor(pitch[:p_len], device=self.device).unsqueeze(0).long(), torch.tensor(pitchf[:p_len], device=self.device).unsqueeze(0).float()
 
         if pbar: pbar.update(1)
 
         if energy_use:
-            if not hasattr(self, "rms_extract"): self.rms_extract = RMSEnergyExtractor(frame_length=2048, hop_length=self.window, center=True, pad_mode = "reflect").to(self.device).eval()
+            if not hasattr(self, "rms_extract"): 
+                from main.inference.extracting.rms import RMSEnergyExtractor
+                self.rms_extract = RMSEnergyExtractor(frame_length=2048, hop_length=self.window, center=True, pad_mode = "reflect").to(self.device).eval()
+
             energy = self.rms_extract(torch.from_numpy(audio_pad).to(self.device).unsqueeze(0))[:p_len].to(self.device).float()
 
         if pbar: pbar.update(1)

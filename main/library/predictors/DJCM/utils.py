@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from einops.layers.torch import Rearrange
 
-SAMPLE_RATE, WINDOW_LENGTH, N_CLASS, HOP_SIZE = 16000, 2048, 360, 160
+SAMPLE_RATE, WINDOW_LENGTH, N_CLASS = 16000, 1024, 360
 
 def init_layer(layer):
     nn.init.xavier_uniform_(layer.weight)

@@ -7,8 +7,8 @@ sys.path.append(os.getcwd())
 
 from main.app.core.presets import load_presets, save_presets
 from main.app.core.inference import convert_audio, convert_selection
-from main.app.variables import translations, paths_for_files, sample_rate_choice, model_name, index_path, method_f0, f0_file, embedders_mode, embedders_model, presets_file, configs, file_types, export_format_choices
-from main.app.core.ui import visible, valueFalse_interactive, change_audios_choices, change_f0_choices, unlock_f0, change_preset_choices, change_backing_choices, hoplength_show, change_models_choices, get_index, index_strength_show, visible_embedders, shutil_move
+from main.app.variables import translations, paths_for_files, sample_rate_choice, model_name, index_path, method_f0, f0_file, embedders_mode, embedders_model, presets_file, configs, file_types, export_format_choices, hybrid_f0_method
+from main.app.core.ui import visible, valueFalse_interactive, change_audios_choices, change_f0_choices, unlock_f0, change_preset_choices, change_backing_choices, hoplength_show, change_models_choices, get_index, index_strength_show, change_embedders_mode, shutil_move
 
 def convert_tab():
     with gr.Row():
@@ -63,8 +63,9 @@ def convert_tab():
                             onnx_f0_mode = gr.Checkbox(label=translations["f0_onnx_mode"], info=translations["f0_onnx_mode_info"], value=False, interactive=True)
                             unlock_full_method = gr.Checkbox(label=translations["f0_unlock"], info=translations["f0_unlock_info"], value=False, interactive=True)
                         method = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
-                        hybrid_method = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=method.value == "hybrid")
+                        hybrid_method = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=hybrid_f0_method, value=hybrid_f0_method[0], interactive=True, allow_custom_value=True, visible=method.value == "hybrid")
                     hop_length = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
+                    alpha = gr.Slider(label=translations["alpha_label"], info=translations["alpha_info"], minimum=0.1, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
                 with gr.Accordion(translations["f0_file"], open=False):
                     upload_f0_file = gr.File(label=translations["upload_f0"], file_types=[".txt"])  
                     f0_file_dropdown = gr.Dropdown(label=translations["f0_file_2"], value="", choices=f0_file, allow_custom_value=True, interactive=True)
@@ -145,7 +146,8 @@ def convert_tab():
                 rms_mix_rate, 
                 protect, 
                 split_audio, 
-                f0_autotune_strength, 
+                f0_autotune_strength,
+                formant_shifting, 
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
@@ -215,7 +217,7 @@ def convert_tab():
     with gr.Row():
         merge_instrument.change(fn=visible, inputs=[merge_instrument], outputs=[vocal_instrument])
         not_merge_backing.change(fn=lambda audio, merge, cvb: [visible(audio and not merge), change_backing_choices(cvb, merge)], inputs=[use_audio, not_merge_backing, convert_backing], outputs=[main_backing, use_original])
-        method.change(fn=lambda method, hybrid: [visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method, hybrid_method], outputs=[hybrid_method, hop_length])
+        method.change(fn=lambda method, hybrid: [visible(method == "hybrid"), visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method, hybrid_method], outputs=[hybrid_method, alpha, hop_length])
     with gr.Row():
         hybrid_method.change(fn=hoplength_show, inputs=[method, hybrid_method], outputs=[hop_length])
         refresh.click(fn=change_models_choices, inputs=[], outputs=[model_pth, model_index])
@@ -233,7 +235,7 @@ def convert_tab():
         convert_button_2.click(fn=lambda: [visible(False), visible(False)], inputs=[], outputs=[audio_select, convert_button_2])
     with gr.Row():
         proposal_pitch.change(fn=visible, inputs=[proposal_pitch], outputs=[proposal_pitch_threshold])
-        embed_mode.change(fn=visible_embedders, inputs=[embed_mode], outputs=[embedders])
+        embed_mode.change(fn=change_embedders_mode, inputs=[embed_mode], outputs=[embedders])
     with gr.Row():
         convert_button.click(
             fn=convert_selection,
@@ -273,7 +275,8 @@ def convert_tab():
                 embed_mode,
                 proposal_pitch,
                 proposal_pitch_threshold,
-                audio_processing
+                audio_processing,
+                alpha
             ],
             outputs=[audio_select, main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button, convert_button_2],
             api_name="convert_selection"
@@ -317,7 +320,8 @@ def convert_tab():
                 embed_mode,
                 proposal_pitch,
                 proposal_pitch_threshold,
-                audio_processing
+                audio_processing,
+                alpha
             ],
             outputs=[main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button],
             api_name="convert_audio"

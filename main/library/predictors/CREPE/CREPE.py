@@ -37,7 +37,7 @@ class CREPE:
             self.model = model.to(device)
 
     def bins_to_frequency(self, bins):
-        if str(bins.device).startswith("ocl"): bins = bins.to(torch.float32)
+        if str(bins.device).startswith(("ocl", "privateuseone")): bins = bins.to(torch.float32)
 
         cents = CENTS_PER_BIN * bins + 1997.3794084376191
         return 10 * 2 ** ((cents + cents.new_tensor(scipy.stats.triang.rvs(c=0.5, loc=-CENTS_PER_BIN, scale=2 * CENTS_PER_BIN, size=cents.size()))) / 1200)
@@ -74,13 +74,13 @@ class CREPE:
         for i in range(0, total_frames, batch_size):
             frames = torch.nn.functional.unfold(audio[:, None, None, max(0, i * hop_length):min(audio.size(1), (i + batch_size - 1) * hop_length + WINDOW_SIZE)], kernel_size=(1, WINDOW_SIZE), stride=(1, hop_length))
             
-            if self.device.startswith("ocl"):
+            if self.device.startswith(("ocl", "privateuseone")):
                 frames = frames.transpose(1, 2).contiguous().reshape(-1, WINDOW_SIZE).to(self.device)
             else:
                 frames = frames.transpose(1, 2).reshape(-1, WINDOW_SIZE).to(self.device)
 
             frames -= frames.mean(dim=1, keepdim=True)
-            frames /= torch.max(torch.tensor(1e-10, device=frames.device), frames.std(dim=1, keepdim=True))
+            frames /= torch.tensor(1e-10, device=frames.device).max(frames.std(dim=1, keepdim=True))
 
             yield frames
 
@@ -111,7 +111,8 @@ class CREPE:
                         {
                             self.model.get_inputs()[0].name: frames.cpu().numpy()
                         }
-                    )[0].transpose(1, 0)[None]
+                    )[0].transpose(1, 0)[None],
+                    device=self.device
                 )
             else:
                 with torch.no_grad():

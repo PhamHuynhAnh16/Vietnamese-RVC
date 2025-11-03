@@ -24,7 +24,7 @@ def create_srt_tab():
         with gr.Accordion(translations["input_output"], open=False):
             with gr.Column():
                 input_audio = gr.Dropdown(label=translations["audio_path"], value="", choices=paths_for_files, info=translations["provide_audio"], allow_custom_value=True, interactive=True)
-                output_file = gr.Textbox(label=translations["output_path"], value="srt/output.srt", placeholder="srt/output.srt", info=translations["output_path_info"], interactive=True)
+                output_file = gr.Textbox(label=translations["srt_output_file"], value="srt/output.srt", placeholder="srt/output.srt", interactive=True)
             with gr.Column():
                 refresh = gr.Button(translations["refresh"])
             with gr.Row():

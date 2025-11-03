@@ -101,10 +101,6 @@ class VRSeparator(CommonSeparator):
         self.logger.debug(f"loading_mix iteraring through {bands_n} bands")
         for d in tqdm(range(bands_n, 0, -1)):
             bp = self.model_params.param["band"][str(d)]
-            wav_resolution = bp["res_type"]
-
-            if self.torch_device_mps is not None:
-                wav_resolution = "polyphase"
 
             if d == bands_n:
                 X_wave[d], _ = librosa.load(audio_file, sr=bp["sr"], mono=False, dtype=np.float32, res_type="soxr_vhq")

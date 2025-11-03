@@ -208,7 +208,7 @@ class Filterbank(torch.nn.Module):
 
     def _triangular_filters(self, all_freqs, f_central, band):
         slope = (all_freqs - f_central) / band
-        return torch.max(torch.zeros(1, device=self.device_inp), torch.min(slope + 1.0, -slope + 1.0)).transpose(0, 1)
+        return torch.zeros(1, device=self.device_inp).max((slope + 1.0).min(-slope + 1.0)).transpose(0, 1)
 
     def _rectangular_filters(self, all_freqs, f_central, band):
         left_side = right_size = all_freqs.ge(f_central - band)
@@ -230,7 +230,7 @@ class Filterbank(torch.nn.Module):
         x_db = self.multiplier * x.clamp(min=self.amin).log10()
         x_db -= self.multiplier * self.db_multiplier
 
-        return torch.max(x_db, (x_db.amax(dim=(-2, -1)) - self.top_db).view(x_db.shape[0], 1, 1))
+        return x_db.max((x_db.amax(dim=(-2, -1)) - self.top_db).view(x_db.shape[0], 1, 1))
 
 class ContextWindow(torch.nn.Module):
     def __init__(self, left_frames=0, right_frames=0):

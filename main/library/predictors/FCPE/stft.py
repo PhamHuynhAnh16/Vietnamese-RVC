@@ -9,8 +9,6 @@ from librosa.filters import mel
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl
-
 class STFT:
     def __init__(self, sr=22050, n_mels=80, n_fft=1024, win_size=1024, hop_length=256, fmin=20, fmax=11025, clip_val=1e-5):
         self.target_sr = sr
@@ -46,8 +44,10 @@ class STFT:
         pad = F.pad(y.unsqueeze(1), (pad_left, pad_right), mode="reflect" if pad_right < y.size(-1) else "constant").squeeze(1)
         n_fft = int(np.round(n_fft * factor))
 
-        if str(y.device).startswith("ocl"):
-            if not hasattr(self, "stft"): self.stft = opencl.STFT(filter_length=n_fft, hop_length=hop_length_new, win_length=win_size_new).to(y.device)
+        if str(y.device).startswith(("ocl", "privateuseone")):
+            if not hasattr(self, "stft"): 
+                from main.library.backends.utils import STFT as _STFT
+                self.stft = _STFT(filter_length=n_fft, hop_length=hop_length_new, win_length=win_size_new).to(y.device)
             spec = self.stft.transform(pad, 1e-9)
         else:
             spec = torch.stft(pad, n_fft, hop_length=hop_length_new, win_length=win_size_new, window=hann_window[keyshift_key], center=center, pad_mode="reflect", normalized=False, onesided=True, return_complex=True)

@@ -12,7 +12,6 @@ sys.path.append(os.getcwd())
 from .modules import WaveNet
 from .commons import get_padding, init_weights
 
-
 LRELU_SLOPE = 0.1
 
 def create_conv1d_layer(channels, kernel_size, dilation):

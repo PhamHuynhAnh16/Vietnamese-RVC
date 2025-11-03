@@ -6,8 +6,8 @@ import gradio as gr
 sys.path.append(os.getcwd())
 
 from main.app.core.inference import convert_with_whisper
-from main.app.core.ui import visible, change_audios_choices, unlock_f0, hoplength_show, change_models_choices, get_index, index_strength_show, visible_embedders, shutil_move
-from main.app.variables import translations, paths_for_files, sample_rate_choice, model_name, index_path, method_f0, embedders_mode, embedders_model, configs, file_types, export_format_choices
+from main.app.core.ui import visible, change_audios_choices, unlock_f0, hoplength_show, change_models_choices, get_index, index_strength_show, change_embedders_mode, shutil_move
+from main.app.variables import translations, paths_for_files, sample_rate_choice, model_name, index_path, method_f0, embedders_mode, embedders_model, configs, file_types, export_format_choices, whisper_model, hybrid_f0_method
 
 def convert_with_whisper_tab():
     with gr.Row():
@@ -59,15 +59,16 @@ def convert_with_whisper_tab():
                     index_strength3 = gr.Slider(label=translations["index_strength"], info=translations["index_strength_info"], minimum=0, maximum=1, value=0.5, step=0.01, interactive=True, visible=model_index3.value != "")
             with gr.Accordion(translations["setting"], open=False):
                 with gr.Row():
-                    model_size = gr.Radio(label=translations["model_size"], info=translations["model_size_info"], choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2", "large-v3", "large-v3-turbo"], value="medium", interactive=True)
+                    model_size = gr.Radio(label=translations["model_size"], info=translations["model_size_info"], choices=whisper_model, value="medium", interactive=True)
                 with gr.Accordion(translations["f0_method"], open=False):
                     with gr.Group():
                         with gr.Row():
                             onnx_f0_mode4 = gr.Checkbox(label=translations["f0_onnx_mode"], info=translations["f0_onnx_mode_info"], value=False, interactive=True)
                             unlock_full_method2 = gr.Checkbox(label=translations["f0_unlock"], info=translations["f0_unlock_info"], value=False, interactive=True)
                         method3 = gr.Radio(label=translations["f0_method"], info=translations["f0_method_info"], choices=method_f0, value="rmvpe", interactive=True)
-                        hybrid_method3 = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=["hybrid[pm+dio]", "hybrid[pm+crepe-tiny]", "hybrid[pm+crepe]", "hybrid[pm+fcpe]", "hybrid[pm+rmvpe]", "hybrid[pm+harvest]", "hybrid[pm+yin]", "hybrid[dio+crepe-tiny]", "hybrid[dio+crepe]", "hybrid[dio+fcpe]", "hybrid[dio+rmvpe]", "hybrid[dio+harvest]", "hybrid[dio+yin]", "hybrid[crepe-tiny+crepe]", "hybrid[crepe-tiny+fcpe]", "hybrid[crepe-tiny+rmvpe]", "hybrid[crepe-tiny+harvest]", "hybrid[crepe+fcpe]", "hybrid[crepe+rmvpe]", "hybrid[crepe+harvest]", "hybrid[crepe+yin]", "hybrid[fcpe+rmvpe]", "hybrid[fcpe+harvest]", "hybrid[fcpe+yin]", "hybrid[rmvpe+harvest]", "hybrid[rmvpe+yin]", "hybrid[harvest+yin]"], value="hybrid[pm+dio]", interactive=True, allow_custom_value=True, visible=method3.value == "hybrid")
+                        hybrid_method3 = gr.Dropdown(label=translations["f0_method_hybrid"], info=translations["f0_method_hybrid_info"], choices=hybrid_f0_method, value=hybrid_f0_method[0], interactive=True, allow_custom_value=True, visible=method3.value == "hybrid")
                     hop_length3 = gr.Slider(label=translations['hop_length'], info=translations["hop_length_info"], minimum=64, maximum=512, value=160, step=1, interactive=True, visible=False)
+                    alpha = gr.Slider(label=translations["alpha_label"], info=translations["alpha_info"], minimum=0.1, maximum=1, value=0.5, step=0.1, interactive=True, visible=False)
                 with gr.Accordion(translations["hubert_model"], open=False):
                     embed_mode3 = gr.Radio(label=translations["embed_mode"], info=translations["embed_mode_info"], value="fairseq", choices=embedders_mode, interactive=True, visible=True)
                     embedders3 = gr.Radio(label=translations["hubert_model"], info=translations["hubert_info"], choices=embedders_model, value="hubert_base", interactive=True)
@@ -94,7 +95,7 @@ def convert_with_whisper_tab():
     with gr.Row():
         autotune2.change(fn=visible, inputs=[autotune2], outputs=[f0_autotune_strength3])
         cleaner2.change(fn=visible, inputs=[cleaner2], outputs=[clean_strength3])
-        method3.change(fn=lambda method, hybrid: [visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method3, hybrid_method3], outputs=[hybrid_method3, hop_length3])
+        method3.change(fn=lambda method, hybrid: [visible(method == "hybrid"), visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method3, hybrid_method3], outputs=[hybrid_method3, alpha, hop_length3])
     with gr.Row():
         hybrid_method3.change(fn=hoplength_show, inputs=[method3, hybrid_method3], outputs=[hop_length3])
         refresh2.click(fn=change_models_choices, inputs=[], outputs=[model_pth2, model_index2])
@@ -113,7 +114,7 @@ def convert_with_whisper_tab():
         model_index3.change(fn=index_strength_show, inputs=[model_index3], outputs=[index_strength3])
     with gr.Row():
         unlock_full_method2.change(fn=unlock_f0, inputs=[unlock_full_method2], outputs=[method3])
-        embed_mode3.change(fn=visible_embedders, inputs=[embed_mode3], outputs=[embedders3])
+        embed_mode3.change(fn=change_embedders_mode, inputs=[embed_mode3], outputs=[embedders3])
         proposal_pitch.change(fn=visible, inputs=[proposal_pitch], outputs=[proposal_pitch_threshold])
     with gr.Row():
         convert_button3.click(
@@ -155,7 +156,8 @@ def convert_with_whisper_tab():
                 formant_timbre4,
                 proposal_pitch,
                 proposal_pitch_threshold,
-                audio_processing
+                audio_processing,
+                alpha
             ],
             outputs=[play_audio3],
             api_name="convert_with_whisper"

@@ -54,7 +54,7 @@ def create_dataset_tab():
             with gr.Row():
                 skip_start = gr.Textbox(label=translations["skip_start"], info=translations["skip_start_info"], value="", placeholder="0,...", interactive=True, visible=skip_seconds.value)
                 skip_end = gr.Textbox(label=translations["skip_end"], info=translations["skip_end_info"], value="", placeholder="0,...", interactive=True, visible=skip_seconds.value)
-            create_dataset_info = gr.Textbox(label=translations["create_dataset_info"], value="", interactive=False, container=True, lines=1, max_lines=5)
+            create_dataset_info = gr.Textbox(label=translations["create_dataset_info"], value="", interactive=False, lines=2)
     with gr.Row():
         separate.change(
             fn=lambda a: [visible(a) for _ in range(3)],

@@ -7,7 +7,6 @@ import torch.nn.functional as F
 
 sys.path.append(os.getcwd())
 
-from main.library.predictors.RMVPE.e2e import E2E
 from main.library.predictors.RMVPE.mel import MelSpectrogram
 
 N_MELS, N_CLASS = 128, 360
@@ -23,6 +22,8 @@ class RMVPE:
             sess_options.log_severity_level = 3
             self.model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
+            from main.library.predictors.RMVPE.e2e import E2E
+
             model = E2E(4, 1, (2, 2))
             ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             model.load_state_dict(ckpt)
@@ -32,7 +33,7 @@ class RMVPE:
 
         self.is_half = is_half
         self.device = device
-        self.mel_extractor = MelSpectrogram(is_half, N_MELS, 16000, 1024, 160, None, 30, 8000).to(device)
+        self.mel_extractor = MelSpectrogram(N_MELS, 16000, 1024, 160, None, 30, 8000).to(device)
         cents_mapping = 20 * np.arange(N_CLASS) + 1997.3794084376191
         self.cents_mapping = np.pad(cents_mapping, (4, 4))
 

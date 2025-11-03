@@ -57,7 +57,10 @@ class SineGenerator(nn.Module):
         self.voiced_threshold = voiced_threshold
 
     def _f02uv(self, f0):
-        return torch.ones_like(f0) * (f0 > self.voiced_threshold)
+        uv = torch.ones_like(f0) * (f0 > self.voiced_threshold)
+        if uv.device.type == "privateuseone": uv = uv.float()
+
+        return uv
 
     def _f02sine(self, f0_values):
         rad_values = (f0_values / self.sampling_rate) % 1
@@ -151,7 +154,8 @@ class HiFiGANMRFGenerator(nn.Module):
             else: remove_weight_norm(up)
 
         for mrf in self.mrfs:
-            mrf.remove_weight_norm()
+            for block in mrf:
+                block.remove_weight_norm()
 
         if hasattr(self.conv_post, "parametrizations") and "weight" in self.conv_post.parametrizations: parametrize.remove_parametrizations(self.conv_post, "weight", leave_parametrized=True)
         else: remove_weight_norm(self.conv_post)

@@ -1,11 +1,7 @@
 import os
 import sys
 import random
-import librosa
 import subprocess
-
-import numpy as np
-import soundfile as sf
 
 sys.path.append(os.getcwd())
 
@@ -34,9 +30,6 @@ def audio_effects(input_path, output_path, resample, resample_sr, chorus_depth, 
     gr_info(translations["success"])
     return replace_export_format(output_path, export_format)
 
-def vibrato(y, sr, freq=5, depth=0.003):
-    return y[np.clip((np.arange(len(y)) + (depth * np.sin(2 * np.pi * freq * (np.arange(len(y)) / sr))) * sr).astype(int), 0, len(y) - 1)]
-
 def apply_voice_quirk(audio_path, mode, output_path, export_format):
     if not audio_path or not os.path.exists(audio_path) or os.path.isdir(audio_path): 
         gr_warning(translations["input_not_valid"])
@@ -53,6 +46,13 @@ def apply_voice_quirk(audio_path, mode, output_path, export_format):
     output_path = process_output(output_path)
     
     gr_info(translations["start"].format(start=translations["apply_effect"]))
+
+    import librosa
+    import numpy as np
+    import soundfile as sf
+
+    def vibrato(y, sr, freq=5, depth=0.003):
+        return y[np.clip((np.arange(len(y)) + (depth * np.sin(2 * np.pi * freq * (np.arange(len(y)) / sr))) * sr).astype(int), 0, len(y) - 1)]
 
     y, sr = librosa.load(audio_path, sr=None)
     output_path = replace_export_format(output_path, export_format)

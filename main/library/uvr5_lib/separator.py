@@ -6,6 +6,7 @@ import torch
 import codecs
 import hashlib
 import requests
+import warnings
 import onnxruntime
 
 from importlib import import_module
@@ -13,12 +14,14 @@ from importlib import import_module
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
-from main.library.backends import opencl
 from main.library.utils import clear_gpu_cache
+from main.library.backends import directml, opencl
 from main.tools.huggingface import HF_download_file
 from main.app.variables import config, translations
 
-class Separator:
+warnings.filterwarnings("ignore")
+
+class Separator: 
     def __init__(
             self, 
             logger, 
@@ -75,15 +78,16 @@ class Separator:
         ort_providers = onnxruntime.get_available_providers()
         self.torch_device_cpu = torch.device("cpu")
 
-        if torch.cuda.is_available():
-            self.configure_cuda(ort_providers)
-            hardware_acceleration_enabled = True
-        elif opencl.is_available():
-            self.configure_amd(ort_providers)
-            hardware_acceleration_enabled = True
-        elif torch.backends.mps.is_available():
-            self.configure_mps(ort_providers)
-            hardware_acceleration_enabled = True
+        if not config.cpu_mode:
+            if torch.cuda.is_available():
+                self.configure_cuda(ort_providers)
+                hardware_acceleration_enabled = True
+            elif opencl.is_available() or directml.is_available():
+                hardware_acceleration_enabled = True
+                self.configure_amd(ort_providers)
+            elif torch.backends.mps.is_available():
+                self.configure_mps(ort_providers)
+                hardware_acceleration_enabled = True
 
         if not hardware_acceleration_enabled:
             self.logger.info(translations["running_in_cpu"])
@@ -101,7 +105,7 @@ class Separator:
 
     def configure_amd(self, ort_providers):
         self.logger.info(translations["running_in_amd"])
-        self.torch_device = torch.device("ocl")
+        self.torch_device = torch.device(config.device)
 
         if "DmlExecutionProvider" in ort_providers:
             self.logger.info(translations["onnx_have"].format(have='DmlExecutionProvider'))

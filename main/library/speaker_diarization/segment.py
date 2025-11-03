@@ -2,13 +2,10 @@ import numpy as np
 
 from sortedcontainers import SortedList
 
-PYANNOTE_SEGMENT = 'segment'
-
-
 class Timeline:
     @classmethod
     def from_df(cls, df, uri = None):
-        return cls(segments=list(df[PYANNOTE_SEGMENT]), uri=uri)
+        return cls(segments=list(df['segment']), uri=uri)
 
     def __init__(self, segments = None, uri = None):
         if segments is None: segments = ()

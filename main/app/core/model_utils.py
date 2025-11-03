@@ -1,16 +1,12 @@
 import os
 import sys
 import json
-import onnx
 import torch
 import datetime
-
-from collections import OrderedDict
 
 sys.path.append(os.getcwd())
 
 from main.app.core.ui import gr_info, gr_warning, gr_error
-from main.library.onnx.onnx_export import onnx_exporter
 from main.app.variables import config, logger, translations, configs
 
 def fushion_model_pth(name, pth_1, pth_2, ratio):
@@ -23,7 +19,9 @@ def fushion_model_pth(name, pth_1, pth_2, ratio):
     if not pth_2 or not os.path.exists(pth_2) or not pth_2.endswith(".pth"):
         gr_warning(translations["provide_file"].format(filename=translations["model"] + " 2"))
         return [translations["provide_file"].format(filename=translations["model"] + " 2"), None]
-    
+
+    from collections import OrderedDict
+
     def extract(ckpt):
         a = ckpt["model"]
         opt = OrderedDict()
@@ -105,6 +103,8 @@ def onnx_export(model_path):
     
     try:
         gr_info(translations["start_onnx_export"])
+
+        from main.library.onnx.onnx_export import onnx_exporter
         output = onnx_exporter(model_path, model_path.replace(".pth", ".onnx"), is_half=config.is_half, device=config.device)
 
         gr_info(translations["success"])
@@ -124,8 +124,10 @@ def model_info(path):
             logger.debug(e)
             return translations["format_not_valid"]
     
-    if path.endswith(".pth"): model_data = torch.load(path, map_location=torch.device("cpu"))
+    if path.endswith(".pth"): model_data = torch.load(path, map_location="cpu")
     else:        
+        import onnx
+
         model = onnx.load(path)
         model_data = None
 

@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.realtime import realtime_start, realtime_stop
 from main.app.variables import translations, configs, model_name, index_path, method_f0, embedders_mode, embedders_model
-from main.app.core.ui import change_models_choices, get_index, index_strength_show, unlock_f0, hoplength_show, visible_embedders, visible, audio_device, change_audio_device_choices, update_audio_device
+from main.app.core.ui import change_models_choices, get_index, index_strength_show, unlock_f0, hoplength_show, change_embedders_mode, visible, audio_device, change_audio_device_choices, update_audio_device
 
 input_channels_map, output_channels_map = audio_device()
 
@@ -118,7 +118,7 @@ def realtime_tab():
                 outputs=[hop_length]
             )
             embed_mode.change(
-                fn=visible_embedders, 
+                fn=change_embedders_mode, 
                 inputs=[embed_mode], 
                 outputs=[embedders]
             )
@@ -213,7 +213,9 @@ def realtime_tab():
                     extra_convert_size,
                     cross_fade_overlap_size,
                     vad_sensitivity,
-                    vad_frame_ms
+                    vad_frame_ms,
+                    clean_audio,
+                    clean_strength
                 ],
                 outputs=[status, start_realtime, stop_realtime]
             )

@@ -20,9 +20,8 @@ from functools import cached_property, lru_cache
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl
-from main.library.utils import load_audio
 from main.app.variables import configs, logger
+from main.library.backends import directml, opencl
 
 LANGUAGES = {"en": "english", "zh": "chinese", "de": "german", "es": "spanish", "ru": "russian", "ko": "korean", "fr": "french", "ja": "japanese", "pt": "portuguese", "tr": "turkish", "pl": "polish", "ca": "catalan", "nl": "dutch", "ar": "arabic", "sv": "swedish", "it": "italian", "id": "indonesian", "hi": "hindi", "fi": "finnish", "vi": "vietnamese", "he": "hebrew", "uk": "ukrainian", "el": "greek", "ms": "malay", "cs": "czech", "ro": "romanian", "da": "danish", "hu": "hungarian", "ta": "tamil", "no": "norwegian", "th": "thai", "ur": "urdu", "hr": "croatian", "bg": "bulgarian", "lt": "lithuanian", "la": "latin", "mi": "maori", "ml": "malayalam", "cy": "welsh", "sk": "slovak", "te": "telugu", "fa": "persian", "lv": "latvian", "bn": "bengali", "sr": "serbian", "az": "azerbaijani", "sl": "slovenian", "kn": "kannada", "et": "estonian", "mk": "macedonian", "br": "breton", "eu": "basque", "is": "icelandic", "hy": "armenian", "ne": "nepali", "mn": "mongolian", "bs": "bosnian", "kk": "kazakh", "sq": "albanian", "sw": "swahili", "gl": "galician", "mr": "marathi", "pa": "punjabi", "si": "sinhala", "km": "khmer", "sn": "shona", "yo": "yoruba", "so": "somali", "af": "afrikaans", "oc": "occitan", "ka": "georgian", "be": "belarusian", "tg": "tajik", "sd": "sindhi", "gu": "gujarati", "am": "amharic", "yi": "yiddish", "lo": "lao", "uz": "uzbek", "fo": "faroese", "ht": "haitian creole", "ps": "pashto", "tk": "turkmen", "nn": "nynorsk", "mt": "maltese", "sa": "sanskrit", "lb": "luxembourgish", "my": "myanmar", "bo": "tibetan", "tl": "tagalog", "mg": "malagasy", "as": "assamese", "tt": "tatar", "haw": "hawaiian", "ln": "lingala", "ha": "hausa", "ba": "bashkir", "jw": "javanese", "su": "sundanese", "yue": "cantonese"}
 TO_LANGUAGE_CODE = {**{language: code for code, language in LANGUAGES.items()}, "burmese": "my", "valencian": "ca", "flemish": "nl", "haitian": "ht", "letzeburgesch": "lb", "pushto": "ps", "panjabi": "pa", "moldavian": "ro", "moldovan": "ro", "sinhalese": "si", "castilian": "es", "mandarin": "zh"}
@@ -31,6 +30,7 @@ _ALIGNMENT_HEADS = {"tiny.en": b"ABzY8J1N>@0{>%R00Bk>$p{7v037`oCl~+#00", "tiny":
 SAMPLE_RATE, N_FFT, HOP_LENGTH, CHUNK_LENGTH = 16000, 400, 160, 30
 N_SAMPLES = CHUNK_LENGTH * SAMPLE_RATE 
 N_SAMPLES_PER_TOKEN = HOP_LENGTH * 2  
+stft = None
 
 def exact_div(x, y):
     assert x % y == 0
@@ -45,7 +45,7 @@ def load_model(name = "base", device = "cpu"):
     alignment_heads = _ALIGNMENT_HEADS[name]
 
     with open(checkpoint_file, "rb") as fp:
-        checkpoint = torch.load(fp, map_location=device, weights_only=True)
+        checkpoint = torch.load(fp, map_location="cpu", weights_only=True)
 
     del checkpoint_file
 
@@ -177,14 +177,18 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
     for hook in hooks:
         hook.remove()
 
-    if not opencl.is_available():
+    if not (opencl.is_available() or directml.is_available()):
         alignment_indices = model.alignment_heads.indices().T
     else:
         alignment_indices = [(l, h) for l in range(model.alignment_heads.size(0)) for h in range(model.alignment_heads.size(1)) if model.alignment_heads[l, h]]
         
     weights = (torch.stack([QKs[_l][_h] for _l, _h in alignment_indices])[:, :, : num_frames // 2] * qk_scale).softmax(dim=-1)
     std, mean = torch.std_mean(weights, dim=-2, keepdim=True, unbiased=False)
-    weights = median_filter((weights - mean) / std, medfilt_width)
+
+    if directml.is_available():
+        weights = median_filter(((weights - mean) / std).cpu(), medfilt_width).to(weights.device)
+    else:
+        weights = median_filter((weights - mean) / std, medfilt_width)
 
     text_indices, time_indices = dtw(-weights.mean(axis=0)[len(tokenizer.sot_sequence) : -1])
 
@@ -257,15 +261,27 @@ def mel_filters(device, n_mels):
         return torch.from_numpy(f[f"mel_{n_mels}"]).to(device)
 
 def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
+    global stft
+
     if not torch.is_tensor(audio):
-        if isinstance(audio, str): audio = load_audio(audio, sample_rate=SAMPLE_RATE).astype(np.float32)
+        if isinstance(audio, str): 
+            from main.library.utils import load_audio
+            audio = load_audio(audio, sample_rate=SAMPLE_RATE).astype(np.float32)
         audio = torch.from_numpy(audio)
 
     if device is not None: audio = audio.to(device)
     if padding > 0: audio = F.pad(audio, (0, padding))
 
-    log_spec = (mel_filters(audio.device, n_mels) @ torch.stft(audio, N_FFT, HOP_LENGTH, window=torch.hann_window(N_FFT).to(audio.device), return_complex=True)[..., :-1].abs() ** 2).clamp(min=1e-10).log10()
-    return (torch.maximum(log_spec, log_spec.max() - 8.0) + 4.0) / 4.0
+    if str(audio.device).startswith(("ocl", "privateuseone")):
+        if stft is None: 
+            from main.library.backends.utils import STFT
+            stft = STFT(N_FFT, HOP_LENGTH, N_FFT).to(audio.device)
+        fft = stft.transform(audio.unsqueeze(0), eps=1e-9).squeeze(0)
+    else:
+        fft = torch.stft(audio, N_FFT, HOP_LENGTH, window=torch.hann_window(N_FFT).to(audio.device), return_complex=True)
+
+    log_spec = (mel_filters(audio.device, n_mels) @ fft[..., :-1].abs() ** 2).clamp(min=1e-10).log10()
+    return (log_spec.maximum(log_spec.max() - 8.0) + 4.0) / 4.0
 
 def pad_or_trim(array, length = N_SAMPLES, *, axis = -1):
     if torch.is_tensor(array):
@@ -684,11 +700,11 @@ class Whisper(nn.Module):
 
         all_heads = torch.zeros(self.dims.n_text_layer, self.dims.n_text_head, dtype=torch.bool)
         all_heads[self.dims.n_text_layer // 2 :] = True
-        self.register_buffer("alignment_heads", all_heads if opencl.is_available() else all_heads.to_sparse(), persistent=False)
+        self.register_buffer("alignment_heads", all_heads if opencl.is_available() or directml.is_available() else all_heads.to_sparse(), persistent=False)
 
     def set_alignment_heads(self, dump):
         alignment = torch.from_numpy(np.frombuffer(gzip.decompress(base64.b85decode(dump)), dtype=bool).copy()).reshape(self.dims.n_text_layer, self.dims.n_text_head)
-        if not opencl.is_available(): alignment = alignment.to_sparse()
+        if not (opencl.is_available() or directml.is_available()): alignment = alignment.to_sparse()
 
         self.register_buffer("alignment_heads", alignment, persistent=False)
 
@@ -867,7 +883,7 @@ class GreedyDecoder(TokenDecoder):
 
     def update(self, tokens, logits, sum_logprobs):
         next_tokens = logits.argmax(dim=-1) if self.temperature == 0 else (
-            Categorical(logits=(logits / self.temperature).cpu()) if opencl.is_available() else Categorical(logits=logits / self.temperature)
+            Categorical(logits=(logits / self.temperature).cpu() if opencl.is_available() else (logits / self.temperature))
         ).sample().to(logits.device)
 
         logprobs = F.log_softmax(logits.float(), dim=-1)
@@ -1059,7 +1075,7 @@ class DecodingTask:
         if self.options.fp16: mel = mel.half()
 
         audio_features = mel if mel.shape[-2:] == (self.model.dims.n_audio_ctx, self.model.dims.n_audio_state) else self.model.encoder(mel)
-        if audio_features.dtype != (torch.float16 if self.options.fp16 else torch.float32): return TypeError(f"audio_features has an incorrect dtype: {audio_features.dtype}")
+        if audio_features.dtype != (torch.float16 if self.options.fp16 else torch.float32): return TypeError
 
         return audio_features
 

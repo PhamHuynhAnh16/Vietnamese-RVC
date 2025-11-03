@@ -12,10 +12,7 @@ sys.path.append(os.getcwd())
 
 from main.library.speaker_diarization.speechbrain import EncoderClassifier
 
-class BaseInference:
-    pass
-
-class SpeechBrainPretrainedSpeakerEmbedding(BaseInference):
+class SpeechBrainPretrainedSpeakerEmbedding:
     def __init__(self, embedding, device = None):
         super().__init__()
 
@@ -23,30 +20,15 @@ class SpeechBrainPretrainedSpeakerEmbedding(BaseInference):
         self.device = device or torch.device("cpu")
         self.classifier_ = EncoderClassifier.from_hparams(source=self.embedding, run_opts={"device": self.device})
 
-    def to(self, device):
-        if not isinstance(device, torch.device): raise TypeError
-
-        self.classifier_ = EncoderClassifier.from_hparams(source=self.embedding, run_opts={"device": device})
-        self.device = device
-        return self
-
-    @cached_property
-    def sample_rate(self):
-        return self.classifier_.audio_normalizer.sample_rate
-
     @cached_property
     def dimension(self):
         *_, dimension = self.classifier_.encode_batch(torch.rand(1, 16000).to(self.device)).shape
         return dimension
 
     @cached_property
-    def metric(self):
-        return "cosine"
-
-    @cached_property
     def min_num_samples(self):
         with torch.inference_mode():
-            lower, upper = 2, round(0.5 * self.sample_rate)
+            lower, upper = 2, round(0.5 * self.classifier_.audio_normalizer.sample_rate)
             middle = (lower + upper) // 2
 
             while lower + 1 < upper:

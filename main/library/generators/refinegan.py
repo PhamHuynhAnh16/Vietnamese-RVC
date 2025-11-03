@@ -16,7 +16,6 @@ sys.path.append(os.getcwd())
 
 from main.library.algorithm.commons import init_weights, get_padding
 
-
 class ResBlock(nn.Module):
     def __init__(self, channels, kernel_size = 7, dilation = (1, 3, 5), leaky_relu_slope = 0.2):
         super().__init__()
@@ -79,8 +78,11 @@ class SineGenerator(nn.Module):
         self.merge = nn.Sequential(nn.Linear(self.dim, 1, bias=False), nn.Tanh())
 
     def _f02uv(self, f0):
-        return torch.ones_like(f0) * (f0 > self.voiced_threshold)
-    
+        uv = torch.ones_like(f0) * (f0 > self.voiced_threshold)
+        if uv.device.type == "privateuseone": uv = uv.float()
+
+        return uv
+
     def _f02sine(self, f0_values):
         rad_values = (f0_values / self.sampling_rate) % 1
         rand_ini = torch.rand(f0_values.shape[0], f0_values.shape[2], dtype=f0_values.dtype, device=f0_values.device)

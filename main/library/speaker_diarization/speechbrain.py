@@ -212,7 +212,7 @@ class EncoderClassifier(Pretrained):
 
     def classify_batch(self, wavs, wav_lens=None):
         out_prob = self.mods.classifier(self.encode_batch(wavs, wav_lens)).squeeze(1)
-        score, index = torch.max(out_prob, dim=-1)
+        score, index = out_prob.max(dim=-1)
 
         return out_prob, score, index, self.hparams.label_encoder.decode_torch(index)
 

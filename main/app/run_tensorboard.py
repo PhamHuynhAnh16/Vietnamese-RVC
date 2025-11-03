@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import logging
+import warnings
 import webbrowser
 
 from tensorboard import program
@@ -11,6 +12,7 @@ sys.path.append(os.getcwd())
 from main.app.variables import config, translations, logger
 
 def launch_tensorboard():
+    warnings.filterwarnings("ignore")
     for l in ["root", "tensorboard"]:
         logging.getLogger(l).setLevel(logging.ERROR)
 

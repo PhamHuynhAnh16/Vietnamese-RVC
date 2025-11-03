@@ -10,11 +10,6 @@ sys.path.append(os.getcwd())
 from main.library.speaker_diarization.speechbrain import if_main_process, ddp_barrier
 from main.library.speaker_diarization.features import register_checkpoint_hooks, mark_as_saver, mark_as_loader
 
-DEFAULT_UNK = "<unk>"
-DEFAULT_BOS = "<bos>"
-DEFAULT_EOS = "<eos>"
-DEFAULT_BLANK = "<blank>"
-
 @register_checkpoint_hooks
 class CategoricalEncoder:
     VALUE_SEPARATOR = " => "
@@ -111,7 +106,7 @@ class CategoricalEncoder:
             self.lab2ind[saved_label] = new_index
             self.ind2lab[new_index] = saved_label
 
-    def add_unk(self, unk_label=DEFAULT_UNK):
+    def add_unk(self, unk_label="<unk>"):
         self.unk_label = unk_label
         return self.add_label(unk_label)
 

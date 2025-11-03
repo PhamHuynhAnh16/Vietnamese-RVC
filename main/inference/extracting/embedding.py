@@ -16,8 +16,8 @@ from main.inference.extracting.setup_path import setup_paths
 from main.library.utils import load_audio, load_embedders_model, extract_features
 
 def process_file_embedding(files, embedder_model, embedders_mode, device, version, is_half, threads):
-    model, embed_suffix = load_embedders_model(embedder_model, embedders_mode)
-    if embed_suffix != ".onnx": model = model.to(device).to(torch.float16 if is_half else torch.float32).eval()
+    model = load_embedders_model(embedder_model, embedders_mode)
+    if isinstance(model, torch.nn.Module): model = model.to(device).to(torch.float16 if is_half else torch.float32).eval()
 
     def worker(file_info):
         try:
@@ -28,7 +28,7 @@ def process_file_embedding(files, embedder_model, embedders_mode, device, versio
             feats = torch.from_numpy(load_audio(file, 16000)).to(device).to(torch.float16 if is_half else torch.float32)
 
             with torch.no_grad():
-                feats = extract_features(model, embed_suffix, feats.view(1, -1), version, device)
+                feats = extract_features(model, feats.view(1, -1), version, device)
 
             feats = feats.squeeze(0).float().cpu().numpy()
             if not np.isnan(feats).any(): np.save(out_file_path, feats, allow_pickle=False)
@@ -45,7 +45,7 @@ def run_embedding_extraction(exp_dir, version, num_processes, devices, embedder_
     wav_path, out_path = setup_paths(exp_dir, version)
 
     logger.info(translations["start_extract_hubert"])
-    num_processes = 1 if config.device.startswith("ocl") and embedders_mode == "onnx" else num_processes
+    num_processes = 1 if (config.device.startswith("ocl") and embedders_mode == "onnx") or config.device.startswith("privateuseone") else num_processes
     paths = sorted([(os.path.join(wav_path, file), out_path) for file in os.listdir(wav_path) if file.endswith(".wav")])
 
     start_time = time.time()
@@ -59,7 +59,7 @@ def create_mute_file(version, embedder_model, embedders_mode, is_half):
     start_time = time.time()
     logger.info(translations["start_extract_hubert"])
 
-    process_file_embedding([(os.path.join("assets", "logs", "mute", "sliced_audios_16k", "mute.wav"), os.path.join("assets", "logs", "mute", f"{version}_extracted", f"mute_{embedder_model.replace('_hubert_base', '')}.npy"))], embedder_model, embedders_mode, config.device, version, is_half, 1)
+    process_file_embedding([(os.path.join("assets", "logs", "mute", "sliced_audios_16k", "mute.wav"), os.path.join("assets", "logs", "mute", f"{version}_extracted", f"mute_{embedder_model}.npy"))], embedder_model, embedders_mode, config.device, version, is_half, 1)
 
     gc.collect()
     logger.info(translations["extract_hubert_success"].format(elapsed_time=f"{(time.time() - start_time):.2f}"))

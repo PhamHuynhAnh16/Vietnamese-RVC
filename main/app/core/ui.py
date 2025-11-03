@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import torch
@@ -9,9 +10,9 @@ import sounddevice as sd
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl
+from main.library.backends import directml, opencl
 from main.inference.realtime.audio import list_audio_device
-from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models
+from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models, embedders_model, spin_model, whisper_model
 
 def gr_info(message):
     gr.Info(message, duration=2)
@@ -27,19 +28,32 @@ def gr_error(message):
 
 def get_gpu_info():
     ngpu = torch.cuda.device_count()
-    gpu_infos = [f"{i}: {torch.cuda.get_device_name(i)} ({int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)" for i in range(ngpu) if torch.cuda.is_available() or ngpu != 0]
+    gpu_infos = [
+        f"{i}: {torch.cuda.get_device_name(i)} ({int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)" 
+        for i in range(ngpu) 
+        if torch.cuda.is_available() or ngpu != 0
+    ]
 
     if len(gpu_infos) == 0:
-        ngpu = opencl.device_count()
-        gpu_infos = [f"{i}: {opencl.device_name(i)}" for i in range(ngpu) if opencl.is_available() or ngpu != 0]
+        if directml.torch_available:
+            ngpu = directml.device_count()
+            gpu_infos = [f"{i}: {directml.device_name(i)}" for i in range(ngpu) if directml.is_available() or ngpu != 0]
+        elif opencl.torch_available:
+            ngpu = opencl.device_count()
+            gpu_infos = [f"{i}: {opencl.device_name(i)}" for i in range(ngpu) if opencl.is_available() or ngpu != 0]
+        else:
+            ngpu = 0
+            gpu_infos = []
 
-    return "\n".join(gpu_infos) if len(gpu_infos) > 0 else translations["no_support_gpu"]
+    return "\n".join(gpu_infos) if len(gpu_infos) > 0 and not config.cpu_mode else translations["no_support_gpu"]
 
 def gpu_number_str():
-    ngpu = torch.cuda.device_count()
-    if ngpu == 0: ngpu = opencl.device_count()
+    if config.cpu_mode: return "-"
 
-    return str("-".join(map(str, range(ngpu))) if torch.cuda.is_available() or opencl.is_available() else "-")
+    ngpu = torch.cuda.device_count()
+    if ngpu == 0: ngpu = directml.device_count() if directml.torch_available else opencl.device_count()
+
+    return str("-".join(map(str, range(ngpu))) if torch.cuda.is_available() or directml.is_available() or opencl.is_available() else "-")
 
 def change_f0_choices(): 
     f0_file = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["f0_path"]) for f in files if f.endswith(".txt")])
@@ -48,6 +62,10 @@ def change_f0_choices():
 def change_audios_choices(input_audio): 
     audios = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["audios_path"]) for f in files if os.path.splitext(f)[1].lower() in (".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3")])
     return {"value": input_audio if input_audio != "" else (audios[0] if len(audios) >= 1 else ""), "choices": audios, "__type__": "update"}
+
+def change_reference_choices(): 
+    reference = sorted([re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) for name in os.listdir(configs["reference_path"]) if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))])
+    return {"value": reference[0] if len(reference) >= 1 else "", "choices": reference, "__type__": "update"}
 
 def change_models_choices():
     model, index = sorted(list(model for model in os.listdir(configs["weights_path"]) if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_"))), sorted([os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name])
@@ -60,7 +78,7 @@ def change_pretrained_choices():
     return [{"choices": pretrainD, "value": pretrainD[0] if len(pretrainD) >= 1 else "", "__type__": "update"}, {"choices": pretrainG, "value": pretrainG[0] if len(pretrainG) >= 1 else "", "__type__": "update"}]
 
 def change_choices_del():
-    return [{"choices": sorted(list(model for model in os.listdir(configs["weights_path"]) if model.endswith(".pth") and not model.startswith("G_") and not model.startswith("D_"))), "__type__": "update"}, {"choices": sorted([os.path.join(configs["logs_path"], f) for f in os.listdir(configs["logs_path"]) if "mute" not in f and os.path.isdir(os.path.join(configs["logs_path"], f))]), "__type__": "update"}]
+    return [{"choices": sorted(list(model for model in os.listdir(configs["weights_path"]) if model.endswith(".pth") and not model.startswith("G_") and not model.startswith("D_"))), "__type__": "update"}, {"choices": sorted([os.path.join(configs["logs_path"], f) for f in os.listdir(configs["logs_path"]) if f not in ["mute", "reference"] and os.path.isdir(os.path.join(configs["logs_path"], f))]), "__type__": "update"}]
 
 def change_preset_choices():
     return {"value": "", "choices": sorted(list(f for f in os.listdir(configs["presets_path"]) if f.endswith(".conversion.json"))), "__type__": "update"}
@@ -107,7 +125,7 @@ def index_strength_show(index):
 def hoplength_show(method, hybrid_method=None):
     visible = False
 
-    for m in ["mangio-crepe", "fcpe", "yin", "piptrack", "fcn"]:
+    for m in ["mangio-crepe", "fcpe", "yin", "piptrack", "mangio-penn"]:
         if m in method: visible = True
         if hybrid_method is not None and m in hybrid_method: visible = True
 
@@ -140,8 +158,13 @@ def unlock_vocoder(value, vocoder):
 def unlock_ver(value, vocoder):
     return {"value": "v2" if vocoder == "Default" else value, "interactive": vocoder == "Default", "__type__": "update"}
 
-def visible_embedders(value):
-    return {"visible": value != "spin", "__type__": "update"}
+def change_embedders_mode(value):
+    if value == "spin":
+        return {"value": spin_model[0], "choices": spin_model, "__type__": "update"}
+    elif value == "whisper":
+        return {"value": whisper_model[0], "choices": whisper_model, "__type__": "update"}
+    else:
+        return {"value": embedders_model[0], "choices": embedders_model, "__type__": "update"}
 
 def change_fp(fp):
     fp16 = fp == "fp16"
@@ -268,9 +291,12 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
     output_is_asio = "ASIO" in output_device if output_device else False
     monitor_is_asio = "ASIO" in monitor_device if monitor_device else False
 
-    input_max_ch = input_channels_map.get(input_device, [])[1]
-    output_max_ch = output_channels_map.get(output_device, [])[1]
-    monitor_max_ch = output_channels_map.get(monitor_device, [])[1] if monitor else 128
+    try:
+        input_max_ch = input_channels_map.get(input_device, [])[1]
+        output_max_ch = output_channels_map.get(output_device, [])[1]
+        monitor_max_ch = output_channels_map.get(monitor_device, [])[1] if monitor else 128
+    except:
+        input_max_ch = output_max_ch = monitor_max_ch = -1
 
     return [
         visible(monitor),

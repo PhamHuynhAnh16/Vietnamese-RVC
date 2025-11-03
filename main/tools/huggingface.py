@@ -11,9 +11,7 @@ def HF_download_file(url, output_path=None):
     url = url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
     output_path = os.path.basename(url) if output_path is None else (os.path.join(output_path, os.path.basename(url)) if os.path.isdir(output_path) else output_path)
 
-    if wget != None:
-        wget.download(url, out=output_path)
-        return output_path
+    if wget != None: wget.download(url, out=output_path)
     else:
         response = requests.get(url, stream=True, timeout=300)
 
@@ -26,5 +24,6 @@ def HF_download_file(url, output_path=None):
                     f.write(chunk)
 
             progress_bar.close()
-            return output_path
         else: raise ValueError(response.status_code)
+
+    return output_path

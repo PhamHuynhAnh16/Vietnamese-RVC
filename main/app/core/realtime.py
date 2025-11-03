@@ -4,9 +4,7 @@ import time
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import clear_gpu_cache
 from main.app.variables import translations, configs
-from main.inference.realtime.callbacks import AudioCallbacks
 from main.app.core.ui import gr_info, gr_warning, audio_device
 
 running, callbacks, audio_manager = False, None, None
@@ -91,6 +89,8 @@ def realtime_start(
 
     chunk_size = int(chunk_size * DEVICE_SAMPLE_RATE / 1000 / 128)
 
+    from main.inference.realtime.callbacks import AudioCallbacks
+
     callbacks = AudioCallbacks(
         pass_through=False, 
         read_chunk_size=chunk_size, 
@@ -162,8 +162,9 @@ def realtime_stop():
         del audio_manager, callbacks
 
         audio_manager = callbacks = None
-
         gr_info(translations["realtime_has_stop"])
+
+        from main.library.utils import clear_gpu_cache
         clear_gpu_cache()
 
         return translations["realtime_has_stop"], interactive_true, interactive_false

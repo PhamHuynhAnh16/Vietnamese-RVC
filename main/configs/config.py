@@ -2,10 +2,11 @@ import os
 import sys
 import json
 import torch
+import onnxruntime
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl, zluda
+from main.library.backends import directml, opencl, zluda
 
 version_config_paths = [os.path.join(version, size) for version in ["v1", "v2"] for size in ["32000.json", "40000.json", "48000.json"]]
 
@@ -21,19 +22,22 @@ def singleton(cls):
 @singleton
 class Config:
     def __init__(self):
-        self.device = "cuda:0" if torch.cuda.is_available() else ("ocl:0" if opencl.is_available() else "cpu")
         self.configs_path = os.path.join("main", "configs", "config.json")
         self.configs = json.load(open(self.configs_path, "r"))
-        self.translations = self.multi_language()
+
+        self.cpu_mode = self.configs.get("cpu_mode", False)
+        self.brain = self.configs.get("brain", False)
+        self.debug_mode = self.configs.get("debug_mode", False)
+
         self.json_config = self.load_config_json()
+        self.translations = self.multi_language()
+
         self.gpu_mem = None
         self.per_preprocess = 3.7
+        self.device = self.get_default_device()
+        self.providers = self.get_providers()
         self.is_half = self.is_fp16()
-        self.brain = self.configs.get("brain", False)
-        self.cpu_mode = self.configs.get("cpu_mode", False)
-        if self.cpu_mode: self.device = "cpu"
         self.x_pad, self.x_query, self.x_center, self.x_max = self.device_config()
-        self.debug_mode = self.configs.get("debug_mode", False)
     
     def multi_language(self):
         try:
@@ -81,21 +85,47 @@ class Config:
         return configs
 
     def device_config(self):
-        if not self.cpu_mode:
-            if self.device.startswith("cuda"): self.set_cuda_config()
-            elif opencl.is_available(): self.device = "ocl:0"
-            elif self.has_mps(): self.device = "mps"
-            else: self.device = "cpu"
-
         if self.gpu_mem is not None and self.gpu_mem <= 4: 
             self.preprocess_per = 3.0
             return 1, 5, 30, 32
         
         return (3, 10, 60, 65) if self.is_half else (1, 6, 38, 41)
+    
+    def get_default_device(self):
+        if not self.cpu_mode:
+            if torch.cuda.is_available():
+                device = "cuda:0"
+                self.gpu_mem = torch.cuda.get_device_properties(int(self.device.split(":")[-1])).total_memory // (1024**3)
+            elif directml.is_available(): 
+                device = "privateuseone:0"
+            elif opencl.is_available(): 
+                device = "ocl:0"
+            elif torch.backends.mps.is_available(): 
+                device = "mps"
+            else: 
+                device = "cpu"
+        else:
+            torch.cuda.is_available = lambda : False
+            directml.is_available = lambda : False
+            opencl.is_available = lambda : False
+            torch.backends.mps.is_available = lambda : False
 
-    def set_cuda_config(self):
-        i_device = int(self.device.split(":")[-1])
-        self.gpu_mem = torch.cuda.get_device_properties(i_device).total_memory // (1024**3)
+            device = "cpu"
 
-    def has_mps(self):
-        return torch.backends.mps.is_available()
+        return device 
+
+    def get_providers(self):
+        ort_providers = onnxruntime.get_available_providers()
+
+        if "CUDAExecutionProvider" in ort_providers and self.device.startswith("cuda"): 
+            providers = ["CUDAExecutionProvider"]
+        elif "ROCMExecutionProvider" in ort_providers and self.device.startswith("cuda"):
+            providers = ["ROCMExecutionProvider"]
+        elif "DmlExecutionProvider" in ort_providers and self.device.startswith(("ocl", "privateuseone")): 
+            providers = ["DmlExecutionProvider"]
+        elif "CoreMLExecutionProvider" in ort_providers and self.device.startswith("mps"): 
+            providers = ["CoreMLExecutionProvider"]
+        else: 
+            providers = ["CPUExecutionProvider"]
+
+        return providers

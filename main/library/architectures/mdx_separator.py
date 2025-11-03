@@ -205,7 +205,6 @@ class STFT:
 
     def __call__(self, input_tensor):
         is_non_standard_device = not input_tensor.device.type in ["cuda", "cpu"]
-
         if is_non_standard_device: input_tensor = input_tensor.cpu()
 
         batch_dimensions = input_tensor.shape[:-2]

@@ -28,7 +28,7 @@ class RMSEnergyExtractor(nn.Module):
         assert x.ndim == 2
         assert x.shape[0] == 1
 
-        if str(x.device).startswith("ocl"): x = x.contiguous()
+        if str(x.device).startswith(("ocl", "privateuseone")): x = x.contiguous()
 
         rms = torch.from_numpy(
             librosa.feature.rms(
@@ -40,7 +40,7 @@ class RMSEnergyExtractor(nn.Module):
             )
         )
 
-        if str(x.device).startswith("ocl"): rms = rms.contiguous()
+        if str(x.device).startswith(("ocl", "privateuseone")): rms = rms.contiguous()
         return rms.squeeze(-2).to(x.device)
     
 def process_file_rms(files, device, threads):
@@ -59,7 +59,7 @@ def process_file_rms(files, device, threads):
             feats = torch.from_numpy(load_audio(file, 16000)).unsqueeze(0)
 
             with torch.no_grad():
-                feats = module(feats if device.startswith("ocl") else feats.to(device))
+                feats = module(feats if device.startswith(("ocl", "privateuseone")) else feats.to(device))
                 
             np.save(out_file_path, feats.float().cpu().numpy(), allow_pickle=False)
         except:

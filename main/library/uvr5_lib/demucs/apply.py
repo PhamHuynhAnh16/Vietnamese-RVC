@@ -3,10 +3,7 @@ import sys
 import tqdm
 import torch
 import random
-
-from torch import nn
-from torch.nn import functional as F
-from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 
 sys.path.append(os.getcwd())
 
@@ -34,7 +31,7 @@ class DummyPoolExecutor:
     def __exit__(self, exc_type, exc_value, exc_tb):
         return
 
-class BagOfModels(nn.Module):
+class BagOfModels(torch.nn.Module):
     def __init__(self, models, weights = None, segment = None):
         super().__init__()
         assert len(models) > 0
@@ -50,7 +47,7 @@ class BagOfModels(nn.Module):
         self.audio_channels = first.audio_channels
         self.samplerate = first.samplerate
         self.sources = first.sources
-        self.models = nn.ModuleList(models)
+        self.models = torch.nn.ModuleList(models)
 
         if weights is None: weights = [[1.0 for _ in first.sources] for _ in models]
         else:
@@ -102,7 +99,7 @@ class TensorChunk:
         pad_left = correct_start - start
         pad_right = end - correct_end
 
-        out = F.pad(self.tensor[..., correct_start:correct_end], (pad_left, pad_right))
+        out = torch.nn.functional.pad(self.tensor[..., correct_start:correct_end], (pad_left, pad_right))
 
         assert out.shape[-1] == target_length
         return out
@@ -117,7 +114,7 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
     global fut_length, bag_num, prog_bar
 
     device = mix.device if device is None else torch.device(device)
-    if pool is None: pool = ThreadPoolExecutor(num_workers) if num_workers > 0 and device.type == "cpu" else DummyPoolExecutor()
+    if pool is None: pool = concurrent.futures.ThreadPoolExecutor(num_workers) if num_workers > 0 and device.type == "cpu" else DummyPoolExecutor()
 
     kwargs = {
         "shifts": shifts,

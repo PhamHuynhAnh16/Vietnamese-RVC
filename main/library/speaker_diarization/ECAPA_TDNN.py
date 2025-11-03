@@ -236,7 +236,6 @@ class ECAPA_TDNN(torch.nn.Module):
 
         self.channels = channels
         self.blocks = nn.ModuleList()
-
         self.blocks.append(TDNNBlock(input_size, channels[0], kernel_sizes[0], dilations[0], activation, groups[0], dropout))
 
         for i in range(1, len(channels) - 1):
@@ -249,8 +248,8 @@ class ECAPA_TDNN(torch.nn.Module):
 
     def forward(self, x, lengths=None):
         x = x.transpose(1, 2)
-
         xl = []
+
         for layer in self.blocks:
             try:
                 x = layer(x, lengths=lengths)

@@ -1,10 +1,10 @@
 import os
 import math
+import torch
 import random
 import torchaudio
 
 from io import IOBase
-from torch.nn.functional import pad
 
 def get_torchaudio_info(file, backend = None):
     if not backend:
@@ -165,6 +165,6 @@ class Audio:
                 file["sample_rate"] = sample_rate
 
         if channel is not None: data = data[channel : channel + 1, :]
-        if mode == "pad": data = pad(data, (pad_start, pad_end))
+        if mode == "pad": data = torch.nn.functional.pad(data, (pad_start, pad_end))
 
         return self.downmix_and_resample(data, sample_rate)

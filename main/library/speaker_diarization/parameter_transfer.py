@@ -7,7 +7,6 @@ sys.path.append(os.getcwd())
 from main.library.speaker_diarization.speechbrain import fetch, run_on_main
 from main.library.speaker_diarization.features import DEFAULT_TRANSFER_HOOKS, DEFAULT_LOAD_HOOKS
 
-
 def get_default_hook(obj, default_hooks):
     for cls in inspect.getmro(type(obj)):
         if cls in default_hooks: return default_hooks[cls]

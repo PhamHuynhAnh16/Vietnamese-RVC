@@ -10,7 +10,6 @@ from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
-from main.library.backends import opencl
 from main.library.utils import check_assets
 from main.inference.extracting.rms import run_rms_extraction
 from main.inference.extracting.feature import run_pitch_extraction
@@ -33,26 +32,43 @@ def parse_arguments():
     parser.add_argument("--cpu_cores", type=int, default=2)
     parser.add_argument("--gpu", type=str, default="-")
     parser.add_argument("--sample_rate", type=int, required=True)
-    parser.add_argument("--embedder_model", type=str, default="contentvec_base")
+    parser.add_argument("--embedder_model", type=str, default="hubert_base")
     parser.add_argument("--f0_onnx", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--embedders_mode", type=str, default="fairseq")
     parser.add_argument("--f0_autotune", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--f0_autotune_strength", type=float, default=1)
     parser.add_argument("--rms_extract", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--alpha", type=float, default=0.5)
 
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
 
-    f0_method, hop_length, num_processes, gpus, version, pitch_guidance, sample_rate, embedder_model, f0_onnx, embedders_mode, f0_autotune, f0_autotune_strength, rms_extract = args.f0_method, args.hop_length, args.cpu_cores, args.gpu, args.rvc_version, args.pitch_guidance, args.sample_rate, args.embedder_model, args.f0_onnx, args.embedders_mode, args.f0_autotune, args.f0_autotune_strength, args.rms_extract
+    f0_method, hop_length, num_processes, gpus, version, pitch_guidance, sample_rate, embedder_model, f0_onnx, embedders_mode, f0_autotune, f0_autotune_strength, rms_extract, alpha = args.f0_method, args.hop_length, args.cpu_cores, args.gpu, args.rvc_version, args.pitch_guidance, args.sample_rate, args.embedder_model, args.f0_onnx, args.embedders_mode, args.f0_autotune, args.f0_autotune_strength, args.rms_extract, args.alpha
     check_assets(f0_method, embedder_model, f0_onnx=f0_onnx, embedders_mode=embedders_mode)
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
 
     num_processes = max(1, num_processes)
-    devices = ["cpu"] if gpus == "-" else [(f"ocl:{idx}" if opencl.is_available() and config.device.startswith("ocl") else f"cuda:{idx}") for idx in gpus.split("-")]
+    devices = ["cpu"] if gpus == "-" else [(f"cuda:{idx}" if config.device.startswith("cuda") else f"{'ocl' if config.device.startswith('ocl') else 'privateuseone'}:{idx}") for idx in gpus.split("-")]
 
-    log_data = {translations['modelname']: args.model_name, translations['export_process']: exp_dir, translations['f0_method']: f0_method, translations['pretrain_sr']: sample_rate, translations['cpu_core']: num_processes, "Gpu": gpus, translations['hop_length']: hop_length, translations['training_version']: version, translations['extract_f0']: pitch_guidance, translations['hubert_model']: embedder_model, translations["f0_onnx_mode"]: f0_onnx, translations["embed_mode"]: embedders_mode, translations["train&energy"]: rms_extract}
+    log_data = {
+        translations['modelname']: args.model_name, 
+        translations['export_process']: exp_dir, 
+        translations['f0_method']: f0_method, 
+        translations['pretrain_sr']: sample_rate, 
+        translations['cpu_core']: num_processes, 
+        "Gpu": gpus, 
+        translations['hop_length']: hop_length, 
+        translations['training_version']: version, 
+        translations['extract_f0']: pitch_guidance, 
+        translations['hubert_model']: embedder_model, 
+        translations["f0_onnx_mode"]: f0_onnx, 
+        translations["embed_mode"]: embedders_mode, 
+        translations["train&energy"]: rms_extract,
+        translations["alpha_label"]: alpha
+    }
+
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}")
 
@@ -61,7 +77,7 @@ def main():
         pid_file.write(str(os.getpid()))
     
     try:
-        run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, devices, f0_onnx, config.is_half, f0_autotune, f0_autotune_strength)
+        run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, devices, f0_onnx, config.is_half, f0_autotune, f0_autotune_strength, alpha)
         run_embedding_extraction(exp_dir, version, num_processes, devices, embedder_model, embedders_mode, config.is_half)
         run_rms_extraction(exp_dir, num_processes, devices, rms_extract)
         generate_config(version, sample_rate, exp_dir)

@@ -5,38 +5,25 @@ import sys
 import torch
 import faiss
 import codecs
-import librosa
 import logging
-import onnxruntime
 
 import numpy as np
-import soundfile as sf
-import torch.nn.functional as F
 
-from torch import nn
 from pydub import AudioSegment
-from transformers import HubertModel
 
 sys.path.append(os.getcwd())
 
 from main.tools import huggingface
-from main.library.backends import opencl
-from main.library.architectures import fairseq
-from main.app.variables import translations, configs, config, embedders_model, logger
+from main.library.backends import directml, opencl
+from main.app.variables import translations, configs, config, logger, embedders_model, spin_model, whisper_model
 
 for l in ["httpx", "httpcore"]:
     logging.getLogger(l).setLevel(logging.ERROR)
 
-class HubertModelWithFinalProj(HubertModel):
-    def __init__(self, config):
-        super().__init__(config)
-        self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
-
 def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
     predictors_url = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cerqvpgbef/", "rot13")
     embedders_url = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/rzorqqref/", "rot13")
-
-    if embedders_mode == "spin": embedders_mode, hubert = "transformers", "spin"
+    if embedders_mode == "spin": embedders_mode = "transformers"
 
     def download_predictor(predictor):
         model_path = os.path.join(configs["predictors_path"], predictor)
@@ -50,11 +37,15 @@ def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
         return os.path.exists(model_path)
 
     def download_embedder(embedders_mode, hubert):
-        model_path = os.path.join(configs["embedders_path"], hubert)
+        model_path = os.path.join(configs["speaker_diarization_path"], "models", hubert) if embedders_mode == "whisper" else os.path.join(configs["embedders_path"], hubert)
 
-        if embedders_mode != "transformers" and not os.path.exists(model_path): huggingface.HF_download_file("".join([embedders_url, "fairseq/" if embedders_mode == "fairseq" else "onnx/", hubert]), model_path)
+        if embedders_mode != "transformers" and not os.path.exists(model_path): 
+            if embedders_mode == "whisper":
+                huggingface.HF_download_file("".join([codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/fcrnxre_qvnevmngvba/", "rot13"), hubert]), model_path)
+            else:
+                huggingface.HF_download_file("".join([embedders_url, "fairseq/" if embedders_mode == "fairseq" else "onnx/", hubert]), model_path)
         elif embedders_mode == "transformers":
-            url, hubert = ("transformers/", hubert) if hubert != "spin" else ("spin", "")
+            url = "transformers/" if not hubert.startswith("spin") else "spin/"
 
             bin_file = os.path.join(model_path, "model.safetensors")
             config_file = os.path.join(model_path, "config.json")
@@ -74,13 +65,17 @@ def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
         if "rmvpe" in f0_method:
             modelname = "rmvpe"
         elif "fcpe" in f0_method:
-            modelname = "fcpe" + ("_legacy" if "legacy" in f0_method else "")
+            modelname = ("fcpe" + ("_legacy" if "legacy" in f0_method and "previous" not in f0_method else "")) if "previous" in f0_method else "ddsp_200k"
         elif "crepe" in f0_method:
             modelname = "crepe_" + f0_method.replace("mangio-", "").split("-")[1]
-        elif "fcn" in f0_method:
+        elif "penn" in f0_method:
             modelname = "fcn"
         elif "djcm" in f0_method:
             modelname = "djcm"
+        elif "pesto" in f0_method:
+            modelname = "pesto"
+        elif "swift" in f0_method:
+            return "swift.onnx"
         else:
             return None
         
@@ -101,8 +96,8 @@ def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
             modelname = get_modelname(f0_method, f0_onnx)
             if modelname is not None: results.append(download_predictor(modelname))
 
-        if hubert in embedders_model:
-            if embedders_mode != "transformers": hubert += ".pt" if embedders_mode == "fairseq" else ".onnx"
+        if hubert in embedders_model + spin_model + whisper_model:
+            if embedders_mode != "transformers": hubert += ".pt" if embedders_mode in ["fairseq", "whisper"] else ".onnx"
             results.append(download_embedder(embedders_mode, hubert))
 
         if all(results): return
@@ -111,19 +106,23 @@ def check_assets(f0_method, hubert, f0_onnx=False, embedders_mode="fairseq"):
     logger.warning(translations["check_assets_error"].format(count=count))
     sys.exit(1)
     
-def check_spk_diarization(model_size):
+def check_spk_diarization(model_size, speechbrain=True):
     whisper_model = os.path.join(configs["speaker_diarization_path"], "models", f"{model_size}.pt")
     if not os.path.exists(whisper_model): huggingface.HF_download_file("".join([codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/fcrnxre_qvnevmngvba/", "rot13"), model_size, ".pt"]), whisper_model)
 
     speechbrain_path = os.path.join(configs["speaker_diarization_path"], "models", "speechbrain")
     if not os.path.exists(speechbrain_path): os.makedirs(speechbrain_path, exist_ok=True)
 
-    for f in ["classifier.ckpt", "config.json", "embedding_model.ckpt", "hyperparams.yaml", "mean_var_norm_emb.ckpt"]:
-        speechbrain_model = os.path.join(speechbrain_path, f)
+    if speechbrain:
+        for f in ["classifier.ckpt", "config.json", "embedding_model.ckpt", "hyperparams.yaml", "mean_var_norm_emb.ckpt"]:
+            speechbrain_model = os.path.join(speechbrain_path, f)
 
-        if not os.path.exists(speechbrain_model): huggingface.HF_download_file(codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/fcrnxre_qvnevmngvba/fcrrpuoenva/", "rot13") + f, speechbrain_model)
+            if not os.path.exists(speechbrain_model): huggingface.HF_download_file(codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/fcrnxre_qvnevmngvba/fcrrpuoenva/", "rot13") + f, speechbrain_model)
 
 def load_audio(file, sample_rate=16000, formant_shifting=False, formant_qfrency=0.8, formant_timbre=0.8):
+    import librosa
+    import soundfile as sf
+
     try:
         file = file.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
         if not os.path.isfile(file): raise FileNotFoundError(translations["not_found"].format(name=file))
@@ -158,30 +157,31 @@ def pydub_load(input_path, volume = None):
     return audio if volume is None else (audio + volume)
 
 def load_embedders_model(embedder_model, embedders_mode="fairseq"):
-    if embedders_mode == "fairseq": embedder_model += ".pt"
+    if embedders_mode in ["fairseq", "whisper"]: embedder_model += ".pt"
     elif embedders_mode == "onnx": embedder_model += ".onnx"
-    elif embedders_mode == "spin": embedders_mode, embedder_model = "transformers", "spin"
+    elif embedders_mode == "spin": embedders_mode = "transformers"
 
-    embedder_model_path = os.path.join(configs["embedders_path"], embedder_model)
+    embedder_model_path = os.path.join(configs["speaker_diarization_path"], "models", embedder_model) if embedders_mode == "whisper" else os.path.join(configs["embedders_path"], embedder_model)
     if not os.path.exists(embedder_model_path): raise FileNotFoundError(f"{translations['not_found'].format(name=translations['model'])}: {embedder_model}")
 
     try:
         if embedders_mode == "fairseq":
-            embed_suffix = ".pt"
-            hubert_model = fairseq.load_model(embedder_model_path)
+            from main.library.embedders.fairseq import load_model
+            hubert_model = load_model(embedder_model_path)
         elif embedders_mode == "onnx":
-            sess_options = onnxruntime.SessionOptions()
-            sess_options.log_severity_level = 3
-            embed_suffix = ".onnx"
-            hubert_model = onnxruntime.InferenceSession(embedder_model_path, sess_options=sess_options, providers=get_providers())
-        elif embedders_mode == "transformers":      
-            embed_suffix = ".safetensors"
+            from main.library.embedders.onnx import HubertModelONNX
+            hubert_model = HubertModelONNX(embedder_model_path, config.providers, config.device)
+        elif embedders_mode == "transformers":
+            from main.library.embedders.transformers import HubertModelWithFinalProj
             hubert_model = HubertModelWithFinalProj.from_pretrained(embedder_model_path)
+        elif embedders_mode == "whisper":
+            from main.library.embedders.ppg import WhisperModel
+            hubert_model = WhisperModel(embedder_model_path, config.device)
         else: raise ValueError(translations["option_not_valid"])
     except Exception as e:
         raise RuntimeError(translations["read_model_error"].format(e=e))
 
-    return hubert_model, embed_suffix
+    return hubert_model
 
 def cut(audio, sr, db_thresh=-60, min_interval=250):
     from main.inference.preprocess.slicer2 import Slicer2
@@ -202,36 +202,10 @@ def restore(segments, total_len, dtype=np.float32):
     if last_end < total_len: out.append(np.zeros(total_len - last_end, dtype=dtype))
     return np.concatenate(out, axis=-1)
 
-def get_providers():
-    ort_providers = onnxruntime.get_available_providers()
-
-    if "CUDAExecutionProvider" in ort_providers and config.device.startswith("cuda"): 
-        providers = ["CUDAExecutionProvider"]
-    elif "ROCMExecutionProvider" in ort_providers and config.device.startswith("cuda"):
-        providers = ["ROCMExecutionProvider"]
-    elif "DmlExecutionProvider" in ort_providers and config.device.startswith("ocl"): 
-        providers = ["DmlExecutionProvider"]
-    elif "CoreMLExecutionProvider" in ort_providers and config.device.startswith("mps"): 
-        providers = ["CoreMLExecutionProvider"]
-    else: 
-        providers = ["CPUExecutionProvider"]
-        logger.info(translations["running_in_cpu"])
-    
-    if not providers[0].startswith("CPUExecutionProvider"): logger.debug(translations["onnx_have"].format(have=providers[0]))
-    return providers
-
-def extract_features(model, suffix, feats, version, device="cpu"):
+def extract_features(model, feats, version, device="cpu"):
     with torch.no_grad():
-        if suffix == ".pt":
-            logits = model.extract_features(**{"source": feats, "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), "output_layer": 9 if version == "v1" else 12})
-            feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
-        elif suffix == ".onnx": 
-            logits = model.run([model.get_outputs()[0].name, model.get_outputs()[1].name], {"feats": feats.detach().cpu().numpy()})
-            feats = torch.as_tensor(logits[int(version != "v1")], dtype=torch.float32, device=device)
-        elif suffix == ".safetensors":
-            logits = model(feats)["last_hidden_state"]
-            feats = model.final_proj(logits[0]).unsqueeze(0) if version == "v1" else logits
-        else: raise ValueError(translations["option_not_valid"])
+        logits = model.extract_features(**{"source": feats, "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), "output_layer": 9 if version == "v1" else 12})
+        feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
 
     return feats
 
@@ -244,6 +218,9 @@ def autotune_f0(note_dict, f0, f0_autotune_strength):
     return autotuned_f0
 
 def change_rms(source_audio, source_rate, target_audio, target_rate, rate):
+    import librosa
+    import torch.nn.functional as F
+
     rms2 = F.interpolate(
         torch.from_numpy(
             librosa.feature.rms(
@@ -261,10 +238,7 @@ def change_rms(source_audio, source_rate, target_audio, target_rate, rate):
             torch.from_numpy(librosa.feature.rms(y=source_audio, frame_length=source_rate // 2 * 2, hop_length=source_rate // 2)).float().unsqueeze(0), 
             size=target_audio.shape[0], 
             mode="linear"
-        ).squeeze().pow(1 - rate) * torch.maximum(
-            rms2, 
-            torch.zeros_like(rms2) + 1e-6
-        ).pow(rate - 1)
+        ).squeeze().pow(1 - rate) * rms2.maximum(torch.zeros_like(rms2) + 1e-6).pow(rate - 1)
     ).numpy()
 
 def clear_gpu_cache():
@@ -272,6 +246,7 @@ def clear_gpu_cache():
 
     if torch.cuda.is_available(): torch.cuda.empty_cache()
     elif torch.backends.mps.is_available(): torch.mps.empty_cache()
+    elif directml.is_available(): directml.empty_cache()
     elif opencl.is_available(): opencl.pytorch_ocl.empty_cache()
 
 def extract_median_f0(f0):
@@ -298,34 +273,6 @@ def proposal_f0_up_key(f0, target_f0 = 155.0, limit = 12):
     except ValueError:
         return 0
 
-def get_onnx_argument(net_g, feats, p_len, sid, pitch, pitchf, energy, pitch_guidance, energy_use):
-    inputs = {
-        net_g.get_inputs()[0].name: feats.cpu().numpy().astype(np.float32),
-        net_g.get_inputs()[1].name: p_len.cpu().numpy(),
-        net_g.get_inputs()[2].name: np.array([sid.cpu().item()], dtype=np.int64),
-        net_g.get_inputs()[3].name: np.random.randn(1, 192, p_len).astype(np.float32)
-    }
-
-    if energy_use:
-        if pitch_guidance:
-            inputs.update({
-                net_g.get_inputs()[4].name: pitch.cpu().numpy().astype(np.int64),
-                net_g.get_inputs()[5].name: pitchf.cpu().numpy().astype(np.float32),
-                net_g.get_inputs()[6].name: energy.cpu().numpy().astype(np.float32)
-            })
-        else:
-            inputs.update({
-                net_g.get_inputs()[4].name: energy.cpu().numpy().astype(np.float32)
-            })
-    else:
-        if pitch_guidance:
-            inputs.update({
-                net_g.get_inputs()[4].name: pitch.cpu().numpy().astype(np.int64),
-                net_g.get_inputs()[5].name: pitchf.cpu().numpy().astype(np.float32)
-            })
-
-    return inputs
-
 def circular_write(new_data, target):
     offset = new_data.shape[0]
 
@@ -349,18 +296,8 @@ def load_faiss_index(index_path):
 def load_model(model_path, weights_only=True, log_severity_level=3):
     if not os.path.isfile(model_path): return None
 
-    if model_path.endswith(".pth"):
-        return torch.load(
-            model_path, 
-            map_location="cpu", 
-            weights_only=weights_only
-        )
+    if model_path.endswith(".pth"): 
+        return torch.load(model_path, map_location="cpu", weights_only=weights_only)
     else: 
-        sess_options = onnxruntime.SessionOptions()
-        sess_options.log_severity_level = log_severity_level
-        
-        return onnxruntime.InferenceSession(
-            model_path, 
-            sess_options=sess_options, 
-            providers=get_providers()
-        )
+        from main.library.onnx.wrapper import ONNXRVC
+        return ONNXRVC(model_path, config.providers, log_severity_level=log_severity_level)

@@ -51,13 +51,15 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 - Chuyển đổi giọng nói thời gian thực
 
-**Phương thức trích xuất cao độ: `pm-ac, pm-cc, pm-shs, dio, mangio-crepe-tiny, mangio-crepe-small, mangio-crepe-medium, mangio-crepe-large, mangio-crepe-full, crepe-tiny, crepe-small, crepe-medium, crepe-large, crepe-full, fcpe, fcpe-legacy, rmvpe, rmvpe-legacy, rmvpe-medfilt, rmvpe-legacy-medfilt, harvest, yin, pyin, swipe, piptrack, fcn, djcm, djcm-legacy, djcm-medfilt, djcm-legacy-medfilt`**
+- Tạo tham chiếu huấn luyện
 
-**Các mô hình trích xuất nhúng: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin`**
+**Phương thức trích xuất cao độ: `pm-ac, pm-cc, pm-shs, dio, mangio-crepe-tiny, mangio-crepe-small, mangio-crepe-medium, mangio-crepe-large, mangio-crepe-full, crepe-tiny, crepe-small, crepe-medium, crepe-large, crepe-full, fcpe, fcpe-legacy, fcpe-previous, rmvpe, rmvpe-clipping, rmvpe-medfilt, rmvpe-clipping-medfilt, harvest, yin, pyin, swipe, piptrack, penn, mangio-penn, djcm, djcm-clipping, djcm-medfilt, djcm-clipping-medfilt, swift, pesto`**
 
-- **Các mô hình trích xuất nhúng có sẳn các chế độ nhúng như: fairseq, onnx, transformers, spin.**
+**Các mô hình trích xuất nhúng: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin-v1, spin-v2, whisper-tiny, whisper-tiny.en, whisper-base, whisper-base.en, whisper-small, whisper-small.en, whisper-medium, whisper-medium.en, whisper-large-v1, whisper-large-v2, whisper-large-v3, whisper-large-v3-turbo`**
+
+- **Các mô hình trích xuất nhúng có sẳn các chế độ nhúng như: fairseq, onnx, transformers, spin, whisper.**
 - **Các mô hình trích xuất cao độ đều có phiên bản tăng tốc ONNX trừ các phương thức hoạt động bằng trình bao bọc.** 
-- **Các mô hình trích xuất cao độ đều có thể kết hợp với nhau để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
+- **Các mô hình trích xuất cao độ đều có thể kết hợp với nhau theo tỉ lệ để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
 
 ## Hướng dẫn sử dụng
 
@@ -90,7 +92,7 @@ python -m venv env
 env\\Scripts\\activate
 
 python -m pip install uv
-uv pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common
+uv pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common wget
 ```
 
 Cài đặt đối với các thiết bị khác nhau
@@ -109,6 +111,7 @@ uv pip install -r requirements.txt
 
 Có thể thay cu118 thành bản cu128 mới hơn nếu GPU hỗ trợ:
 ```
+uv pip install numpy==1.26.4 numba==0.61.0
 uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
 uv pip install -r requirements.txt
 ```
@@ -116,20 +119,42 @@ uv pip install -r requirements.txt
 </details>
 
 <details>
-<summary>Đối với AMD</summary>
+<summary>Đối với OPENCL (AMD)</summary>
 
 ```
+uv pip install numpy==1.26.4 numba==0.61.0
 uv pip install torch==2.6.0 torchaudio==2.6.0 torchvision
 uv pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
 uv pip install onnxruntime-directml
 uv pip install -r requirements.txt
 ```
 
-Lưu ý đối với AMD: 
-- Chỉ cài đặt AMD trên python 3.11 vì DLPRIM không có bản cho python 3.10 với torch 2.6.0.
+Lưu ý: 
+- Có vẻ như OPENCL đã không còn được hỗ trợ tiếp.
+- Chỉ nên cài đặt trên python 3.11 do không có bản biên dịch cho python 3.10 với torch 2.6.0.
 - Demucs có thể gây quá tải và tràn bộ nhớ đối với GPU (nếu cần sử dụng demucs hãy mở tệp config.json trong main\configs sửa đối số demucs_cpu_mode thành true).
-- DDP không hỗ trợ huấn luyện đa GPU đối với OPENCL (AMD).
+- DDP không hỗ trợ huấn luyện đa GPU đối với OPENCL.
 - Một số thuật toán khác phải chạy trên cpu nên có thể hiệu suất của GPU có thể không sử dụng hết.
+
+</details>
+
+<details>
+<summary>Đối với DIRECTML (AMD)</summary>
+
+```
+uv pip install numpy==1.26.4 numba==0.61.0
+uv pip install torch==2.4.1 torchaudio==2.4.1 torchvision
+uv pip install torch-directml==0.2.5.dev240914
+uv pip install onnxruntime-directml
+uv pip install -r requirements.txt
+```
+
+Lưu ý: 
+- Directml đã ngừng phát triển một khoảng thời gian dài.
+- Directml không hỗ trợ quá tốt tác vụ đa luồng nên khi chạy trích xuất thường sẽ bị khóa ở 1 luồng.
+- Directml có hỗ trợ 1 phần fp16 nhưng không được khuyến khích sử dụng vì có thể chỉ nhận được hiệu năng tương đương fp32.
+- Directml không có hàm để dọn dẹp bộ nhớ, tôi đã tạo 1 hàm đơn giản để dọn dẹp bộ nhớ nhưng có thể sẽ không quá hiệu quả.
+- Directml được thiết kế để suy luận chứ không phải dùng để huấn luyện mặc dù có thể hoàn toàn chạy được huấn luyện nhưng sẽ không được khuyến khích.
 
 </details>
 
@@ -212,7 +237,7 @@ python main\\app\\parser.py --help
 | **[Hubert-No-Fairseq](https://github.com/PhamHuynhAnh16/hubert-no-fairseq)**                                                   | Phạm Huỳnh Anh          | MIT License |
 | **[Local-attention](https://github.com/lucidrains/local-attention)**                                                           | Phil Wang               | MIT License |
 | **[TorchFcpe](https://github.com/CNChTu/FCPE/tree/main)**                                                                      | CN_ChiTu                | MIT License |
-| **[FcpeONNX](https://github.com/deiteris/voice-changer/blob/master-custom/server/utils/fcpe_onnx.py)**                         | Yury                    | MIT License |
+| **[FcpeONNX](https://github.com/deiteris/voice-changer/blob/master-custom/server/utils/fcpe_onnx.py)**                         | Yury deiteris           | MIT License |
 | **[ContentVec](https://github.com/auspicious3000/contentvec)**                                                                 | Kaizhi Qian             | MIT License |
 | **[Mediafiredl](https://github.com/Gann4Life/mediafiredl)**                                                                    | Santiago Ariel Mansilla | MIT License |
 | **[Noisereduce](https://github.com/timsainb/noisereduce)**                                                                     | Tim Sainburg            | MIT License |
@@ -223,38 +248,13 @@ python main\\app\\parser.py --help
 | **[PyannoteAudio](https://github.com/pyannote/pyannote-audio)**                                                                | pyannote                | MIT License |
 | **[AudioEditingCode](https://github.com/HilaManor/AudioEditingCode)**                                                          | Hila Manor              | MIT License |
 | **[StftPitchShift](https://github.com/jurihock/stftPitchShift)**                                                               | Jürgen Hock             | MIT License |
-| **[Codename-RVC-Fork-3](https://github.com/codename0og/codename-rvc-fork-3)**                                                  | Codename;0              | MIT License |
 | **[Penn](https://github.com/interactiveaudiolab/penn)**                                                                        | Interactive Audio Lab   | MIT License |
 | **[Voice Changer](https://github.com/deiteris/voice-changer)**                                                                 | Yury deiteris           | MIT License |
+| **[Pesto](https://github.com/SonyCSLParis/pesto)**                                                                             | Sony CSL Paris          | LGPL 3.0    |
 
 ## Kho mô hình của công cụ tìm kiếm mô hình
 
 - **[VOICE-MODELS.COM](https://voice-models.com/)**
-
-## Các phương pháp trích xuất F0 trong RVC
-
-<details>
-<summary>Nhấn vào để xem</summary>
-
-Tài liệu này trình bày chi tiết các phương pháp trích xuất cao độ được sử dụng, thông tin về ưu, nhược điểm, sức mạnh và độ tin cậy của từng phương pháp theo trải nghiệm cá nhân.
-
-| Phương pháp        |      Loại      |          Ưu điểm          |            Hạn chế           |      Sức mạnh      |     Độ tin cậy     |
-|--------------------|----------------|---------------------------|------------------------------|--------------------|--------------------|
-| pm                 | Praat          | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
-| dio                | PYWORLD        | Thích hợp với Rap         | Kém chính xác với tần số cao | Trung bình         | Trung bình         |
-| harvest            | PYWORLD        | Chính xác hơn DIO         | Xử lí chậm                   | Cao                | Rất cao            |
-| crepe              | Deep Learning  | Chính xác cao             | Yêu cầu GPU                  | Rất cao            | Rất cao            |
-| mangio-crepe       | crepe nofilter | Tối ưu hóa cho RVC        | Đôi khi kém crepe gốc        | Trung bình đến cao | Trung bình đến cao |
-| fcpe               | Deep Learning  | Chính xác, thời gian thực | Cần GPU mạnh                 | Khá                | Trung bình         |
-| rmvpe              | Deep Learning  | Hiệu quả với giọng hát    | Tốn tài nguyên               | Rất cao            | Xuất sắc           |
-| yin                | Librosa        | Đơn giản, hiệu quả        | Dễ lỗi bội                   | Trung bình         | Thấp               |
-| pyin               | Librosa        | Ổn định hơn YIN           | Tính toán phức tạp hơn       | Khá                | Khá                |
-| swipe              | WORLD          | Độ chính xác cao          | Nhạy cảm với nhiễu           | Cao                | Khá                |
-| piptrack           | Librosa        | Nhanh                     | Kém chính xác                | Thấp               | Thấp               |
-| fcn                | Deep Learning  | Không Rõ                  | Xử lí chậm                   | Trung bình         | Trung bình         |
-| djcm               | Deep Learning  | Phụ âm có vẻ tốt          | Yêu cầu GPU                  | Cao                | Cao                |
-
-</details>
 
 ## Báo cáo lỗi
 - **Với trường hợp hệ thống báo cáo lỗi không hoạt động bạn có thể báo cáo lỗi cho tôi thông qua Discord `pham_huynh_anh` Hoặc [ISSUE](https://github.com/PhamHuynhAnh16/Vietnamese-RVC/issues)**

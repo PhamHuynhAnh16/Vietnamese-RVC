@@ -10,8 +10,8 @@ from main.app.core.ui import configs, config
 from main.inference.extracting.embedding import create_mute_file
 
 def mute_file(embedders_mode, embedders_model, mute_base_path, rvc_version):
-    if embedders_mode == "spin":
-        mute_file = "mute_spin.npy"
+    if embedders_mode.startswith(("spin", "whisper")):
+        mute_file = f"mute_{embedders_model}.npy"
     else:
         mute_file = {
             "contentvec_base": "mute.npy",
@@ -23,9 +23,9 @@ def mute_file(embedders_mode, embedders_model, mute_base_path, rvc_version):
             "portuguese_hubert_base": "mute_portuguese.npy"
         }.get(embedders_model, None)
 
-    if mute_file is None:
+    if mute_file is None or not os.path.exists(mute_file):
         create_mute_file(rvc_version, embedders_model, embedders_mode, config.is_half)
-        mute_file = f"mute_{embedders_model.replace('_hubert_base', '')}.npy"
+        mute_file = f"mute_{embedders_model}.npy"
 
     return os.path.join(mute_base_path, f"{rvc_version}_extracted", mute_file)
 
@@ -33,7 +33,7 @@ def generate_config(rvc_version, sample_rate, model_path):
     config_save_path = os.path.join(model_path, "config.json")
     if not os.path.exists(config_save_path): shutil.copy(os.path.join("main", "configs", rvc_version, f"{sample_rate}.json"), config_save_path)
 
-def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate, embedders_mode = "fairseq", embedder_model = "contentvec_base", rms_extract = False):
+def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate, embedders_mode = "fairseq", embedder_model = "hubert_base", rms_extract = False):
     gt_wavs_dir, feature_dir = os.path.join(model_path, "sliced_audios"), os.path.join(model_path, f"{rvc_version}_extracted")
     f0_dir, f0nsf_dir, energy_dir = None, None, None
 

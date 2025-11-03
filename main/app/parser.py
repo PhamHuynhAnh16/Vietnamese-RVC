@@ -8,7 +8,7 @@ try:
 except IndexError:
     argv = None
 
-argv_is_allows = ["--audio_effects", "--convert", "--create_dataset", "--create_index", "--extract", "--preprocess", "--separator_music", "--train", "--help_audio_effects", "--help_convert", "--help_create_dataset", "--help_create_index", "--help_extract", "--help_preprocess", "--help_separate_music",  "--help_train", "--help"]
+argv_is_allows = ["--audio_effects", "--convert", "--create_dataset", "--create_index", "--extract", "--preprocess", "--separator_music", "--train", "--help_audio_effects", "--help_convert", "--help_create_dataset", "--help_create_index", "--help_extract", "--help_preprocess", "--help_separate_music",  "--help_train", "--help", "--create_reference", "help_create_reference"]
 
 if argv not in argv_is_allows:
     print("Cú pháp không hợp lệ! Sử dụng --help để biết thêm")
@@ -22,6 +22,7 @@ elif argv_is_allows[4] in argv: from main.inference.extracting.extract import ma
 elif argv_is_allows[5] in argv: from main.inference.preprocess.preprocess import main
 elif argv_is_allows[6] in argv: from main.inference.separate_music import main
 elif argv_is_allows[7] in argv: from main.inference.training.train import main
+elif argv_is_allows[17] in argv: from main.inference.create_reference import main
 elif argv_is_allows[8] in argv:
     print("""Các tham số của `--audio_effects`:
         1. Đường dẫn tệp:
@@ -109,12 +110,12 @@ elif argv_is_allows[9] in argv:
             - `--f0_file` (mặc định: ``): Đường dẫn tệp F0 có sẵn.
             - `--f0_onnx` (mặc định: `False`): Có sử dụng phiên bản ONNX của F0 hay không.
             - `--proposal_pitch` (mặc định: `False`): Đề xuất cao độ thay vì điều chỉnh thủ công.
-            - `--proposal_pitch` (mặc định: `0.0`): Ngưỡng tần số ước tính cao độ.
+            - `--proposal_pitch_threshold` (mặc định: `0.0`): Ngưỡng tần số ước tính cao độ.
+            - `--alpha` (mặc định: `0.5`): Ngưỡng trộn cao độ khi ước tính cao độ hybrid.
 
-        
         3. Mô hình nhúng:
-            - `--embedder_model` (mặc định: `contentvec_base`): Mô hình nhúng sử dụng.
-            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`).
+            - `--embedder_model` (mặc định: `hubert_base`): Mô hình nhúng sử dụng.
+            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
 
         4. Đường dẫn tệp:
             - `--input_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
@@ -196,9 +197,11 @@ elif argv_is_allows[12] in argv:
 
         2. Cấu hình F0:
             - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
+            - `--f0_onnx` (mặc định: `False`): Có sử dụng phiên bản ONNX của F0 hay không.
             - `--pitch_guidance` (mặc định: `True`): Có sử dụng hướng dẫn cao độ hay không.
             - `--f0_autotune` (mặc định: `False`): Có tự động điều chỉnh F0 hay không.
             - `--f0_autotune_strength` (mặc định: `1`): Cường độ hiệu chỉnh tự động F0.
+            - `--alpha` (mặc định: `0.5`): Ngưỡng trộn cao độ khi ước tính cao độ hybrid.
 
         3. Cấu hình xử lí:
             - `--hop_length` (mặc định: `128`): Độ dài bước nhảy trong quá trình xử lí.
@@ -207,9 +210,8 @@ elif argv_is_allows[12] in argv:
             - `--sample_rate` (bắt buộc): Tần số lấy mẫu của âm thanh đầu vào.
 
         4. Cấu hình nhúng:
-            - `--embedder_model` (mặc định: `contentvec_base`): Tên mô hình nhúng.
-            - `--f0_onnx` (mặc định: `False`): Có sử dụng phiên bản ONNX của F0 hay không.
-            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`).
+            - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.
+            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
           
         4. RMS:
             - `--rms_extract` (mặc định: False): Trích xuất thêm năng lượng rms.
@@ -226,10 +228,15 @@ elif argv_is_allows[13] in argv:
 
         3. Cấu hình xử lí:
             - `--cpu_cores` (mặc định: `2`): Số lượng luồng CPU sử dụng.
-            - `--cut_preprocess` (mặc định: `True`): Có cắt tệp dữ liệu hay không.
+            - `--cut_preprocess` (mặc định: `Automatic`): Cách cắt dữ liệu tiền xử lí (`Automatic`, `Simple`, `Skip`).
             - `--process_effects` (mặc định: `False`): Có áp dụng tiền xử lí hay không.
             - `--clean_dataset` (mặc định: `False`): Có làm sạch tệp dữ liệu hay không.
             - `--clean_strength` (mặc định: `0.7`): Độ mạnh của quá trình làm sạch dữ liệu.
+        
+        4. Cấu hình khác:
+            - `--chunk_len` (mặc định: `3.0`): Độ dài của đoạn âm thanh cho phương pháp 'Simple'.
+            - `--overlap_len` (mặc định: `0.3`): Độ dài của phần chồng chéo giữa các lát cắt đối với phương pháp 'Simple'.
+            - `--normalization_mode` (mặc định: `none`): Có xử lí chuẩn hóa âm thanh không (`none`, `pre`, `post`)
     """)
     quit()
 elif argv_is_allows[14] in argv:
@@ -280,7 +287,6 @@ elif argv_is_allows[15] in argv:
         3. Cấu hình huấn luyện:
             - `--total_epoch` (mặc định: `300`): Tổng số kỷ nguyên huấn luyện.
             - `--batch_size` (mặc định: `8`): Kích thước lô trong quá trình huấn luyện.
-            - `--sample_rate` (bắt buộc): Tần số lấy mẫu của âm thanh.
 
         4. Cấu hình thiết bị:
             - `--gpu` (mặc định: `0`): Chỉ định GPU để sử dụng (số hoặc `-` nếu không dùng GPU).
@@ -304,7 +310,40 @@ elif argv_is_allows[15] in argv:
             - `--checkpointing` (mặc định: `False`): Bật/tắt checkpointing để tiết kiệm RAM.
             - `--deterministic` (mặc định: `False`): Khi bật sẽ sử dụng các thuật toán có tính xác định cao, đảm bảo rằng mỗi lần chạy cùng một dữ liệu đầu vào sẽ cho kết quả giống nhau.
             - `--benchmark` (mặc định: `False`): Khi bật sẽ thử nghiệm và chọn thuật toán tối ưu nhất cho phần cứng và kích thước cụ thể.
-            - `--optimizer` (mặc định: `AdamW`): Trình tối ưu hóa được sử dụng (`AdamW`, `RAdam`).
+            - `--optimizer` (mặc định: `AdamW`): Trình tối ưu hóa được sử dụng (`AdamW`, `RAdam`, `AnyPrecisionAdamW`).
+            - `--multiscale_mel_loss` (mặc định: `False`): So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra.
+          
+        9. Bộ tham chiếu:
+            - `--use_custom_reference` (mặc định: `False`): Có tùy chỉnh bộ tham chiếu hay không.
+            - `--reference_path` (mặc định: `False`): Đường dẫn đến bộ tham chiếu.
+    """)
+    quit()
+elif argv_is_allows[18] in argv:
+    print("""Các tham số của --create_reference:
+        1. Đường dẫn tệp:
+            - `--audio_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
+            - `--reference_name` (mặc định: `reference`): Đường dẫn lưu bộ tham chiếu đầu ra.
+          
+        2. Cấu hình bộ tham chiếu:
+            - `--pitch_guidance` (mặc định: `True`): Sử dụng hướng dẫn cao độ.
+            - `--energy_use` (mặc định: `False`): Sử dụng năng lượng rms.
+            - `--version` (mặc định: `v2`): Phiên bản RVC (`v1`, `v2`).
+
+        3. Cấu hình nhúng:
+            - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.
+            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
+        
+        4. Cấu hình F0:
+            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
+            - `--f0_onnx` (mặc định: `False`): Có sử dụng phiên bản ONNX của F0 hay không.
+            - `--f0_up_key` (mặc định: `0`): Điều chỉnh cao độ.
+            - `--filter_radius` (mặc định: `3`): Độ mượt của đường F0.
+            - `--f0_autotune` (mặc định: `False`): Có tự động điều chỉnh F0 hay không.
+            - `--f0_autotune_strength` (mặc định: `1`): Cường độ hiệu chỉnh tự động F0.
+            - `--f0_file` (mặc định: ``): Đường dẫn tệp F0 có sẵn.
+            - `--proposal_pitch` (mặc định: `False`): Đề xuất cao độ thay vì điều chỉnh thủ công.
+            - `--proposal_pitch_threshold` (mặc định: `0.0`): Ngưỡng tần số ước tính cao độ.
+            - `--alpha` (mặc định: `0.5`): Ngưỡng trộn cao độ khi ước tính cao độ hybrid.
     """)
     quit()
 elif argv_is_allows[16] in argv:
@@ -317,6 +356,7 @@ elif argv_is_allows[16] in argv:
         6. `--help_preprocess`: Trợ giúp về xử lí trước dữ liệu.
         7. `--help_separate_music`: Trợ giúp về tách nhạc.
         8. `--help_train`: Trợ giúp về huấn luyện mô hình.
+        9. `--help_create_reference`: Trợ giúp về tạo bộ tham chiếu.
     """)
     quit()
 

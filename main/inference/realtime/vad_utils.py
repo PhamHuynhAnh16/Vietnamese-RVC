@@ -4,7 +4,7 @@ import numpy as np
 
 class VADProcessor:
     def __init__(self, sensitivity_mode=3, sample_rate=16000, frame_duration_ms=30):
-        if sample_rate not in [8000, 16000, 32000, 48000]: raise ValueError
+        if sample_rate not in [8000, 16000]: raise ValueError
         if frame_duration_ms not in [10, 20, 30]: raise ValueError
 
         self.vad = webrtcvad.Vad(sensitivity_mode)

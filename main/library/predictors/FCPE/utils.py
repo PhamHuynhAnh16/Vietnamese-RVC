@@ -27,7 +27,7 @@ def l2_regularization(model, l2_alpha):
     return l2_alpha * sum(l2_loss)
 
 def torch_interp(x, xp, fp):
-    sort_idx = torch.argsort(xp)
+    sort_idx = xp.argsort()
     xp = xp[sort_idx]
     fp = fp[sort_idx]
 
