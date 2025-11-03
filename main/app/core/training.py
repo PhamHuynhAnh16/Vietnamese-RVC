@@ -142,7 +142,7 @@ def create_index(model_name, rvc_version, index_algorithm):
     for log in log_read(done, "create_index"):
         yield log
 
-def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_every_weights, total_epoch, sample_rate, batch_size, gpu, pitch_guidance, not_pretrain, custom_pretrained, pretrain_g, pretrain_d, detector, threshold, clean_up, cache, model_author, vocoder, checkpointing, deterministic, benchmark, optimizer, energy_use, custom_reference=False, reference_name="", embedders="hubert_base", embedders_custom=None, multiscale_mel_loss=False):
+def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_every_weights, total_epoch, sample_rate, batch_size, gpu, pitch_guidance, not_pretrain, custom_pretrained, pretrain_g, pretrain_d, detector, threshold, clean_up, cache, model_author, vocoder, checkpointing, deterministic, benchmark, optimizer, energy_use, custom_reference=False, reference_name="", multiscale_mel_loss=False):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
 
@@ -240,8 +240,7 @@ def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_e
         gr_warning(translations["not_use_pretrain"])
 
     if custom_reference:
-        embedder_model = (embedders if embedders != "custom" else embedders_custom)
-        reference_path = os.path.join(configs["reference_path"], f"{reference_name}_{rvc_version}_{embedder_model}_{pitch_guidance}_{energy_use}")
+        reference_path = os.path.join(configs["reference_path"], reference_name)
 
         if not os.path.exists(reference_path):
             gr_warning(translations["not_found_reference"])

@@ -32,7 +32,7 @@ def training_model_tab():
                         preprocess_normalization_mode = gr.Radio(label=translations["normalization_mode"], info=translations["normalization_mode_info"], value="none", choices=["none", "pre", "post"], interactive=True)
                     with gr.Row(visible=custom_reference.value) as custom_reference_row:
                         with gr.Accordion(translations["custom_reference"], open=True):
-                            reference_name = gr.Dropdown(label=translations["reference_name"], info=translations["reference_name_info"], choices=reference_list, value=reference_list[0] if len(reference_list) >= 1 else "", interactive=True)
+                            reference_name = gr.Dropdown(label=translations["reference_name"], info=translations["reference_name_info"], choices=reference_list, value=reference_list[0] if len(reference_list) >= 1 else "", allow_custom_value=True, interactive=True)
                             reference_refresh = gr.Button(translations["refresh"], scale=2)
                     with gr.Row(visible=clean_dataset.value) as clean_dataset_row:
                         clean_dataset_strength = gr.Slider(label=translations["clean_strength"], info=translations["clean_strength_info"], minimum=0, maximum=1, value=0.7, step=0.1, interactive=True)
@@ -252,8 +252,6 @@ def training_model_tab():
                 rms_extract,
                 custom_reference,
                 reference_name,
-                extract_embedders,
-                extract_embedders_custom,
                 multiscale_mel_loss
             ],
             outputs=[training_info],

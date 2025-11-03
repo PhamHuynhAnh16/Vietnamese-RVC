@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import glob
 import json
@@ -347,7 +346,7 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
     if use_custom_reference and os.path.isfile(os.path.join(reference_path, "feats.npy")):
         import numpy as np
 
-        logger.info(translations["using_reference"].format(reference_name=re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', os.path.basename(reference_path))))
+        logger.info(translations["using_reference"].format(reference_name=reference_path))
         phone = np.repeat(np.load(os.path.join(reference_path, "feats.npy")), 2, axis=0)
 
         reference = (

@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import csv
 import json
@@ -54,7 +53,7 @@ spin_model = ["spin-v1", "spin-v2"]
 whisper_model = ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2", "large-v3", "large-v3-turbo"]
 
 paths_for_files = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["audios_path"]) for f in files if os.path.splitext(f)[1].lower() in (".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3")])
-reference_list = sorted([re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) for name in os.listdir(configs["reference_path"]) if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))])
+reference_list = sorted([name for name in os.listdir(configs["reference_path"]) if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))])
 model_name = sorted(list(model for model in os.listdir(configs["weights_path"]) if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_"))) 
 index_path = sorted([os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name])
 
