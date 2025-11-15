@@ -68,7 +68,7 @@ class Config:
             with open(self.configs_path, "w") as f:
                 json.dump(self.configs, f, indent=4)
         
-        if not fp16: self.preprocess_per = 3.0
+        if not fp16: self.per_preprocess = 3.0
         return fp16
 
     def load_config_json(self):
@@ -86,7 +86,7 @@ class Config:
 
     def device_config(self):
         if self.gpu_mem is not None and self.gpu_mem <= 4: 
-            self.preprocess_per = 3.0
+            self.per_preprocess = 3.0
             return 1, 5, 30, 32
         
         return (3, 10, 60, 65) if self.is_half else (1, 6, 38, 41)

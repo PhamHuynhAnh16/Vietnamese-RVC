@@ -21,10 +21,14 @@ def check_amd_gpu(gpu):
         return i in gpu
 
 def get_amd_gpu_windows():
+    gpus = ""
+
     try:
-        return [gpu.strip() for gpu in subprocess.check_output("wmic path win32_VideoController get name", shell=True).decode().split('\n')[1:] if check_amd_gpu(gpu)]
-    except:
-        return []
+        gpus = subprocess.check_output("wmic path win32_VideoController get name", shell=True, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        gpus = subprocess.check_output('powershell "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"', shell=True, stderr=subprocess.DEVNULL)
+
+    return [gpu.strip() for gpu in gpus.decode().split('\n')[1:] if check_amd_gpu(gpu)]
 
 def get_amd_gpu_linux():
     try:

@@ -513,14 +513,8 @@ class Generator:
                 confidence_threshold=filter_radius / 4 + 0.137
             )
 
-        pitch_hz, voicing, timestamps = self.swift.detect_from_array(x, self.sample_rate)
-        if len(timestamps) == 0: return np.zeros(p_len)
-
-        pitch = np.nan_to_num(pitch_hz, nan=0.0)
-        pitch[~voicing] = 0.0
-
-        f0 = np.interp((np.arange(p_len) * self.window + self.window / 2) / self.sample_rate, timestamps, pitch, left=0.0, right=0.0)
-        return self._resize_f0(f0, p_len)
+        pitch_hz, _, _ = self.swift.detect_from_array(x, self.sample_rate)
+        return self._resize_f0(pitch_hz, p_len)
 
     def get_f0_pesto(self, x, p_len):
         if not hasattr(self, "pesto"):
