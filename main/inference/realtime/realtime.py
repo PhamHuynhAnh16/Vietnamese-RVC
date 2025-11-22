@@ -9,8 +9,8 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import circular_write
 from main.app.variables import config, translations
+from main.library.utils import circular_write, check_assets
 from main.inference.realtime.pipeline import create_pipeline
 
 class RVC_Realtime:
@@ -46,6 +46,8 @@ class RVC_Realtime:
         self.dtype = torch.float16 if config.is_half else torch.float32
 
     def initialize(self):
+        check_assets(self.f0_method, self.embedder_model, f0_onnx=self.f0_onnx, embedders_mode=self.embedders_mode)
+
         if self.vad_enabled:
             from main.inference.realtime.vad_utils import VADProcessor
             self.vad = VADProcessor(sensitivity_mode=self.vad_sensitivity, sample_rate=self.sample_rate, frame_duration_ms=self.vad_frame_ms)

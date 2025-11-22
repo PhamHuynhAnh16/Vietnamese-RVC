@@ -5,38 +5,30 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.core.realtime import realtime_start, realtime_stop
 from main.app.variables import translations, configs, model_name, index_path, method_f0, embedders_mode, embedders_model
-from main.app.core.ui import change_models_choices, get_index, index_strength_show, unlock_f0, hoplength_show, change_embedders_mode, visible, audio_device, change_audio_device_choices, update_audio_device
+from main.app.core.ui import change_models_choices, get_index, index_strength_show, unlock_f0, hoplength_show, change_embedders_mode, visible, update_dropdowns_from_json, update_button_from_json
 
-input_channels_map, output_channels_map = audio_device()
-
-def realtime_tab():
-    with gr.TabItem(translations["realtime"], visible=configs.get("realtime_tab", True)):
+def realtime_client_tab():
+    with gr.TabItem(translations["realtime_client"], visible=configs.get("realtime_client_tab", True)):
         gr.Markdown(translations["realtime_markdown"])
         with gr.Row():
             gr.Markdown(translations["realtime_markdown_2"])
         with gr.Row():
-            status = gr.Label(label=translations["realtime_latency"], value=translations["realtime_not_startup"])
+            gr.Label(label=translations["realtime_latency"], value=translations["realtime_not_startup"], elem_id="realtime-status-info")
         with gr.Row():
             monitor = gr.Checkbox(label=translations["monitor"], value=False, interactive=True)
-            exclusive_mode = gr.Checkbox(label=translations["exclusive_mode"], value=False, interactive=True)
             vad_enabled = gr.Checkbox(label=translations["vad_enabled"], value=False, interactive=True)
             clean_audio = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)
         with gr.Row():
             with gr.Accordion(translations["audio_device"], open=True):
                 with gr.Row():
-                    input_audio_device = gr.Dropdown(label=translations["input_audio_device_label"], info=translations["input_audio_device_info"], choices=list(input_channels_map.keys()), value=list(input_channels_map.keys())[0] if len(list(input_channels_map.keys())) >= 1 else "", interactive=True)
-                    output_audio_device = gr.Dropdown(label=translations["output_audio_device_label"], info=translations["output_audio_device_info"], choices=list(output_channels_map.keys()), value=list(output_channels_map.keys())[0] if len(list(output_channels_map.keys())) >= 1 else "", interactive=True)
-                    monitor_output_device = gr.Dropdown(label=translations["monitor_output_device_label"], info=translations["monitor_output_device_info"], choices=list(output_channels_map.keys()), value=list(output_channels_map.keys())[0] if len(list(output_channels_map.keys())) >= 1 else "", interactive=True, visible=False)
+                    input_audio_device = gr.Dropdown(label=translations["input_audio_device_label"], info=translations["input_audio_device_info"], choices=[], value=None, interactive=True)
+                    output_audio_device = gr.Dropdown(label=translations["output_audio_device_label"], info=translations["output_audio_device_info"], choices=[], value=None, interactive=True)
+                    monitor_output_device = gr.Dropdown(label=translations["monitor_output_device_label"], info=translations["monitor_output_device_info"], choices=[], value=None, interactive=True, visible=False)
                 with gr.Row():
                     input_audio_gain = gr.Slider(minimum=0, maximum=2500, label=translations["input_audio_gain_label"], info=translations["input_audio_gain_info"], value=100, step=1, interactive=True)
                     output_audio_gain = gr.Slider(minimum=0, maximum=4000, label=translations["output_audio_gain_label"], info=translations["output_audio_gain_info"], value=100, step=1, interactive=True)
                     monitor_audio_gain = gr.Slider(minimum=0, maximum=4000, label=translations["monitor_audio_gain_label"], info=translations["monitor_audio_gain_info"], value=100, step=1, interactive=True, visible=False)
-                with gr.Row(visible=False) as asio_row:
-                    input_asio_channels = gr.Slider(minimum=-1, maximum=128, label=translations["input_asio_channels_label"], info=translations["input_asio_channels_info"], value=-1, step=1, interactive=True, visible=False)
-                    output_asio_channels = gr.Slider(minimum=-1, maximum=128, label=translations["output_asio_channels_label"], info=translations["output_asio_channels_info"], value=-1, step=1, interactive=True, visible=False)
-                    monitor_asio_channels = gr.Slider(minimum=-1, maximum=128, label=translations["monitor_asio_channels_label"], info=translations["monitor_asio_channels_info"], value=-1, step=1, interactive=True, visible=False)
                 with gr.Row():
                     refresh_audio_device = gr.Button(value=translations["refresh_audio_device"], variant="secondary")
         with gr.Row():
@@ -91,6 +83,9 @@ def realtime_tab():
                         vad_sensitivity = gr.Slider(minimum=0, maximum=3, label=translations["vad_sensitivity_label"], info=translations["vad_sensitivity_info"], value=3, step=1, interactive=True, visible=vad_enabled.value)
                         vad_frame_ms = gr.Slider(minimum=10, maximum=30, label=translations["vad_frame_ms_label"], info=translations["vad_frame_ms_info"], value=30, step=10, interactive=True, visible=vad_enabled.value)
         with gr.Row():
+            json_audio_hidden = gr.JSON(visible=False)
+            json_button_hidden = gr.JSON(visible=False)
+        with gr.Row():
             model_pth.change(
                 fn=get_index, 
                 inputs=[model_pth], 
@@ -128,31 +123,15 @@ def realtime_tab():
                 inputs=[embedders], 
                 outputs=[custom_embedders]
             )
-            input_audio_device.change(
-                fn=update_audio_device,
-                inputs=[input_audio_device, output_audio_device, monitor_output_device, monitor],
-                outputs=[monitor_output_device, monitor_audio_gain, monitor_asio_channels, asio_row, input_asio_channels, output_asio_channels, monitor_asio_channels]
-            )
-            output_audio_device.change(
-                fn=update_audio_device,
-                inputs=[input_audio_device, output_audio_device, monitor_output_device, monitor],
-                outputs=[monitor_output_device, monitor_audio_gain, monitor_asio_channels, asio_row, input_asio_channels, output_asio_channels, monitor_asio_channels]
-            )
-        with gr.Row():
-            monitor_output_device.change(
-                fn=update_audio_device,
-                inputs=[input_audio_device, output_audio_device, monitor_output_device, monitor],
-                outputs=[monitor_output_device, monitor_audio_gain, monitor_asio_channels, asio_row, input_asio_channels, output_asio_channels, monitor_asio_channels]
-            )
-            monitor.change(
-                fn=update_audio_device,
-                inputs=[input_audio_device, output_audio_device, monitor_output_device, monitor],
-                outputs=[monitor_output_device, monitor_audio_gain, monitor_asio_channels, asio_row, input_asio_channels, output_asio_channels, monitor_asio_channels]
-            )
             f0_autotune.change(
                 fn=visible, 
                 inputs=[f0_autotune], 
                 outputs=[f0_autotune_strength]
+            )
+            clean_audio.change(
+                fn=visible, 
+                inputs=[clean_audio], 
+                outputs=[clean_strength]
             )
         with gr.Row():
             proposal_pitch.change(
@@ -166,21 +145,28 @@ def realtime_tab():
                 outputs=[vad_sensitivity, vad_frame_ms]
             )
             refresh_audio_device.click(
-                fn=change_audio_device_choices,
+                fn=None,
+                js="getAudioDevices",
                 inputs=[],
-                outputs=[input_audio_device, output_audio_device, monitor_output_device]
+                outputs=json_audio_hidden
             )
         with gr.Row():
-            clean_audio.change(
-                fn=visible, 
-                inputs=[clean_audio], 
-                outputs=[clean_strength]
+            json_audio_hidden.change(
+                fn=update_dropdowns_from_json,
+                inputs=[json_audio_hidden],
+                outputs=[input_audio_device, output_audio_device, monitor_output_device]
             )
+            json_button_hidden.change(
+                fn=update_button_from_json,
+                inputs=[json_button_hidden],
+                outputs=[start_realtime, stop_realtime]
+            )
+        with gr.Row():
             start_realtime.click(
-                fn=realtime_start,
+                fn=None,
+                js="StreamAudioRealtime",
                 inputs=[
                     monitor,
-                    exclusive_mode,
                     vad_enabled,
                     input_audio_device,
                     output_audio_device,
@@ -188,9 +174,6 @@ def realtime_tab():
                     input_audio_gain,
                     output_audio_gain,
                     monitor_audio_gain,
-                    input_asio_channels,
-                    output_asio_channels,
-                    monitor_asio_channels,
                     chunk_size,
                     pitch,
                     model_pth,
@@ -217,10 +200,11 @@ def realtime_tab():
                     clean_audio,
                     clean_strength
                 ],
-                outputs=[status, start_realtime, stop_realtime]
+                outputs=[json_button_hidden]
             )
         stop_realtime.click(
-            fn=realtime_stop,
+            fn=None,
+            js="StopAudioStream",
             inputs=[],
-            outputs=[status, start_realtime, stop_realtime]
+            outputs=[json_button_hidden]
         )

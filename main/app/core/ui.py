@@ -120,7 +120,7 @@ def get_index(model):
     return {"value": next((f for f in [os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name] if model.split(".")[0] in f), ""), "__type__": "update"} if model else None
 
 def index_strength_show(index):
-    return {"visible": index and os.path.exists(index) and os.path.isfile(index), "value": 0.5, "__type__": "update"}
+    return {"visible": index != "" and index != None and os.path.exists(index) and os.path.isfile(index), "value": 0.5, "__type__": "update"}
 
 def hoplength_show(method, hybrid_method=None):
     visible = False
@@ -334,3 +334,29 @@ def replace_export_format(audio_path, export_format = "wav"):
     export_format = f".{export_format}"
 
     return audio_path if audio_path.endswith(export_format) else audio_path.replace(f".{os.path.basename(audio_path).split('.')[-1]}", export_format)
+
+def update_dropdowns_from_json(data):
+    if not data:
+        return [
+            gr.update(choices=[], value=None), 
+            gr.update(choices=[], value=None), 
+            gr.update(choices=[], value=None)
+        ]
+
+    inputs = [tuple(d) for d in data.get("inputs", [])]
+    outputs = [tuple(d) for d in data.get("outputs", [])]
+
+    return [
+        gr.update(choices=inputs, value=None),
+        gr.update(choices=outputs, value=None),
+        gr.update(choices=outputs, value=None),
+    ]
+
+def update_button_from_json(data):
+    if not data:
+        return [gr.update(interactive=True), gr.update(interactive=False)]
+    
+    return [
+        gr.update(interactive=data.get("start_button", True)),
+        gr.update(interactive=data.get("stop_button", False))
+    ]

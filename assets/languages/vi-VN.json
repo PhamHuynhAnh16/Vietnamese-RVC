@@ -736,5 +736,12 @@
     "alpha_label": "Mức trộn của các phương thức",
     "alpha_info": "Mức trộn các cao độ của các phương thức trích xuất với nhau",
     "multiscale_mel_loss": "Sử dụng tổn thất Mel đa tần",
-    "multiscale_mel_loss_info": "So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra."
+    "multiscale_mel_loss_info": "So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra.",
+    "realtime_client": "Thời gian thực (Client)",
+    "media_devices": "Trình duyệt không hỗ trợ truy cập thiết bị âm thanh thông qua API",
+    "mic_inaccessible": "Không thể truy cập được thiết bị âm thanh đầu vào!",
+    "ws_connected": "Đã kết nối với [WS]",
+    "ws_closed": "Đã dừng kết nối với [WS]",
+    "ws_disconnected": "Đã ngắt kết nối với [WS]",
+    "8080warn": "Cổng 8080 đã được sử dụng cho mục đích khác"
 }

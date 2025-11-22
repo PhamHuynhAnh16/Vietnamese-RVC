@@ -736,5 +736,12 @@
     "alpha_label": "Blending Level of Methods",
     "alpha_info": "The blending ratio of pitch values extracted by different methods.",
     "multiscale_mel_loss": "Use Multi-Scale Mel Loss",
-    "multiscale_mel_loss_info": "Compares the Mel spectrograms of real and generated audio at multiple scales. Helps the model learn timbral details, brightness, and frequency structure more effectively, thereby improving output speech quality and naturalness."
+    "multiscale_mel_loss_info": "Compares the Mel spectrograms of real and generated audio at multiple scales. Helps the model learn timbral details, brightness, and frequency structure more effectively, thereby improving output speech quality and naturalness.",
+    "realtime_client": "Realtime (Client)",
+    "media_devices": "Browser does not support accessing audio devices via API",
+    "mic_inaccessible": "Unable to access input devices!",
+    "ws_connected": "Connected to [WS]",
+    "ws_closed": "Stopped connecting to [WS]",
+    "ws_disconnected": "Disconnected from [WS]",
+    "8080warn": "Port 8080 is already in use"
 }

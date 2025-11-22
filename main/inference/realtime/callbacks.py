@@ -6,7 +6,6 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import check_assets
 from main.inference.realtime.audio import Audio
 from main.app.variables import logger, translations
 from main.inference.realtime.realtime import VoiceChanger, RVC_Realtime
@@ -60,8 +59,6 @@ class AudioCallbacks:
         )
 
     def initialize(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = -90, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio = False, clean_strength = 0.7):
-        check_assets(f0_method, embedder_model, f0_onnx, embedders_mode)
-
         self.vc.initialize(
             RVC_Realtime(
                 model_path, 
