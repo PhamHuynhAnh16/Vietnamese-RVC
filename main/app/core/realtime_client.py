@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import uvicorn
 
 import numpy as np
 
@@ -113,6 +112,3 @@ async def websocket_audio(ws: WebSocket):
             pass
 
         logger.info(translations["ws_closed"])
-
-def run_uvicorn():
-    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")

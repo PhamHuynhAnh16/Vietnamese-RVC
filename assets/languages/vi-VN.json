@@ -742,6 +742,5 @@
     "mic_inaccessible": "Không thể truy cập được thiết bị âm thanh đầu vào!",
     "ws_connected": "Đã kết nối với [WS]",
     "ws_closed": "Đã dừng kết nối với [WS]",
-    "ws_disconnected": "Đã ngắt kết nối với [WS]",
-    "8080warn": "Cổng 8080 đã được sử dụng cho mục đích khác"
+    "ws_disconnected": "Đã ngắt kết nối với [WS]"
 }

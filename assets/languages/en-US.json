@@ -742,6 +742,5 @@
     "mic_inaccessible": "Unable to access input devices!",
     "ws_connected": "Connected to [WS]",
     "ws_closed": "Stopped connecting to [WS]",
-    "ws_disconnected": "Disconnected from [WS]",
-    "8080warn": "Port 8080 is already in use"
+    "ws_disconnected": "Disconnected from [WS]"
 }

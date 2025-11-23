@@ -278,7 +278,7 @@ js_code = """
             if (monitor && monitor_output_device) createOutputRoute(window._audioCtx, playbackNode, monitor_output_device, monitor_audio_gain / 100);
             
             const protocol = (location.protocol === "https:") ? "wss:" : "ws:";
-            const wsUrl = protocol + '//' + location.hostname + ':8080' + '/ws-audio';
+            const wsUrl = protocol + '//' + location.hostname + `:${location.port}` + '/api/ws-audio';
             const ws = new WebSocket(wsUrl);
 
             ButtonState.start_button = false;
@@ -469,25 +469,15 @@ with gr.Blocks(
         logger.info(translations["set_lang"].format(lang=language))
 
         port = configs.get("app_port", 7860)
-        if port == 8080 and client_mode:
-            logger.warning(translations["8080warn"])
-            port = 7860
-
         server_name = configs.get("server_name", "0.0.0.0")
         share = "--share" in sys.argv
 
         original_stdout = sys.stdout
         sys.stdout = io.StringIO()
 
-        if client_mode:
-            import threading
-            from main.app.core.realtime_client import run_uvicorn
-
-            threading.Thread(target=run_uvicorn, daemon=True).start()
-
         for i in range(configs.get("num_of_restart", 5)):
             try:
-                _, _, share_url = app.queue().launch(
+                gradio_app, _, share_url = app.queue().launch(
                     favicon_path=configs["ico_path"], 
                     server_name=server_name, 
                     server_port=port, 
@@ -505,6 +495,10 @@ with gr.Blocks(
             except Exception as e:
                 logger.error(translations["error_occurred"].format(e=e))
                 sys.exit(1)
+
+        if client_mode:
+            from main.app.core.realtime_client import app as fastapi_app
+            gradio_app.mount("/api", fastapi_app)
         
         sys.stdout = original_stdout
 
