@@ -159,7 +159,7 @@ js_code = """
     window.getAudioDevices = async function() {
         if (!navigator.mediaDevices) {
             setStatus("__MEDIA_DEVICES__");
-            return {"inputs": [], "outputs": []};
+            return {"inputs": {}, "outputs": {}};
         }
 
         try {
@@ -168,22 +168,22 @@ js_code = """
             console.error(err);
             setStatus("__MIC_INACCESSIBLE__")
 
-            return {"inputs": [], "outputs": []};
+            return {"inputs": {}, "outputs": {}};
         }
 
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const inputs = [];
-        const outputs = [];
+        const inputs = {};
+        const outputs = {};
         
         for (const device of devices) {
             if (device.kind === "audioinput") {
-                inputs.push([device.label, device.deviceId])
+                inputs[device.label] = device.deviceId
             } else if (device.kind === "audiooutput") {
-                outputs.push([device.label, device.deviceId])
+                outputs[device.label] = device.deviceId
             }
         }
 
-        if (!inputs.length && !outputs.length) return {"inputs": [], "outputs": []};
+        if (!Object.keys(inputs).length && !Object.keys(outputs).length) return {"inputs": {}, "outputs": {}};
         return {"inputs": inputs, "outputs": outputs};
     };
         
@@ -225,10 +225,14 @@ js_code = """
         const SampleRate = 48000;
         const ReadChunkSize = Math.round(chunk_size * SampleRate / 1000 / 128);
         const block_frame = parseInt(ReadChunkSize) * 128;
-        const ButtonState = { start_button: true, stop_button: false};
+        const ButtonState = { start_button: true, stop_button: false };
+        const devices = await window.getAudioDevices();
+
+        input_audio_device = devices["inputs"][input_audio_device];
+        output_audio_device = devices["outputs"][output_audio_device];
+        if (monitor && devices["outputs"][monitor_output_device]) monitor_output_device = devices["outputs"][monitor_output_device];
 
         try {
-
             if (!input_audio_device || !output_audio_device) {
                 setStatus("__PROVIDE_AUDIO_DEVICE__");
                 return ButtonState;
@@ -335,7 +339,7 @@ js_code = """
                 if (typeof ev.data === 'string') {
                     const msg = JSON.parse(ev.data);
 
-                    if (msg.type === 'latency') setStatus(`__LATENCY__ ${msg.value.toFixed(1)} ms`, use_alert=false)
+                    if (msg.type === 'latency') setStatus(`__LATENCY__: ${msg.value.toFixed(1)} ms`, use_alert=false)
                     if (msg.type === 'warnings') {
                         setStatus(msg.value);
                         StopAudioStream();

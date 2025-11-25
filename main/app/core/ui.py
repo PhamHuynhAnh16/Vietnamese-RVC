@@ -343,13 +343,13 @@ def update_dropdowns_from_json(data):
             gr.update(choices=[], value=None)
         ]
 
-    inputs = [tuple(d) for d in data.get("inputs", [])]
-    outputs = [tuple(d) for d in data.get("outputs", [])]
+    inputs = list(data.get("inputs", {}).keys())
+    outputs = list(data.get("outputs", {}).keys())
 
     return [
-        gr.update(choices=inputs, value=None),
-        gr.update(choices=outputs, value=None),
-        gr.update(choices=outputs, value=None),
+        gr.update(choices=inputs, value=inputs[0] if len(inputs) > 0 else None),
+        gr.update(choices=outputs, value=outputs[0] if len(outputs) > 0 else None),
+        gr.update(choices=outputs, value=outputs[0] if len(outputs) > 0 else None),
     ]
 
 def update_button_from_json(data):
