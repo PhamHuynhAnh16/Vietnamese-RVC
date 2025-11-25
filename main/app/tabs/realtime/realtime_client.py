@@ -17,6 +17,7 @@ def realtime_client_tab():
             gr.Label(label=translations["realtime_latency"], value=translations["realtime_not_startup"], elem_id="realtime-status-info")
         with gr.Row():
             monitor = gr.Checkbox(label=translations["monitor"], value=False, interactive=True)
+            exclusive_mode = gr.Checkbox(label=translations["exclusive_mode"], value=False, interactive=True)
             vad_enabled = gr.Checkbox(label=translations["vad_enabled"], value=False, interactive=True)
             clean_audio = gr.Checkbox(label=translations["clear_audio"], value=False, interactive=True)
         with gr.Row():
@@ -198,7 +199,8 @@ def realtime_client_tab():
                     vad_sensitivity,
                     vad_frame_ms,
                     clean_audio,
-                    clean_strength
+                    clean_strength,
+                    exclusive_mode
                 ],
                 outputs=[json_button_hidden]
             )

@@ -220,7 +220,8 @@ js_code = """
         vad_sensitivity,
         vad_frame_ms,
         clean_audio,
-        clean_strength
+        clean_strength,
+        exclusive_mode
     ) {
         const SampleRate = 48000;
         const ReadChunkSize = Math.round(chunk_size * SampleRate / 1000 / 128);
@@ -255,14 +256,17 @@ js_code = """
                     deviceId: { exact: input_audio_device },
                     channelCount: 1,
                     sampleRate: SampleRate,
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
+                    echoCancellation: !exclusive_mode,
+                    noiseSuppression: !exclusive_mode,
+                    autoGainControl: !exclusive_mode
                 }
             });
 
+            let latencyHint = "playback";
+            if (exclusive_mode) latencyHint = "interactive";
+
             window._activeStream = stream;
-            window._audioCtx = new AudioContext({ sampleRate: SampleRate, latencyHint: "interactive" });
+            window._audioCtx = new AudioContext({ sampleRate: SampleRate, latencyHint: latencyHint });
 
             await addModuleFromString(window._audioCtx, inputWorkletSource);
             await addModuleFromString(window._audioCtx, playbackWorkletSource);

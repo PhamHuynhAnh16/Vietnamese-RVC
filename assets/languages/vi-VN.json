@@ -675,7 +675,7 @@
     "realtime_latency": "Độ trễ thời gian thực",
     "realtime_not_startup": "Chưa bắt đầu thời gian thực",
     "monitor": "Sử dụng thiết bị nghe lại",
-    "exclusive_mode": "Giảm trễ thiết bị WASAPI",
+    "exclusive_mode": "Giảm trễ thiết bị",
     "vad_enabled": "Phát hiện giọng nói VAD",
     "audio_device": "Thiết bị âm thanh",
     "input_audio_device_label": "Thiết bị âm thanh đầu vào",
