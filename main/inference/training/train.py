@@ -94,6 +94,7 @@ d_step_per_g_step = 1
 
 args = parse_arguments()
 model_name, save_every_epoch, total_epoch, pretrainG, pretrainD, version, gpus, batch_size, pitch_guidance, save_only_latest, save_every_weights, cache_data_in_gpu, overtraining_detector, overtraining_threshold, cleanup, model_author, vocoder, checkpointing, optimizer_choice, energy_use, use_custom_reference, reference_path, multiscale_mel_loss = args.model_name, args.save_every_epoch, args.total_epoch, args.g_pretrained_path, args.d_pretrained_path, args.rvc_version, args.gpu, args.batch_size, args.pitch_guidance, args.save_only_latest, args.save_every_weights, args.cache_data_in_gpu, args.overtraining_detector, args.overtraining_threshold, args.cleanup, args.model_author, args.vocoder, args.checkpointing, args.optimizer, args.energy_use, args.use_custom_reference, args.reference_path, args.multiscale_mel_loss
+disc_version = version if vocoder != "RefineGAN" else "v3"
 
 experiment_dir = os.path.join(main_configs["logs_path"], model_name)
 training_file_path = os.path.join(experiment_dir, "training_data.json")
@@ -283,8 +284,8 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
             energy=energy_use
         ), 
         MultiPeriodDiscriminator(
-            version, 
-            config.model.use_spectral_norm, 
+            version=disc_version, 
+            use_spectral_norm=config.model.use_spectral_norm, 
             checkpointing=checkpointing
         )
     )

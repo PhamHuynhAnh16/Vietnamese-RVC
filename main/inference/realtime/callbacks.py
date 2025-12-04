@@ -14,7 +14,7 @@ class AudioCallbacks:
     def emit_to(self, performance):
         self.latency = performance[1]
     
-    def __init__(self, pass_through = False, read_chunk_size = 192, cross_fade_overlap_size = 0.1, input_sample_rate = 48000, output_sample_rate = 48000, extra_convert_size = 0.5, model_path = None, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = -90, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0, input_audio_gain = 1.0, output_audio_gain = 1.0, monitor_audio_gain = 1.0, monitor = False, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio = False, clean_strength = 0.7):
+    def __init__(self, pass_through = False, read_chunk_size = 192, cross_fade_overlap_size = 0.1, input_sample_rate = 48000, output_sample_rate = 48000, extra_convert_size = 0.5, model_path = None, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = -90, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0, input_audio_gain = 1.0, output_audio_gain = 1.0, monitor_audio_gain = 1.0, monitor = False, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio = False, clean_strength = 0.7, post_process = False, **kwargs):
         self.pass_through = pass_through
         self.input_sample_rate = input_sample_rate
         self.output_sample_rate = output_sample_rate
@@ -55,10 +55,12 @@ class AudioCallbacks:
             vad_sensitivity,
             vad_frame_ms,
             clean_audio, 
-            clean_strength
+            clean_strength,
+            post_process, 
+            **kwargs
         )
 
-    def initialize(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = -90, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio = False, clean_strength = 0.7):
+    def initialize(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = -90, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio = False, clean_strength = 0.7, post_process = False, **kwargs):
         self.vc.initialize(
             RVC_Realtime(
                 model_path, 
@@ -76,7 +78,9 @@ class AudioCallbacks:
                 vad_sensitivity,
                 vad_frame_ms,
                 clean_audio, 
-                clean_strength
+                clean_strength,
+                post_process,
+                **kwargs
             )
         )
 

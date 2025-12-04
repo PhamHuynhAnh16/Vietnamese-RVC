@@ -2,19 +2,10 @@ import os
 import math
 import torch
 import random
+import librosa
 import torchaudio
 
 from io import IOBase
-
-def get_torchaudio_info(file, backend = None):
-    if not backend:
-        backends = (torchaudio.list_audio_backends())
-        backend = "soundfile" if "soundfile" in backends else backends[0]
-
-    info = torchaudio.info(file["audio"], backend=backend)
-    if isinstance(file["audio"], IOBase): file["audio"].seek(0)
-
-    return info
 
 class Audio:
     @staticmethod
@@ -51,10 +42,7 @@ class Audio:
         self.sample_rate = sample_rate
         self.mono = mono
 
-        if not backend:
-            backends = (torchaudio.list_audio_backends())  
-            backend = "soundfile" if "soundfile" in backends else backends[0]
-
+        if not backend: backend = "soundfile"
         self.backend = backend
 
     def downmix_and_resample(self, waveform, sample_rate):
@@ -78,11 +66,7 @@ class Audio:
         if "waveform" in file:
             frames = len(file["waveform"].T)
             sample_rate = file["sample_rate"]
-        else:
-            info = file["torchaudio.info"] if "torchaudio.info" in file else get_torchaudio_info(file, backend=self.backend)
-            frames = info.num_frames
-            sample_rate = info.sample_rate
-
+        else: return librosa.get_duration(file, sr=None)
         return frames / sample_rate
 
     def get_num_samples(self, duration, sample_rate = None):
@@ -118,9 +102,9 @@ class Audio:
             frames = info.num_frames
             sample_rate = info.sample_rate
         else:
-            info = get_torchaudio_info(file, backend=self.backend)
-            frames = info.num_frames
-            sample_rate = info.sample_rate
+            info, sr = librosa.load(file["audio"], sr=None)
+            frames = info.shape[0]
+            sample_rate = sr
 
         channel = file.get("channel", None)
         start_frame = math.floor(segment.start * sample_rate)

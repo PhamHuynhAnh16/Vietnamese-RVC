@@ -668,7 +668,7 @@ class TextDecoder(nn.Module):
             x = block(x, xa, mask=self.mask, kv_cache=kv_cache)
 
         x = self.ln(x)
-        return x @ self.token_embedding.weight.to(x.dtype).transpose(0, 1).float()
+        return (x @ self.token_embedding.weight.to(x.dtype).transpose(0, 1)).float()
 
 class AudioEncoder(nn.Module):
     def __init__(self, n_mels, n_ctx, n_state, n_head, n_layer):

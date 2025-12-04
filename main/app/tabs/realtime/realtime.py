@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.realtime import realtime_start, realtime_stop
 from main.app.variables import translations, configs, model_name, index_path, method_f0, embedders_mode, embedders_model
-from main.app.core.ui import change_models_choices, get_index, index_strength_show, unlock_f0, hoplength_show, change_embedders_mode, visible, audio_device, change_audio_device_choices, update_audio_device
+from main.app.core.ui import change_models_choices, get_index, index_strength_show, unlock_f0, hoplength_show, change_embedders_mode, visible, audio_device, change_audio_device_choices, update_audio_device, visibleFalse
 
 input_channels_map, output_channels_map = audio_device()
 
@@ -90,6 +90,121 @@ def realtime_tab():
                     with gr.Row():
                         vad_sensitivity = gr.Slider(minimum=0, maximum=3, label=translations["vad_sensitivity_label"], info=translations["vad_sensitivity_info"], value=3, step=1, interactive=True, visible=vad_enabled.value)
                         vad_frame_ms = gr.Slider(minimum=10, maximum=30, label=translations["vad_frame_ms_label"], info=translations["vad_frame_ms_info"], value=30, step=10, interactive=True, visible=vad_enabled.value)
+                    with gr.Row():
+                        post_process = gr.Checkbox(label=translations["audio_effects"], value=False, interactive=True)
+                        reverb = gr.Checkbox(label=translations["reverb"], value=False, interactive=True, visible=False)
+                        chorus = gr.Checkbox(label=translations["chorus"], value=False, interactive=True, visible=False)
+                        delay = gr.Checkbox(label=translations["delay"], value=False, interactive=True, visible=False)
+                        phaser = gr.Checkbox(label=translations["phaser"], value=False, interactive=True, visible=False)
+                        compressor = gr.Checkbox(label=translations["compressor"], value=False, interactive=True, visible=False)
+                    with gr.Row():
+                        limiter = gr.Checkbox(label=translations["limiter"], value=False, interactive=True, visible=False)
+                        distortion = gr.Checkbox(label=translations["distortion"], value=False, interactive=True, visible=False)
+                        pitch_shift = gr.Checkbox(label=translations["pitch"], value=False, interactive=True, visible=False)
+                        gain = gr.Checkbox(label=translations["gain"], value=False, interactive=True, visible=False)
+                        bitcrush = gr.Checkbox(label=translations["bitcrush"], value=False, interactive=True, visible=False)
+                        clipping = gr.Checkbox(label=translations["clipping"], value=False, interactive=True, visible=False)
+                    with gr.Accordion(translations["reverb"], open=True, visible=False) as reverb_accordion:
+                        reverb_freeze_mode = gr.Checkbox(label=translations["reverb_freeze"], info=translations["reverb_freeze_info"], value=False, interactive=True)
+                        reverb_room_size = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.15, label=translations["room_size"], info=translations["room_size_info"], interactive=True)
+                        reverb_damping = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.7, label=translations["damping"], info=translations["damping_info"], interactive=True)
+                        reverb_wet_gain = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.2, label=translations["wet_level"], info=translations["wet_level_info"], interactive=True)
+                        reverb_dry_gain = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.8, label=translations["dry_level"], info=translations["dry_level_info"], interactive=True)
+                        reverb_width = gr.Slider(minimum=0, maximum=1, step=0.01, value=1, label=translations["width"], info=translations["width_info"], interactive=True)
+                    with gr.Accordion(translations["chorus"], open=True, visible=False) as chorus_accordion:
+                        chorus_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["chorus_depth"], info=translations["chorus_depth_info"], interactive=True)
+                        chorus_rate = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1.5, label=translations["chorus_rate_hz"], info=translations["chorus_rate_hz_info"], interactive=True)
+                        chorus_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["chorus_mix"], info=translations["chorus_mix_info"], interactive=True)
+                        chorus_center_delay = gr.Slider(minimum=0, maximum=50, step=1, value=10, label=translations["chorus_center_delay_ms"], info=translations["chorus_center_delay_ms_info"], interactive=True)
+                        chorus_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label=translations["chorus_feedback"], info=translations["chorus_feedback_info"], interactive=True)
+                    with gr.Accordion(translations["phaser"], open=True, visible=False) as phaser_accordion:
+                        phaser_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["phaser_depth"], info=translations["phaser_depth_info"], interactive=True)
+                        phaser_rate_hz = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1, label=translations["phaser_rate_hz"], info=translations["phaser_rate_hz_info"], interactive=True)
+                        phaser_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["phaser_mix"], info=translations["phaser_mix_info"], interactive=True)
+                        phaser_centre_frequency_hz = gr.Slider(minimum=50, maximum=5000, step=10, value=1000, label=translations["phaser_centre_frequency_hz"], info=translations["phaser_centre_frequency_hz_info"], interactive=True)
+                        phaser_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label=translations["phaser_feedback"], info=translations["phaser_feedback_info"], interactive=True)
+                    with gr.Accordion(translations["delay"], open=True, visible=False) as delay_accordion:
+                        delay_seconds = gr.Slider(minimum=0, maximum=5, step=0.01, value=0.5, label=translations["delay_seconds"], info=translations["delay_seconds_info"], interactive=True)
+                        delay_feedback = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["delay_feedback"], info=translations["delay_feedback_info"], interactive=True)
+                        delay_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["delay_mix"], info=translations["delay_mix_info"], interactive=True)
+                    with gr.Accordion(translations["compressor"], open=True, visible=False) as compressor_accordion:
+                        compressor_threshold = gr.Slider(minimum=-60, maximum=0, step=1, value=-20, label=translations["compressor_threshold_db"], info=translations["compressor_threshold_db_info"], interactive=True)
+                        compressor_ratio = gr.Slider(minimum=1, maximum=20, step=0.1, value=1, label=translations["compressor_ratio"], info=translations["compressor_ratio_info"], interactive=True)
+                        compressor_attack = gr.Slider(minimum=0.1, maximum=100, step=0.1, value=10, label=translations["compressor_attack_ms"], info=translations["compressor_attack_ms_info"], interactive=True)
+                        compressor_release = gr.Slider(minimum=10, maximum=1000, step=1, value=100, label=translations["compressor_release_ms"], info=translations["compressor_release_ms_info"], interactive=True)
+                    with gr.Accordion(translations["limiter"], open=True, visible=limiter.value) as limiter_accordion:
+                        limiter_threshold = gr.Slider(minimum=-60, maximum=0, step=1, value=-1, label=translations["limiter_threshold_db"], info=translations["limiter_threshold_db_info"], interactive=True)
+                        limiter_release_time = gr.Slider(minimum=10, maximum=1000, step=1, value=100, label=translations["limiter_release_ms"], info=translations["limiter_release_ms_info"], interactive=True)
+                    with gr.Row():
+                        distortion_gain = gr.Slider(minimum=0, maximum=50, step=1, value=20, label=translations["distortion"], info=translations["distortion_info"], interactive=True, visible=False)
+                        pitch_shift_semitones = gr.Slider(minimum=-20, maximum=20, step=1, value=0, label=translations["pitch"], info=translations["pitch_info"], interactive=True, visible=False)
+                        gain_db = gr.Slider(minimum=-60, maximum=60, step=1, value=0, label=translations["gain"], info=translations["gain_info"], interactive=True, visible=False)
+                        bitcrush_bit_depth = gr.Slider(minimum=1, maximum=24, step=1, value=16, label=translations["bitcrush_bit_depth"], info=translations["bitcrush_bit_depth_info"], interactive=True, visible=False)
+                        clipping_threshold = gr.Slider(minimum=-60, maximum=0, step=1, value=-1, label=translations["clipping_threshold_db"], info=translations["clipping_threshold_db_info"], interactive=True, visible=False)
+        with gr.Row():
+            post_process.change(
+                fn=lambda a: [visibleFalse(a) for _ in range(11)],
+                inputs=[post_process],
+                outputs=[reverb, chorus, delay, phaser, compressor, pitch_shift, limiter, distortion, gain, bitcrush, clipping]
+            )
+            reverb.change(
+                fn=visible,
+                inputs=[reverb],
+                outputs=[reverb_accordion]
+            )
+            chorus.change(
+                fn=visible,
+                inputs=[chorus],
+                outputs=[chorus_accordion]
+            )
+        with gr.Row():
+            delay.change(
+                fn=visible,
+                inputs=[delay],
+                outputs=[delay_accordion]
+            )
+            phaser.change(
+                fn=visible,
+                inputs=[phaser],
+                outputs=[phaser_accordion]
+            )
+            compressor.change(
+                fn=visible,
+                inputs=[compressor],
+                outputs=[compressor_accordion]
+            )
+        with gr.Row():
+            limiter.change(
+                fn=visible,
+                inputs=[limiter],
+                outputs=[limiter_accordion]
+            )
+            distortion.change(
+                fn=visible,
+                inputs=[distortion],
+                outputs=[distortion_gain]
+            )
+            pitch_shift.change(
+                fn=visible,
+                inputs=[pitch_shift],
+                outputs=[pitch_shift_semitones]
+            )
+        with gr.Row():
+            gain.change(
+                fn=visible,
+                inputs=[gain],
+                outputs=[gain_db]
+            )
+            bitcrush.change(
+                fn=visible,
+                inputs=[bitcrush],
+                outputs=[bitcrush_bit_depth]
+            )
+            clipping.change(
+                fn=visible,
+                inputs=[clipping],
+                outputs=[clipping_threshold]
+            )
         with gr.Row():
             model_pth.change(
                 fn=get_index, 
@@ -215,7 +330,49 @@ def realtime_tab():
                     vad_sensitivity,
                     vad_frame_ms,
                     clean_audio,
-                    clean_strength
+                    clean_strength,
+                    post_process,
+                    chorus,
+                    distortion,
+                    reverb,
+                    pitch_shift,
+                    delay,
+                    compressor,
+                    limiter,
+                    gain,
+                    bitcrush,
+                    clipping,
+                    phaser,
+                    chorus_depth,
+                    chorus_rate,
+                    chorus_mix,
+                    chorus_center_delay,
+                    chorus_feedback,
+                    distortion_gain,
+                    reverb_room_size,
+                    reverb_damping,
+                    reverb_wet_gain,
+                    reverb_dry_gain,
+                    reverb_width,
+                    reverb_freeze_mode,
+                    pitch_shift_semitones,
+                    delay_seconds,
+                    delay_feedback,
+                    delay_mix,
+                    compressor_threshold,
+                    compressor_ratio,
+                    compressor_attack,
+                    compressor_release,
+                    limiter_threshold,
+                    limiter_release_time,
+                    gain_db,
+                    bitcrush_bit_depth,
+                    clipping_threshold,
+                    phaser_rate_hz,
+                    phaser_depth,
+                    phaser_centre_frequency_hz,
+                    phaser_feedback,
+                    phaser_mix
                 ],
                 outputs=[status, start_realtime, stop_realtime]
             )

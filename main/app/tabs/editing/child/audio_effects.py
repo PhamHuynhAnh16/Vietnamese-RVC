@@ -53,7 +53,7 @@ def audio_effects_tab():
                         name_to_save_file = gr.Textbox(label=translations["filename_to_save"])
                         save_file_button = gr.Button(translations["export_file"])
             with gr.Row():
-                upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".effect.json"]) 
+                upload_presets = gr.Files(label=translations["upload_presets"], file_types=[".effect.json"])
     with gr.Row():
         apply_effects_button = gr.Button(translations["apply"], variant="primary", scale=2)
     with gr.Row():
@@ -71,7 +71,7 @@ def audio_effects_tab():
                     chorus_depth = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["chorus_depth"], info=translations["chorus_depth_info"], interactive=True)
                     chorus_rate_hz = gr.Slider(minimum=0.1, maximum=10, step=0.1, value=1.5, label=translations["chorus_rate_hz"], info=translations["chorus_rate_hz_info"], interactive=True)
                     chorus_mix = gr.Slider(minimum=0, maximum=1, step=0.01, value=0.5, label=translations["chorus_mix"], info=translations["chorus_mix_info"], interactive=True)
-                    chorus_centre_delay_ms = gr.Slider(minimum=0, maximum=50, step=1, value=10, label=translations["chorus_centre_delay_ms"], info=translations["chorus_centre_delay_ms_info"], interactive=True)
+                    chorus_center_delay_ms = gr.Slider(minimum=0, maximum=50, step=1, value=10, label=translations["chorus_center_delay_ms"], info=translations["chorus_center_delay_ms_info"], interactive=True)
                     chorus_feedback = gr.Slider(minimum=-1, maximum=1, step=0.01, value=0, label=translations["chorus_feedback"], info=translations["chorus_feedback_info"], interactive=True)
             with gr.Row():
                 with gr.Accordion(translations["delay"], open=False, visible=delay_check_box.value) as delay_accordion:
@@ -170,7 +170,7 @@ def audio_effects_tab():
                 chorus_depth, 
                 chorus_rate_hz, 
                 chorus_mix, 
-                chorus_centre_delay_ms, 
+                chorus_center_delay_ms, 
                 chorus_feedback, 
                 distortion_drive_db, 
                 reverb_room_size, 
@@ -222,7 +222,7 @@ def audio_effects_tab():
                 chorus_depth, 
                 chorus_rate_hz, 
                 chorus_mix, 
-                chorus_centre_delay_ms, 
+                chorus_center_delay_ms, 
                 chorus_feedback, 
                 distortion_drive_db, 
                 reverb_room_size, 
@@ -278,7 +278,7 @@ def audio_effects_tab():
                 chorus_depth, 
                 chorus_rate_hz, 
                 chorus_mix, 
-                chorus_centre_delay_ms, 
+                chorus_center_delay_ms, 
                 chorus_feedback, 
                 distortion_drive_db, 
                 reverb_room_size, 
@@ -337,7 +337,7 @@ def audio_effects_tab():
                 chorus_depth, 
                 chorus_rate_hz, 
                 chorus_mix, 
-                chorus_centre_delay_ms, 
+                chorus_center_delay_ms, 
                 chorus_feedback, 
                 distortion_drive_db, 
                 reverb_room_size, 

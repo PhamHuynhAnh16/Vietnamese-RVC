@@ -14,7 +14,7 @@ from main.library.utils import circular_write, check_assets
 from main.inference.realtime.pipeline import create_pipeline
 
 class RVC_Realtime:
-    def __init__(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = 0, input_sample_rate = 48000, output_sample_rate = 48000, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio=False, clean_strength=0.7):
+    def __init__(self, model_path, index_path = None, f0_method = "rmvpe", f0_onnx = False, embedder_model = "hubert_base", embedders_mode = "fairseq", sample_rate = 16000, hop_length = 160, silent_threshold = 0, input_sample_rate = 48000, output_sample_rate = 48000, vad_enabled = False, vad_sensitivity = 3, vad_frame_ms = 30, clean_audio=False, clean_strength=0.7, post_process = False, **kwargs):
         self.model_path = model_path
         self.index_path = index_path
         self.f0_method = f0_method
@@ -23,6 +23,8 @@ class RVC_Realtime:
         self.embedders_mode = embedders_mode
         self.sample_rate = sample_rate
         self.hop_length = hop_length
+        self.post_process = post_process
+        self.kwargs = kwargs
         self.pipeline = None
         self.convert_buffer = None
         self.pitch_buffer = None
@@ -55,8 +57,10 @@ class RVC_Realtime:
 
         if self.clean_audio:
             from main.tools.noisereduce import TorchGate
-            self.tg = TorchGate(self.sample_rate, prop_decrease=self.clean_strength).to(config.device)
+            self.tg = TorchGate(self.output_sample_rate, prop_decrease=self.clean_strength).to(config.device)
         else: self.tg = None
+
+        self.board = self.setup_pedalboard(**self.kwargs) if self.post_process else None
 
         self.pipeline = create_pipeline(
             model_path=self.model_path, 
@@ -79,6 +83,109 @@ class RVC_Realtime:
             new_freq=self.output_sample_rate,
             dtype=torch.float32
         ).to(config.device)
+
+    def setup_pedalboard(self, **kwargs):
+        from pedalboard import Pedalboard, Chorus, Distortion, Reverb, PitchShift, Delay, Limiter, Gain, Bitcrush, Clipping, Compressor, Phaser, HighpassFilter
+
+        board = Pedalboard([HighpassFilter()])
+
+        if ["chorus"]:
+            board.append(
+                Chorus(
+                    depth=kwargs["chorus_depth"], 
+                    rate_hz=kwargs["chorus_rate"], 
+                    mix=kwargs["chorus_mix"], 
+                    centre_delay_ms=kwargs["chorus_delay"], 
+                    feedback=kwargs["chorus_feedback"]
+                )
+            )
+        
+        if kwargs["distortion"]:
+            board.append(
+                Distortion(
+                    drive_db=kwargs["distortion_gain"]
+                )
+            )
+
+        if kwargs["reverb"]:
+            board.append(
+                Reverb(
+                    room_size=kwargs["reverb_room_size"],
+                    damping=kwargs["reverb_damping"],
+                    wet_level=kwargs["reverb_wet_level"],
+                    dry_level=kwargs["reverb_dry_level"],
+                    width=kwargs["reverb_width"],
+                    freeze_mode=int(kwargs["reverb_freeze_mode"])
+                )
+            )
+
+        if kwargs["pitch_shift"]:
+            board.append(
+                PitchShift(
+                    semitones=kwargs["pitch_shift_semitones"]
+                )
+            )
+
+        if kwargs["delay"]:
+            board.append(
+                Delay(
+                    delay_seconds=kwargs["delay_seconds"],
+                    feedback=kwargs["delay_feedback"],
+                    mix=kwargs["delay_mix"]
+                )
+            )
+
+        if kwargs["compressor"]:
+            board.append(
+                Compressor(
+                    threshold_db=kwargs["compressor_threshold"],
+                    ratio=kwargs["compressor_ratio"],
+                    attack_ms=kwargs["compressor_attack"],
+                    release_ms=kwargs["compressor_release"]
+                )
+            )
+
+        if kwargs["limiter"]:
+            board.append(
+                Limiter(
+                    threshold_db=kwargs["limiter_threshold"],
+                    release_ms=kwargs["limiter_release"]
+                )
+            )
+
+        if kwargs["gain"]:
+            board.append(
+                Gain(
+                    gain_db=kwargs["gain_db"]
+                )
+            )
+
+        if kwargs["bitcrush"]:
+            board.append(
+                Bitcrush(
+                    bit_depth=kwargs["bitcrush_bit_depth"]
+                )
+            )
+
+        if kwargs["clipping"]:
+            board.append(
+                Clipping(
+                    threshold_db=kwargs["clipping_threshold"]
+                )
+            )
+
+        if kwargs["phaser"]: 
+            board.append(
+                Phaser(
+                    rate_hz=kwargs["phaser_rate_hz"], 
+                    depth=kwargs["phaser_depth"], 
+                    centre_frequency_hz=kwargs["phaser_centre_frequency_hz"], 
+                    feedback=kwargs["phaser_feedback"], 
+                    mix=kwargs["phaser_mix"]
+                )
+            )
+
+        return board
 
     def realloc(self, block_frame, extra_frame, crossfade_frame, sola_search_frame):
         block_frame_16k = int(block_frame / self.input_sample_rate * self.sample_rate)
@@ -177,8 +284,9 @@ class RVC_Realtime:
             proposal_pitch_threshold
         )
 
-        if self.tg is not None: audio_model = self.tg(audio_model.unsqueeze(0)).squeeze(0)
         audio_out = self.resample_out(audio_model * vol_t.sqrt())
+        if self.tg is not None: audio_out = self.tg(audio_out.unsqueeze(0)).squeeze(0)
+        if self.board is not None: audio_out = torch.as_tensor(self.board(audio_out.cpu().numpy(), self.output_sample_rate), device=config.device)
 
         return audio_out, vol
     

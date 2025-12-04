@@ -26,3 +26,7 @@ dataset
 assets/logs
 assets/models
 assets/weights
+
+.vscode
+venv
+runtime

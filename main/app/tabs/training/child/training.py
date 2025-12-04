@@ -29,7 +29,7 @@ def training_model_tab():
                         upload = gr.Checkbox(label=translations["upload_dataset"], value=False, interactive=True)
                     with gr.Row():
                         preprocess_split_audio_mode = gr.Radio(label=translations["split_audio_mode"], info=translations["split_audio_mode_info"], value="Automatic", choices=["Automatic", "Simple", "Skip"], interactive=True)
-                        preprocess_normalization_mode = gr.Radio(label=translations["normalization_mode"], info=translations["normalization_mode_info"], value="none", choices=["none", "pre", "post"], interactive=True)
+                        preprocess_normalization_mode = gr.Radio(label=translations["normalization_mode"], info=translations["normalization_mode_info"], value="post", choices=["none", "pre", "post"], interactive=True)
                     with gr.Row(visible=custom_reference.value) as custom_reference_row:
                         with gr.Accordion(translations["custom_reference"], open=True):
                             reference_name = gr.Dropdown(label=translations["reference_name"], info=translations["reference_name_info"], choices=reference_list, value=reference_list[0] if len(reference_list) >= 1 else "", allow_custom_value=True, interactive=True)

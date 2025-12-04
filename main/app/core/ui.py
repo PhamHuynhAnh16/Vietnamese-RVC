@@ -137,6 +137,9 @@ def hoplength_show(method, hybrid_method=None):
 def visible(value):
     return {"visible": value, "__type__": "update"}
 
+def visibleFalse(value):
+    return {"visible": value, "value": False, "__type__": "update"}
+
 def valueFalse_interactive(value): 
     return {"value": False, "interactive": value, "__type__": "update"}
 

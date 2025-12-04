@@ -15,8 +15,18 @@ class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self, version, use_spectral_norm=False, checkpointing=False):
         super(MultiPeriodDiscriminator, self).__init__()
         self.checkpointing = checkpointing
-        periods = ([2, 3, 5, 7, 11, 17] if version == "v1" else [2, 3, 5, 7, 11, 17, 23, 37])
-        self.discriminators = torch.nn.ModuleList([DiscriminatorS(use_spectral_norm=use_spectral_norm, checkpointing=checkpointing)] + [DiscriminatorP(p, use_spectral_norm=use_spectral_norm, checkpointing=checkpointing) for p in periods])
+
+        if version == "v1":
+            periods = [2, 3, 5, 7, 11, 17]
+            resolutions = []
+        elif version == "v2": 
+            periods = [2, 3, 5, 7, 11, 17, 23, 37]
+            resolutions = []
+        elif version == "v3":
+            periods = [2, 3, 5, 7, 11]
+            resolutions = [[1024, 120, 600], [2048, 240, 1200], [512, 50, 240]]
+
+        self.discriminators = torch.nn.ModuleList([DiscriminatorS(use_spectral_norm=use_spectral_norm, checkpointing=checkpointing)] + [DiscriminatorP(p, use_spectral_norm=use_spectral_norm, checkpointing=checkpointing) for p in periods] + [DiscriminatorR(r, use_spectral_norm=use_spectral_norm) for r in resolutions])
 
     def forward(self, y, y_hat):
         y_d_rs, y_d_gs, fmap_rs, fmap_gs = [], [], [], []
@@ -82,3 +92,32 @@ class DiscriminatorP(torch.nn.Module):
         x = self.conv_post(x)
         fmap.append(x)
         return x.flatten(1, -1), fmap
+
+class DiscriminatorR(torch.nn.Module):
+    def __init__(self, resolution, use_spectral_norm=False):
+        super().__init__()
+        self.resolution = resolution
+        self.lrelu_slope = 0.1
+        norm_f = spectral_norm if use_spectral_norm else weight_norm
+        self.convs = torch.nn.ModuleList([norm_f(torch.nn.Conv2d( 1, 32, (3, 9), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 3), padding=(1, 1)))])
+        self.conv_post = norm_f(torch.nn.Conv2d(32, 1, (3, 3), padding=(1, 1)))
+
+    def forward(self, x):
+        fmap = []
+        x = self.spectrogram(x).unsqueeze(1)
+        
+        for layer in self.convs:
+            x = F.leaky_relu(layer(x), self.lrelu_slope)
+            fmap.append(x)
+
+        x = self.conv_post(x)
+        fmap.append(x)
+
+        return x.flatten(1, -1), fmap
+
+    def spectrogram(self, x):
+        n_fft, hop_length, win_length = self.resolution
+        pad = int((n_fft - hop_length) / 2)
+
+        stft = torch.stft(F.pad(x.cpu() if x.device.type in ["privateuseone", "ocl"] else x, (pad, pad), mode="reflect").squeeze(1), n_fft=n_fft, hop_length=hop_length, win_length=win_length, window=torch.ones(win_length, device=x.device), center=False, return_complex=True)
+        return torch.view_as_real(stft).norm(p=2, dim=-1).to(x.device)

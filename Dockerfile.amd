@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 EXPOSE 7860
 
-RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
+RUN apt-get update && apt-get install -y ffmpeg && apt-get install -y libportaudio2 && apt-get clean
 
 WORKDIR /app
 
