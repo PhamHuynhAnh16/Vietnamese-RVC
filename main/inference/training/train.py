@@ -269,6 +269,21 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         logger.warning(translations["not_enough_data"])
         sys.exit(1)
 
+    spk_dim = config.model.spk_embed_dim
+
+    try:
+        last_g = os.path.join(experiment_dir, "G_latest.pth") if save_only_latest and os.path.exists(os.path.join(experiment_dir, "G_latest.pth"))  else latest_checkpoint_path(experiment_dir, "G_*.pth")
+        chk_path = (last_g if last_g else (pretrainG if pretrainG not in ["", "None"] else None))
+
+        if chk_path:
+            ckpt = torch.load(chk_path, map_location="cpu", weights_only=True)
+            spk_dim = ckpt["model"]["emb_g.weight"].shape[0]
+            del ckpt
+    except Exception as e:
+        logger.debug(e)
+
+    config.model.spk_embed_dim = spk_dim
+
     from main.library.algorithm.synthesizers import Synthesizer
     from main.library.algorithm.discriminators import MultiPeriodDiscriminator
 
