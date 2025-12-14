@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import shutil
 
 from random import shuffle
@@ -33,7 +34,7 @@ def generate_config(rvc_version, sample_rate, model_path):
     config_save_path = os.path.join(model_path, "config.json")
     if not os.path.exists(config_save_path): shutil.copy(os.path.join("main", "configs", rvc_version, f"{sample_rate}.json"), config_save_path)
 
-def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate, embedders_mode = "fairseq", embedder_model = "hubert_base", rms_extract = False):
+def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate, embedders_mode = "fairseq", embedder_model = "hubert_base", rms_extract = False, include_mutes = 2):
     gt_wavs_dir, feature_dir = os.path.join(model_path, "sliced_audios"), os.path.join(model_path, f"{rvc_version}_extracted")
     f0_dir, f0nsf_dir, energy_dir = None, None, None
 
@@ -46,39 +47,53 @@ def generate_filelist(pitch_guidance, model_path, rvc_version, sample_rate, embe
     if pitch_guidance: names = names & set(name.split(".")[0] for name in os.listdir(f0_dir)) & set(name.split(".")[0] for name in os.listdir(f0nsf_dir))
     if rms_extract: names = names & set(name.split(".")[0] for name in os.listdir(energy_dir))
     
-    options = []
+    options, sids = [], []
     mute_base_path = os.path.join(configs["logs_path"], "mute")
 
     for name in names:
+        sid = name.split("_")[0]
+        if sid not in sids: sids.append(sid)
+
         option = {
             True: {
-                True: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{f0_dir}/{name}.wav.npy|{f0nsf_dir}/{name}.wav.npy|{energy_dir}/{name}.wav.npy|0",
-                False: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{f0_dir}/{name}.wav.npy|{f0nsf_dir}/{name}.wav.npy|0"
+                True: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{f0_dir}/{name}.wav.npy|{f0nsf_dir}/{name}.wav.npy|{energy_dir}/{name}.wav.npy|{sid}",
+                False: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{f0_dir}/{name}.wav.npy|{f0nsf_dir}/{name}.wav.npy|{sid}"
             },
             False: {
-                True: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{energy_dir}/{name}.wav.npy|0",
-                False: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|0"
+                True: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{energy_dir}/{name}.wav.npy|{sid}",
+                False: f"{gt_wavs_dir}/{name}.wav|{feature_dir}/{name}.npy|{sid}"
             }
         }[pitch_guidance][rms_extract]
 
         options.append(option)
 
-    mute_audio_path, mute_feature_path = os.path.join(mute_base_path, "sliced_audios", f"mute{sample_rate}.wav"), mute_file(embedders_mode, embedder_model, mute_base_path, rvc_version)
-    
-    for _ in range(2):
-        option = {
-            True: {
-                True: f"{mute_audio_path}|{mute_feature_path}|{os.path.join(mute_base_path, 'f0', 'mute.wav.npy')}|{os.path.join(mute_base_path, 'f0_voiced', 'mute.wav.npy')}|{os.path.join(mute_base_path, 'energy', 'mute.wav.npy')}|0",
-                False: f"{mute_audio_path}|{mute_feature_path}|{os.path.join(mute_base_path, 'f0', 'mute.wav.npy')}|{os.path.join(mute_base_path, 'f0_voiced', 'mute.wav.npy')}|0"
-            },
-            False: {
-                True: f"{mute_audio_path}|{mute_feature_path}|{os.path.join(mute_base_path, 'energy', 'mute.wav.npy')}|0",
-                False: f"{mute_audio_path}|{mute_feature_path}|0"
-            }
-        }[pitch_guidance][rms_extract]
+    if include_mutes > 0:
+        mute_audio_path, mute_feature_path = os.path.join(mute_base_path, "sliced_audios", f"mute{sample_rate}.wav"), mute_file(embedders_mode, embedder_model, mute_base_path, rvc_version)
+        mute_f0_path, mute_f0nsf_path = os.path.join(mute_base_path, 'f0', 'mute.wav.npy'), os.path.join(mute_base_path, 'f0_voiced', 'mute.wav.npy')
+        mute_energy_path = os.path.join(mute_base_path, 'energy', 'mute.wav.npy')
+        
+        for sid in sids * include_mutes:
+            option = {
+                True: {
+                    True: f"{mute_audio_path}|{mute_feature_path}|{mute_f0_path}|{mute_f0nsf_path}|{mute_energy_path}|{sid}",
+                    False: f"{mute_audio_path}|{mute_feature_path}|{mute_f0_path}|{mute_f0nsf_path}|{sid}"
+                },
+                False: {
+                    True: f"{mute_audio_path}|{mute_feature_path}|{mute_energy_path}|{sid}",
+                    False: f"{mute_audio_path}|{mute_feature_path}|{sid}"
+                }
+            }[pitch_guidance][rms_extract]
 
-        options.append(option)
+            options.append(option)
 
     shuffle(options)
     with open(os.path.join(model_path, "filelist.txt"), "w") as f:
         f.write("\n".join(options))
+
+    configs_path = os.path.join(model_path, "config.json")
+    with open(configs_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        data["sid"] = len(sids)
+
+    with open(configs_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)

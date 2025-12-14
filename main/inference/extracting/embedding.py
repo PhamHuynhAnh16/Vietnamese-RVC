@@ -59,7 +59,18 @@ def create_mute_file(version, embedder_model, embedders_mode, is_half):
     start_time = time.time()
     logger.info(translations["start_extract_hubert"])
 
-    process_file_embedding([(os.path.join("assets", "logs", "mute", "sliced_audios_16k", "mute.wav"), os.path.join("assets", "logs", "mute", f"{version}_extracted", f"mute_{embedder_model}.npy"))], embedder_model, embedders_mode, config.device, version, is_half, 1)
+    process_file_embedding(
+        [(
+            os.path.join("assets", "logs", "mute", "sliced_audios_16k", "mute.wav"), 
+            os.path.join("assets", "logs", "mute", f"{version}_extracted", f"mute_{embedder_model}.npy")
+        )], 
+        embedder_model, 
+        embedders_mode, 
+        config.device, 
+        version, 
+        is_half, 
+        1
+    )
 
     gc.collect()
     logger.info(translations["extract_hubert_success"].format(elapsed_time=f"{(time.time() - start_time):.2f}"))

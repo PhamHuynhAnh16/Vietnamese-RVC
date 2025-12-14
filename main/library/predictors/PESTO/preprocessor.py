@@ -45,7 +45,23 @@ class HarmonicCQT(torch.nn.Module):
     def __init__(self, harmonics, sr = 22050, hop_length = 512, fmin = 32.7, fmax = None, bins_per_semitone = 1, n_bins = 84, center_bins = True, gamma = 0, center = True, streaming = False, mirror = 0, max_batch_size = 1):
         super(HarmonicCQT, self).__init__()
         if center_bins: fmin = fmin / 2 ** ((bins_per_semitone - 1) / (24 * bins_per_semitone))
-        self.cqt_kernels = torch.nn.ModuleList([CQT(sr=sr, hop_length=hop_length, fmin=h * fmin, fmax=fmax, n_bins=n_bins, bins_per_octave=12*bins_per_semitone, gamma=gamma, center=center, streaming=streaming, mirror=mirror, max_batch_size=max_batch_size, output_format="Complex") for h in harmonics])
+        self.cqt_kernels = torch.nn.ModuleList([
+            CQT(
+                sr=sr, 
+                hop_length=hop_length, 
+                fmin=h * fmin, 
+                fmax=fmax, 
+                n_bins=n_bins, 
+                bins_per_octave=12 * bins_per_semitone, 
+                gamma=gamma, 
+                center=center, 
+                streaming=streaming, 
+                mirror=mirror, 
+                max_batch_size=max_batch_size, 
+                output_format="Complex"
+            ) 
+            for h in harmonics
+        ])
 
     def forward(self, audio_waveforms):
         return torch.stack([cqt(audio_waveforms) for cqt in self.cqt_kernels], dim=1)

@@ -26,7 +26,7 @@ class Config:
         self.configs = json.load(open(self.configs_path, "r"))
 
         self.cpu_mode = self.configs.get("cpu_mode", False)
-        self.brain = self.configs.get("brain", False)
+        self.brain = self.configs.get("brain", False) and torch.cuda.is_bf16_supported() and torch.cuda.is_available() and not self.cpu_mode
         self.debug_mode = self.configs.get("debug_mode", False)
 
         self.json_config = self.load_config_json()

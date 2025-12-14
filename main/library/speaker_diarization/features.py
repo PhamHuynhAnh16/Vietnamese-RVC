@@ -62,13 +62,39 @@ def _cycliclrloader(obj, path, end_of_epoch):
     except TypeError:
         obj.load_state_dict(torch.load(path, map_location="cpu", weights_only=False))
 
-DEFAULT_LOAD_HOOKS = {torch.nn.Module: torch_recovery, torch.optim.Optimizer: torch_recovery, torch.optim.lr_scheduler.ReduceLROnPlateau: torch_recovery, torch.cuda.amp.grad_scaler.GradScaler: torch_recovery}
-DEFAULT_SAVE_HOOKS = { torch.nn.Module: torch_save, torch.optim.Optimizer: torch_save, torch.optim.lr_scheduler.ReduceLROnPlateau: torch_save, torch.cuda.amp.grad_scaler.GradScaler: torch_save}
-DEFAULT_LOAD_HOOKS[torch.optim.lr_scheduler.LRScheduler] = torch_recovery
-DEFAULT_SAVE_HOOKS[torch.optim.lr_scheduler.LRScheduler] = torch_save
-DEFAULT_TRANSFER_HOOKS = {torch.nn.Module: torch_parameter_transfer}
-DEFAULT_SAVE_HOOKS[torch.optim.lr_scheduler.CyclicLR] = _cycliclrsaver
-DEFAULT_LOAD_HOOKS[torch.optim.lr_scheduler.CyclicLR] = _cycliclrloader
+DEFAULT_LOAD_HOOKS = {
+    torch.nn.Module: torch_recovery, 
+    torch.optim.Optimizer: torch_recovery, 
+    torch.optim.lr_scheduler.ReduceLROnPlateau: torch_recovery, 
+    torch.cuda.amp.grad_scaler.GradScaler: torch_recovery
+}
+
+DEFAULT_SAVE_HOOKS = { 
+    torch.nn.Module: torch_save, 
+    torch.optim.Optimizer: torch_save, 
+    torch.optim.lr_scheduler.ReduceLROnPlateau: torch_save, 
+    torch.cuda.amp.grad_scaler.GradScaler: torch_save
+}
+
+DEFAULT_LOAD_HOOKS[
+    torch.optim.lr_scheduler.LRScheduler
+] = torch_recovery
+
+DEFAULT_SAVE_HOOKS[
+    torch.optim.lr_scheduler.LRScheduler
+] = torch_save
+
+DEFAULT_TRANSFER_HOOKS = {
+    torch.nn.Module: torch_parameter_transfer
+}
+
+DEFAULT_SAVE_HOOKS[
+    torch.optim.lr_scheduler.CyclicLR
+] = _cycliclrsaver
+
+DEFAULT_LOAD_HOOKS[
+    torch.optim.lr_scheduler.CyclicLR
+] = _cycliclrloader
 
 def register_checkpoint_hooks(cls, save_on_main_only=True):
     global DEFAULT_LOAD_HOOKS, DEFAULT_SAVE_HOOKS, DEFAULT_TRANSFER_HOOKS
@@ -140,7 +166,23 @@ def spectral_magnitude(stft, power = 1, log = False, eps = 1e-14):
     return spectr
 
 class Filterbank(torch.nn.Module):
-    def __init__(self, n_mels=40, log_mel=True, filter_shape="triangular", f_min=0, f_max=8000, n_fft=400, sample_rate=16000, power_spectrogram=2, amin=1e-10, ref_value=1.0, top_db=80.0, param_change_factor=1.0, param_rand_factor=0.0, freeze=True):
+    def __init__(
+        self, 
+        n_mels=40, 
+        log_mel=True, 
+        filter_shape="triangular", 
+        f_min=0, 
+        f_max=8000, 
+        n_fft=400, 
+        sample_rate=16000, 
+        power_spectrogram=2, 
+        amin=1e-10, 
+        ref_value=1.0, 
+        top_db=80.0, 
+        param_change_factor=1.0, 
+        param_rand_factor=0.0, 
+        freeze=True
+    ):
         super().__init__()
         self.n_mels = n_mels
         self.log_mel = log_mel
@@ -352,7 +394,24 @@ class Deltas(torch.nn.Module):
         return delta_coeff.transpose(1, -1).transpose(2, -1)
 
 class Fbank(torch.nn.Module):
-    def __init__(self, deltas=False, context=False, requires_grad=False, sample_rate=16000, f_min=0, f_max=None, n_fft=400, n_mels=40, filter_shape="triangular", param_change_factor=1.0, param_rand_factor=0.0, left_frames=5, right_frames=5, win_length=25, hop_length=10):
+    def __init__(
+        self, 
+        deltas=False, 
+        context=False, 
+        requires_grad=False, 
+        sample_rate=16000, 
+        f_min=0, 
+        f_max=None, 
+        n_fft=400, 
+        n_mels=40, 
+        filter_shape="triangular", 
+        param_change_factor=1.0, 
+        param_rand_factor=0.0, 
+        left_frames=5, 
+        right_frames=5, 
+        win_length=25, 
+        hop_length=10
+    ):
         super().__init__()
         self.deltas = deltas
         self.context = context

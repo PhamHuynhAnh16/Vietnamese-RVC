@@ -11,7 +11,7 @@ set FFMPEG=%BASE_URL%/ffmpeg/ffmpeg.exe
 set FFPROBE=%BASE_URL%/ffmpeg/ffprobe.exe
 set DIR=%~dp0
 
-for /f "tokens=*" %%i in ('wmic path win32_VideoController get Name') do (
+for /f "tokens=*" %%i in ('powershell "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"') do (
     echo %%i | find /i "GTX" >nul && set GPU_NVIDIA=1
     echo %%i | find /i "RTX" >nul && set GPU_NVIDIA=1
     echo %%i | find /i "NVIDIA" >nul && set GPU_NVIDIA=1

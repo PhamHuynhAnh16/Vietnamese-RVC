@@ -82,7 +82,23 @@ def list_audio_device():
     return audio_input_device, audio_output_device
 
 class Audio:
-    def __init__(self, callbacks, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0, input_audio_gain = 1.0, output_audio_gain = 1.0, monitor_audio_gain = 1.0, monitor = False):
+    def __init__(
+        self, 
+        callbacks, 
+        f0_up_key = 0, 
+        index_rate = 0.5, 
+        protect = 0.5, 
+        filter_radius = 3, 
+        rms_mix_rate = 1, 
+        f0_autotune = False, 
+        f0_autotune_strength = 1, 
+        proposal_pitch = False, 
+        proposal_pitch_threshold = 255.0, 
+        input_audio_gain = 1.0, 
+        output_audio_gain = 1.0, 
+        monitor_audio_gain = 1.0, 
+        monitor = False
+    ):
         self.callbacks = callbacks
         self.mon_queue = Queue()
         self.performance = [0, 0, 0]
@@ -120,7 +136,18 @@ class Audio:
         indata = indata * self.input_audio_gain
         unpacked_data = librosa.to_mono(indata.T)
 
-        return self.callbacks.change_voice(unpacked_data, self.f0_up_key, self.index_rate, self.protect, self.filter_radius, self.rms_mix_rate, self.f0_autotune, self.f0_autotune_strength, self.proposal_pitch, self.proposal_pitch_threshold)
+        return self.callbacks.change_voice(
+            unpacked_data, 
+            self.f0_up_key, 
+            self.index_rate, 
+            self.protect, 
+            self.filter_radius, 
+            self.rms_mix_rate, 
+            self.f0_autotune, 
+            self.f0_autotune_strength, 
+            self.proposal_pitch, 
+            self.proposal_pitch_threshold
+        )
     
     def process_data_with_time(self, indata):
         out_wav, _, perf, _ = self.process_data(indata)
@@ -150,7 +177,21 @@ class Audio:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
 
-    def run_audio_stream(self, block_frame, input_device_id, output_device_id, output_monitor_id, input_audio_sample_rate, output_monitor_sample_rate, input_max_channel, output_max_channel, output_monitor_max_channel, input_extra_setting, output_extra_setting, output_monitor_extra_setting):
+    def run_audio_stream(
+        self, 
+        block_frame, 
+        input_device_id, 
+        output_device_id, 
+        output_monitor_id, 
+        input_audio_sample_rate, 
+        output_monitor_sample_rate, 
+        input_max_channel, 
+        output_max_channel, 
+        output_monitor_max_channel, 
+        input_extra_setting, 
+        output_extra_setting, 
+        output_monitor_extra_setting
+    ):
         self.input_stream = sd.InputStream(
             callback=self.audio_stream_callback,
             latency="low",
@@ -202,7 +243,19 @@ class Audio:
             self.monitor.close()
             self.monitor = None
 
-    def start(self, input_device_id, output_device_id, output_monitor_id, exclusive_mode, asio_input_channel, asio_output_channel, asio_output_monitor_channel, read_chunk_size, input_audio_sample_rate, output_monitor_sample_rate):
+    def start(
+        self, 
+        input_device_id, 
+        output_device_id, 
+        output_monitor_id, 
+        exclusive_mode, 
+        asio_input_channel, 
+        asio_output_channel, 
+        asio_output_monitor_channel, 
+        read_chunk_size, 
+        input_audio_sample_rate, 
+        output_monitor_sample_rate
+    ):
         self.stop()
 
         input_audio_device, output_audio_device = self.get_input_audio_device(input_device_id), self.get_output_audio_device(output_device_id)
@@ -236,7 +289,20 @@ class Audio:
         block_frame = int((read_chunk_size * 128 / 48000) * input_audio_sample_rate)
 
         try:
-            self.run_audio_stream(block_frame, input_device_id, output_device_id, output_monitor_id, input_audio_sample_rate, output_monitor_sample_rate, input_channels, output_channels, monitor_channels, input_extra_setting, output_extra_setting, output_monitor_extra_setting)
+            self.run_audio_stream(
+                block_frame, 
+                input_device_id, 
+                output_device_id, 
+                output_monitor_id, 
+                input_audio_sample_rate, 
+                output_monitor_sample_rate, 
+                input_channels, 
+                output_channels, 
+                monitor_channels, 
+                input_extra_setting, 
+                output_extra_setting, 
+                output_monitor_extra_setting
+            )
             self.running = True
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))

@@ -234,7 +234,26 @@ class STFT:
         if is_non_standard_device: input_tensor = input_tensor.cpu()
 
         batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins = self.calculate_inverse_dimensions(input_tensor)
-        final_output = torch.istft(self.prepare_for_istft(self.pad_frequency_dimension(input_tensor, batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins), batch_dimensions, channel_dim, num_freq_bins, time_dim), n_fft=self.n_fft, hop_length=self.hop_length, window=self.hann_window.to(input_tensor.device), center=True).reshape([*batch_dimensions, 2, -1])
+        final_output = torch.istft(
+            self.prepare_for_istft(
+                self.pad_frequency_dimension(
+                    input_tensor, 
+                    batch_dimensions, 
+                    channel_dim, 
+                    freq_dim, 
+                    time_dim, 
+                    num_freq_bins
+                ), 
+                batch_dimensions, 
+                channel_dim, 
+                num_freq_bins, 
+                time_dim
+            ), 
+            n_fft=self.n_fft, 
+            hop_length=self.hop_length, 
+            window=self.hann_window.to(input_tensor.device), 
+            center=True
+        ).reshape([*batch_dimensions, 2, -1])
 
         if is_non_standard_device: final_output = final_output.to(self.device)
         return final_output

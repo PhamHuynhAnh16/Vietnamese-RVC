@@ -25,13 +25,37 @@ class FeatureInput:
     def process_file(self, file_info, f0_method, hop_length, f0_onnx, f0_autotune, f0_autotune_strength, alpha):
         if not hasattr(self, "f0_gen"): 
             from main.library.predictors.Generator import Generator
-            self.f0_gen = Generator(self.sample_rate, hop_length, self.f0_min, self.f0_max, alpha, self.is_half, self.device, f0_onnx, False)
+
+            self.f0_gen = Generator(
+                self.sample_rate, 
+                hop_length, 
+                self.f0_min, 
+                self.f0_max, 
+                alpha, 
+                self.is_half, 
+                self.device, 
+                f0_onnx, 
+                False
+            )
 
         inp_path, opt_path1, opt_path2, file_inp = file_info
         if os.path.exists(opt_path1 + ".npy") and os.path.exists(opt_path2 + ".npy"): return
 
         try:
-            pitch, pitchf = self.f0_gen.calculator(x_pad=config.x_pad, f0_method=f0_method, x=load_audio(file_inp, self.sample_rate), f0_up_key=0, p_len=None, filter_radius=3, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, manual_f0=None, proposal_pitch=False, proposal_pitch_threshold=0.0)
+            pitch, pitchf = self.f0_gen.calculator(
+                x_pad=config.x_pad, 
+                f0_method=f0_method, 
+                x=load_audio(file_inp, self.sample_rate), 
+                f0_up_key=0, 
+                p_len=None, 
+                filter_radius=3, 
+                f0_autotune=f0_autotune, 
+                f0_autotune_strength=f0_autotune_strength, 
+                manual_f0=None, 
+                proposal_pitch=False, 
+                proposal_pitch_threshold=0.0
+            )
+
             np.save(opt_path2, pitchf, allow_pickle=False)
             np.save(opt_path1, pitch, allow_pickle=False)
         except Exception as e:
@@ -56,12 +80,38 @@ def run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, devices,
 
     logger.info(translations["extract_f0_method"].format(num_processes=num_processes, f0_method=f0_method))
     num_processes = 1 if config.device.startswith(("ocl", "privateuseone")) and ("crepe" in f0_method or "fcpe" in f0_method or "rmvpe" in f0_method or "penn" in f0_method or "swift" in f0_method) else num_processes
-    paths = [(os.path.join(input_root, name), os.path.join(output_root1, name) if output_root1 else None, os.path.join(output_root2, name) if output_root2 else None, os.path.join(input_root, name)) for name in sorted(os.listdir(input_root)) if "spec" not in name]
+
+    paths = [
+        (
+            os.path.join(input_root, name), 
+            os.path.join(output_root1, name) if output_root1 else None, 
+            os.path.join(output_root2, name) if output_root2 else None, 
+            os.path.join(input_root, name)
+        ) 
+        for name in sorted(os.listdir(input_root)) 
+        if "spec" not in name
+    ]
 
     start_time = time.time()
     feature_input = FeatureInput()
+
     with concurrent.futures.ProcessPoolExecutor(max_workers=len(devices)) as executor:
-        concurrent.futures.wait([executor.submit(feature_input.process_files, paths[i::len(devices)], f0_method, hop_length, f0_onnx, devices[i], is_half, num_processes // len(devices), f0_autotune, f0_autotune_strength, alpha) for i in range(len(devices))])
+        concurrent.futures.wait([
+            executor.submit(
+                feature_input.process_files, 
+                paths[i::len(devices)], 
+                f0_method, 
+                hop_length, 
+                f0_onnx, 
+                devices[i], 
+                is_half, 
+                num_processes // len(devices), 
+                f0_autotune, 
+                f0_autotune_strength, 
+                alpha
+            ) 
+            for i in range(len(devices))
+        ])
     
     gc.collect()
     logger.info(translations["extract_f0_success"].format(elapsed_time=f"{(time.time() - start_time):.2f}"))

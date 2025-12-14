@@ -207,17 +207,126 @@ def convert_tab():
             outputs=[presets_name]
         )
     with gr.Row():
-        upload_presets.upload(fn=lambda presets_in: [shutil_move(preset.name, configs["presets_path"]) for preset in presets_in][0], inputs=[upload_presets], outputs=[presets_name])
-        autotune.change(fn=visible, inputs=[autotune], outputs=[f0_autotune_strength])
-        use_audio.change(fn=lambda a: [visible(a), visible(a), visible(a), visible(a), visible(a), valueFalse_interactive(a), valueFalse_interactive(a), valueFalse_interactive(a), valueFalse_interactive(a), visible(not a), visible(not a), visible(not a), visible(not a)], inputs=[use_audio], outputs=[main_backing, use_original, convert_backing, not_merge_backing, merge_instrument, use_original, convert_backing, not_merge_backing, merge_instrument, input_audio0, output_audio, input0, play_audio])
+        upload_presets.upload(
+            fn=lambda presets_in: [shutil_move(preset.name, configs["presets_path"]) for preset in presets_in][0], 
+            inputs=[upload_presets], 
+            outputs=[presets_name]
+        )
+        autotune.change(
+            fn=visible, 
+            inputs=[autotune], 
+            outputs=[f0_autotune_strength]
+        )
+        use_audio.change(
+            fn=lambda a: [
+                visible(a), 
+                visible(a), 
+                visible(a), 
+                visible(a), 
+                visible(a), 
+                valueFalse_interactive(a), 
+                valueFalse_interactive(a), 
+                valueFalse_interactive(a), 
+                valueFalse_interactive(a), 
+                visible(not a), 
+                visible(not a), 
+                visible(not a), 
+                visible(not a)
+            ], 
+            inputs=[use_audio], 
+            outputs=[
+                main_backing, 
+                use_original, 
+                convert_backing, 
+                not_merge_backing, 
+                merge_instrument, 
+                use_original, 
+                convert_backing, 
+                not_merge_backing, 
+                merge_instrument, 
+                input_audio0, 
+                output_audio, 
+                input0, 
+                play_audio
+            ]
+        )
     with gr.Row():
-        convert_backing.change(fn=lambda a,b: [change_backing_choices(a, b), visible(a)], inputs=[convert_backing, not_merge_backing], outputs=[use_original, backing_convert])
-        use_original.change(fn=lambda audio, original: [visible(original), visible(not original), visible(audio and not original), valueFalse_interactive(not original), valueFalse_interactive(not original)], inputs=[use_audio, use_original], outputs=[original_convert, main_convert, main_backing, convert_backing, not_merge_backing])
-        cleaner0.change(fn=visible, inputs=[cleaner0], outputs=[clean_strength0])
+        convert_backing.change(
+            fn=lambda a,b: [
+                change_backing_choices(a, b), 
+                visible(a)
+            ], 
+            inputs=[
+                convert_backing, 
+                not_merge_backing
+            ], 
+            outputs=[
+                use_original, 
+                backing_convert
+            ]
+        )
+        use_original.change(
+            fn=lambda audio, original: [
+                visible(original), 
+                visible(not original), 
+                visible(audio and not original), 
+                valueFalse_interactive(not original), 
+                valueFalse_interactive(not original)
+            ], 
+            inputs=[
+                use_audio, 
+                use_original
+            ], 
+            outputs=[
+                original_convert, 
+                main_convert, 
+                main_backing, 
+                convert_backing, 
+                not_merge_backing
+            ]
+        )
+        cleaner0.change(
+            fn=visible, 
+            inputs=[cleaner0], 
+            outputs=[clean_strength0]
+        )
     with gr.Row():
-        merge_instrument.change(fn=visible, inputs=[merge_instrument], outputs=[vocal_instrument])
-        not_merge_backing.change(fn=lambda audio, merge, cvb: [visible(audio and not merge), change_backing_choices(cvb, merge)], inputs=[use_audio, not_merge_backing, convert_backing], outputs=[main_backing, use_original])
-        method.change(fn=lambda method, hybrid: [visible(method == "hybrid"), visible(method == "hybrid"), hoplength_show(method, hybrid)], inputs=[method, hybrid_method], outputs=[hybrid_method, alpha, hop_length])
+        merge_instrument.change(
+            fn=visible, 
+            inputs=[merge_instrument], 
+            outputs=[vocal_instrument]
+        )
+        not_merge_backing.change(
+            fn=lambda audio, merge, cvb: [
+                visible(audio and not merge), 
+                change_backing_choices(cvb, merge)
+            ], 
+            inputs=[
+                use_audio, 
+                not_merge_backing, 
+                convert_backing
+            ], 
+            outputs=[
+                main_backing, 
+                use_original
+            ]
+        )
+        method.change(
+            fn=lambda method, hybrid: [
+                visible(method == "hybrid"), 
+                visible(method == "hybrid"), 
+                hoplength_show(method, hybrid)
+            ], 
+            inputs=[
+                method, 
+                hybrid_method
+            ], 
+            outputs=[
+                hybrid_method, 
+                alpha, 
+                hop_length
+            ]
+        )
     with gr.Row():
         hybrid_method.change(fn=hoplength_show, inputs=[method, hybrid_method], outputs=[hop_length])
         refresh.click(fn=change_models_choices, inputs=[], outputs=[model_pth, model_index])
@@ -278,7 +387,16 @@ def convert_tab():
                 audio_processing,
                 alpha
             ],
-            outputs=[audio_select, main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button, convert_button_2],
+            outputs=[
+                audio_select, 
+                main_convert, 
+                backing_convert, 
+                main_backing, 
+                original_convert, 
+                vocal_instrument, 
+                convert_button, 
+                convert_button_2
+            ],
             api_name="convert_selection"
         )
         convert_button_2.click(
@@ -323,6 +441,13 @@ def convert_tab():
                 audio_processing,
                 alpha
             ],
-            outputs=[main_convert, backing_convert, main_backing, original_convert, vocal_instrument, convert_button],
+            outputs=[
+                main_convert, 
+                backing_convert, 
+                main_backing, 
+                original_convert, 
+                vocal_instrument, 
+                convert_button
+            ],
             api_name="convert_audio"
         )

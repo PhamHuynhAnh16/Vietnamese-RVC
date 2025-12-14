@@ -20,7 +20,7 @@ from main.library.utils import autotune_f0, proposal_f0_up_key, circular_write
 
 @nb.jit(nopython=True)
 def post_process(tf0, f0, f0_up_key, manual_x_pad, f0_mel_min, f0_mel_max, manual_f0 = None):
-    f0 = np.multiply(f0, pow(2, f0_up_key / 12))
+    f0 *= pow(2, f0_up_key / 12)
 
     if manual_f0 is not None:
         replace_f0 = np.interp(
@@ -128,6 +128,8 @@ class Generator:
         )
 
     def _resize_f0(self, x, target_len):
+        if len(x) == target_len: return x
+
         source = np.array(x)
         source[source < 0.001] = np.nan
 
@@ -143,22 +145,22 @@ class Generator:
         if "pm" in f0_method:
             f0 = self.get_f0_pm(x, p_len, filter_radius=filter_radius, mode=f0_method.split("-")[1])
         elif f0_method in ["harvest", "dio"]:
-            f0 = self.get_f0_pyworld(x, p_len, filter_radius, f0_method)
+            f0 = self.get_f0_pyworld(x, p_len, filter_radius, f0_method, use_stonemask="stonemask" in f0_method)
         elif "crepe" in f0_method:
             split_f0 = f0_method.split("-")
             f0 = self.get_f0_mangio_crepe(x, p_len, split_f0[2]) if split_f0[0] == "mangio" else self.get_f0_crepe(x, p_len, split_f0[1], filter_radius=filter_radius)
         elif "fcpe" in f0_method:
             f0 = self.get_f0_fcpe(x, p_len, legacy="legacy" in f0_method and "previous" not in f0_method, previous="previous" in f0_method, filter_radius=filter_radius)
         elif "rmvpe" in f0_method:
-            f0 = self.get_f0_rmvpe(x, p_len, clipping="clipping" in f0_method, filter_radius=filter_radius)
+            f0 = self.get_f0_rmvpe(x, p_len, clipping="clipping" in f0_method, filter_radius=filter_radius, hpa="hpa" in f0_method)
         elif f0_method in ["yin", "pyin", "piptrack"]:
             f0 = self.get_f0_librosa(x, p_len, mode=f0_method)
         elif "swipe" in f0_method:
-            f0 = self.get_f0_swipe(x, p_len, filter_radius=filter_radius)
+            f0 = self.get_f0_swipe(x, p_len, filter_radius=filter_radius, use_stonemask="stonemask" in f0_method)
         elif "penn" in f0_method:
             f0 = self.get_f0_mangio_penn(x, p_len) if f0_method.split("-")[0] == "mangio" else self.get_f0_penn(x, p_len, filter_radius=filter_radius)
         elif "djcm" in f0_method:
-            f0 = self.get_f0_djcm(x, p_len, clipping="clipping" in f0_method, filter_radius=filter_radius)
+            f0 = self.get_f0_djcm(x, p_len, clipping="clipping" in f0_method, svs="svs" in f0_method, filter_radius=filter_radius)
         elif "pesto" in f0_method:
             f0 = self.get_f0_pesto(x, p_len)
         elif "swift" in f0_method:
@@ -167,7 +169,7 @@ class Generator:
             raise ValueError(translations["option_not_valid"])
         
         if isinstance(f0, tuple): f0 = f0[0]
-        if "medfilt" in f0_method: f0 = medfilt(f0, kernel_size=5)
+        if "medfilt" in f0_method or "svs" in f0_method: f0 = medfilt(f0, kernel_size=5)
 
         return f0
     
@@ -320,19 +322,20 @@ class Generator:
 
         return f0
     
-    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3):
+    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False):
         if not hasattr(self, "rmvpe"): 
             from main.library.predictors.RMVPE.RMVPE import RMVPE
 
             self.rmvpe = RMVPE(
                 os.path.join(
                     configs["predictors_path"], 
-                    "rmvpe" + (".onnx" if self.f0_onnx_mode else ".pt")
+                    ("hpa-rmvpe" if hpa else "rmvpe") + (".onnx" if self.f0_onnx_mode else ".pt")
                 ), 
                 is_half=self.is_half, 
                 device=self.device, 
                 onnx=self.f0_onnx_mode, 
-                providers=self.providers
+                providers=self.providers,
+                hpa=hpa
             )
 
         filter_radius = filter_radius / 100
@@ -341,7 +344,7 @@ class Generator:
         if self.f0_onnx_mode and self.del_onnx_model: del self.rmvpe.model, self.rmvpe
         return self._resize_f0(f0, p_len)
     
-    def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest"):
+    def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest", use_stonemask=True):
         if not hasattr(self, "pw"): 
             from main.library.predictors.WORLD.WORLD import PYWORLD
 
@@ -358,12 +361,13 @@ class Generator:
             frame_period=1000 * self.window / self.sample_rate
         )
 
-        f0 = self.pw.stonemask(
-            x, 
-            self.sample_rate, 
-            t, 
-            f0
-        )
+        if use_stonemask:
+            f0 = self.pw.stonemask(
+                x, 
+                self.sample_rate, 
+                t, 
+                f0
+            )
 
         if filter_radius > 2 and model == "harvest": f0 = medfilt(f0, filter_radius)
         elif model == "dio":
@@ -372,7 +376,7 @@ class Generator:
 
         return self._resize_f0(f0, p_len)
     
-    def get_f0_swipe(self, x, p_len, filter_radius=3):
+    def get_f0_swipe(self, x, p_len, filter_radius=3, use_stonemask=True):
         f0, t = swipe(
             x.astype(np.float32), 
             self.sample_rate, 
@@ -382,15 +386,15 @@ class Generator:
             sTHR=filter_radius / 10
         )
 
-        return self._resize_f0(
-            stonemask(
+        if use_stonemask:
+            f0 = stonemask(
                 x, 
                 self.sample_rate, 
                 t, 
                 f0
-            ), 
-            p_len
-        )
+            )
+
+        return self._resize_f0(f0, p_len)
     
     def get_f0_librosa(self, x, p_len, mode="yin"):
         if mode != "piptrack":
@@ -478,18 +482,19 @@ class Generator:
 
         return self._resize_f0(f0.squeeze(0).cpu().float().numpy(), p_len)
 
-    def get_f0_djcm(self, x, p_len, clipping=False, filter_radius=3):
+    def get_f0_djcm(self, x, p_len, clipping=False, svs=False, filter_radius=3):
         if not hasattr(self, "djcm"): 
             from main.library.predictors.DJCM.DJCM import DJCM
             
             self.djcm = DJCM(
                 os.path.join(
                     configs["predictors_path"], 
-                    "djcm" + (".onnx" if self.f0_onnx_mode else ".pt")
+                    ("djcm-svs" if svs else "djcm") + (".onnx" if self.f0_onnx_mode else ".pt")
                 ), 
                 is_half=self.is_half, 
                 device=self.device, 
                 onnx=self.f0_onnx_mode, 
+                svs=svs,
                 providers=self.providers
             )
 

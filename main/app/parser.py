@@ -8,22 +8,36 @@ try:
 except IndexError:
     argv = None
 
-argv_is_allows = ["--audio_effects", "--convert", "--create_dataset", "--create_index", "--extract", "--preprocess", "--separator_music", "--train", "--help_audio_effects", "--help_convert", "--help_create_dataset", "--help_create_index", "--help_extract", "--help_preprocess", "--help_separate_music",  "--help_train", "--help", "--create_reference", "help_create_reference"]
+argv_is_allows = [
+    "--audio_effects", 
+    "--convert", 
+    "--create_dataset", 
+    "--create_index", 
+    "--extract", 
+    "--preprocess", 
+    "--separate_music", 
+    "--train", 
+    "--create_reference", 
+]
+
+argv_help_is_allows = [
+    "--help_audio_effects", 
+    "--help_convert", 
+    "--help_create_dataset", 
+    "--help_create_index", 
+    "--help_extract", 
+    "--help_preprocess", 
+    "--help_separate_music",  
+    "--help_train", 
+    "--help_create_reference",
+    "--help"
+]
 
 if argv not in argv_is_allows:
     print("Cú pháp không hợp lệ! Sử dụng --help để biết thêm")
     quit()
 
-if argv_is_allows[0] in argv: from main.inference.audio_effects import main
-elif argv_is_allows[1] in argv: from main.inference.conversion.convert import main
-elif argv_is_allows[2] in argv: from main.inference.create_dataset import main
-elif argv_is_allows[3] in argv: from main.inference.create_index import main
-elif argv_is_allows[4] in argv: from main.inference.extracting.extract import main
-elif argv_is_allows[5] in argv: from main.inference.preprocess.preprocess import main
-elif argv_is_allows[6] in argv: from main.inference.separate_music import main
-elif argv_is_allows[7] in argv: from main.inference.training.train import main
-elif argv_is_allows[17] in argv: from main.inference.create_reference import main
-elif argv_is_allows[8] in argv:
+if argv_help_is_allows[0] in argv:
     print("""Các tham số của `--audio_effects`:
         1. Đường dẫn tệp:
             - `--input_path` (bắt buộc): Đường dẫn đến tệp âm thanh đầu vào.
@@ -93,7 +107,7 @@ elif argv_is_allows[8] in argv:
             - `--combination_volume`:: Âm lượng của âm thanh cần kết hợp.
     """)
     quit()
-elif argv_is_allows[9] in argv:
+elif argv_help_is_allows[1] in argv:
     print("""Các tham số của --convert:
         1. Cấu hình xử lí giọng nói:
             - `--pitch` (mặc định: `0`): Điều chỉnh cao độ.
@@ -141,7 +155,7 @@ elif argv_is_allows[9] in argv:
             - `--formant_timbre` (mặc định: `0.8`): Hệ số thay đổi màu sắc giọng.
     """)
     quit()
-elif argv_is_allows[10] in argv:
+elif argv_help_is_allows[2] in argv:
     print("""Các tham số của --create_dataset:
         1. Đường dẫn & cấu hình dataset:
             - `--input_data` (bắt buộc): Đường dẫn liên kết đến âm thanh (Liên kết Youtube, có thể dùng dấu `,` để dùng nhiều liên kết).
@@ -181,7 +195,7 @@ elif argv_is_allows[10] in argv:
             - `--skip_end_audios` (mặc định: `0`): Thời gian (giây) cần bỏ qua ở cuối audio.
     """)
     quit()
-elif argv_is_allows[11] in argv:
+elif argv_help_is_allows[3] in argv:
     print("""Các tham số của --create_index:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -189,7 +203,7 @@ elif argv_is_allows[11] in argv:
             - `--index_algorithm` (mặc định: `Auto`): Thuật toán index sử dụng (`Auto`, `Faiss`, `KMeans`).
     """)
     quit()
-elif argv_is_allows[12] in argv:
+elif argv_help_is_allows[4] in argv:
     print("""Các tham số của --extract:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -217,7 +231,7 @@ elif argv_is_allows[12] in argv:
             - `--rms_extract` (mặc định: False): Trích xuất thêm năng lượng rms.
     """)
     quit()
-elif argv_is_allows[13] in argv:
+elif argv_help_is_allows[5] in argv:
     print("""Các tham số của --preprocess:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -239,7 +253,7 @@ elif argv_is_allows[13] in argv:
             - `--normalization_mode` (mặc định: `none`): Có xử lí chuẩn hóa âm thanh không (`none`, `pre`, `post`)
     """)
     quit()
-elif argv_is_allows[14] in argv:
+elif argv_help_is_allows[6] in argv:
     print("""Các tham số của --separate_music:
         1. Cấu hình đầu vào, đầu ra:
             - `--input_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
@@ -272,7 +286,7 @@ elif argv_is_allows[14] in argv:
             - `--separate_reverb` (mặc định: `False`): Tách vang giọng.
     """)
     quit()
-elif argv_is_allows[15] in argv:
+elif argv_help_is_allows[7] in argv:
     print("""Các tham số của --train:
         1. Cấu hình mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -318,7 +332,7 @@ elif argv_is_allows[15] in argv:
             - `--reference_path` (mặc định: `False`): Đường dẫn đến bộ tham chiếu.
     """)
     quit()
-elif argv_is_allows[18] in argv:
+elif argv_help_is_allows[8] in argv:
     print("""Các tham số của --create_reference:
         1. Đường dẫn tệp:
             - `--audio_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
@@ -346,7 +360,7 @@ elif argv_is_allows[18] in argv:
             - `--alpha` (mặc định: `0.5`): Ngưỡng trộn cao độ khi ước tính cao độ hybrid.
     """)
     quit()
-elif argv_is_allows[16] in argv:
+elif argv_help_is_allows[9] in argv:
     print("""Sử dụng:
         1. `--help_audio_effects`: Trợ giúp về phần thêm hiệu ứng âm thanh.
         2. `--help_convert`: Trợ giúp về chuyển đổi âm thanh.
@@ -359,6 +373,16 @@ elif argv_is_allows[16] in argv:
         9. `--help_create_reference`: Trợ giúp về tạo bộ tham chiếu.
     """)
     quit()
+
+elif argv_is_allows[0] in argv: from main.inference.audio_effects import main
+elif argv_is_allows[1] in argv: from main.inference.conversion.convert import main
+elif argv_is_allows[2] in argv: from main.inference.create_dataset import main
+elif argv_is_allows[3] in argv: from main.inference.create_index import main
+elif argv_is_allows[4] in argv: from main.inference.extracting.extract import main
+elif argv_is_allows[5] in argv: from main.inference.preprocess.preprocess import main
+elif argv_is_allows[6] in argv: from main.inference.separate_music import main
+elif argv_is_allows[7] in argv: from main.inference.training.train import main
+elif argv_is_allows[8] in argv: from main.inference.create_reference import main
 
 if __name__ == "__main__":
     import torch.multiprocessing as mp

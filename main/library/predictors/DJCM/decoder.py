@@ -8,7 +8,7 @@ import torch.nn.functional as F
 sys.path.append(os.getcwd())
 
 from main.library.predictors.DJCM.encoder import ResEncoderBlock
-from main.library.predictors.DJCM.utils import ResConvBlock, BiGRU, init_bn, init_layer, N_CLASS, WINDOW_LENGTH
+from main.library.predictors.DJCM.utils import ResConvBlock, BiGRU, init_bn, init_layer
 
 class ResDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, n_blocks, stride):
@@ -54,13 +54,27 @@ class Decoder(nn.Module):
         return x
 
 class PE_Decoder(nn.Module):
-    def __init__(self, n_blocks, seq_layers=1):
+    def __init__(self, n_blocks, seq_layers=1, window_length = 1024, n_class = 360):
         super(PE_Decoder, self).__init__()
         self.de_blocks = Decoder(n_blocks)
         self.after_conv1 = ResEncoderBlock(32, 32, n_blocks, None)
         self.after_conv2 = nn.Conv2d(32, 1, (1, 1))
-        self.fc = nn.Sequential(BiGRU((1, WINDOW_LENGTH // 2), 1, seq_layers), nn.Linear(WINDOW_LENGTH // 2, N_CLASS), nn.Sigmoid())
+        self.fc = nn.Sequential(BiGRU((1, window_length // 2), 1, seq_layers), nn.Linear(window_length // 2, n_class), nn.Sigmoid())
         init_layer(self.after_conv2)
 
     def forward(self, x, concat_tensors):
         return self.fc(self.after_conv2(self.after_conv1(self.de_blocks(x, concat_tensors)))).squeeze(1)
+    
+class SVS_Decoder(nn.Module):
+    def __init__(self, in_channels, n_blocks):
+        super(SVS_Decoder, self).__init__()
+        self.de_blocks = Decoder(n_blocks)
+        self.after_conv1 = ResEncoderBlock(32, 32, n_blocks, None)
+        self.after_conv2 = nn.Conv2d(32, in_channels * 4, (1, 1))
+        self.init_weights()
+
+    def init_weights(self):
+        init_layer(self.after_conv2)
+
+    def forward(self, x, concat_tensors):
+        return self.after_conv2(self.after_conv1(self.de_blocks(x, concat_tensors)))

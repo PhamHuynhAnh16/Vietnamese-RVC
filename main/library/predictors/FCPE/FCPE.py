@@ -153,7 +153,23 @@ class CFNaiveMelPE(nn.Module):
         return cent_to_f0(latent2cents_decoder(self.cent_table, latent, threshold=threshold) if decoder == "argmax" else latent2cents_local_decoder(self.cent_table, self.out_dims, latent, threshold=threshold))
 
 class FCPE_LEGACY(nn.Module):
-    def __init__(self, input_channel=128, out_dims=360, n_layers=12, n_chans=512, loss_mse_scale=10, loss_l2_regularization=False, loss_l2_regularization_scale=1, loss_grad1_mse=False, loss_grad1_mse_scale=1, f0_max=1975.5, f0_min=32.70, confidence=False, threshold=0.05, use_input_conv=True):
+    def __init__(
+        self, 
+        input_channel=128, 
+        out_dims=360, 
+        n_layers=12, 
+        n_chans=512, 
+        loss_mse_scale=10, 
+        loss_l2_regularization=False, 
+        loss_l2_regularization_scale=1, 
+        loss_grad1_mse=False, 
+        loss_grad1_mse_scale=1, 
+        f0_max=1975.5, 
+        f0_min=32.70, 
+        confidence=False, 
+        threshold=0.05, 
+        use_input_conv=True
+    ):
         super().__init__()
         self.loss_mse_scale = loss_mse_scale
         self.loss_l2_regularization = loss_l2_regularization
@@ -197,7 +213,20 @@ class FCPE_LEGACY(nn.Module):
 class InferCFNaiveMelPE(torch.nn.Module):
     def __init__(self, args, state_dict):
         super().__init__()
-        self.model = CFNaiveMelPE(input_channels=args.mel.num_mels, out_dims=args.model.out_dims, hidden_dims=args.model.hidden_dims, n_layers=args.model.n_layers, n_heads=args.model.n_heads, f0_max=args.model.f0_max, f0_min=args.model.f0_min, use_fa_norm=args.model.use_fa_norm, conv_only=args.model.conv_only, conv_dropout=args.model.conv_dropout, atten_dropout=args.model.atten_dropout, use_harmonic_emb=False)
+        self.model = CFNaiveMelPE(
+            input_channels=args.mel.num_mels, 
+            out_dims=args.model.out_dims, 
+            hidden_dims=args.model.hidden_dims, 
+            n_layers=args.model.n_layers, 
+            n_heads=args.model.n_heads, 
+            f0_max=args.model.f0_max, 
+            f0_min=args.model.f0_min, 
+            use_fa_norm=args.model.use_fa_norm, 
+            conv_only=args.model.conv_only, 
+            conv_dropout=args.model.conv_dropout, 
+            atten_dropout=args.model.atten_dropout, 
+            use_harmonic_emb=False
+        )
         self.model.load_state_dict(state_dict)
         self.model.eval()
         self.register_buffer("tensor_device_marker", torch.tensor(1.0).float(), persistent=False)
@@ -242,7 +271,20 @@ class FCPEInfer_LEGACY:
         else:
             ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             self.args = DotDict(ckpt["config"])
-            model = FCPE_LEGACY(input_channel=self.args.model.input_channel, out_dims=self.args.model.out_dims, n_layers=self.args.model.n_layers, n_chans=self.args.model.n_chans, loss_mse_scale=self.args.loss.loss_mse_scale, loss_l2_regularization=self.args.loss.loss_l2_regularization, loss_l2_regularization_scale=self.args.loss.loss_l2_regularization_scale, loss_grad1_mse=self.args.loss.loss_grad1_mse, loss_grad1_mse_scale=self.args.loss.loss_grad1_mse_scale, f0_max=self.f0_max, f0_min=self.f0_min, confidence=self.args.model.confidence)
+            model = FCPE_LEGACY(
+                input_channel=self.args.model.input_channel, 
+                out_dims=self.args.model.out_dims, 
+                n_layers=self.args.model.n_layers, 
+                n_chans=self.args.model.n_chans, 
+                loss_mse_scale=self.args.loss.loss_mse_scale, 
+                loss_l2_regularization=self.args.loss.loss_l2_regularization, 
+                loss_l2_regularization_scale=self.args.loss.loss_l2_regularization_scale, 
+                loss_grad1_mse=self.args.loss.loss_grad1_mse, 
+                loss_grad1_mse_scale=self.args.loss.loss_grad1_mse_scale, 
+                f0_max=self.f0_max, 
+                f0_min=self.f0_min, 
+                confidence=self.args.model.confidence
+            )
             model.to(self.device).to(self.dtype)
             model.load_state_dict(ckpt["model"])
             model.eval()

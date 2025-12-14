@@ -63,9 +63,103 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, f0_autotune_strength, clean_audio, clean_strength, export_format, embedder_model, resample_sr, split_audio, checkpointing, f0_file, f0_onnx, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha = args.pitch, args.filter_radius, args.index_rate, args.rms_mix_rate,args.protect, args.hop_length, args.f0_method, args.input_path, args.output_path, args.pth_path, args.index_path, args.f0_autotune, args.f0_autotune_strength, args.clean_audio, args.clean_strength, args.export_format, args.embedder_model, args.resample_sr, args.split_audio, args.checkpointing, args.f0_file, args.f0_onnx, args.embedders_mode, args.formant_shifting, args.formant_qfrency, args.formant_timbre, args.proposal_pitch, args.proposal_pitch_threshold, args.audio_processing, args.alpha
+
+    (
+        pitch, 
+        filter_radius, 
+        index_rate, 
+        rms_mix_rate, 
+        protect, 
+        hop_length, 
+        f0_method, 
+        input_path, 
+        output_path, 
+        pth_path, 
+        index_path, 
+        f0_autotune, 
+        f0_autotune_strength, 
+        clean_audio, 
+        clean_strength, 
+        export_format, 
+        embedder_model, 
+        resample_sr, 
+        split_audio, 
+        checkpointing, 
+        f0_file, 
+        f0_onnx, 
+        embedders_mode, 
+        formant_shifting, 
+        formant_qfrency, 
+        formant_timbre, 
+        proposal_pitch, 
+        proposal_pitch_threshold, 
+        audio_processing, 
+        alpha
+    ) = (
+        args.pitch, 
+        args.filter_radius, 
+        args.index_rate, 
+        args.rms_mix_rate,
+        args.protect, 
+        args.hop_length, 
+        args.f0_method, 
+        args.input_path, 
+        args.output_path, 
+        args.pth_path, 
+        args.index_path, 
+        args.f0_autotune, 
+        args.f0_autotune_strength, 
+        args.clean_audio, 
+        args.clean_strength, 
+        args.export_format, 
+        args.embedder_model, 
+        args.resample_sr, 
+        args.split_audio, 
+        args.checkpointing, 
+        args.f0_file, 
+        args.f0_onnx, 
+        args.embedders_mode, 
+        args.formant_shifting, 
+        args.formant_qfrency, 
+        args.formant_timbre, 
+        args.proposal_pitch, 
+        args.proposal_pitch_threshold, 
+        args.audio_processing, 
+        args.alpha
+    )
     
-    run_convert_script(pitch=pitch, filter_radius=filter_radius, index_rate=index_rate, rms_mix_rate=rms_mix_rate, protect=protect, hop_length=hop_length, f0_method=f0_method, input_path=input_path, output_path=output_path, pth_path=pth_path, index_path=index_path, f0_autotune=f0_autotune, f0_autotune_strength=f0_autotune_strength, clean_audio=clean_audio, clean_strength=clean_strength, export_format=export_format, embedder_model=embedder_model, resample_sr=resample_sr, split_audio=split_audio, checkpointing=checkpointing, f0_file=f0_file, f0_onnx=f0_onnx, embedders_mode=embedders_mode, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold, audio_processing=audio_processing, alpha=alpha)
+    run_convert_script(
+        pitch=pitch, 
+        filter_radius=filter_radius, 
+        index_rate=index_rate, 
+        rms_mix_rate=rms_mix_rate, 
+        protect=protect, 
+        hop_length=hop_length, 
+        f0_method=f0_method, 
+        input_path=input_path, 
+        output_path=output_path, 
+        pth_path=pth_path, 
+        index_path=index_path, 
+        f0_autotune=f0_autotune, 
+        f0_autotune_strength=f0_autotune_strength, 
+        clean_audio=clean_audio, 
+        clean_strength=clean_strength, 
+        export_format=export_format, 
+        embedder_model=embedder_model, 
+        resample_sr=resample_sr, 
+        split_audio=split_audio, 
+        checkpointing=checkpointing, 
+        f0_file=f0_file, 
+        f0_onnx=f0_onnx, 
+        embedders_mode=embedders_mode, 
+        formant_shifting=formant_shifting, 
+        formant_qfrency=formant_qfrency, 
+        formant_timbre=formant_timbre, 
+        proposal_pitch=proposal_pitch, 
+        proposal_pitch_threshold=proposal_pitch_threshold, 
+        audio_processing=audio_processing, 
+        alpha=alpha
+    )
 
 def run_convert_script(
     pitch=0, 
@@ -232,7 +326,38 @@ class VoiceConverter:
         self.sid = sid
         self.get_vc(model_path, sid)
 
-    def convert_audio(self, audio_input_path, audio_output_path, index_path, embedder_model, pitch, f0_method, index_rate, rms_mix_rate, protect, hop_length, f0_autotune, f0_autotune_strength, filter_radius, clean_audio, clean_strength, export_format, resample_sr = 0, checkpointing = False, f0_file = None, f0_onnx = False, embedders_mode = "fairseq", formant_shifting = False, formant_qfrency = 0.8, formant_timbre = 0.8, split_audio = False, proposal_pitch = False, proposal_pitch_threshold = 0, audio_processing = False, alpha = 0.5):
+    def convert_audio(
+        self, 
+        audio_input_path, 
+        audio_output_path, 
+        index_path, 
+        embedder_model, 
+        pitch, 
+        f0_method, 
+        index_rate, 
+        rms_mix_rate, 
+        protect, 
+        hop_length, 
+        f0_autotune, 
+        f0_autotune_strength, 
+        filter_radius, 
+        clean_audio, 
+        clean_strength, 
+        export_format, 
+        resample_sr = 0, 
+        checkpointing = False, 
+        f0_file = None, 
+        f0_onnx = False, 
+        embedders_mode = "fairseq", 
+        formant_shifting = False, 
+        formant_qfrency = 0.8, 
+        formant_timbre = 0.8, 
+        split_audio = False, 
+        proposal_pitch = False, 
+        proposal_pitch_threshold = 0, 
+        audio_processing = False, 
+        alpha = 0.5
+    ):
         self.checkpointing = checkpointing
 
         try:

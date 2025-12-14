@@ -3,8 +3,6 @@ import torch
 from torch import nn
 from einops.layers.torch import Rearrange
 
-SAMPLE_RATE, WINDOW_LENGTH, N_CLASS = 16000, 1024, 360
-
 def init_layer(layer):
     nn.init.xavier_uniform_(layer.weight)
     if hasattr(layer, "bias") and layer.bias is not None: layer.bias.data.fill_(0.0)

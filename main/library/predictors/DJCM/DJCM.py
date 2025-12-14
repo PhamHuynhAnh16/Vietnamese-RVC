@@ -8,13 +8,14 @@ from scipy.signal import medfilt
 
 sys.path.append(os.getcwd())
 
-from main.library.predictors.DJCM.model import DJCMM
 from main.library.predictors.DJCM.spec import Spectrogram
-from main.library.predictors.DJCM.utils import WINDOW_LENGTH, SAMPLE_RATE, N_CLASS
+
+SAMPLE_RATE, WINDOW_LENGTH, N_CLASS = 16000, 1024, 360
 
 class DJCM:
-    def __init__(self, model_path, device = "cpu", is_half = False, onnx = False, providers = ["CPUExecutionProvider"], batch_size = 1, segment_len = 5.12, kernel_size = 3):
+    def __init__(self, model_path, device = "cpu", is_half = False, onnx = False, svs = False, providers = ["CPUExecutionProvider"], batch_size = 1, segment_len = 5.12, kernel_size = 3):
         super(DJCM, self).__init__()
+        if svs: WINDOW_LENGTH = 2048
         self.onnx = onnx
 
         if self.onnx:
@@ -24,10 +25,13 @@ class DJCM:
             sess_options.log_severity_level = 3
             self.model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
-            model = DJCMM(1, 1, 1)
+            from main.library.predictors.DJCM.model import DJCMM
+
+            model = DJCMM(1, 1, 1, svs=svs, window_length=WINDOW_LENGTH, n_class=N_CLASS)
             model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
-            model = model.to(device).eval()
-            self.model = model.half() if is_half else model.float()
+            model.eval()
+            if is_half: model = model.half()
+            self.model = model.to(device)
 
         self.batch_size = batch_size
         self.seg_len = int(segment_len * SAMPLE_RATE)
@@ -43,13 +47,11 @@ class DJCM:
 
     def spec2hidden(self, spec):
         if self.onnx:
-            hidden = torch.as_tensor(
-                self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: spec.cpu().numpy().astype(np.float32)})[0], device=self.device
-            )
+            spec = spec.cpu().numpy().astype(np.float32)
+            hidden = torch.as_tensor(self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: spec})[0], device=self.device)
         else:
-            hidden = self.model(
-                spec.half() if self.is_half else spec.float()
-            )
+            if self.is_half: spec = spec.half()
+            hidden = self.model(spec)
 
         return hidden
 

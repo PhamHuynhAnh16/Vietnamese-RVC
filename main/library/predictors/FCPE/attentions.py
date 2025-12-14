@@ -105,7 +105,23 @@ class SinusoidalEmbeddings(nn.Module):
         return freqs, torch.cat((scale, scale), dim = -1)
 
 class LocalAttention(nn.Module):
-    def __init__(self, window_size, causal = False, look_backward = 1, look_forward = None, dropout = 0., shared_qk = False, rel_pos_emb_config = None, dim = None, autopad = False, exact_windowsize = False, scale = None, use_rotary_pos_emb = True, use_xpos = False, xpos_scale_base = None):
+    def __init__(
+        self, 
+        window_size, 
+        causal = False, 
+        look_backward = 1, 
+        look_forward = None, 
+        dropout = 0., 
+        shared_qk = False, 
+        rel_pos_emb_config = None, 
+        dim = None, 
+        autopad = False, 
+        exact_windowsize = False, 
+        scale = None, 
+        use_rotary_pos_emb = True, 
+        use_xpos = False, 
+        xpos_scale_base = None
+    ):
         super().__init__()
         look_forward = default(look_forward, 0 if causal else 1)
         assert not (causal and look_forward > 0)

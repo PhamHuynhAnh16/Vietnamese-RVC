@@ -26,19 +26,19 @@ class MultiPeriodDiscriminator(torch.nn.Module):
             periods = [2, 3, 5, 7, 11]
             resolutions = [[1024, 120, 600], [2048, 240, 1200], [512, 50, 240]]
 
-        self.discriminators = torch.nn.ModuleList([DiscriminatorS(use_spectral_norm=use_spectral_norm, checkpointing=checkpointing)] + [DiscriminatorP(p, use_spectral_norm=use_spectral_norm, checkpointing=checkpointing) for p in periods] + [DiscriminatorR(r, use_spectral_norm=use_spectral_norm) for r in resolutions])
+        self.discriminators = torch.nn.ModuleList(
+            [DiscriminatorS(use_spectral_norm=use_spectral_norm)] + 
+            [DiscriminatorP(p, use_spectral_norm=use_spectral_norm) for p in periods] + 
+            [DiscriminatorR(r, use_spectral_norm=use_spectral_norm) for r in resolutions]
+        )
 
     def forward(self, y, y_hat):
         y_d_rs, y_d_gs, fmap_rs, fmap_gs = [], [], [], []
 
         for d in self.discriminators:
             if self.training and self.checkpointing:
-                def forward_discriminator(d, y, y_hat):
-                    y_d_r, fmap_r = d(y)
-                    y_d_g, fmap_g = d(y_hat)
-
-                    return y_d_r, fmap_r, y_d_g, fmap_g
-                y_d_r, fmap_r, y_d_g, fmap_g = checkpoint(forward_discriminator, d, y, y_hat, use_reentrant=False)
+                y_d_r, fmap_r = checkpoint(d, y, use_reentrant=False)
+                y_d_g, fmap_g = checkpoint(d, y_hat, use_reentrant=False)
             else:
                 y_d_r, fmap_r = d(y)
                 y_d_g, fmap_g = d(y_hat)
@@ -49,19 +49,24 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 class DiscriminatorS(torch.nn.Module):
-    def __init__(self, use_spectral_norm=False, checkpointing=False):
+    def __init__(self, use_spectral_norm=False):
         super(DiscriminatorS, self).__init__()
-        self.checkpointing = checkpointing
         norm_f = spectral_norm if use_spectral_norm else weight_norm
-        self.convs = torch.nn.ModuleList([norm_f(torch.nn.Conv1d(1, 16, 15, 1, padding=7)), norm_f(torch.nn.Conv1d(16, 64, 41, 4, groups=4, padding=20)), norm_f(torch.nn.Conv1d(64, 256, 41, 4, groups=16, padding=20)), norm_f(torch.nn.Conv1d(256, 1024, 41, 4, groups=64, padding=20)), norm_f(torch.nn.Conv1d(1024, 1024, 41, 4, groups=256, padding=20)), norm_f(torch.nn.Conv1d(1024, 1024, 5, 1, padding=2))])
+        self.convs = torch.nn.ModuleList([
+            norm_f(torch.nn.Conv1d(1, 16, 15, 1, padding=7)), 
+            norm_f(torch.nn.Conv1d(16, 64, 41, 4, groups=4, padding=20)), 
+            norm_f(torch.nn.Conv1d(64, 256, 41, 4, groups=16, padding=20)), 
+            norm_f(torch.nn.Conv1d(256, 1024, 41, 4, groups=64, padding=20)), 
+            norm_f(torch.nn.Conv1d(1024, 1024, 41, 4, groups=256, padding=20)), 
+            norm_f(torch.nn.Conv1d(1024, 1024, 5, 1, padding=2))
+        ])
         self.conv_post = norm_f(torch.nn.Conv1d(1024, 1, 3, 1, padding=1))
         self.lrelu = torch.nn.LeakyReLU(LRELU_SLOPE)
 
     def forward(self, x):
         fmap = []
-
         for conv in self.convs:
-            x = checkpoint(self.lrelu, checkpoint(conv, x, use_reentrant = False), use_reentrant = False) if self.training and self.checkpointing else self.lrelu(conv(x))
+            x = self.lrelu(conv(x))
             fmap.append(x)
 
         x = self.conv_post(x)
@@ -70,12 +75,26 @@ class DiscriminatorS(torch.nn.Module):
         return x.flatten(1, -1), fmap
 
 class DiscriminatorP(torch.nn.Module):
-    def __init__(self, period, kernel_size=5, use_spectral_norm=False, checkpointing=False):
+    def __init__(self, period, kernel_size=5, use_spectral_norm=False):
         super(DiscriminatorP, self).__init__()
         self.period = period
-        self.checkpointing = checkpointing
         norm_f = spectral_norm if use_spectral_norm else weight_norm
-        self.convs = torch.nn.ModuleList([norm_f(torch.nn.Conv2d(in_ch, out_ch, (kernel_size, 1), (stride, 1), padding=(get_padding(kernel_size, 1), 0))) for in_ch, out_ch, stride in zip([1, 32, 128, 512, 1024], [32, 128, 512, 1024, 1024], [3, 3, 3, 3, 1])])
+        self.convs = torch.nn.ModuleList([
+            norm_f(
+                torch.nn.Conv2d(
+                    in_ch, 
+                    out_ch, 
+                    (kernel_size, 1), 
+                    (stride, 1), 
+                    padding=(get_padding(kernel_size, 1), 0)
+                )
+            ) 
+            for in_ch, out_ch, stride in zip(
+                [1, 32, 128, 512, 1024], 
+                [32, 128, 512, 1024, 1024], 
+                [3, 3, 3, 3, 1]
+            )
+        ])
         self.conv_post = norm_f(torch.nn.Conv2d(1024, 1, (3, 1), 1, padding=(1, 0)))
         self.lrelu = torch.nn.LeakyReLU(LRELU_SLOPE)
 
@@ -86,7 +105,7 @@ class DiscriminatorP(torch.nn.Module):
         x = x.view(b, c, -1, self.period)
 
         for conv in self.convs:
-            x = checkpoint(self.lrelu, checkpoint(conv, x, use_reentrant = False), use_reentrant = False) if self.training and self.checkpointing else self.lrelu(conv(x))
+            x = self.lrelu(conv(x))
             fmap.append(x)
 
         x = self.conv_post(x)
@@ -99,7 +118,13 @@ class DiscriminatorR(torch.nn.Module):
         self.resolution = resolution
         self.lrelu_slope = 0.1
         norm_f = spectral_norm if use_spectral_norm else weight_norm
-        self.convs = torch.nn.ModuleList([norm_f(torch.nn.Conv2d( 1, 32, (3, 9), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), norm_f(torch.nn.Conv2d(32, 32, (3, 3), padding=(1, 1)))])
+        self.convs = torch.nn.ModuleList([
+            norm_f(torch.nn.Conv2d( 1, 32, (3, 9), padding=(1, 4))), 
+            norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
+            norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
+            norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
+            norm_f(torch.nn.Conv2d(32, 32, (3, 3), padding=(1, 1)))
+        ])
         self.conv_post = norm_f(torch.nn.Conv2d(32, 1, (3, 3), padding=(1, 1)))
 
     def forward(self, x):

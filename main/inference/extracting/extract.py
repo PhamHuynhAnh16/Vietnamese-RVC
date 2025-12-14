@@ -45,7 +45,37 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    f0_method, hop_length, num_processes, gpus, version, pitch_guidance, sample_rate, embedder_model, f0_onnx, embedders_mode, f0_autotune, f0_autotune_strength, rms_extract, alpha = args.f0_method, args.hop_length, args.cpu_cores, args.gpu, args.rvc_version, args.pitch_guidance, args.sample_rate, args.embedder_model, args.f0_onnx, args.embedders_mode, args.f0_autotune, args.f0_autotune_strength, args.rms_extract, args.alpha
+    (
+        f0_method, 
+        hop_length, 
+        num_processes, 
+        gpus, version, 
+        pitch_guidance, 
+        sample_rate, 
+        embedder_model, 
+        f0_onnx, 
+        embedders_mode, 
+        f0_autotune, 
+        f0_autotune_strength, 
+        rms_extract, 
+        alpha
+    ) = (
+        args.f0_method, 
+        args.hop_length, 
+        args.cpu_cores, 
+        args.gpu, 
+        args.rvc_version, 
+        args.pitch_guidance, 
+        args.sample_rate, 
+        args.embedder_model, 
+        args.f0_onnx, 
+        args.embedders_mode, 
+        args.f0_autotune, 
+        args.f0_autotune_strength, 
+        args.rms_extract, 
+        args.alpha
+    )
+
     check_assets(f0_method, embedder_model, f0_onnx=f0_onnx, embedders_mode=embedders_mode)
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
 

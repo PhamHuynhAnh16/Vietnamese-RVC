@@ -54,7 +54,60 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    input_data, output_dirs, skip_seconds, skip_start_audios, skip_end_audios, separate, model_name, reverb_model, denoise_model, sample_rate, shifts, batch_size, overlap, aggression, hop_length, window_size, segments_size, post_process_threshold, enable_tta, enable_denoise, high_end_process, enable_post_process, separate_reverb, clean_dataset, clean_strength = args.input_data, args.output_dirs, args.skip_seconds, args.skip_start_audios, args.skip_end_audios, args.separate, args.model_name, args.reverb_model, args.denoise_model, args.sample_rate, args.shifts, args.batch_size, args.overlap, args.aggression, args.hop_length, args.window_size, args.segments_size, args.post_process_threshold, args.enable_tta, args.enable_denoise, args.high_end_process, args.enable_post_process, args.separate_reverb, args.clean_dataset, args.clean_strength
+
+    (
+        input_data, 
+        output_dirs, 
+        skip_seconds, 
+        skip_start_audios, 
+        skip_end_audios, 
+        separate, 
+        model_name, 
+        reverb_model, 
+        denoise_model, 
+        sample_rate, 
+        shifts, 
+        batch_size, 
+        overlap, 
+        aggression, 
+        hop_length, 
+        window_size, 
+        segments_size, 
+        post_process_threshold, 
+        enable_tta, 
+        enable_denoise, 
+        high_end_process, 
+        enable_post_process, 
+        separate_reverb, 
+        clean_dataset, 
+        clean_strength
+    ) = (
+        args.input_data, 
+        args.output_dirs, 
+        args.skip_seconds, 
+        args.skip_start_audios, 
+        args.skip_end_audios, 
+        args.separate, 
+        args.model_name, 
+        args.reverb_model, 
+        args.denoise_model, 
+        args.sample_rate, 
+        args.shifts, 
+        args.batch_size, 
+        args.overlap, 
+        args.aggression, 
+        args.hop_length, 
+        args.window_size, 
+        args.segments_size, 
+        args.post_process_threshold, 
+        args.enable_tta, 
+        args.enable_denoise, 
+        args.high_end_process, 
+        args.enable_post_process, 
+        args.separate_reverb, 
+        args.clean_dataset, 
+        args.clean_strength
+    )
 
     create_dataset(
         input_data,

@@ -161,4 +161,15 @@ def model_info(path):
     rms_extract = model_data.get("energy", False)
 
     gr_info(translations["success"])
-    return translations["model_info"].format(model_name=model_name, model_author=model_author, epochs=epochs, steps=steps, version=version, sr=sr, pitch_guidance=pitch_guidance, model_hash=model_hash, creation_date_str=creation_date_str, vocoder=vocoder, rms_extract=rms_extract)
+    return translations["model_info"].format(
+        model_name=model_name, 
+        model_author=model_author, 
+        epochs=epochs, steps=steps, 
+        version=version, 
+        sr=sr, 
+        pitch_guidance=pitch_guidance, 
+        model_hash=model_hash, 
+        creation_date_str=creation_date_str, 
+        vocoder=vocoder, 
+        rms_extract=rms_extract
+    )

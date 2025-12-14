@@ -291,7 +291,7 @@ js_code = """
                 return ButtonState;
             }
 
-            setStatus("__START_REALTIME__", use_alert=false)
+            setStatus("__START_REALTIME__", false)
 
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -429,7 +429,7 @@ js_code = """
                 if (typeof ev.data === 'string') {
                     const msg = JSON.parse(ev.data);
 
-                    if (msg.type === 'latency') setStatus(`__LATENCY__: ${msg.value.toFixed(1)} ms`, use_alert=false)
+                    if (msg.type === 'latency') setStatus(`__LATENCY__: ${msg.value.toFixed(1)} ms`, false)
                     if (msg.type === 'warnings') {
                         setStatus(msg.value);
                         StopAudioStream();
@@ -486,7 +486,7 @@ js_code = """
             }
 
             document.querySelectorAll('audio').forEach(a => a.remove());
-            setStatus("__REALTIME_HAS_STOP__", use_alert=false);
+            setStatus("__REALTIME_HAS_STOP__", false);
 
             return {"start_button": true, "stop_button": false};
         } catch (e) {

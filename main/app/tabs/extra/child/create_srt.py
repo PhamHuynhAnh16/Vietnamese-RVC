@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 
 from main.app.core.csrt import create_srt
 from main.app.core.ui import shutil_move, change_audios_choices
-from main.app.variables import translations, file_types, configs, paths_for_files
+from main.app.variables import translations, file_types, configs, paths_for_files, whisper_model
 
 def create_srt_tab():
     with gr.Row():
@@ -17,7 +17,7 @@ def create_srt_tab():
             srt_content = gr.Textbox(label=translations["srt_content"], value="", lines=9, max_lines=9, interactive=False)
         with gr.Column():
             word_timestamps = gr.Checkbox(label=translations["word_timestamps"], info=translations["word_timestamps_info"], value=False, interactive=True)
-            model_size = gr.Radio(label=translations["model_size"], info=translations["model_size_info"], choices=["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2", "large-v3", "large-v3-turbo"], value="medium", interactive=True)
+            model_size = gr.Radio(label=translations["model_size"], info=translations["model_size_info"], choices=whisper_model, value=whisper_model[0], interactive=True)
     with gr.Row():
         convert_button = gr.Button(translations["convert_audio"], variant="primary")
     with gr.Row():

@@ -50,9 +50,13 @@ class STFT(torch.nn.Module):
     def inverse(self, magnitude, phase):
         cat = torch.cat([magnitude * phase.cos(), magnitude * phase.sin()], dim=1)
         fold = torch.nn.Fold(output_size=(1, (cat.size(-1) - 1) * self.hop_length + self.filter_length), kernel_size=(1, self.filter_length), stride=(1, self.hop_length))
-
         inverse_transform = fold(self.inverse_basis @ cat)[:, 0, 0, self.pad_amount : -self.pad_amount]
-        window_square_sum = fold(self.fft_window.cpu().pow(2).repeat(cat.size(-1), 1).T.unsqueeze(0))[:, 0, 0, self.pad_amount : -self.pad_amount].to(cat.device) if str(cat.device).startswith("ocl") else fold(self.fft_window.pow(2).repeat(cat.size(-1), 1).T.unsqueeze(0))[:, 0, 0, self.pad_amount : -self.pad_amount]
+
+        window_square_sum = (
+            fold(self.fft_window.cpu().pow(2).repeat(cat.size(-1), 1).T.unsqueeze(0))
+        ) if str(cat.device).startswith("ocl") else (
+            fold(self.fft_window.pow(2).repeat(cat.size(-1), 1).T.unsqueeze(0))
+        )[:, 0, 0, self.pad_amount : -self.pad_amount].to(cat.device)
 
         return inverse_transform / window_square_sum
 

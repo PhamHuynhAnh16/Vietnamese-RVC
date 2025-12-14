@@ -113,7 +113,20 @@ class Pretrained(torch.nn.Module):
     def __init__(self, modules=None, hparams=None, run_opts=None, freeze_params=True):
         super().__init__()
 
-        for arg, default in {"device": "cpu", "data_parallel_count": -1, "data_parallel_backend": False, "distributed_launch": False, "distributed_backend": "nccl", "jit": False, "jit_module_keys": None, "compile": False, "compile_module_keys": None, "compile_mode": "reduce-overhead", "compile_using_fullgraph": False, "compile_using_dynamic_shape_tracing": False}.items():
+        for arg, default in {
+            "device": "cpu", 
+            "data_parallel_count": -1, 
+            "data_parallel_backend": False, 
+            "distributed_launch": False, 
+            "distributed_backend": "nccl", 
+            "jit": False, 
+            "jit_module_keys": None, 
+            "compile": False, 
+            "compile_module_keys": None, 
+            "compile_mode": "reduce-overhead", 
+            "compile_using_fullgraph": False, 
+            "compile_using_dynamic_shape_tracing": False
+        }.items():
             if run_opts is not None and arg in run_opts: setattr(self, arg, run_opts[arg])
             elif hparams is not None and arg in hparams: setattr(self, arg, hparams[arg])
             else: setattr(self, arg, default)

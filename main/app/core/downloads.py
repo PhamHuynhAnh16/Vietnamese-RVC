@@ -155,6 +155,9 @@ def download_pretrained_model(choices, model, sample_rate):
 
         gr_info(translations["success"])
         return translations["success"], translations["success"]
+    
+def is_empty_table(html):
+    return ('<td colspan=' in html and 'text-center' in html)
 
 def fetch_models_data(search):
     all_table_data = [] 
@@ -166,7 +169,9 @@ def fetch_models_data(search):
 
             if response.status_code == 200:
                 table_data = response.json().get("table", "")
+
                 if not table_data.strip(): break
+                if is_empty_table(table_data): break
 
                 all_table_data.append(table_data)
                 page += 1

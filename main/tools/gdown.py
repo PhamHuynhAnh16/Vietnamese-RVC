@@ -20,7 +20,16 @@ def parse_url(url):
     file_id = parse_qs(parsed.query).get("id", [None])[0]
 
     if file_id is None:
-        for pattern in (r"^/file/d/(.*?)/(edit|view)$", r"^/file/u/[0-9]+/d/(.*?)/(edit|view)$", r"^/document/d/(.*?)/(edit|htmlview|view)$", r"^/document/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$", r"^/presentation/d/(.*?)/(edit|htmlview|view)$", r"^/presentation/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$", r"^/spreadsheets/d/(.*?)/(edit|htmlview|view)$", r"^/spreadsheets/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$"):
+        for pattern in (
+            r"^/file/d/(.*?)/(edit|view)$", 
+            r"^/file/u/[0-9]+/d/(.*?)/(edit|view)$", 
+            r"^/document/d/(.*?)/(edit|htmlview|view)$", 
+            r"^/document/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$", 
+            r"^/presentation/d/(.*?)/(edit|htmlview|view)$", 
+            r"^/presentation/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$", 
+            r"^/spreadsheets/d/(.*?)/(edit|htmlview|view)$", 
+            r"^/spreadsheets/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$"
+        ):
             match = re.match(pattern, parsed.path)
             if match:
                 file_id = match.group(1)

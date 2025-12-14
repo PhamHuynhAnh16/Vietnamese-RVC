@@ -19,7 +19,7 @@ sys.path.append(os.getcwd())
 
 from main.library.utils import load_audio
 from main.inference.preprocess.slicer2 import Slicer
-from main.app.variables import config, logger, translations, configs
+from main.app.variables import config, logger, translations, configs, file_types
 
 for l in ["numba.core.byteflow", "numba.core.ssa", "numba.core.interpreter"]:
     logging.getLogger(l).setLevel(logging.ERROR)
@@ -151,7 +151,7 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
         try:
             sid = 0 if root == input_root else int(os.path.basename(root))
             for f in filenames:
-                if f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3")):
+                if f.lower().endswith(tuple(file_types)):
                     files.append((os.path.join(root, f), idx, sid))
                     idx += 1
         except ValueError:
@@ -177,10 +177,40 @@ def main():
     num_processes = args.cpu_cores
     num_processes = 2 if num_processes is None else int(num_processes)
 
-    dataset, sample_rate, cut_preprocess, preprocess_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode = args.dataset_path, args.sample_rate, args.cut_preprocess, args.process_effects, args.clean_dataset, args.clean_strength, args.chunk_len, args.overlap_len, args.normalization_mode
+    (
+        dataset, 
+        sample_rate, 
+        cut_preprocess, 
+        preprocess_effects, 
+        clean_dataset, 
+        clean_strength, 
+        chunk_len, 
+        overlap_len, 
+        normalization_mode
+    ) = (
+        args.dataset_path, 
+        args.sample_rate, 
+        args.cut_preprocess, 
+        args.process_effects, 
+        args.clean_dataset, 
+        args.clean_strength, 
+        args.chunk_len, 
+        args.overlap_len, 
+        args.normalization_mode
+    )
+
     os.makedirs(experiment_directory, exist_ok=True)
 
-    log_data = {translations['modelname']: args.model_name, translations['export_process']: experiment_directory, translations['dataset_folder']: dataset, translations['pretrain_sr']: sample_rate, translations['cpu_core']: num_processes, translations['split_audio']: cut_preprocess, translations['preprocess_effect']: preprocess_effects, translations['clear_audio']: clean_dataset}
+    log_data = {
+        translations['modelname']: args.model_name, 
+        translations['export_process']: experiment_directory, 
+        translations['dataset_folder']: dataset, 
+        translations['pretrain_sr']: sample_rate, 
+        translations['cpu_core']: num_processes, 
+        translations['split_audio']: cut_preprocess, 
+        translations['preprocess_effect']: preprocess_effects, 
+        translations['clear_audio']: clean_dataset
+    }
     if clean_dataset: log_data[translations['clean_strength']] = clean_strength
 
     for key, value in log_data.items():

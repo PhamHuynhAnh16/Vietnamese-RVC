@@ -10,7 +10,7 @@ sys.path.append(os.getcwd())
 
 from main.tools import huggingface
 from main.app.core.ui import gr_info, gr_warning
-from main.app.variables import python, translations, configs
+from main.app.variables import python, translations, configs, file_types
 
 def if_done(done, p):
     while 1:
@@ -89,7 +89,7 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
     sr = int(float(sample_rate.rstrip("k")) * 1000)
 
     if not model_name: return gr_warning(translations["provide_name"])
-    if not os.path.exists(dataset) or not any(f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3")) for f in os.listdir(dataset) if os.path.isfile(os.path.join(dataset, f))): return gr_warning(translations["not_found_data"])
+    if not os.path.exists(dataset) or not any(f.lower().endswith(tuple(file_types)) for f in os.listdir(dataset) if os.path.isfile(os.path.join(dataset, f))): return gr_warning(translations["not_found_data"])
     
     model_dir = os.path.join(configs["logs_path"], model_name)
     if os.path.exists(model_dir): shutil.rmtree(model_dir, ignore_errors=True)
@@ -111,7 +111,14 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
     model_dir = os.path.join(configs["logs_path"], model_name)
 
     try:
-        if not any(os.path.isfile(os.path.join(model_dir, "sliced_audios", f)) for f in os.listdir(os.path.join(model_dir, "sliced_audios"))) or not any(os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f)) for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k"))): return gr_warning(translations["not_found_data_preprocess"])
+        if not any(
+            os.path.isfile(os.path.join(model_dir, "sliced_audios", f)) 
+            for f in os.listdir(os.path.join(model_dir, "sliced_audios"))
+        ) or not any(
+            os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f)) 
+            for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k"))
+        ): 
+            return gr_warning(translations["not_found_data_preprocess"])
     except:
         return gr_warning(translations["not_found_data_preprocess"])
     
@@ -142,7 +149,36 @@ def create_index(model_name, rvc_version, index_algorithm):
     for log in log_read(done, "create_index"):
         yield log
 
-def training(model_name, rvc_version, save_every_epoch, save_only_latest, save_every_weights, total_epoch, sample_rate, batch_size, gpu, pitch_guidance, not_pretrain, custom_pretrained, pretrain_g, pretrain_d, detector, threshold, clean_up, cache, model_author, vocoder, checkpointing, deterministic, benchmark, optimizer, energy_use, custom_reference=False, reference_name="", multiscale_mel_loss=False):
+def training(
+    model_name, 
+    rvc_version, 
+    save_every_epoch, 
+    save_only_latest, 
+    save_every_weights, 
+    total_epoch, 
+    sample_rate, 
+    batch_size, 
+    gpu, 
+    pitch_guidance, 
+    not_pretrain, 
+    custom_pretrained, 
+    pretrain_g, 
+    pretrain_d, 
+    detector, 
+    threshold, 
+    clean_up, 
+    cache, 
+    model_author, 
+    vocoder, 
+    checkpointing, 
+    deterministic, 
+    benchmark, 
+    optimizer, 
+    energy_use, 
+    custom_reference=False, 
+    reference_name="", 
+    multiscale_mel_loss=False
+):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
 

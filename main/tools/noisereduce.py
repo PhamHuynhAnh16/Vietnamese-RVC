@@ -21,7 +21,21 @@ def amp_to_db(x, eps=torch.finfo(torch.float32).eps, top_db=40):
 
 class TorchGate(torch.nn.Module):
     @torch.no_grad()
-    def __init__(self, sr, nonstationary = False, n_std_thresh_stationary = 1.5, n_thresh_nonstationary = 1.3, temp_coeff_nonstationary = 0.1, n_movemean_nonstationary = 20, prop_decrease = 1.0, n_fft = 1024, win_length = None, hop_length = None, freq_mask_smooth_hz = 500, time_mask_smooth_ms = 50):
+    def __init__(
+        self, 
+        sr, 
+        nonstationary = False, 
+        n_std_thresh_stationary = 1.5, 
+        n_thresh_nonstationary = 1.3, 
+        temp_coeff_nonstationary = 0.1, 
+        n_movemean_nonstationary = 20, 
+        prop_decrease = 1.0, 
+        n_fft = 1024, 
+        win_length = None, 
+        hop_length = None, 
+        freq_mask_smooth_hz = 500, 
+        time_mask_smooth_ms = 50
+    ):
         super().__init__()
         self.sr = sr
         self.nonstationary = nonstationary
@@ -48,7 +62,17 @@ class TorchGate(torch.nn.Module):
         if n_grad_time < 1: raise ValueError
         if n_grad_time == 1 and n_grad_freq == 1: return None
 
-        smoothing_filter = torch.outer(torch.cat([linspace(0, 1, n_grad_freq + 1, endpoint=False), linspace(1, 0, n_grad_freq + 2)])[1:-1], torch.cat([linspace(0, 1, n_grad_time + 1, endpoint=False), linspace(1, 0, n_grad_time + 2)])[1:-1]).unsqueeze(0).unsqueeze(0)
+        smoothing_filter = torch.outer(
+            torch.cat([
+                linspace(0, 1, n_grad_freq + 1, endpoint=False), 
+                linspace(1, 0, n_grad_freq + 2)
+            ])[1:-1], 
+            torch.cat([
+                linspace(0, 1, n_grad_time + 1, endpoint=False), 
+                linspace(1, 0, n_grad_time + 2)
+            ])[1:-1]
+        ).unsqueeze(0).unsqueeze(0)
+
         return smoothing_filter / smoothing_filter.sum()
 
     @torch.no_grad()

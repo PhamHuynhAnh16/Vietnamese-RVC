@@ -78,7 +78,30 @@ class LayerScale(nn.Module):
         else: return self.scale[:, None] * x
 
 class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation=F.relu, group_norm=0, norm_first=False, norm_out=False, layer_norm_eps=1e-5, layer_scale=False, init_values=1e-4, device=None, dtype=None, sparse=False, mask_type="diag", mask_random_seed=42, sparse_attn_window=500, global_window=50, auto_sparsity=False, sparsity=0.95, batch_first=False):
+    def __init__(
+        self, 
+        d_model, 
+        nhead, 
+        dim_feedforward=2048, 
+        dropout=0.1, 
+        activation=F.relu, 
+        group_norm=0, 
+        norm_first=False, 
+        norm_out=False, 
+        layer_norm_eps=1e-5, 
+        layer_scale=False, 
+        init_values=1e-4, 
+        device=None, 
+        dtype=None, 
+        sparse=False, 
+        mask_type="diag", 
+        mask_random_seed=42, 
+        sparse_attn_window=500, 
+        global_window=50, 
+        auto_sparsity=False, 
+        sparsity=0.95, 
+        batch_first=False
+    ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, activation=activation, layer_norm_eps=layer_norm_eps, batch_first=batch_first, norm_first=norm_first, device=device, dtype=dtype)
         self.auto_sparsity = auto_sparsity
@@ -108,7 +131,40 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
         return x
 
 class CrossTransformerEncoder(nn.Module):
-    def __init__(self, dim, emb = "sin", hidden_scale = 4.0, num_heads = 8, num_layers = 6, cross_first = False, dropout = 0.0, max_positions = 1000, norm_in = True, norm_in_group = False, group_norm = False, norm_first = False, norm_out = False, max_period = 10000.0, weight_decay = 0.0, lr = None, layer_scale = False, gelu = True, sin_random_shift = 0, weight_pos_embed = 1.0, cape_mean_normalize = True, cape_augment = True, cape_glob_loc_scale = [5000.0, 1.0, 1.4], sparse_self_attn = False, sparse_cross_attn = False, mask_type = "diag", mask_random_seed = 42, sparse_attn_window = 500, global_window = 50, auto_sparsity = False, sparsity = 0.95):
+    def __init__(
+        self, 
+        dim, 
+        emb = "sin", 
+        hidden_scale = 4.0, 
+        num_heads = 8, 
+        num_layers = 6, 
+        cross_first = False, 
+        dropout = 0.0, 
+        max_positions = 1000, 
+        norm_in = True, 
+        norm_in_group = False, 
+        group_norm = False, 
+        norm_first = False, 
+        norm_out = False, 
+        max_period = 10000.0, 
+        weight_decay = 0.0, 
+        lr = None, 
+        layer_scale = False, 
+        gelu = True, 
+        sin_random_shift = 0, 
+        weight_pos_embed = 1.0, 
+        cape_mean_normalize = True, 
+        cape_augment = True, 
+        cape_glob_loc_scale = [5000.0, 1.0, 1.4], 
+        sparse_self_attn = False, 
+        sparse_cross_attn = False, 
+        mask_type = "diag", 
+        mask_random_seed = 42, 
+        sparse_attn_window = 500, 
+        global_window = 50, 
+        auto_sparsity = False, 
+        sparsity = 0.95
+    ):
         super().__init__()
         assert dim % num_heads == 0
         hidden_dim = int(dim * hidden_scale)
@@ -210,10 +266,38 @@ class CrossTransformerEncoder(nn.Module):
     def _get_pos_embedding(self, T, B, C, device):
         if self.emb == "sin":
             shift = random.randrange(self.sin_random_shift + 1)
-            pos_emb = create_sin_embedding(T, C, shift=shift, device=device, max_period=self.max_period)
+
+            pos_emb = create_sin_embedding(
+                T, 
+                C, 
+                shift=shift, 
+                device=device, 
+                max_period=self.max_period
+            )
         elif self.emb == "cape":
-            if self.training: pos_emb = create_sin_embedding_cape(T, C, B, device=device, max_period=self.max_period, mean_normalize=self.cape_mean_normalize, augment=self.cape_augment, max_global_shift=self.cape_glob_loc_scale[0], max_local_shift=self.cape_glob_loc_scale[1], max_scale=self.cape_glob_loc_scale[2])
-            else: pos_emb = create_sin_embedding_cape(T, C, B, device=device, max_period=self.max_period, mean_normalize=self.cape_mean_normalize, augment=False)
+            if self.training: 
+                pos_emb = create_sin_embedding_cape(
+                    T, 
+                    C, 
+                    B, 
+                    device=device, 
+                    max_period=self.max_period, 
+                    mean_normalize=self.cape_mean_normalize, 
+                    augment=self.cape_augment, 
+                    max_global_shift=self.cape_glob_loc_scale[0], 
+                    max_local_shift=self.cape_glob_loc_scale[1], 
+                    max_scale=self.cape_glob_loc_scale[2]
+                )
+            else: 
+                pos_emb = create_sin_embedding_cape(
+                    T, 
+                    C, 
+                    B, 
+                    device=device, 
+                    max_period=self.max_period, 
+                    mean_normalize=self.cape_mean_normalize, 
+                    augment=False
+                )
         elif self.emb == "scaled":
             pos = torch.arange(T, device=device)
             pos_emb = self.position_embeddings(pos)[:, None]
@@ -226,7 +310,30 @@ class CrossTransformerEncoder(nn.Module):
         return group
 
 class CrossTransformerEncoderLayer(nn.Module):
-    def __init__(self, d_model, nhead, dim_feedforward = 2048, dropout = 0.1, activation=F.relu, layer_norm_eps = 1e-5, layer_scale = False, init_values = 1e-4, norm_first = False, group_norm = False, norm_out = False, sparse=False, mask_type="diag", mask_random_seed=42, sparse_attn_window=500, global_window=50, sparsity=0.95, auto_sparsity=None, device=None, dtype=None, batch_first=False):
+    def __init__(
+        self, 
+        d_model, 
+        nhead, 
+        dim_feedforward = 2048, 
+        dropout = 0.1, 
+        activation=F.relu, 
+        layer_norm_eps = 1e-5, 
+        layer_scale = False, 
+        init_values = 1e-4, 
+        norm_first = False, 
+        group_norm = False, 
+        norm_out = False, 
+        sparse=False, 
+        mask_type="diag", 
+        mask_random_seed=42, 
+        sparse_attn_window=500, 
+        global_window=50, 
+        sparsity=0.95, 
+        auto_sparsity=None, 
+        device=None, 
+        dtype=None, 
+        batch_first=False
+    ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.auto_sparsity = auto_sparsity
@@ -284,7 +391,72 @@ class CrossTransformerEncoderLayer(nn.Module):
 
 class HTDemucs(nn.Module):
     @capture_init
-    def __init__(self, sources, audio_channels=2, channels=48, channels_time=None, growth=2, nfft=4096, wiener_iters=0, end_iters=0, wiener_residual=False, cac=True, depth=4, rewrite=True, multi_freqs=None, multi_freqs_depth=3, freq_emb=0.2, emb_scale=10, emb_smooth=True, kernel_size=8, time_stride=2, stride=4, context=1, context_enc=0, norm_starts=4, norm_groups=4, dconv_mode=1, dconv_depth=2, dconv_comp=8, dconv_init=1e-3, bottom_channels=0, t_layers=5, t_emb="sin", t_hidden_scale=4.0, t_heads=8, t_dropout=0.0, t_max_positions=10000, t_norm_in=True, t_norm_in_group=False, t_group_norm=False, t_norm_first=True, t_norm_out=True, t_max_period=10000.0, t_weight_decay=0.0, t_lr=None, t_layer_scale=True, t_gelu=True, t_weight_pos_embed=1.0, t_sin_random_shift=0, t_cape_mean_normalize=True, t_cape_augment=True, t_cape_glob_loc_scale=[5000.0, 1.0, 1.4], t_sparse_self_attn=False, t_sparse_cross_attn=False, t_mask_type="diag", t_mask_random_seed=42, t_sparse_attn_window=500, t_global_window=100, t_sparsity=0.95, t_auto_sparsity=False, t_cross_first=False, rescale=0.1, samplerate=44100, segment=4 * 10, use_train_segment=True):
+    def __init__(
+        self, 
+        sources, 
+        audio_channels=2, 
+        channels=48, 
+        channels_time=None, 
+        growth=2, 
+        nfft=4096, 
+        wiener_iters=0, 
+        end_iters=0, 
+        wiener_residual=False, 
+        cac=True, 
+        depth=4, 
+        rewrite=True, 
+        multi_freqs=None, 
+        multi_freqs_depth=3, 
+        freq_emb=0.2, 
+        emb_scale=10, 
+        emb_smooth=True, 
+        kernel_size=8, 
+        time_stride=2, 
+        stride=4, 
+        context=1, 
+        context_enc=0, 
+        norm_starts=4, 
+        norm_groups=4, 
+        dconv_mode=1, 
+        dconv_depth=2, 
+        dconv_comp=8, 
+        dconv_init=1e-3, 
+        bottom_channels=0, 
+        t_layers=5, 
+        t_emb="sin", 
+        t_hidden_scale=4.0, 
+        t_heads=8, 
+        t_dropout=0.0, 
+        t_max_positions=10000, 
+        t_norm_in=True, 
+        t_norm_in_group=False, 
+        t_group_norm=False, 
+        t_norm_first=True, 
+        t_norm_out=True, 
+        t_max_period=10000.0, 
+        t_weight_decay=0.0, 
+        t_lr=None, 
+        t_layer_scale=True, 
+        t_gelu=True, 
+        t_weight_pos_embed=1.0, 
+        t_sin_random_shift=0, 
+        t_cape_mean_normalize=True, 
+        t_cape_augment=True, 
+        t_cape_glob_loc_scale=[5000.0, 1.0, 1.4], 
+        t_sparse_self_attn=False, 
+        t_sparse_cross_attn=False, 
+        t_mask_type="diag", 
+        t_mask_random_seed=42, 
+        t_sparse_attn_window=500, 
+        t_global_window=100, 
+        t_sparsity=0.95, 
+        t_auto_sparsity=False, 
+        t_cross_first=False, 
+        rescale=0.1, 
+        samplerate=44100, 
+        segment=4 * 10, 
+        use_train_segment=True
+    ):
         super().__init__()
         self.cac = cac
         self.wiener_residual = wiener_residual
@@ -406,7 +578,40 @@ class HTDemucs(nn.Module):
             self.channel_downsampler_t = nn.Conv1d(bottom_channels, transformer_channels, 1)
             transformer_channels = bottom_channels
 
-        if t_layers > 0: self.crosstransformer = CrossTransformerEncoder(dim=transformer_channels, emb=t_emb, hidden_scale=t_hidden_scale, num_heads=t_heads, num_layers=t_layers, cross_first=t_cross_first, dropout=t_dropout, max_positions=t_max_positions, norm_in=t_norm_in, norm_in_group=t_norm_in_group, group_norm=t_group_norm, norm_first=t_norm_first, norm_out=t_norm_out, max_period=t_max_period, weight_decay=t_weight_decay, lr=t_lr, layer_scale=t_layer_scale, gelu=t_gelu, sin_random_shift=t_sin_random_shift, weight_pos_embed=t_weight_pos_embed, cape_mean_normalize=t_cape_mean_normalize, cape_augment=t_cape_augment, cape_glob_loc_scale=t_cape_glob_loc_scale, sparse_self_attn=t_sparse_self_attn, sparse_cross_attn=t_sparse_cross_attn, mask_type=t_mask_type, mask_random_seed=t_mask_random_seed, sparse_attn_window=t_sparse_attn_window, global_window=t_global_window, sparsity=t_sparsity, auto_sparsity=t_auto_sparsity)
+        if t_layers > 0: 
+            self.crosstransformer = CrossTransformerEncoder(
+                dim=transformer_channels, 
+                emb=t_emb, 
+                hidden_scale=t_hidden_scale, 
+                num_heads=t_heads, 
+                num_layers=t_layers, 
+                cross_first=t_cross_first, 
+                dropout=t_dropout, 
+                max_positions=t_max_positions, 
+                norm_in=t_norm_in, 
+                norm_in_group=t_norm_in_group, 
+                group_norm=t_group_norm, 
+                norm_first=t_norm_first, 
+                norm_out=t_norm_out, 
+                max_period=t_max_period, 
+                weight_decay=t_weight_decay, 
+                lr=t_lr, 
+                layer_scale=t_layer_scale, 
+                gelu=t_gelu, 
+                sin_random_shift=t_sin_random_shift, 
+                weight_pos_embed=t_weight_pos_embed, 
+                cape_mean_normalize=t_cape_mean_normalize, 
+                cape_augment=t_cape_augment, 
+                cape_glob_loc_scale=t_cape_glob_loc_scale, 
+                sparse_self_attn=t_sparse_self_attn, 
+                sparse_cross_attn=t_sparse_cross_attn, 
+                mask_type=t_mask_type, 
+                mask_random_seed=t_mask_random_seed, 
+                sparse_attn_window=t_sparse_attn_window, 
+                global_window=t_global_window, 
+                sparsity=t_sparsity, 
+                auto_sparsity=t_auto_sparsity
+            )
         else: self.crosstransformer = None
 
     def _spec(self, x):

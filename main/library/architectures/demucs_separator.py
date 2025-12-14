@@ -55,7 +55,20 @@ class DemucsSeparator(common_separator.CommonSeparator):
         output_files = []
 
         if isinstance(inst_source, np.ndarray):
-            inst_source[self.demucs_source_map[common_separator.CommonSeparator.VOCAL_STEM]] = spec_utils.reshape_sources(inst_source[self.demucs_source_map[common_separator.CommonSeparator.VOCAL_STEM]], source[self.demucs_source_map[common_separator.CommonSeparator.VOCAL_STEM]])
+            inst_source[
+                self.demucs_source_map[common_separator.CommonSeparator.VOCAL_STEM]
+            ] = spec_utils.reshape_sources(
+                inst_source[
+                    self.demucs_source_map[
+                        common_separator.CommonSeparator.VOCAL_STEM
+                    ]
+                ], 
+                source[
+                    self.demucs_source_map[
+                        common_separator.CommonSeparator.VOCAL_STEM
+                    ]
+                ]
+            )
             source = inst_source
 
         if isinstance(source, np.ndarray):
@@ -96,7 +109,17 @@ class DemucsSeparator(common_separator.CommonSeparator):
         mix_infer = mix
 
         with torch.no_grad():
-            sources = apply.apply_model(model=self.demucs_model_instance, mix=mix_infer[None], shifts=self.shifts, split=self.segments_enabled, overlap=self.overlap, static_shifts=max(self.shifts, 1), set_progress_bar=None, device=self.torch_device, progress=True)[0]
+            sources = apply.apply_model(
+                model=self.demucs_model_instance, 
+                mix=mix_infer[None], 
+                shifts=self.shifts, 
+                split=self.segments_enabled, 
+                overlap=self.overlap, 
+                static_shifts=max(self.shifts, 1), 
+                set_progress_bar=None, 
+                device=self.torch_device, 
+                progress=True
+            )[0]
 
         sources = (sources * ref.std() + ref.mean()).cpu().numpy()
         sources[[0, 1]] = sources[[1, 0]]

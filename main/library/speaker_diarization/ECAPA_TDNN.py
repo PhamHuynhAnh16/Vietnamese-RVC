@@ -229,7 +229,22 @@ class SERes2NetBlock(nn.Module):
         return self.se_block(self.tdnn2(self.res2net_block(self.tdnn1(x))), lengths) + residual
 
 class ECAPA_TDNN(torch.nn.Module):
-    def __init__(self, input_size, device="cpu", lin_neurons=192, activation=torch.nn.ReLU, channels=[512, 512, 512, 512, 1536], kernel_sizes=[5, 3, 3, 3, 1], dilations=[1, 2, 3, 4, 1], attention_channels=128, res2net_scale=8, se_channels=128, global_context=True, groups=[1, 1, 1, 1, 1], dropout=0.0):
+    def __init__(
+        self, 
+        input_size, 
+        device="cpu", 
+        lin_neurons=192, 
+        activation=torch.nn.ReLU, 
+        channels=[512, 512, 512, 512, 1536], 
+        kernel_sizes=[5, 3, 3, 3, 1], 
+        dilations=[1, 2, 3, 4, 1], 
+        attention_channels=128, 
+        res2net_scale=8, 
+        se_channels=128, 
+        global_context=True, 
+        groups=[1, 1, 1, 1, 1], 
+        dropout=0.0
+    ):
         super().__init__()
         assert len(channels) == len(kernel_sizes)
         assert len(channels) == len(dilations)

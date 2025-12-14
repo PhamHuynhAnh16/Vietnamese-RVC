@@ -10,10 +10,41 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import logger, config, configs, translations, python
+from main.app.variables import logger, config, configs, translations, python, file_types
 from main.app.core.ui import gr_info, gr_warning, gr_error, process_output, replace_export_format
 
-def convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0_method, input_path, output_path, pth_path, index_path, f0_autotune, clean_audio, clean_strength, export_format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, f0_onnx, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing=False, alpha=0.5):    
+def convert(
+    pitch, 
+    filter_radius, 
+    index_rate, 
+    rms_mix_rate, 
+    protect, 
+    hop_length, 
+    f0_method, 
+    input_path, 
+    output_path, 
+    pth_path, 
+    index_path, 
+    f0_autotune, 
+    clean_audio, 
+    clean_strength, 
+    export_format, 
+    embedder_model, 
+    resample_sr, 
+    split_audio, 
+    f0_autotune_strength, 
+    checkpointing, 
+    f0_onnx, 
+    embedders_mode, 
+    formant_shifting, 
+    formant_qfrency, 
+    formant_timbre, 
+    f0_file, 
+    proposal_pitch, 
+    proposal_pitch_threshold, 
+    audio_processing=False, 
+    alpha=0.5
+):    
     subprocess.run([
         python, 
         configs["convert_path"], 
@@ -49,7 +80,45 @@ def convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length,
         "--alpha", str(alpha)
     ])
 
-def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, rms_mix_rate, protect, split_audio, f0_autotune_strength, input_audio_name, checkpointing, onnx_f0_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, embedders_mode, proposal_pitch, proposal_pitch_threshold, audio_processing=False, alpha=0.5):
+def convert_audio(
+    clean, autotune, 
+    use_audio, 
+    use_original, 
+    convert_backing, 
+    not_merge_backing, 
+    merge_instrument, 
+    pitch, 
+    clean_strength, 
+    model, 
+    index, 
+    index_rate, 
+    input, 
+    output, 
+    format, 
+    method, 
+    hybrid_method, 
+    hop_length, 
+    embedders, 
+    custom_embedders, 
+    resample_sr, 
+    filter_radius, 
+    rms_mix_rate, 
+    protect, 
+    split_audio, 
+    f0_autotune_strength, 
+    input_audio_name, 
+    checkpointing, 
+    onnx_f0_mode, 
+    formant_shifting, 
+    formant_qfrency, 
+    formant_timbre, 
+    f0_file, 
+    embedders_mode, 
+    proposal_pitch, 
+    proposal_pitch_threshold, 
+    audio_processing=False, 
+    alpha=0.5
+):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
     return_none = [None]*6
@@ -121,7 +190,37 @@ def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not
 
         gr_info(translations["convert_vocal"])
 
-        convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0method, input_path, output_path, model_path, index, autotune, clean, clean_strength, format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+        convert(
+            pitch, 
+            filter_radius, 
+            index_rate, 
+            rms_mix_rate, 
+            protect, 
+            hop_length, 
+            f0method, 
+            input_path, 
+            output_path, 
+            model_path, 
+            index, 
+            autotune, 
+            clean, 
+            clean_strength, 
+            format, 
+            embedder_model, 
+            resample_sr, 
+            split_audio, 
+            f0_autotune_strength, 
+            checkpointing, 
+            onnx_f0_mode, 
+            embedders_mode, 
+            formant_shifting, 
+            formant_qfrency, 
+            formant_timbre, 
+            f0_file, 
+            proposal_pitch, 
+            proposal_pitch_threshold, 
+            audio_processing, 
+            alpha)
 
         gr_info(translations["convert_success"])
 
@@ -130,7 +229,38 @@ def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not
 
             gr_info(translations["convert_backup"])
 
-            convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0method, backing_path, output_backing, model_path, index, autotune, clean, clean_strength, format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+            convert(
+                pitch, 
+                filter_radius, 
+                index_rate, 
+                rms_mix_rate, 
+                protect, 
+                hop_length, 
+                f0method, 
+                backing_path, 
+                output_backing, 
+                model_path, 
+                index, 
+                autotune, 
+                clean, 
+                clean_strength, 
+                format, 
+                embedder_model, 
+                resample_sr, 
+                split_audio, 
+                f0_autotune_strength, 
+                checkpointing, 
+                onnx_f0_mode, 
+                embedders_mode, 
+                formant_shifting, 
+                formant_qfrency, 
+                formant_timbre, 
+                f0_file, 
+                proposal_pitch, 
+                proposal_pitch_threshold, 
+                audio_processing, 
+                alpha
+            )
 
             gr_info(translations["convert_backup_success"])
 
@@ -164,7 +294,14 @@ def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not
         except:
             return return_none
 
-        return [(None if use_original else output_path), output_backing, (None if not_merge_backing and use_original else output_merge_backup), (output_path if use_original else None), (output_merge_instrument if merge_instrument else None), {"visible": True, "__type__": "update"}]
+        return [
+            (None if use_original else output_path), 
+            output_backing, 
+            (None if not_merge_backing and use_original else output_merge_backup), 
+            (output_path if use_original else None), 
+            (output_merge_instrument if merge_instrument else None), 
+            {"visible": True, "__type__": "update"}
+        ]
     else:
         if not input or not os.path.exists(input): 
             gr_warning(translations["input_not_valid"])
@@ -179,14 +316,45 @@ def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not
         if os.path.isdir(input):
             gr_info(translations["is_folder"])
 
-            if not [f for f in os.listdir(input) if f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]:
+            if not [f for f in os.listdir(input) if f.lower().endswith(tuple(file_types))]:
                 gr_warning(translations["not_found_in_folder"])
                 return return_none
             
             gr_info(translations["batch_convert"])
-
             output_dir = os.path.dirname(output) or output
-            convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0method, input, output_dir, model_path, index, autotune, clean, clean_strength, format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+
+            convert(
+                pitch, 
+                filter_radius, 
+                index_rate, 
+                rms_mix_rate, 
+                protect, 
+                hop_length, 
+                f0method, 
+                input, 
+                output_dir, 
+                model_path, 
+                index, 
+                autotune, 
+                clean, 
+                clean_strength, 
+                format, 
+                embedder_model, 
+                resample_sr, 
+                split_audio, 
+                f0_autotune_strength, 
+                checkpointing, 
+                onnx_f0_mode, 
+                embedders_mode, 
+                formant_shifting, 
+                formant_qfrency, 
+                formant_timbre, 
+                f0_file, 
+                proposal_pitch, 
+                proposal_pitch_threshold, 
+                audio_processing, 
+                alpha
+            )
 
             gr_info(translations["batch_convert_success"])
 
@@ -199,33 +367,223 @@ def convert_audio(clean, autotune, use_audio, use_original, convert_backing, not
 
             gr_info(translations["convert_vocal"])
 
-            convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+            convert(
+                pitch, 
+                filter_radius, 
+                index_rate, 
+                rms_mix_rate, 
+                protect, 
+                hop_length, 
+                f0method, 
+                input, 
+                output, 
+                model_path, 
+                index, 
+                autotune, 
+                clean, 
+                clean_strength, 
+                format, 
+                embedder_model, 
+                resample_sr, 
+                split_audio, 
+                f0_autotune_strength, 
+                checkpointing, 
+                onnx_f0_mode, 
+                embedders_mode, 
+                formant_shifting, 
+                formant_qfrency, 
+                formant_timbre, 
+                f0_file, 
+                proposal_pitch, 
+                proposal_pitch_threshold, 
+                audio_processing, 
+                alpha
+            )
 
             gr_info(translations["convert_success"])
 
             return_none[0] = output
             return return_none
 
-def convert_selection(clean, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, rms_mix_rate, protect, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, embedders_mode, proposal_pitch, proposal_pitch_threshold, audio_processing=False, alpha=0.5):
+def convert_selection(
+    clean,
+    autotune,
+    use_audio,
+    use_original,
+    convert_backing,
+    not_merge_backing,
+    merge_instrument,
+    pitch,
+    clean_strength,
+    model,
+    index,
+    index_rate,
+    input,
+    output,
+    format,
+    method,
+    hybrid_method,
+    hop_length,
+    embedders,
+    custom_embedders,
+    resample_sr,
+    filter_radius,
+    rms_mix_rate,
+    protect,
+    split_audio,
+    f0_autotune_strength,
+    checkpointing,
+    onnx_f0_mode,
+    formant_shifting,
+    formant_qfrency,
+    formant_timbre,
+    f0_file,
+    embedders_mode,
+    proposal_pitch,
+    proposal_pitch_threshold,
+    audio_processing=False,
+    alpha=0.5
+):
     if use_audio:
         gr_info(translations["search_separate"])
-        choice = [f for f in os.listdir(configs["audios_path"]) if os.path.isdir(os.path.join(configs["audios_path"], f))] if config.debug_mode else [f for f in os.listdir(configs["audios_path"]) if os.path.isdir(os.path.join(configs["audios_path"], f)) and any(file.lower().endswith((".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3")) for file in os.listdir(os.path.join(configs["audios_path"], f)))]
+        choice = [
+            f for f in os.listdir(configs["audios_path"]) 
+            if os.path.isdir(os.path.join(configs["audios_path"], f))
+        ] if config.debug_mode else [
+            f for f in os.listdir(configs["audios_path"]) 
+            if os.path.isdir(os.path.join(configs["audios_path"], f)) and any(file.lower().endswith(tuple(file_types)) for file in os.listdir(os.path.join(configs["audios_path"], f)))
+        ]
 
         gr_info(translations["found_choice"].format(choice=len(choice)))
 
         if len(choice) == 0: 
             gr_warning(translations["separator==0"])
 
-            return [{"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, None, None, None, None, None, {"visible": True, "__type__": "update"}, {"visible": False, "__type__": "update"}]
+            return [
+                {"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, 
+                None, 
+                None, 
+                None, 
+                None, 
+                None, 
+                {"visible": True, "__type__": "update"}, 
+                {"visible": False, "__type__": "update"}
+            ]
         elif len(choice) == 1:
-            convert_output = convert_audio(clean, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, None, None, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, rms_mix_rate, protect, split_audio, f0_autotune_strength, choice[0], checkpointing, onnx_f0_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, embedders_mode, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+            convert_output = convert_audio(
+                clean, 
+                autotune, 
+                use_audio, 
+                use_original, 
+                convert_backing, 
+                not_merge_backing, 
+                merge_instrument, 
+                pitch, 
+                clean_strength, 
+                model, 
+                index, 
+                index_rate, 
+                None, 
+                None, 
+                format, 
+                method, 
+                hybrid_method, 
+                hop_length, 
+                embedders, 
+                custom_embedders, 
+                resample_sr, 
+                filter_radius, 
+                rms_mix_rate, 
+                protect, 
+                split_audio, 
+                f0_autotune_strength, 
+                choice[0], 
+                checkpointing, 
+                onnx_f0_mode, 
+                formant_shifting, 
+                formant_qfrency, 
+                formant_timbre, 
+                f0_file, 
+                embedders_mode, 
+                proposal_pitch, 
+                proposal_pitch_threshold, 
+                audio_processing, 
+                alpha
+            )
 
-            return [{"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, convert_output[0], convert_output[1], convert_output[2], convert_output[3], convert_output[4], {"visible": True, "__type__": "update"}, {"visible": False, "__type__": "update"}]
-        else: return [{"choices": choice, "value": choice[0], "interactive": True, "visible": True, "__type__": "update"}, None, None, None, None, None, {"visible": False, "__type__": "update"}, {"visible": True, "__type__": "update"}]
+            return [
+                {"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, 
+                convert_output[0], 
+                convert_output[1], 
+                convert_output[2], 
+                convert_output[3], 
+                convert_output[4], 
+                {"visible": True, "__type__": "update"}, 
+                {"visible": False, "__type__": "update"}
+            ]
+        else: 
+            return [
+                {"choices": choice, "value": choice[0], "interactive": True, "visible": True, "__type__": "update"}, 
+                None, 
+                None, 
+                None, 
+                None, 
+                None, 
+                {"visible": False, "__type__": "update"}, 
+                {"visible": True, "__type__": "update"}
+            ]
     else:
-        main_convert = convert_audio(clean, autotune, use_audio, use_original, convert_backing, not_merge_backing, merge_instrument, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, rms_mix_rate, protect, split_audio, f0_autotune_strength, None, checkpointing, onnx_f0_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, embedders_mode, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+        main_convert = convert_audio(
+            clean, 
+            autotune, 
+            use_audio, 
+            use_original, 
+            convert_backing, 
+            not_merge_backing, 
+            merge_instrument, 
+            pitch, 
+            clean_strength, 
+            model, 
+            index, 
+            index_rate, 
+            input, 
+            output, 
+            format, 
+            method, 
+            hybrid_method, 
+            hop_length, 
+            embedders, 
+            custom_embedders, 
+            resample_sr, 
+            filter_radius, 
+            rms_mix_rate, 
+            protect, 
+            split_audio, 
+            f0_autotune_strength, 
+            None, 
+            checkpointing, 
+            onnx_f0_mode, 
+            formant_shifting, 
+            formant_qfrency, 
+            formant_timbre, 
+            f0_file, 
+            embedders_mode, 
+            proposal_pitch, 
+            proposal_pitch_threshold, 
+            audio_processing, 
+            alpha
+        )
 
-        return [{"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, main_convert[0], None, None, None, None, {"visible": True, "__type__": "update"}, {"visible": False, "__type__": "update"}]
+        return [
+            {"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, 
+            main_convert[0], 
+            None, 
+            None, 
+            None, 
+            None, 
+            {"visible": True, "__type__": "update"}, 
+            {"visible": False, "__type__": "update"}
+        ]
 
 def whisper_process(model_size, input_audio, configs, device, out_queue, word_timestamps=True):
     from main.library.speaker_diarization.whisper import load_model
@@ -239,7 +597,46 @@ def whisper_process(model_size, input_audio, configs, device, out_queue, word_ti
         del segments
         gc.collect()
 
-def convert_with_whisper(num_spk, model_size, cleaner, clean_strength, autotune, f0_autotune_strength, checkpointing, model_1, model_2, model_index_1, model_index_2, pitch_1, pitch_2, index_strength_1, index_strength_2, export_format, input_audio, output_audio, onnx_f0_mode, method, hybrid_method, hop_length, embed_mode, embedders, custom_embedders, resample_sr, filter_radius, rms_mix_rate, protect, formant_shifting, formant_qfrency_1, formant_timbre_1, formant_qfrency_2, formant_timbre_2, proposal_pitch, proposal_pitch_threshold, audio_processing=False, alpha=0.5):
+def convert_with_whisper(
+    num_spk, 
+    model_size, 
+    cleaner, 
+    clean_strength, 
+    autotune, 
+    f0_autotune_strength, 
+    checkpointing, 
+    model_1, 
+    model_2, 
+    model_index_1, 
+    model_index_2, 
+    pitch_1, 
+    pitch_2, 
+    index_strength_1, 
+    index_strength_2, 
+    export_format, 
+    input_audio, 
+    output_audio, 
+    onnx_f0_mode, 
+    method, 
+    hybrid_method, 
+    hop_length, 
+    embed_mode, 
+    embedders, 
+    custom_embedders, 
+    resample_sr, 
+    filter_radius, 
+    rms_mix_rate, 
+    protect, 
+    formant_shifting, 
+    formant_qfrency_1, 
+    formant_timbre_1, 
+    formant_qfrency_2, 
+    formant_timbre_2, 
+    proposal_pitch, 
+    proposal_pitch_threshold, 
+    audio_processing=False, 
+    alpha=0.5
+):
     import librosa
     import multiprocessing as mp
 
@@ -255,7 +652,11 @@ def convert_with_whisper(num_spk, model_size, cleaner, clean_strength, autotune,
     check_spk_diarization(model_size)
     model_pth_1, model_pth_2 = os.path.join(configs["weights_path"], model_1) if not os.path.exists(model_1) else model_1, os.path.join(configs["weights_path"], model_2) if not os.path.exists(model_2) else model_2
 
-    if (not model_1 or not os.path.exists(model_pth_1) or os.path.isdir(model_pth_1) or not model_pth_1.endswith((".pth", ".onnx"))) and (not model_2 or not os.path.exists(model_pth_2) or os.path.isdir(model_pth_2) or not model_pth_2.endswith((".pth", ".onnx"))):
+    if (
+        not model_1 or not os.path.exists(model_pth_1) or os.path.isdir(model_pth_1) or not model_pth_1.endswith((".pth", ".onnx"))
+    ) and (
+        not model_2 or not os.path.exists(model_pth_2) or os.path.isdir(model_pth_2) or not model_pth_2.endswith((".pth", ".onnx"))
+    ):
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
         return None
     
@@ -385,8 +786,73 @@ def convert_with_whisper(num_spk, model_size, cleaner, clean_strength, autotune,
 
         gr_info(translations["process_done_start_convert"])
 
-        convert(pitch_1, filter_radius, index_strength_1, rms_mix_rate, protect, hop_length, f0method, os.path.join(output_folder, "1"), output_folder, model_pth_1, model_index_1, autotune, cleaner, clean_strength, "wav", embedder_model, resample_sr, False, f0_autotune_strength, checkpointing, onnx_f0_mode, embed_mode, formant_shifting, formant_qfrency_1, formant_timbre_1, "", proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
-        convert(pitch_2, filter_radius, index_strength_2, rms_mix_rate, protect, hop_length, f0method, os.path.join(output_folder, "2"), output_folder, model_pth_2, model_index_2, autotune, cleaner, clean_strength, "wav", embedder_model, resample_sr, False, f0_autotune_strength, checkpointing, onnx_f0_mode, embed_mode, formant_shifting, formant_qfrency_2, formant_timbre_2, "", proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+        convert(
+            pitch_1, 
+            filter_radius, 
+            index_strength_1, 
+            rms_mix_rate, 
+            protect, 
+            hop_length, 
+            f0method, 
+            os.path.join(output_folder, 
+            "1"), 
+            output_folder, 
+            model_pth_1, 
+            model_index_1, 
+            autotune, 
+            cleaner, 
+            clean_strength, 
+            "wav", 
+            embedder_model, 
+            resample_sr, 
+            False, 
+            f0_autotune_strength, 
+            checkpointing, 
+            onnx_f0_mode, 
+            embed_mode, 
+            formant_shifting, 
+            formant_qfrency_1, 
+            formant_timbre_1, 
+            "", 
+            proposal_pitch, 
+            proposal_pitch_threshold, 
+            audio_processing, 
+            alpha
+        )
+
+        convert(
+            pitch_2, 
+            filter_radius, 
+            index_strength_2, 
+            rms_mix_rate, 
+            protect, 
+            hop_length, 
+            f0method, 
+            os.path.join(output_folder, 
+            "2"), 
+            output_folder, 
+            model_pth_2, 
+            model_index_2, 
+            autotune, 
+            cleaner, 
+            clean_strength, 
+            "wav", 
+            embedder_model, 
+            resample_sr, 
+            False, 
+            f0_autotune_strength, 
+            checkpointing, 
+            onnx_f0_mode, 
+            embed_mode, 
+            formant_shifting, 
+            formant_qfrency_2, 
+            formant_timbre_2, 
+            "", 
+            proposal_pitch, 
+            proposal_pitch_threshold, 
+            audio_processing, 
+            alpha
+        )
 
         gr_info(translations["convert_success"])
         return merge_audio(processed_segments, time_stamps, input_audio, replace_export_format(output_audio, export_format), export_format)
@@ -398,7 +864,40 @@ def convert_with_whisper(num_spk, model_size, cleaner, clean_strength, autotune,
     finally:
         if os.path.exists("audios_temp"): shutil.rmtree("audios_temp", ignore_errors=True)
 
-def convert_tts(clean, autotune, pitch, clean_strength, model, index, index_rate, input, output, format, method, hybrid_method, hop_length, embedders, custom_embedders, resample_sr, filter_radius, rms_mix_rate, protect, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, embedders_mode, proposal_pitch, proposal_pitch_threshold, audio_processing=False, alpha=0.5):
+def convert_tts(
+    clean, 
+    autotune, 
+    pitch, 
+    clean_strength, 
+    model, 
+    index, 
+    index_rate, 
+    input, 
+    output, 
+    format, 
+    method, 
+    hybrid_method, 
+    hop_length, 
+    embedders, 
+    custom_embedders, 
+    resample_sr, 
+    filter_radius, 
+    rms_mix_rate, 
+    protect, 
+    split_audio, 
+    f0_autotune_strength, 
+    checkpointing, 
+    onnx_f0_mode, 
+    formant_shifting, 
+    formant_qfrency, 
+    formant_timbre, 
+    f0_file, 
+    embedders_mode, 
+    proposal_pitch, 
+    proposal_pitch_threshold, 
+    audio_processing=False, 
+    alpha=0.5
+):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
     if not model_path or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")):
@@ -410,7 +909,7 @@ def convert_tts(clean, autotune, pitch, clean_strength, model, index, index_rate
         return None
     
     if os.path.isdir(input): 
-        input_audio = [f for f in os.listdir(input) if "tts" in f and f.lower().endswith(("wav", "mp3", "flac", "ogg", "opus", "m4a", "mp4", "aac", "alac", "wma", "aiff", "webm", "ac3"))]
+        input_audio = [f for f in os.listdir(input) if "tts" in f and f.lower().endswith(tuple(file_types))]
         
         if not input_audio:
             gr_warning(translations["not_found_in_folder"])
@@ -435,7 +934,38 @@ def convert_tts(clean, autotune, pitch, clean_strength, model, index, index_rate
 
     gr_info(translations["convert_vocal"])
 
-    convert(pitch, filter_radius, index_rate, rms_mix_rate, protect, hop_length, f0method, input, output, model_path, index, autotune, clean, clean_strength, format, embedder_model, resample_sr, split_audio, f0_autotune_strength, checkpointing, onnx_f0_mode, embedders_mode, formant_shifting, formant_qfrency, formant_timbre, f0_file, proposal_pitch, proposal_pitch_threshold, audio_processing, alpha)
+    convert(
+        pitch, 
+        filter_radius, 
+        index_rate, 
+        rms_mix_rate, 
+        protect, 
+        hop_length, 
+        f0method, 
+        input, 
+        output, 
+        model_path, 
+        index, 
+        autotune, 
+        clean, 
+        clean_strength, 
+        format, 
+        embedder_model, 
+        resample_sr, 
+        split_audio, 
+        f0_autotune_strength, 
+        checkpointing, 
+        onnx_f0_mode, 
+        embedders_mode, 
+        formant_shifting, 
+        formant_qfrency, 
+        formant_timbre, 
+        f0_file, 
+        proposal_pitch, 
+        proposal_pitch_threshold, 
+        audio_processing, 
+        alpha
+    )
 
     gr_info(translations["convert_success"])
     return output

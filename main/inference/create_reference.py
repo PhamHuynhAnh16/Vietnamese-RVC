@@ -44,7 +44,41 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    audio_path, reference_name, pitch_guidance, use_energy, version, embedder_model, embedders_mode, f0_method, f0_onnx, f0_up_key, filter_radius, f0_autotune, f0_autotune_strength, proposal_pitch, proposal_pitch_threshold, alpha = args.audio_path, args.reference_name, args.pitch_guidance, args.use_energy, args.version, args.embedder_model, args.embedders_mode, args.f0_method, args.f0_onnx, args.f0_up_key, args.filter_radius, args.f0_autotune, args.f0_autotune_strength, args.proposal_pitch, args.proposal_pitch_threshold, args.alpha
+
+    (
+        audio_path, 
+        reference_name, 
+        pitch_guidance, 
+        use_energy, 
+        version, embedder_model, 
+        embedders_mode, 
+        f0_method, 
+        f0_onnx, 
+        f0_up_key, 
+        filter_radius, 
+        f0_autotune, 
+        f0_autotune_strength, 
+        proposal_pitch, 
+        proposal_pitch_threshold, 
+        alpha
+    ) = (
+        args.audio_path, 
+        args.reference_name, 
+        args.pitch_guidance, 
+        args.use_energy, 
+        args.version, 
+        args.embedder_model, 
+        args.embedders_mode, 
+        args.f0_method, 
+        args.f0_onnx, 
+        args.f0_up_key, 
+        args.filter_radius, 
+        args.f0_autotune, 
+        args.f0_autotune_strength, 
+        args.proposal_pitch, 
+        args.proposal_pitch_threshold, 
+        args.alpha
+    )
 
     create_reference(
         audio_path, 

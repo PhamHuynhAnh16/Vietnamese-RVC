@@ -471,7 +471,43 @@ class HDecLayer(nn.Module):
 
 class HDemucs(nn.Module):
     @capture_init
-    def __init__(self, sources, audio_channels=2, channels=48, channels_time=None, growth=2, nfft=4096, wiener_iters=0, end_iters=0, wiener_residual=False, cac=True, depth=6, rewrite=True, hybrid=True, hybrid_old=False, multi_freqs=None, multi_freqs_depth=2, freq_emb=0.2, emb_scale=10, emb_smooth=True, kernel_size=8, time_stride=2, stride=4, context=1, context_enc=0, norm_starts=4, norm_groups=4, dconv_mode=1, dconv_depth=2, dconv_comp=4, dconv_attn=4, dconv_lstm=4, dconv_init=1e-4, rescale=0.1, samplerate=44100, segment=4 * 10):
+    def __init__(
+        self, 
+        sources, 
+        audio_channels=2, 
+        channels=48, 
+        channels_time=None, 
+        growth=2, nfft=4096, 
+        wiener_iters=0, 
+        end_iters=0, 
+        wiener_residual=False, 
+        cac=True, 
+        depth=6, 
+        rewrite=True, 
+        hybrid=True, 
+        hybrid_old=False, 
+        multi_freqs=None, 
+        multi_freqs_depth=2, 
+        freq_emb=0.2, 
+        emb_scale=10, 
+        emb_smooth=True, 
+        kernel_size=8, 
+        time_stride=2, 
+        stride=4, 
+        context=1, 
+        context_enc=0, 
+        norm_starts=4, 
+        norm_groups=4, 
+        dconv_mode=1, 
+        dconv_depth=2, 
+        dconv_comp=4, 
+        dconv_attn=4, 
+        dconv_lstm=4, 
+        dconv_init=1e-4, 
+        rescale=0.1, 
+        samplerate=44100, 
+        segment=4 * 10
+    ):
         super().__init__()
         self.cac = cac
         self.wiener_residual = wiener_residual

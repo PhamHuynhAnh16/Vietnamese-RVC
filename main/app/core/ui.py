@@ -12,7 +12,7 @@ sys.path.append(os.getcwd())
 
 from main.library.backends import directml, opencl
 from main.inference.realtime.audio import list_audio_device
-from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models, embedders_model, spin_model, whisper_model
+from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models, embedders_model, spin_model, whisper_model, file_types
 
 def gr_info(message):
     gr.Info(message, duration=2)
@@ -60,15 +60,29 @@ def change_f0_choices():
     return {"value": f0_file[0] if len(f0_file) >= 1 else "", "choices": f0_file, "__type__": "update"}
 
 def change_audios_choices(input_audio): 
-    audios = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["audios_path"]) for f in files if os.path.splitext(f)[1].lower() in (".wav", ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4", ".aac", ".alac", ".wma", ".aiff", ".webm", ".ac3")])
+    audios = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["audios_path"]) for f in files if os.path.splitext(f)[1].lower() in file_types])
     return {"value": input_audio if input_audio != "" else (audios[0] if len(audios) >= 1 else ""), "choices": audios, "__type__": "update"}
 
 def change_reference_choices(): 
-    reference = sorted([re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) for name in os.listdir(configs["reference_path"]) if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))])
+    reference = sorted([
+        re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) 
+        for name in os.listdir(configs["reference_path"]) 
+        if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))
+    ])
+
     return {"value": reference[0] if len(reference) >= 1 else "", "choices": reference, "__type__": "update"}
 
 def change_models_choices():
-    model, index = sorted(list(model for model in os.listdir(configs["weights_path"]) if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_"))), sorted([os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name])
+    model, index = sorted(list(
+        model 
+        for model in os.listdir(configs["weights_path"]) 
+        if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_")
+    )), sorted([
+        os.path.join(root, name) 
+        for root, _, files in os.walk(configs["logs_path"], topdown=False) 
+        for name in files if name.endswith(".index") and "trained" not in name
+    ])
+
     return [{"value": model[0] if len(model) >= 1 else "", "choices": model, "__type__": "update"}, {"value": index[0] if len(index) >= 1 else "", "choices": index, "__type__": "update"}]
 
 def change_pretrained_choices():
@@ -76,9 +90,6 @@ def change_pretrained_choices():
     pretrainG = sorted([model for model in os.listdir(configs["pretrained_custom_path"]) if model.endswith(".pth") and "G" in model])
 
     return [{"choices": pretrainD, "value": pretrainD[0] if len(pretrainD) >= 1 else "", "__type__": "update"}, {"choices": pretrainG, "value": pretrainG[0] if len(pretrainG) >= 1 else "", "__type__": "update"}]
-
-def change_choices_del():
-    return [{"choices": sorted(list(model for model in os.listdir(configs["weights_path"]) if model.endswith(".pth") and not model.startswith("G_") and not model.startswith("D_"))), "__type__": "update"}, {"choices": sorted([os.path.join(configs["logs_path"], f) for f in os.listdir(configs["logs_path"]) if f not in ["mute", "reference"] and os.path.isdir(os.path.join(configs["logs_path"], f))]), "__type__": "update"}]
 
 def change_preset_choices():
     return {"value": "", "choices": sorted(list(f for f in os.listdir(configs["presets_path"]) if f.endswith(".conversion.json"))), "__type__": "update"}
@@ -117,7 +128,18 @@ def change_download_pretrained_choices(select):
 
 def get_index(model):
     model = os.path.basename(model).split("_")[0]
-    return {"value": next((f for f in [os.path.join(root, name) for root, _, files in os.walk(configs["logs_path"], topdown=False) for name in files if name.endswith(".index") and "trained" not in name] if model.split(".")[0] in f), ""), "__type__": "update"} if model else None
+
+    return {
+        "value": next((
+            f for f in [
+                os.path.join(root, name) 
+                for root, _, files in os.walk(configs["logs_path"], topdown=False) 
+                for name in files if name.endswith(".index") and "trained" not in name
+            ] 
+            if model.split(".")[0] in f
+        ), ""), 
+        "__type__": "update"
+    } if model else None
 
 def index_strength_show(index):
     return {"visible": index != "" and index != None and os.path.exists(index) and os.path.isfile(index), "value": 0.5, "__type__": "update"}
@@ -325,7 +347,17 @@ def change_audio_device_choices():
     ]
 
 def replace_punctuation(filename):
-    return filename.replace(" ", "_").replace("-", "").replace("(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").replace('"', "").replace("'", "").replace("|", "_").replace("{", "").replace("}", "").replace("-_-", "_").replace("_-_", "_").replace("-", "_").replace("---", "_").replace("___", "_").strip()
+    return (filename
+        .replace(" ", "_").replace("-", "")
+        .replace("(", "").replace(")", "")
+        .replace("[", "").replace("]", "")
+        .replace(",", "").replace('"', "")
+        .replace("'", "").replace("|", "_")
+        .replace("{", "").replace("}", "")
+        .replace("-_-", "_").replace("_-_", "_")
+        .replace("-", "_").replace("---", "_")
+        .replace("___", "_").strip()
+    )
 
 def replace_url(url):
     return url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()

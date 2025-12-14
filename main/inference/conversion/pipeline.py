@@ -32,13 +32,28 @@ class Pipeline:
         self.f0_max = 1100
         self.device = config.device
         self.is_half = config.is_half
+        self.dtype = torch.float16 if self.is_half else torch.float32
         self.tgt_sr = tgt_sr
 
-    def voice_conversion(self, model, net_g, sid, audio0, pitch, pitchf, index, big_npy, index_rate, version, protect, energy):
+    def voice_conversion(
+        self, 
+        model, 
+        net_g, 
+        sid, 
+        audio0, 
+        pitch, 
+        pitchf, 
+        index, 
+        big_npy, 
+        index_rate, 
+        version, 
+        protect, 
+        energy
+    ):
         pitch_guidance = pitch != None and pitchf != None
         energy_use = energy != None
 
-        feats = torch.from_numpy(audio0).to(self.device).to(torch.float16 if self.is_half else torch.float32)
+        feats = torch.from_numpy(audio0).to(self.device).to(self.dtype)
         feats = feats.mean(-1) if feats.dim() == 2 else feats
         assert feats.dim() == 1, feats.dim()
 
@@ -74,7 +89,7 @@ class Pipeline:
                 feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
             p_len = torch.tensor([p_len], device=self.device).long()
-            feats = feats.to(torch.float16 if self.is_half else torch.float32) 
+            feats = feats.to(self.dtype) 
 
             audio1 = (
                 (
@@ -82,9 +97,9 @@ class Pipeline:
                         feats, 
                         p_len, 
                         pitch if pitch_guidance else None, 
-                        pitchf.to(torch.float16 if self.is_half else torch.float32) if pitch_guidance else None,
+                        pitchf.to(self.dtype) if pitch_guidance else None,
                         sid,
-                        energy.to(torch.float16 if self.is_half else torch.float32) if energy_use else None
+                        energy.to(self.dtype) if energy_use else None
                     )[0][0, 0]
                 ).data.cpu().float().numpy()
             )
@@ -94,7 +109,34 @@ class Pipeline:
         clear_gpu_cache()
         return audio1
     
-    def pipeline(self, logger, model, net_g, sid, audio, f0_up_key, f0_method, file_index, index_rate, pitch_guidance, filter_radius, rms_mix_rate, version, protect, hop_length, f0_autotune, f0_autotune_strength, f0_file=None, f0_onnx=False, pbar=None, proposal_pitch=False, proposal_pitch_threshold=255.0, energy_use=False, del_onnx=True, alpha = 0.5):
+    def pipeline(
+        self, 
+        logger, 
+        model, 
+        net_g, 
+        sid, 
+        audio, 
+        f0_up_key, 
+        f0_method, 
+        file_index, 
+        index_rate, 
+        pitch_guidance, 
+        filter_radius, 
+        rms_mix_rate, 
+        version, 
+        protect, 
+        hop_length, 
+        f0_autotune, 
+        f0_autotune_strength, 
+        f0_file=None, 
+        f0_onnx=False, 
+        pbar=None, 
+        proposal_pitch=False, 
+        proposal_pitch_threshold=255.0, 
+        energy_use=False, 
+        del_onnx=True, 
+        alpha = 0.5
+    ):
         index, big_npy = load_faiss_index(file_index) if index_rate != 0 else None, None
         if pbar: pbar.update(1)
 
@@ -138,9 +180,33 @@ class Pipeline:
         if pitch_guidance:
             if not hasattr(self, "f0_generator"): 
                 from main.library.predictors.Generator import Generator
-                self.f0_generator = Generator(self.sample_rate, hop_length, self.f0_min, self.f0_max, alpha, self.is_half, self.device, f0_onnx, del_onnx)
 
-            pitch, pitchf = self.f0_generator.calculator(self.x_pad, f0_method, audio_pad, f0_up_key, p_len, filter_radius, f0_autotune, f0_autotune_strength, manual_f0=inp_f0, proposal_pitch=proposal_pitch, proposal_pitch_threshold=proposal_pitch_threshold)
+                self.f0_generator = Generator(
+                    self.sample_rate, 
+                    hop_length, 
+                    self.f0_min, 
+                    self.f0_max, 
+                    alpha, 
+                    self.is_half, 
+                    self.device, 
+                    f0_onnx, 
+                    del_onnx
+                )
+
+            pitch, pitchf = self.f0_generator.calculator(
+                self.x_pad, 
+                f0_method, 
+                audio_pad, 
+                f0_up_key, 
+                p_len, 
+                filter_radius, 
+                f0_autotune, 
+                f0_autotune_strength, 
+                manual_f0=inp_f0, 
+                proposal_pitch=proposal_pitch, 
+                proposal_pitch_threshold=proposal_pitch_threshold
+            )
+
             if self.device == "mps": pitchf = pitchf.astype(np.float32)
             pitch, pitchf = torch.tensor(pitch[:p_len], device=self.device).unsqueeze(0).long(), torch.tensor(pitchf[:p_len], device=self.device).unsqueeze(0).float()
 

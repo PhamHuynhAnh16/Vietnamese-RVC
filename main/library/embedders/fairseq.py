@@ -198,7 +198,25 @@ class FairseqIncrementalDecoder(FairseqDecoder):
             self._beam_size = beam_size
 
 class MultiheadAttention(FairseqIncrementalDecoder):
-    def __init__(self, embed_dim, num_heads, kdim=None, vdim=None, dropout=0.0, bias=True, add_bias_kv=False, add_zero_attn=False, self_attention=False, encoder_decoder_attention=False, dictionary=None, q_noise=0.0, qn_block_size=8, xformers_att_config=None, xformers_blocksparse_layout=None, xformers_blocksparse_blocksize=16):
+    def __init__(
+        self, 
+        embed_dim, 
+        num_heads, 
+        kdim=None, 
+        vdim=None, 
+        dropout=0.0, 
+        bias=True, 
+        add_bias_kv=False, 
+        add_zero_attn=False, 
+        self_attention=False, 
+        encoder_decoder_attention=False, 
+        dictionary=None, 
+        q_noise=0.0, 
+        qn_block_size=8, 
+        xformers_att_config=None, 
+        xformers_blocksparse_layout=None, 
+        xformers_blocksparse_blocksize=16
+    ):
         super().__init__(dictionary)
         xformers_att_config = eval_str_dict(xformers_att_config)
         self.use_xformers = xformers_att_config is not None
@@ -329,7 +347,6 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def forward(self, query, key, value, key_padding_mask = None, incremental_state = None, need_weights = True, static_kv = False, attn_mask = None, before_softmax = False, need_head_weights = False):
         if need_head_weights: need_weights = True
-        is_tpu = query.device.type == "xla"
         tgt_len, bsz, embed_dim = query.size()
         src_len = tgt_len
         if not self.skip_embed_dim_check: assert (embed_dim == self.embed_dim)
@@ -340,9 +357,31 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 assert value is not None
                 assert src_len, key_bsz == value.shape[:2]
 
-        if (not self.onnx_trace and not is_tpu and incremental_state is None and not static_kv and not torch.jit.is_scripting() and not self.skip_embed_dim_check):
+        if (not self.onnx_trace and incremental_state is None and not static_kv and not torch.jit.is_scripting() and not self.skip_embed_dim_check):
             assert key is not None and value is not None
-            return F.multi_head_attention_forward(query, key, value, self.embed_dim, self.num_heads, torch.empty([0]), torch.cat((self.q_proj.bias, self.k_proj.bias, self.v_proj.bias)), self.bias_k, self.bias_v, self.add_zero_attn, self.dropout_module.p, self.out_proj.weight, self.out_proj.bias, self.training or self.dropout_module.apply_during_inference, key_padding_mask.bool() if key_padding_mask is not None else None, need_weights, attn_mask, use_separate_proj_weight=True, q_proj_weight=self.q_proj.weight, k_proj_weight=self.k_proj.weight, v_proj_weight=self.v_proj.weight)
+            return F.multi_head_attention_forward(
+                query, 
+                key, 
+                value, 
+                self.embed_dim, 
+                self.num_heads, 
+                torch.empty([0]), 
+                torch.cat((self.q_proj.bias, self.k_proj.bias, self.v_proj.bias)), 
+                self.bias_k, 
+                self.bias_v, 
+                self.add_zero_attn, 
+                self.dropout_module.p, 
+                self.out_proj.weight, 
+                self.out_proj.bias, 
+                self.training or self.dropout_module.apply_during_inference, 
+                key_padding_mask.bool() if key_padding_mask is not None else None, 
+                need_weights, 
+                attn_mask, 
+                use_separate_proj_weight=True, 
+                q_proj_weight=self.q_proj.weight, 
+                k_proj_weight=self.k_proj.weight, 
+                v_proj_weight=self.v_proj.weight
+            )
 
         if incremental_state is not None:
             saved_state = self._get_input_buffer(incremental_state)
@@ -446,7 +485,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
         if key_padding_mask is not None:
             attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
-            attn_weights = attn_weights.view(kv_bsz, -1, self.num_heads, tgt_len, src_len).masked_fill(key_padding_mask.unsqueeze(1).unsqueeze(2).unsqueeze(3).to(torch.bool), float("-inf")) if not is_tpu else attn_weights.transpose(0, 2).masked_fill(key_padding_mask, float("-inf")).transpose(0, 2)
+            attn_weights = attn_weights.view(kv_bsz, -1, self.num_heads, tgt_len, src_len).masked_fill(key_padding_mask.unsqueeze(1).unsqueeze(2).unsqueeze(3).to(torch.bool), float("-inf"))
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
         if before_softmax: return attn_weights, v
@@ -560,18 +599,8 @@ def make_conv_pos(e, k, g):
     nn.init.constant_(pos_conv.bias, 0)
     return nn.Sequential(nn.utils.parametrizations.weight_norm(pos_conv, name="weight", dim=2), SamePad(k), nn.GELU())
 
-def is_xla_tensor(tensor):
-    return torch.is_tensor(tensor) and tensor.device.type == "xla"
-
 def index_put(tensor, indices, value):
-    if is_xla_tensor(tensor):
-        for _ in range(indices.dim(), tensor.dim()): 
-            indices = indices.unsqueeze(-1)
-
-        if indices.size(-1) < tensor.size(-1): indices = indices.expand_as(tensor)
-        tensor = tensor.mul(~indices).add(value.mul(indices))
-    else: tensor[indices] = value
-
+    tensor[indices] = value
     return tensor
 
 def pad_to_multiple(x, multiple, dim=-1, value=0):
@@ -582,7 +611,25 @@ def pad_to_multiple(x, multiple, dim=-1, value=0):
     if m.is_integer(): return x, 0
     return F.pad(x, (*((0,) * (-1 - dim) * 2), 0, remainder), value=value), remainder
 
-def compute_mask_indices(shape, padding_mask, mask_prob, mask_length, mask_type = "static", mask_other = 0.0, min_masks = 0, no_overlap = False, min_space = 0, require_same_masks = True, mask_dropout = 0.0, add_masks = False, seed = None, epoch = None, indices = None, idc_select_ver = 1, num_mask_ver = 2):
+def compute_mask_indices(
+    shape, 
+    padding_mask, 
+    mask_prob, 
+    mask_length, 
+    mask_type = "static", 
+    mask_other = 0.0, 
+    min_masks = 0, 
+    no_overlap = False, 
+    min_space = 0, 
+    require_same_masks = True, 
+    mask_dropout = 0.0, 
+    add_masks = False, 
+    seed = None, 
+    epoch = None, 
+    indices = None, 
+    idc_select_ver = 1, 
+    num_mask_ver = 2
+):
     bsz, all_sz = shape
     mask = np.full((bsz, all_sz), False)
     if num_mask_ver == 1: all_num_mask = max(min_masks, int(mask_prob * all_sz / float(mask_length) + np.random.rand()))
@@ -919,7 +966,9 @@ class RelPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
         q, k, v = self.forward_qkv(query.transpose(0, 1), key.transpose(0, 1), value.transpose(0, 1))
         q = q.transpose(1, 2)
 
-        return self.forward_attention(v, (((q + self.pos_bias_u).transpose(1, 2) @ k.transpose(-2, -1)) + self.rel_shift(((q + self.pos_bias_v).transpose(1, 2) @ self.linear_pos(pos_emb).view(pos_emb.size(0), -1, self.h, self.d_k).transpose(1, 2).transpose(-2, -1)))) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
+        return self.forward_attention(
+            v, (((q + self.pos_bias_u).transpose(1, 2) @ k.transpose(-2, -1)) + self.rel_shift(((q + self.pos_bias_v).transpose(1, 2) @ self.linear_pos(pos_emb).view(pos_emb.size(0), -1, self.h, self.d_k).transpose(1, 2).transpose(-2, -1)))
+        ) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
 
 class RotaryPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
     def __init__(self, n_feat, n_head, dropout, precision, rotary_emd_base=10000):
@@ -981,8 +1030,30 @@ class ConformerWav2Vec2EncoderLayer(ConformerEncoderLayer):
         return super().forward(x, self_attn_padding_mask, position_emb)
 
 class TransformerSentenceEncoderWithAdapterLayer(TransformerSentenceEncoderLayer):
-    def __init__(self, embedding_dim = 768, ffn_embedding_dim = 3072, num_attention_heads = 8, dropout = 0.1, attention_dropout = 0.1, activation_dropout = 0.1, activation_fn = "relu", layer_norm_first = False, adapter_num=201, adapter_dim=64, adapter_act_fn="relu"):
-        super().__init__(embedding_dim=embedding_dim, ffn_embedding_dim=ffn_embedding_dim, num_attention_heads=num_attention_heads, dropout=dropout, attention_dropout=attention_dropout, activation_dropout=activation_dropout, activation_fn=activation_fn, layer_norm_first=layer_norm_first)
+    def __init__(
+        self, 
+        embedding_dim = 768, 
+        ffn_embedding_dim = 3072, 
+        num_attention_heads = 8, 
+        dropout = 0.1, 
+        attention_dropout = 0.1, 
+        activation_dropout = 0.1, 
+        activation_fn = "relu", 
+        layer_norm_first = False, 
+        adapter_num=201, 
+        adapter_dim=64, 
+        adapter_act_fn="relu"
+    ):
+        super().__init__(
+            embedding_dim=embedding_dim, 
+            ffn_embedding_dim=ffn_embedding_dim, 
+            num_attention_heads=num_attention_heads, 
+            dropout=dropout, 
+            attention_dropout=attention_dropout, 
+            activation_dropout=activation_dropout, 
+            activation_fn=activation_fn, 
+            layer_norm_first=layer_norm_first
+        )
         self.adapter_num = adapter_num
         self.adapter_dim = adapter_dim
         self.adapter_layer = AdapterFast(adapter_num, self.embedding_dim, self.adapter_dim, adapter_act_fn)
@@ -1005,15 +1076,61 @@ class TransposeLast(nn.Module):
 
 class TransformerEncoder(nn.Module):
     def build_encoder_layer(self, args, **kwargs):
-        if args.layer_type == "transformer": layer = TransformerSentenceEncoderLayer(embedding_dim=self.embedding_dim, ffn_embedding_dim=args.encoder_ffn_embed_dim, num_attention_heads=args.encoder_attention_heads, dropout=self.dropout, attention_dropout=args.attention_dropout, activation_dropout=args.activation_dropout, activation_fn=args.activation_fn, layer_norm_first=args.layer_norm_first)
-        elif args.layer_type == "conformer": layer = ConformerWav2Vec2EncoderLayer(embed_dim=self.embedding_dim, ffn_embed_dim=args.encoder_ffn_embed_dim, attention_heads=args.encoder_attention_heads, dropout=args.dropout, depthwise_conv_kernel_size=args.depthwise_conv_kernel_size, activation_fn="swish", attn_type=args.attn_type, use_fp16=args.fp16, pos_enc_type="abs")
+        if args.layer_type == "transformer": 
+            layer = TransformerSentenceEncoderLayer(
+                embedding_dim=self.embedding_dim, 
+                ffn_embedding_dim=args.encoder_ffn_embed_dim, 
+                num_attention_heads=args.encoder_attention_heads, 
+                dropout=self.dropout, 
+                attention_dropout=args.attention_dropout, 
+                activation_dropout=args.activation_dropout, 
+                activation_fn=args.activation_fn, 
+                layer_norm_first=args.layer_norm_first
+            )
+        elif args.layer_type == "conformer": 
+            layer = ConformerWav2Vec2EncoderLayer(
+                embed_dim=self.embedding_dim, 
+                ffn_embed_dim=args.encoder_ffn_embed_dim, 
+                attention_heads=args.encoder_attention_heads, 
+                dropout=args.dropout, 
+                depthwise_conv_kernel_size=args.depthwise_conv_kernel_size, 
+                activation_fn="swish", 
+                attn_type=args.attn_type, 
+                use_fp16=args.fp16, 
+                pos_enc_type="abs"
+            )
         elif args.layer_type == "trf_adp":
             use_adp = False
             if args.adp_trf_idx == "all": use_adp = True
             else: 
                 if kwargs.get("layer_idx", None) in list(range(*[int(g) for g in args.adp_trf_idx.split(":")])): use_adp = True
 
-            layer = TransformerSentenceEncoderWithAdapterLayer(embedding_dim=self.embedding_dim, ffn_embedding_dim=args.encoder_ffn_embed_dim, num_attention_heads=args.encoder_attention_heads, dropout=self.dropout, attention_dropout=args.attention_dropout, activation_dropout=args.activation_dropout, activation_fn=args.activation_fn, layer_norm_first=args.layer_norm_first, adapter_num=args.adp_num, adapter_dim=args.adp_dim, adapter_act_fn=args.adp_act_fn) if use_adp else TransformerSentenceEncoderLayer(embedding_dim=self.embedding_dim, ffn_embedding_dim=args.encoder_ffn_embed_dim, num_attention_heads=args.encoder_attention_heads, dropout=self.dropout, attention_dropout=args.attention_dropout, activation_dropout=args.activation_dropout, activation_fn=args.activation_fn, layer_norm_first=args.layer_norm_first,)
+            layer = (
+                TransformerSentenceEncoderWithAdapterLayer(
+                    embedding_dim=self.embedding_dim, 
+                    ffn_embedding_dim=args.encoder_ffn_embed_dim, 
+                    num_attention_heads=args.encoder_attention_heads, 
+                    dropout=self.dropout, 
+                    attention_dropout=args.attention_dropout, 
+                    activation_dropout=args.activation_dropout, 
+                    activation_fn=args.activation_fn, 
+                    layer_norm_first=args.layer_norm_first, 
+                    adapter_num=args.adp_num, 
+                    adapter_dim=args.adp_dim, 
+                    adapter_act_fn=args.adp_act_fn
+                )
+            ) if use_adp else (
+                TransformerSentenceEncoderLayer(
+                    embedding_dim=self.embedding_dim, 
+                    ffn_embedding_dim=args.encoder_ffn_embed_dim, 
+                    num_attention_heads=args.encoder_attention_heads, 
+                    dropout=self.dropout, 
+                    attention_dropout=args.attention_dropout, 
+                    activation_dropout=args.activation_dropout, 
+                    activation_fn=args.activation_fn, 
+                    layer_norm_first=args.layer_norm_first
+                )
+            )
 
         return layer
 
@@ -1359,7 +1476,22 @@ class HubertModel(BaseFairseqModel):
             x[mask_indices] = self.mask_emb
         else: mask_indices = None
 
-        if self.mask_channel_prob > 0: x[(torch.from_numpy(compute_mask_indices((B, C), None, self.mask_channel_prob, self.mask_channel_length, self.mask_channel_selection, self.mask_channel_other, no_overlap=self.no_mask_channel_overlap, min_space=self.mask_channel_min_space)).to(x.device).unsqueeze(1).expand(-1, T, -1))] = 0
+        if self.mask_channel_prob > 0: 
+            x[(
+                torch.from_numpy(
+                    compute_mask_indices(
+                        (B, C), 
+                        None, 
+                        self.mask_channel_prob, 
+                        self.mask_channel_length, 
+                        self.mask_channel_selection, 
+                        self.mask_channel_other, 
+                        no_overlap=self.no_mask_channel_overlap, 
+                        min_space=self.mask_channel_min_space
+                    )
+                ).to(x.device).unsqueeze(1).expand(-1, T, -1)
+            )] = 0
+
         return x, mask_indices
 
     def compute_nce(self, x, pos, negs):

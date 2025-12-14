@@ -68,7 +68,16 @@ class Inference:
         return torch.clip(output, -1.0, 1.0, out=output)
     
 class Pipeline:
-    def __init__(self, inference, embedder, predictor = None, rms = None, index = (None, None), f0_method = "rmvpe", sid = 0):
+    def __init__(
+        self, 
+        inference, 
+        embedder, 
+        predictor = None, 
+        rms = None, 
+        index = (None, None), 
+        f0_method = "rmvpe", 
+        sid = 0
+    ):
         self.inference = inference
         self.embedder = embedder
         self.predictor = predictor
@@ -87,12 +96,42 @@ class Pipeline:
         self.sid = torch.tensor([sid], device=self.device, dtype=torch.int64)
         self.resamplers = {}
     
-    def execute(self, audio, pitch = None, pitchf = None, f0_up_key = 0, index_rate = 0.5, audio_feats_len = 0, silence_front = 0, skip_head = None, return_length = None, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0):
+    def execute(
+        self, 
+        audio, 
+        pitch = None, 
+        pitchf = None, 
+        f0_up_key = 0, 
+        index_rate = 0.5, 
+        audio_feats_len = 0, 
+        silence_front = 0, 
+        skip_head = None, 
+        return_length = None, 
+        protect = 0.5, 
+        filter_radius = 3, 
+        rms_mix_rate = 1, 
+        f0_autotune = False, 
+        f0_autotune_strength = 1, 
+        proposal_pitch = False, 
+        proposal_pitch_threshold = 255.0
+    ):
         with torch.no_grad():     
             assert audio.dim() == 1, audio.dim()
             formant_length = int(np.ceil(return_length * 1.0))
 
-            pitch, pitchf = self.predictor.realtime_calculator(audio[silence_front:], self.f0_method, pitch, pitchf, f0_up_key, filter_radius, f0_autotune, f0_autotune_strength, proposal_pitch, proposal_pitch_threshold) if self.use_f0 else (None, None)
+            pitch, pitchf = self.predictor.realtime_calculator(
+                audio[silence_front:], 
+                self.f0_method, 
+                pitch, 
+                pitchf, 
+                f0_up_key, 
+                filter_radius, 
+                f0_autotune, 
+                f0_autotune_strength, 
+                proposal_pitch, 
+                proposal_pitch_threshold
+            ) if self.use_f0 else (None, None)
+
             energy = self.rms(audio[silence_front:].to(self.device).unsqueeze(0)) if self.energy else None
             
             feats = extract_features(self.embedder, audio.view(1, -1), self.inference.version, device=self.device)
@@ -146,18 +185,44 @@ class Pipeline:
 
             return out_audio
 
-def create_pipeline(model_path=None, index_path=None, f0_method="rmvpe", f0_onnx=False, embedder_model="hubert_base", embedders_mode="fairseq", sample_rate=16000, hop_length=160):
+def create_pipeline(
+    model_path=None, 
+    index_path=None, 
+    f0_method="rmvpe", 
+    f0_onnx=False, 
+    embedder_model="hubert_base", 
+    embedders_mode="fairseq", 
+    sample_rate=16000, 
+    hop_length=160
+):
     inference = Inference()
     inference = inference.get_synthesizer(model_path)
 
     if inference.use_f0:
         from main.library.predictors.Generator import Generator
-        predictor = Generator(sample_rate=sample_rate, hop_length=hop_length, f0_min=50.0, f0_max=1100.0, alpha=0.5, is_half=config.is_half, device=config.device, f0_onnx_mode=f0_onnx, del_onnx_model=False) 
+
+        predictor = Generator(
+            sample_rate=sample_rate, 
+            hop_length=hop_length, 
+            f0_min=50.0, 
+            f0_max=1100.0, 
+            alpha=0.5, 
+            is_half=config.is_half, 
+            device=config.device, 
+            f0_onnx_mode=f0_onnx, 
+            del_onnx_model=False
+        ) 
     else: predictor = None
 
     if inference.energy:
         from main.inference.extracting.rms import RMSEnergyExtractor
-        rms = RMSEnergyExtractor(frame_length=2048, hop_length=160, center=True, pad_mode="reflect").to(config.device).eval()
+
+        rms = RMSEnergyExtractor(
+            frame_length=2048, 
+            hop_length=160, 
+            center=True, 
+            pad_mode="reflect"
+        ).to(config.device).eval()
     else: rms = None
 
     index, index_reconstruct = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"))

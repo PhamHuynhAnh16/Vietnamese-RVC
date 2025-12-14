@@ -85,7 +85,15 @@ def separate_tab():
     with gr.Row():
         model_name.change(
             fn=separate_change,
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise],
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ],
             outputs=[
                 karaoke_model,
                 reverb_model,
@@ -106,7 +114,15 @@ def separate_tab():
     with gr.Row():
         karaoke_model.change(
             fn=separate_change, 
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise], 
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ], 
             outputs=[
                 karaoke_model,
                 reverb_model,
@@ -126,7 +142,15 @@ def separate_tab():
         )
         separate_backing.change(
             fn=separate_change, 
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise], 
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ], 
             outputs=[
                 karaoke_model,
                 reverb_model,
@@ -147,7 +171,15 @@ def separate_tab():
     with gr.Row():
         reverb_model.change(
             fn=separate_change, 
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise], 
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ], 
             outputs=[
                 karaoke_model,
                 reverb_model,
@@ -167,7 +199,15 @@ def separate_tab():
         )
         separate_reverb.change(
             fn=separate_change, 
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise], 
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ], 
             outputs=[
                 karaoke_model,
                 reverb_model,
@@ -188,7 +228,15 @@ def separate_tab():
     with gr.Row():
         enable_denoise.change(
             fn=separate_change, 
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise], 
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ], 
             outputs=[
                 karaoke_model,
                 reverb_model,
@@ -208,7 +256,15 @@ def separate_tab():
         )
         enable_post_process.change(
             fn=separate_change, 
-            inputs=[model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise], 
+            inputs=[
+                model_name, 
+                karaoke_model, 
+                reverb_model, 
+                enable_post_process, 
+                separate_backing, 
+                separate_reverb, 
+                enable_denoise
+            ], 
             outputs=[
                 karaoke_model,
                 reverb_model,

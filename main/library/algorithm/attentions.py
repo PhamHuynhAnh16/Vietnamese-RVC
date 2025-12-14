@@ -17,15 +17,11 @@ class MultiHeadAttention(nn.Module):
         self.channels = channels
         self.out_channels = out_channels
         self.n_heads = n_heads
-        self.p_dropout = p_dropout
+        self.k_channels = channels // n_heads
         self.window_size = window_size
-        self.heads_share = heads_share
         self.block_length = block_length
         self.proximal_bias = proximal_bias
-        self.proximal_init = proximal_init
         self.onnx = onnx
-        self.attn = None
-        self.k_channels = channels // n_heads
         self.conv_q = nn.Conv1d(channels, channels, 1)
         self.conv_k = nn.Conv1d(channels, channels, 1)
         self.conv_v = nn.Conv1d(channels, channels, 1)
@@ -91,23 +87,43 @@ class MultiHeadAttention(nn.Module):
         if onnx:
             pad_length = (length - (self.window_size + 1)).clamp(min=0)
             slice_start_position = ((self.window_size + 1) - length).clamp(min=0)
-
-            return (F.pad(relative_embeddings, [0, 0, pad_length, pad_length, 0, 0]) if pad_length > 0 else relative_embeddings)[:, slice_start_position:(slice_start_position + 2 * length - 1)]
+            pad_shape = [0, 0, pad_length, pad_length, 0, 0]
         else:
             pad_length = max(length - (self.window_size + 1), 0)
             slice_start_position = max((self.window_size + 1) - length, 0)
+            pad_shape = convert_pad_shape([[0, 0], [pad_length, pad_length], [0, 0]])
 
-            return (F.pad(relative_embeddings, convert_pad_shape([[0, 0], [pad_length, pad_length], [0, 0]])) if pad_length > 0 else relative_embeddings)[:, slice_start_position:(slice_start_position + 2 * length - 1)]  
+        return (F.pad(relative_embeddings, pad_shape) if pad_length > 0 else relative_embeddings)[:, slice_start_position:(slice_start_position + 2 * length - 1)]  
 
     def _relative_position_to_absolute_position(self, x, onnx=False):
         batch, heads, length, _ = x.size()
 
-        return (F.pad(F.pad(x, [0, 1, 0, 0, 0, 0, 0, 0]).view([batch, heads, length * 2 * length]), [0, length - 1, 0, 0, 0, 0]).view([batch, heads, length + 1, 2 * length - 1]) if onnx else F.pad(F.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])).view([batch, heads, length * 2 * length]), convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])).view([batch, heads, length + 1, 2 * length - 1]))[:, :, :length, length - 1 :]
+        return ((
+            F.pad(
+                F.pad(x, [0, 1, 0, 0, 0, 0, 0, 0]).view([batch, heads, length * 2 * length]), 
+                [0, length - 1, 0, 0, 0, 0]
+            )
+        ) if onnx else (
+            F.pad(
+                F.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])).view([batch, heads, length * 2 * length]), 
+                convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
+            )
+        )).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
 
     def _absolute_position_to_relative_position(self, x, onnx=False):
         batch, heads, length, _ = x.size()
 
-        return (F.pad(F.pad(x, [0, length - 1, 0, 0, 0, 0, 0, 0]).view([batch, heads, length*length + length * (length - 1)]), [length, 0, 0, 0, 0, 0]).view([batch, heads, length, 2 * length]) if onnx else F.pad(F.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])).view([batch, heads, length**2 + length * (length - 1)]), convert_pad_shape([[0, 0], [0, 0], [length, 0]])).view([batch, heads, length, 2 * length]))[:, :, :, 1:]
+        return ((
+            F.pad(
+                F.pad(x, [0, length - 1, 0, 0, 0, 0, 0, 0]).view([batch, heads, length*length + length * (length - 1)]), 
+                [length, 0, 0, 0, 0, 0]
+            ) 
+        ) if onnx else (
+            F.pad(
+                F.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])).view([batch, heads, length**2 + length * (length - 1)]), 
+                convert_pad_shape([[0, 0], [0, 0], [length, 0]])
+            )
+        )).view([batch, heads, length, 2 * length])[:, :, :, 1:]
 
     def _attention_bias_proximal(self, length):
         r = torch.arange(length, dtype=torch.float32)
@@ -138,9 +154,13 @@ class FFN(nn.Module):
     def _causal_padding(self, x):
         if self.kernel_size == 1: return x
 
-        return F.pad(x, [self.kernel_size - 1, 0, 0, 0, 0, 0]) if self.onnx else F.pad(x, convert_pad_shape([[0, 0], [0, 0], [(self.kernel_size - 1), 0]]))
+        return F.pad(
+            x, [self.kernel_size - 1, 0, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [(self.kernel_size - 1), 0]])
+        )
 
     def _same_padding(self, x):
         if self.kernel_size == 1: return x
         
-        return F.pad(x, [(self.kernel_size - 1) // 2, self.kernel_size // 2, 0, 0, 0, 0]) if self.onnx else F.pad(x, convert_pad_shape([[0, 0], [0, 0], [((self.kernel_size - 1) // 2), (self.kernel_size // 2)]]))
+        return F.pad(
+            x, [(self.kernel_size - 1) // 2, self.kernel_size // 2, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [((self.kernel_size - 1) // 2), (self.kernel_size // 2)]])
+        )

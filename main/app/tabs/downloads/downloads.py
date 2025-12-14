@@ -71,9 +71,34 @@ def download_tab():
                 api_name="download_browser"
             )
         with gr.Row():
-            downloadmodel.change(fn=change_download_choices, inputs=[downloadmodel], outputs=[url_input, download_model_name, url_download, model_browser, download_from_browser, search_name, search, search_dropdown, download, model_upload])
-            search.click(fn=search_models, inputs=[search_name], outputs=[search_dropdown, download])
-            model_upload.upload(fn=save_drop_model, inputs=[model_upload], outputs=[model_upload])
+            downloadmodel.change(
+                fn=change_download_choices, 
+                inputs=[downloadmodel], 
+                outputs=[
+                    url_input, 
+                    download_model_name, 
+                    url_download, model_browser, 
+                    download_from_browser, 
+                    search_name, search, 
+                    search_dropdown, 
+                    download, 
+                    model_upload
+                ]
+            )
+            search.click(
+                fn=search_models, 
+                inputs=[search_name], 
+                outputs=[
+                    search_dropdown, 
+                    download
+                ]
+            )
+        with gr.Row():
+            model_upload.upload(
+                fn=save_drop_model, 
+                inputs=[model_upload], 
+                outputs=[model_upload]
+            )
             download.click(
                 fn=lambda model: download_model(model_options[model], model), 
                 inputs=[search_dropdown], 
@@ -81,8 +106,24 @@ def download_tab():
                 api_name="search_models"
             )
         with gr.Row():
-            pretrain_download_choices.change(fn=change_download_pretrained_choices, inputs=[pretrain_download_choices], outputs=[pretrainD, pretrainG, download_pretrain_button, pretrain_choices, sample_rate_pretrain, download_pretrain_choices_button, pretrain_upload])
-            pretrain_choices.change(fn=update_sample_rate_dropdown, inputs=[pretrain_choices], outputs=[sample_rate_pretrain])
+            pretrain_download_choices.change(
+                fn=change_download_pretrained_choices, 
+                inputs=[pretrain_download_choices], 
+                outputs=[
+                    pretrainD, 
+                    pretrainG, 
+                    download_pretrain_button, 
+                    pretrain_choices, 
+                    sample_rate_pretrain, 
+                    download_pretrain_choices_button, 
+                    pretrain_upload
+                ]
+            )
+            pretrain_choices.change(
+                fn=update_sample_rate_dropdown, 
+                inputs=[pretrain_choices], 
+                outputs=[sample_rate_pretrain]
+            )
         with gr.Row():
             download_pretrain_button.click(
                 fn=download_pretrained_model,

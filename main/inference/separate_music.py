@@ -41,7 +41,54 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    input_path, output_dirs, export_format, model_name, karaoke_model, reverb_model, denoise_model, sample_rate, shifts, batch_size, overlap, aggression, hop_length, window_size, segments_size, post_process_threshold, enable_tta, enable_denoise, high_end_process, enable_post_process, separate_backing, separate_reverb = args.input_path, args.output_dirs, args.export_format, args.model_name, args.karaoke_model, args.reverb_model, args.denoise_model, args.sample_rate, args.shifts, args.batch_size, args.overlap, args.aggression, args.hop_length, args.window_size, args.segments_size, args.post_process_threshold, args.enable_tta, args.enable_denoise, args.high_end_process, args.enable_post_process, args.separate_backing, args.separate_reverb
+
+    (
+        input_path, 
+        output_dirs, 
+        export_format, 
+        model_name, 
+        karaoke_model, 
+        reverb_model, 
+        denoise_model, 
+        sample_rate, 
+        shifts, 
+        batch_size, 
+        overlap, 
+        aggression, 
+        hop_length, 
+        window_size, 
+        segments_size, 
+        post_process_threshold, 
+        enable_tta, 
+        enable_denoise, 
+        high_end_process, 
+        enable_post_process, 
+        separate_backing, 
+        separate_reverb
+    ) = (
+        args.input_path, 
+        args.output_dirs, 
+        args.export_format, 
+        args.model_name, 
+        args.karaoke_model, 
+        args.reverb_model, 
+        args.denoise_model, 
+        args.sample_rate, 
+        args.shifts, 
+        args.batch_size, 
+        args.overlap, 
+        args.aggression, 
+        args.hop_length, 
+        args.window_size, 
+        args.segments_size, 
+        args.post_process_threshold, 
+        args.enable_tta, 
+        args.enable_denoise, 
+        args.high_end_process, 
+        args.enable_post_process, 
+        args.separate_backing, 
+        args.separate_reverb
+    )
 
     separate(
         input_path,

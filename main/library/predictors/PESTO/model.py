@@ -88,7 +88,18 @@ class CropCQT(torch.nn.Module):
 class Resnet1d(torch.nn.Module):
     def __init__(self, n_chan_input=1, n_chan_layers=(20, 20, 10, 1), n_prefilt_layers=1, prefilt_kernel_size=15, residual=False, n_bins_in=216, output_dim=128, activation_fn = "leaky", a_lrelu=0.3, p_dropout=0.2, **unused):
         super(Resnet1d, self).__init__()
-        self.hparams = dict(n_chan_input=n_chan_input, n_chan_layers=n_chan_layers, n_prefilt_layers=n_prefilt_layers, prefilt_kernel_size=prefilt_kernel_size, residual=residual, n_bins_in=n_bins_in, output_dim=output_dim, activation_fn=activation_fn, a_lrelu=a_lrelu, p_dropout=p_dropout)
+        self.hparams = dict(
+            n_chan_input=n_chan_input, 
+            n_chan_layers=n_chan_layers, 
+            n_prefilt_layers=n_prefilt_layers, 
+            prefilt_kernel_size=prefilt_kernel_size, 
+            residual=residual, 
+            n_bins_in=n_bins_in, 
+            output_dim=output_dim, 
+            activation_fn=activation_fn, 
+            a_lrelu=a_lrelu, 
+            p_dropout=p_dropout
+        )
 
         if activation_fn == "relu":
             activation_layer = torch.nn.ReLU
@@ -108,7 +119,14 @@ class Resnet1d(torch.nn.Module):
 
         self.conv1 = torch.nn.Sequential(torch.nn.Conv1d(in_channels=n_in, out_channels=n_ch[0], kernel_size=prefilt_kernel_size, padding=prefilt_padding, stride=1), activation_layer(), torch.nn.Dropout(p=p_dropout))
         self.n_prefilt_layers = n_prefilt_layers
-        self.prefilt_layers = torch.nn.ModuleList([torch.nn.Sequential(torch.nn.Conv1d(in_channels=n_ch[0], out_channels=n_ch[0], kernel_size=prefilt_kernel_size, padding=prefilt_padding, stride=1), activation_layer(), torch.nn.Dropout(p=p_dropout)) for _ in range(n_prefilt_layers-1)])
+        self.prefilt_layers = torch.nn.ModuleList([
+            torch.nn.Sequential(
+                torch.nn.Conv1d(in_channels=n_ch[0], out_channels=n_ch[0], kernel_size=prefilt_kernel_size, padding=prefilt_padding, stride=1), 
+                activation_layer(), 
+                torch.nn.Dropout(p=p_dropout)
+            ) 
+            for _ in range(n_prefilt_layers-1)
+        ])
         self.residual = residual
         conv_layers = []
 

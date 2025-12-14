@@ -173,7 +173,34 @@ class LocalState(nn.Module):
 
 class Demucs(nn.Module):
     @capture_init
-    def __init__(self, sources, audio_channels=2, channels=64, growth=2.0, depth=6, rewrite=True, lstm_layers=0, kernel_size=8, stride=4, context=1, gelu=True, glu=True, norm_starts=4, norm_groups=4, dconv_mode=1, dconv_depth=2, dconv_comp=4, dconv_attn=4, dconv_lstm=4, dconv_init=1e-4, normalize=True, resample=True, rescale=0.1, samplerate=44100, segment=4 * 10):
+    def __init__(
+        self, 
+        sources, 
+        audio_channels=2, 
+        channels=64, 
+        growth=2.0, 
+        depth=6, 
+        rewrite=True, 
+        lstm_layers=0, 
+        kernel_size=8, 
+        stride=4, 
+        context=1, 
+        gelu=True, 
+        glu=True, 
+        norm_starts=4, 
+        norm_groups=4, 
+        dconv_mode=1, 
+        dconv_depth=2, 
+        dconv_comp=4, 
+        dconv_attn=4, 
+        dconv_lstm=4, 
+        dconv_init=1e-4, 
+        normalize=True, 
+        resample=True, 
+        rescale=0.1, 
+        samplerate=44100, 
+        segment=4 * 10
+    ):
         super().__init__()
         self.audio_channels = audio_channels
         self.sources = sources

@@ -23,9 +23,142 @@ sys.path.append(os.getcwd())
 from main.app.variables import configs, logger
 from main.library.backends import directml, opencl
 
-LANGUAGES = {"en": "english", "zh": "chinese", "de": "german", "es": "spanish", "ru": "russian", "ko": "korean", "fr": "french", "ja": "japanese", "pt": "portuguese", "tr": "turkish", "pl": "polish", "ca": "catalan", "nl": "dutch", "ar": "arabic", "sv": "swedish", "it": "italian", "id": "indonesian", "hi": "hindi", "fi": "finnish", "vi": "vietnamese", "he": "hebrew", "uk": "ukrainian", "el": "greek", "ms": "malay", "cs": "czech", "ro": "romanian", "da": "danish", "hu": "hungarian", "ta": "tamil", "no": "norwegian", "th": "thai", "ur": "urdu", "hr": "croatian", "bg": "bulgarian", "lt": "lithuanian", "la": "latin", "mi": "maori", "ml": "malayalam", "cy": "welsh", "sk": "slovak", "te": "telugu", "fa": "persian", "lv": "latvian", "bn": "bengali", "sr": "serbian", "az": "azerbaijani", "sl": "slovenian", "kn": "kannada", "et": "estonian", "mk": "macedonian", "br": "breton", "eu": "basque", "is": "icelandic", "hy": "armenian", "ne": "nepali", "mn": "mongolian", "bs": "bosnian", "kk": "kazakh", "sq": "albanian", "sw": "swahili", "gl": "galician", "mr": "marathi", "pa": "punjabi", "si": "sinhala", "km": "khmer", "sn": "shona", "yo": "yoruba", "so": "somali", "af": "afrikaans", "oc": "occitan", "ka": "georgian", "be": "belarusian", "tg": "tajik", "sd": "sindhi", "gu": "gujarati", "am": "amharic", "yi": "yiddish", "lo": "lao", "uz": "uzbek", "fo": "faroese", "ht": "haitian creole", "ps": "pashto", "tk": "turkmen", "nn": "nynorsk", "mt": "maltese", "sa": "sanskrit", "lb": "luxembourgish", "my": "myanmar", "bo": "tibetan", "tl": "tagalog", "mg": "malagasy", "as": "assamese", "tt": "tatar", "haw": "hawaiian", "ln": "lingala", "ha": "hausa", "ba": "bashkir", "jw": "javanese", "su": "sundanese", "yue": "cantonese"}
-TO_LANGUAGE_CODE = {**{language: code for code, language in LANGUAGES.items()}, "burmese": "my", "valencian": "ca", "flemish": "nl", "haitian": "ht", "letzeburgesch": "lb", "pushto": "ps", "panjabi": "pa", "moldavian": "ro", "moldovan": "ro", "sinhalese": "si", "castilian": "es", "mandarin": "zh"}
-_ALIGNMENT_HEADS = {"tiny.en": b"ABzY8J1N>@0{>%R00Bk>$p{7v037`oCl~+#00", "tiny": b"ABzY8bu8Lr0{>%RKn9Fp%m@SkK7Kt=7ytkO", "base.en": b"ABzY8;40c<0{>%RzzG;p*o+Vo09|#PsxSZm00", "base": b"ABzY8KQ!870{>%RzyTQH3`Q^yNP!>##QT-<FaQ7m", "small.en": b"ABzY8>?_)10{>%RpeA61k&I|OI3I$65C{;;pbCHh0B{qLQ;+}v00", "small": b"ABzY8DmU6=0{>%Rpa?J`kvJ6qF(V^F86#Xh7JUGMK}P<N0000", "medium.en": b"ABzY8usPae0{>%R7<zz_OvQ{)4kMa0BMw6u5rT}kRKX;$NfYBv00*Hl@qhsU00", "medium": b"ABzY8B0Jh+0{>%R7}kK1fFL7w6%<-Pf*t^=N)Qr&0RR9", "large-v1": b"ABzY8r9j$a0{>%R7#4sLmoOs{s)o3~84-RPdcFk!JR<kSfC2yj", "large-v2": b"ABzY8zd+h!0{>%R7=D0pU<_bnWW*tkYAhobTNnu$jnkEkXqp)j;w1Tzk)UH3X%SZd&fFZ2fC2yj", "large-v3": b"ABzY8gWO1E0{>%R7(9S+Kn!D~%ngiGaR?*L!iJG9p-nab0JQ=-{D1-g00", "large": b"ABzY8gWO1E0{>%R7(9S+Kn!D~%ngiGaR?*L!iJG9p-nab0JQ=-{D1-g00", "large-v3-turbo": b"ABzY8j^C+e0{>%RARaKHP%t(lGR*)0g!tONPyhe`"}
+LANGUAGES = {
+    "en": "english", 
+    "zh": "chinese", 
+    "de": "german", 
+    "es": "spanish", 
+    "ru": "russian", 
+    "ko": "korean", 
+    "fr": "french", 
+    "ja": "japanese", 
+    "pt": "portuguese", 
+    "tr": "turkish", 
+    "pl": "polish", 
+    "ca": "catalan", 
+    "nl": "dutch", 
+    "ar": "arabic", 
+    "sv": "swedish", 
+    "it": "italian", 
+    "id": "indonesian", 
+    "hi": "hindi", 
+    "fi": "finnish", 
+    "vi": "vietnamese", 
+    "he": "hebrew", 
+    "uk": "ukrainian", 
+    "el": "greek", 
+    "ms": "malay", 
+    "cs": "czech", 
+    "ro": "romanian", 
+    "da": "danish", 
+    "hu": "hungarian", 
+    "ta": "tamil", 
+    "no": "norwegian", 
+    "th": "thai", 
+    "ur": "urdu", 
+    "hr": "croatian", 
+    "bg": "bulgarian", 
+    "lt": "lithuanian", 
+    "la": "latin", 
+    "mi": "maori", 
+    "ml": "malayalam", 
+    "cy": "welsh", 
+    "sk": "slovak", 
+    "te": "telugu", 
+    "fa": "persian", 
+    "lv": "latvian", 
+    "bn": "bengali", 
+    "sr": "serbian", 
+    "az": "azerbaijani", 
+    "sl": "slovenian", 
+    "kn": "kannada", 
+    "et": "estonian", 
+    "mk": "macedonian", 
+    "br": "breton", 
+    "eu": "basque", 
+    "is": "icelandic", 
+    "hy": "armenian", 
+    "ne": "nepali", 
+    "mn": "mongolian", 
+    "bs": "bosnian", 
+    "kk": "kazakh", 
+    "sq": "albanian", 
+    "sw": "swahili", 
+    "gl": "galician", 
+    "mr": "marathi", 
+    "pa": "punjabi", 
+    "si": "sinhala", 
+    "km": "khmer", 
+    "sn": "shona", 
+    "yo": "yoruba", 
+    "so": "somali", 
+    "af": "afrikaans", 
+    "oc": "occitan", 
+    "ka": "georgian", 
+    "be": "belarusian", 
+    "tg": "tajik", 
+    "sd": "sindhi", 
+    "gu": "gujarati", 
+    "am": "amharic", 
+    "yi": "yiddish", 
+    "lo": "lao", 
+    "uz": "uzbek", 
+    "fo": "faroese", 
+    "ht": "haitian creole", 
+    "ps": "pashto", 
+    "tk": "turkmen", 
+    "nn": "nynorsk", 
+    "mt": "maltese", 
+    "sa": "sanskrit", 
+    "lb": "luxembourgish", 
+    "my": "myanmar", 
+    "bo": "tibetan", 
+    "tl": "tagalog", 
+    "mg": "malagasy", 
+    "as": "assamese", 
+    "tt": "tatar", 
+    "haw": "hawaiian", 
+    "ln": "lingala", 
+    "ha": "hausa", 
+    "ba": "bashkir", 
+    "jw": "javanese", 
+    "su": "sundanese", 
+    "yue": "cantonese"
+}
+
+TO_LANGUAGE_CODE = {
+    **{
+        language: code for code, language in LANGUAGES.items()
+    }, 
+    "burmese": "my", 
+    "valencian": "ca", 
+    "flemish": "nl", 
+    "haitian": "ht", 
+    "letzeburgesch": "lb", 
+    "pushto": "ps", 
+    "panjabi": "pa", 
+    "moldavian": "ro", 
+    "moldovan": "ro", 
+    "sinhalese": "si", 
+    "castilian": "es", 
+    "mandarin": "zh"
+}
+
+_ALIGNMENT_HEADS = {
+    "tiny.en": b"ABzY8J1N>@0{>%R00Bk>$p{7v037`oCl~+#00", 
+    "tiny": b"ABzY8bu8Lr0{>%RKn9Fp%m@SkK7Kt=7ytkO", 
+    "base.en": b"ABzY8;40c<0{>%RzzG;p*o+Vo09|#PsxSZm00", 
+    "base": b"ABzY8KQ!870{>%RzyTQH3`Q^yNP!>##QT-<FaQ7m", 
+    "small.en": b"ABzY8>?_)10{>%RpeA61k&I|OI3I$65C{;;pbCHh0B{qLQ;+}v00", 
+    "small": b"ABzY8DmU6=0{>%Rpa?J`kvJ6qF(V^F86#Xh7JUGMK}P<N0000", 
+    "medium.en": b"ABzY8usPae0{>%R7<zz_OvQ{)4kMa0BMw6u5rT}kRKX;$NfYBv00*Hl@qhsU00", 
+    "medium": b"ABzY8B0Jh+0{>%R7}kK1fFL7w6%<-Pf*t^=N)Qr&0RR9", 
+    "large-v1": b"ABzY8r9j$a0{>%R7#4sLmoOs{s)o3~84-RPdcFk!JR<kSfC2yj", 
+    "large-v2": b"ABzY8zd+h!0{>%R7=D0pU<_bnWW*tkYAhobTNnu$jnkEkXqp)j;w1Tzk)UH3X%SZd&fFZ2fC2yj", 
+    "large-v3": b"ABzY8gWO1E0{>%R7(9S+Kn!D~%ngiGaR?*L!iJG9p-nab0JQ=-{D1-g00", 
+    "large": b"ABzY8gWO1E0{>%R7(9S+Kn!D~%ngiGaR?*L!iJG9p-nab0JQ=-{D1-g00", 
+    "large-v3-turbo": b"ABzY8j^C+e0{>%RARaKHP%t(lGR*)0g!tONPyhe`"
+}
 
 SAMPLE_RATE, N_FFT, HOP_LENGTH, CHUNK_LENGTH = 16000, 400, 160, 30
 N_SAMPLES = CHUNK_LENGTH * SAMPLE_RATE 
@@ -198,7 +331,29 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
     word_boundaries = np.pad(np.cumsum([len(t) for t in word_tokens[:-1]]), (1, 0))
     jump_times = time_indices[np.pad(np.diff(text_indices), (1, 0), constant_values=1).astype(bool)] / TOKENS_PER_SECOND
 
-    return [WordTiming(word, tokens, start, end, probability) for word, tokens, start, end, probability in zip(words, word_tokens, jump_times[word_boundaries[:-1]], jump_times[word_boundaries[1:]], [np.mean(text_token_probs[i:j]) for i, j in zip(word_boundaries[:-1], word_boundaries[1:])])]
+    return [
+        WordTiming(
+            word, 
+            tokens, 
+            start, 
+            end, 
+            probability
+        ) 
+
+        for word, tokens, start, end, probability in zip(
+            words, 
+            word_tokens, 
+            jump_times[word_boundaries[:-1]], 
+            jump_times[word_boundaries[1:]], 
+            [
+                np.mean(text_token_probs[i:j]) 
+                for i, j in zip(
+                    word_boundaries[:-1], 
+                    word_boundaries[1:]
+                )
+            ]
+        )
+    ]
 
 def add_word_timestamps(*, segments, model, tokenizer, mel, num_frames, prepend_punctuations = "\"'“¿([{-", append_punctuations = "\"'.。,，!！?？:：”)]}、", last_speech_timestamp, **kwargs):
     if len(segments) == 0: return
@@ -304,7 +459,26 @@ def pad_or_trim(array, length = N_SAMPLES, *, axis = -1):
 def get_end(segments):
     return next((w["end"] for s in reversed(segments) for w in reversed(s["words"])), segments[-1]["end"] if segments else None)
 
-def transcribe_function(model, audio, *, verbose = None, temperature = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0), compression_ratio_threshold = 2.4, logprob_threshold = -1.0, no_speech_threshold = 0.6, condition_on_previous_text = True, initial_prompt = None, carry_initial_prompt = False, word_timestamps = False, prepend_punctuations = "\"'“¿([{-", append_punctuations = "\"'.。,，!！?？:：”)]}、", clip_timestamps = "0", hallucination_silence_threshold = None, fp16 = False, **decode_options):
+def transcribe_function(
+    model, 
+    audio, 
+    *, 
+    verbose = None, 
+    temperature = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0), 
+    compression_ratio_threshold = 2.4, 
+    logprob_threshold = -1.0, 
+    no_speech_threshold = 0.6, 
+    condition_on_previous_text = True, 
+    initial_prompt = None, 
+    carry_initial_prompt = False, 
+    word_timestamps = False, 
+    prepend_punctuations = "\"'“¿([{-", 
+    append_punctuations = "\"'.。,，!！?？:：”)]}、", 
+    clip_timestamps = "0", 
+    hallucination_silence_threshold = None, 
+    fp16 = False, 
+    **decode_options
+):
     dtype = torch.float16 if fp16 else torch.float32
     decode_options["fp16"] = fp16
 
@@ -375,7 +549,18 @@ def transcribe_function(model, audio, *, verbose = None, temperature = (0.0, 0.2
 
     def new_segment(*, start, end, tokens, result):
         tokens = tokens.tolist()
-        return {"seek": seek, "start": start, "end": end, "text": tokenizer.decode([token for token in tokens if token < tokenizer.eot]), "tokens": tokens, "temperature": result.temperature, "avg_logprob": result.avg_logprob, "compression_ratio": result.compression_ratio, "no_speech_prob": result.no_speech_prob}
+
+        return {
+            "seek": seek, 
+            "start": start, 
+            "end": end, 
+            "text": tokenizer.decode([token for token in tokens if token < tokenizer.eot]), 
+            "tokens": tokens, 
+            "temperature": result.temperature, 
+            "avg_logprob": result.avg_logprob, 
+            "compression_ratio": result.compression_ratio, 
+            "no_speech_prob": result.no_speech_prob
+        }
 
     with tqdm.tqdm(total=content_frames, unit="frames", disable=verbose is not False) as pbar:
         last_speech_timestamp = 0.0
@@ -453,7 +638,14 @@ def transcribe_function(model, audio, *, verbose = None, temperature = (0.0, 0.2
                 last_slice = 0
                 for current_slice in slices:
                     sliced_tokens = tokens[last_slice:current_slice]
-                    current_segments.append(new_segment(start=time_offset + (sliced_tokens[0].item() - tokenizer.timestamp_begin) * time_precision, end=time_offset + (sliced_tokens[-1].item() - tokenizer.timestamp_begin) * time_precision, tokens=sliced_tokens, result=result))
+                    current_segments.append(
+                        new_segment(
+                            start=time_offset + (sliced_tokens[0].item() - tokenizer.timestamp_begin) * time_precision, 
+                            end=time_offset + (sliced_tokens[-1].item() - tokenizer.timestamp_begin) * time_precision, 
+                            tokens=sliced_tokens, 
+                            result=result
+                        )
+                    )
                     last_slice = current_slice
 
                 if single_timestamp_ending: seek += segment_size
@@ -468,7 +660,16 @@ def transcribe_function(model, audio, *, verbose = None, temperature = (0.0, 0.2
                 seek += segment_size
 
             if word_timestamps:
-                add_word_timestamps(segments=current_segments, model=model, tokenizer=tokenizer, mel=mel_segment, num_frames=segment_size, prepend_punctuations=prepend_punctuations, append_punctuations=append_punctuations, last_speech_timestamp=last_speech_timestamp)
+                add_word_timestamps(
+                    segments=current_segments, 
+                    model=model, 
+                    tokenizer=tokenizer, 
+                    mel=mel_segment, 
+                    num_frames=segment_size, 
+                    prepend_punctuations=prepend_punctuations, 
+                    append_punctuations=append_punctuations, 
+                    last_speech_timestamp=last_speech_timestamp
+                )
 
                 if not single_timestamp_ending:
                     last_word_end = get_end(current_segments)
@@ -500,7 +701,11 @@ def transcribe_function(model, audio, *, verbose = None, temperature = (0.0, 0.2
                             next_segment = next_words_segment(current_segments[si + 1 :])
                             hal_next_start = next_segment["words"][0]["start"] if next_segment is not None else (time_offset + segment_duration)
 
-                            if (segment["start"] - hal_last_end > threshold or segment["start"] < threshold or segment["start"] - time_offset < 2.0) and (hal_next_start - segment["end"] > threshold or is_segment_anomaly(next_segment) or window_end_time - segment["end"] < 2.0):
+                            if (
+                                segment["start"] - hal_last_end > threshold or segment["start"] < threshold or segment["start"] - time_offset < 2.0
+                            ) and (
+                                hal_next_start - segment["end"] > threshold or is_segment_anomaly(next_segment) or window_end_time - segment["end"] < 2.0
+                            ):
                                 seek = round(max(time_offset + 1, segment["start"]) * FRAMES_PER_SECOND)
                                 if content_duration - segment["end"] < threshold: seek = content_frames
 
@@ -590,7 +795,17 @@ def get_encoding(name = "gpt2", num_languages = 99):
     n_vocab = len(ranks)
     special_tokens = {}
 
-    specials = ["<|endoftext|>", "<|startoftranscript|>", *[f"<|{lang}|>" for lang in list(LANGUAGES.keys())[:num_languages]], "<|translate|>", "<|transcribe|>", "<|startoflm|>", "<|startofprev|>", "<|nospeech|>", "<|notimestamps|>", *[f"<|{i * 0.02:.2f}|>" for i in range(1501)]]
+    specials = [
+        "<|endoftext|>", "<|startoftranscript|>", 
+        *[f"<|{lang}|>" for lang in list(LANGUAGES.keys())[:num_languages]], 
+        "<|translate|>", 
+        "<|transcribe|>", 
+        "<|startoflm|>", 
+        "<|startofprev|>", 
+        "<|nospeech|>", 
+        "<|notimestamps|>", 
+        *[f"<|{i * 0.02:.2f}|>" for i in range(1501)]
+    ]
 
     for token in specials:
         special_tokens[token] = n_vocab
@@ -599,7 +814,24 @@ def get_encoding(name = "gpt2", num_languages = 99):
     return tiktoken.Encoding(name=os.path.basename(vocab_path), explicit_n_vocab=n_vocab, pat_str=r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""", mergeable_ranks=ranks, special_tokens=special_tokens)
 
 class DecodingOptions:
-    def __init__(self, task = "transcribe", language = None, temperature = 0.0, sample_len = None, best_of = None, beam_size = None, patience = None, length_penalty = None, prompt = None, prefix = None, suppress_tokens = "-1", suppress_blank = True, without_timestamps = False, max_initial_timestamp = 1.0, fp16 = False):
+    def __init__(
+        self, 
+        task = "transcribe", 
+        language = None, 
+        temperature = 0.0, 
+        sample_len = None, 
+        best_of = None, 
+        beam_size = None, 
+        patience = None, 
+        length_penalty = None, 
+        prompt = None, 
+        prefix = None, 
+        suppress_tokens = "-1", 
+        suppress_blank = True, 
+        without_timestamps = False, 
+        max_initial_timestamp = 1.0, 
+        fp16 = False
+    ):
         self.task = task
         self.language = language
         self.temperature = temperature
@@ -1147,7 +1379,19 @@ class DecodingTask:
         fields = ([tokenizer.decode(t).strip() for t in tokens], languages, tokens, audio_features, [lp / (len(t) + 1) for t, lp in zip(tokens, [lp[i] for i, lp in zip(selected, sum_logprobs)])], no_speech_probs)
         if len(set(map(len, fields))) != 1: raise RuntimeError
 
-        return [DecodingResult(audio_features=features, language=language, tokens=tokens, text=text, avg_logprob=avg_logprob, no_speech_prob=no_speech_prob, temperature=self.options.temperature, compression_ratio=compression_ratio(text)) for text, language, tokens, features, avg_logprob, no_speech_prob in zip(*fields)]
+        return [
+            DecodingResult(
+                audio_features=features, 
+                language=language, 
+                tokens=tokens, 
+                text=text, 
+                avg_logprob=avg_logprob, 
+                no_speech_prob=no_speech_prob, 
+                temperature=self.options.temperature, 
+                compression_ratio=compression_ratio(text)
+            ) 
+            for text, language, tokens, features, avg_logprob, no_speech_prob in zip(*fields)
+        ]
     
 class DecodingResult:
     def __init__(self, audio_features, language, language_probs = None, tokens = None, text = "", avg_logprob = np.nan, no_speech_prob = np.nan, temperature = np.nan, compression_ratio = np.nan):

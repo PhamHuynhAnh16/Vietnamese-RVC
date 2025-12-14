@@ -1,11 +1,46 @@
+import os
+import sys
+
 import torch
 
 import torch.nn as nn
 
+sys.path.append(os.getcwd())
+
+from main.library.predictors.RMVPE.yolo import YOLO13Encoder, YOLO13FullPADDecoder, HyperACE
+
 class ConvBlockRes(nn.Module):
     def __init__(self, in_channels, out_channels, momentum=0.01):
         super(ConvBlockRes, self).__init__()
-        self.conv = nn.Sequential(nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False), nn.BatchNorm2d(out_channels, momentum=momentum), nn.ReLU(), nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False), nn.BatchNorm2d(out_channels, momentum=momentum), nn.ReLU())
+        self.conv = nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channels, 
+                out_channels=out_channels, 
+                kernel_size=(3, 3), 
+                stride=(1, 1), 
+                padding=(1, 1), 
+                bias=False
+            ), 
+            nn.BatchNorm2d(
+                out_channels, 
+                momentum=momentum
+            ), 
+            nn.ReLU(), 
+            nn.Conv2d(
+                in_channels=out_channels, 
+                out_channels=out_channels, 
+                kernel_size=(3, 3), 
+                stride=(1, 1), 
+                padding=(1, 1), 
+                bias=False
+            ), 
+            nn.BatchNorm2d(
+                out_channels, 
+                momentum=momentum
+            ), 
+            nn.ReLU()
+        )
+
         if in_channels != out_channels:
             self.shortcut = nn.Conv2d(in_channels, out_channels, (1, 1))
             self.is_shortcut = True
@@ -79,7 +114,23 @@ class ResDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride, n_blocks=1, momentum=0.01):
         super(ResDecoderBlock, self).__init__()
         out_padding = (0, 1) if stride == (1, 2) else (1, 1)
-        self.conv1 = nn.Sequential(nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 3), stride=stride, padding=(1, 1), output_padding=out_padding, bias=False), nn.BatchNorm2d(out_channels, momentum=momentum), nn.ReLU())
+        self.conv1 = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels=in_channels, 
+                out_channels=out_channels, 
+                kernel_size=(3, 3), 
+                stride=stride, 
+                padding=(1, 1), 
+                output_padding=out_padding, 
+                bias=False
+            ), 
+            nn.BatchNorm2d(
+                out_channels, 
+                momentum=momentum
+            ), 
+            nn.ReLU()
+        )
+
         self.conv2 = nn.ModuleList()
         self.conv2.append(ConvBlockRes(out_channels * 2, out_channels, momentum))
 
@@ -119,3 +170,28 @@ class DeepUnet(nn.Module):
     def forward(self, x):
         x, concat_tensors = self.encoder(x)
         return self.decoder(self.intermediate(x), concat_tensors)
+    
+class HPADeepUnet(nn.Module):
+    def __init__(self, in_channels=1, en_out_channels=16, base_channels=64, hyperace_k=2, hyperace_l=1, num_hyperedges=16, num_heads=8):
+        super().__init__()
+        self.encoder = YOLO13Encoder(in_channels, base_channels)
+        enc_ch = self.encoder.out_channels
+
+        self.hyperace = HyperACE(
+            in_channels=enc_ch,
+            out_channels=enc_ch[-1],
+            num_hyperedges=num_hyperedges,
+            num_heads=num_heads,
+            k=hyperace_k, 
+            l=hyperace_l
+        )
+
+        self.decoder = YOLO13FullPADDecoder(
+            encoder_channels=enc_ch,
+            hyperace_out_c=enc_ch[-1],
+            out_channels_final=en_out_channels
+        )
+
+    def forward(self, x):
+        features = self.encoder(x)
+        return nn.functional.interpolate(self.decoder(features, self.hyperace(features)), size=x.shape[2:], mode='bilinear', align_corners=False)
