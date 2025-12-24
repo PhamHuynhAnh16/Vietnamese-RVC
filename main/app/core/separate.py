@@ -45,7 +45,8 @@ def separate_music(
     gr_info(translations["start"].format(start=translations["separator_music"]))
 
     subprocess.run([
-        python, configs["separate_path"], 
+        python, 
+        configs["separate_path"], 
         "--input_path", input_path,
         "--output_dirs", output_dirs,
         "--export_format", export_format,

@@ -25,7 +25,7 @@ class AudioCallbacks:
         model_path = None, 
         index_path = None, 
         f0_method = "rmvpe", 
-        f0_onnx = False, 
+        predictor_onnx = False, 
         embedder_model = "hubert_base", 
         embedders_mode = "fairseq", 
         sample_rate = 16000, 
@@ -50,6 +50,7 @@ class AudioCallbacks:
         clean_audio = False, 
         clean_strength = 0.7, 
         post_process = False, 
+        sid = 0,
         **kwargs
     ):
         self.pass_through = pass_through
@@ -82,7 +83,7 @@ class AudioCallbacks:
             model_path, 
             index_path, 
             f0_method, 
-            f0_onnx, 
+            predictor_onnx, 
             embedder_model, 
             embedders_mode, 
             sample_rate, 
@@ -94,6 +95,7 @@ class AudioCallbacks:
             clean_audio, 
             clean_strength,
             post_process, 
+            sid,
             **kwargs
         )
 
@@ -102,7 +104,7 @@ class AudioCallbacks:
         model_path, 
         index_path = None, 
         f0_method = "rmvpe", 
-        f0_onnx = False, 
+        predictor_onnx = False, 
         embedder_model = "hubert_base", 
         embedders_mode = "fairseq", 
         sample_rate = 16000, 
@@ -114,6 +116,7 @@ class AudioCallbacks:
         clean_audio = False, 
         clean_strength = 0.7, 
         post_process = False, 
+        sid = 0,
         **kwargs
     ):
         self.vc.initialize(
@@ -121,7 +124,7 @@ class AudioCallbacks:
                 model_path, 
                 index_path, 
                 f0_method, 
-                f0_onnx, 
+                predictor_onnx, 
                 embedder_model, 
                 embedders_mode, 
                 sample_rate, 
@@ -135,18 +138,42 @@ class AudioCallbacks:
                 clean_audio, 
                 clean_strength,
                 post_process,
+                sid,
                 **kwargs
             )
         )
 
-    def change_voice(self, received_data, f0_up_key = 0, index_rate = 0.5, protect = 0.5, filter_radius = 3, rms_mix_rate = 1, f0_autotune = False, f0_autotune_strength = 1, proposal_pitch = False, proposal_pitch_threshold = 255.0):
+    def change_voice(
+        self, 
+        received_data, 
+        f0_up_key = 0, 
+        index_rate = 0.5, 
+        protect = 0.5, 
+        filter_radius = 3, 
+        rms_mix_rate = 1, 
+        f0_autotune = False, 
+        f0_autotune_strength = 1, 
+        proposal_pitch = False, 
+        proposal_pitch_threshold = 255.0
+    ):
         if self.pass_through:
             vol = float(np.sqrt(np.square(received_data).mean(dtype=np.float32)))
             return received_data, vol, [0, 0, 0], None
 
         try:
             with self.lock:
-                audio, vol, perf = self.vc.on_request(received_data, f0_up_key, index_rate, protect, filter_radius, rms_mix_rate, f0_autotune, f0_autotune_strength, proposal_pitch, proposal_pitch_threshold)
+                audio, vol, perf = self.vc.on_request(
+                    received_data, 
+                    f0_up_key, 
+                    index_rate, 
+                    protect, 
+                    filter_radius, 
+                    rms_mix_rate, 
+                    f0_autotune, 
+                    f0_autotune_strength, 
+                    proposal_pitch, 
+                    proposal_pitch_threshold
+                )
 
             return audio, vol, perf, None
         except RuntimeError as e:

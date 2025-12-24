@@ -17,9 +17,22 @@ def spectro(x, n_fft=512, hop_length=None, pad=0):
     *other, length = x.shape
     x = x.reshape(-1, length)
     device_type = x.device.type
+
     is_other_gpu = not device_type in ["cuda", "cpu"]
     if is_other_gpu: x = x.cpu()
-    z = torch.stft(x, n_fft * (1 + pad), hop_length or n_fft // 4, window=torch.hann_window(n_fft).to(x), win_length=n_fft, normalized=True, center=True, return_complex=True, pad_mode="reflect")
+
+    z = torch.stft(
+        x, 
+        n_fft * (1 + pad), 
+        hop_length or n_fft // 4, 
+        window=torch.hann_window(n_fft).to(x), 
+        win_length=n_fft, 
+        normalized=True, 
+        center=True, 
+        return_complex=True, 
+        pad_mode="reflect"
+    )
+
     _, freqs, frame = z.shape
     return z.view(*other, freqs, frame)
 
@@ -27,11 +40,24 @@ def ispectro(z, hop_length=None, length=None, pad=0):
     *other, freqs, frames = z.shape
     n_fft = 2 * freqs - 2
     z = z.view(-1, freqs, frames)
+
     win_length = n_fft // (1 + pad)
     device_type = z.device.type
+
     is_other_gpu = not device_type in ["cuda", "cpu"]
     if is_other_gpu: z = z.cpu()
-    x = torch.istft(z, n_fft, hop_length, window=torch.hann_window(win_length).to(z.real), win_length=win_length, normalized=True, length=length, center=True)
+
+    x = torch.istft(
+        z, 
+        n_fft, 
+        hop_length, 
+        window=torch.hann_window(win_length).to(z.real), 
+        win_length=win_length, 
+        normalized=True, 
+        length=length, 
+        center=True
+    )
+
     _, length = x.shape
     return x.view(*other, length)
 
@@ -52,7 +78,13 @@ def _norm(x):
 
 def _mul_add(a, b, out = None):
     target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape)])
-    if out is None or out.shape != target_shape: out = torch.zeros(target_shape, dtype=a.dtype, device=a.device)
+
+    if out is None or out.shape != target_shape: 
+        out = torch.zeros(
+            target_shape, 
+            dtype=a.dtype, 
+            device=a.device
+        )
 
     if out is a:
         real_a = a[..., 0]
@@ -66,7 +98,13 @@ def _mul_add(a, b, out = None):
 
 def _mul(a, b, out = None):
     target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape)])
-    if out is None or out.shape != target_shape: out = torch.zeros(target_shape, dtype=a.dtype, device=a.device)
+
+    if out is None or out.shape != target_shape: 
+        out = torch.zeros(
+            target_shape, 
+            dtype=a.dtype, 
+            device=a.device
+        )
 
     if out is a:
         real_a = a[..., 0]
@@ -114,9 +152,23 @@ def _invert(M, out = None):
 def expectation_maximization(y, x, iterations = 2, eps = 1e-10, batch_size = 200):
     (nb_frames, nb_bins, nb_channels) = x.shape[:-1]
     nb_sources = y.shape[-1]
-    regularization = torch.cat((torch.eye(nb_channels, dtype=x.dtype, device=x.device)[..., None], torch.zeros((nb_channels, nb_channels, 1), dtype=x.dtype, device=x.device)), dim=2)
-    regularization = (torch.as_tensor(eps)).sqrt() * (regularization[None, None, ...].expand((-1, nb_bins, -1, -1, -1)))
-    R = [torch.zeros((nb_bins, nb_channels, nb_channels, 2), dtype=x.dtype, device=x.device) for j in range(nb_sources)]
+
+    regularization = torch.cat((
+        torch.eye(nb_channels, dtype=x.dtype, device=x.device)[..., None], 
+        torch.zeros((nb_channels, nb_channels, 1), dtype=x.dtype, device=x.device)
+    ), dim=2)
+
+    regularization = (
+        torch.as_tensor(eps)
+    ).sqrt() * (
+        regularization[None, None, ...].expand((-1, nb_bins, -1, -1, -1))
+    )
+
+    R = [
+        torch.zeros((nb_bins, nb_channels, nb_channels, 2), dtype=x.dtype, device=x.device) 
+        for j in range(nb_sources)
+    ]
+
     weight = torch.zeros((nb_bins,), dtype=x.dtype, device=x.device)
     v = torch.zeros((nb_frames, nb_bins, nb_sources), dtype=x.dtype, device=x.device)
 
@@ -158,23 +210,50 @@ def expectation_maximization(y, x, iterations = 2, eps = 1e-10, batch_size = 200
 
             for j in range(nb_sources):
                 gain = torch.zeros_like(inv_Cxx)
-                indices = torch.cartesian_prod(torch.arange(nb_channels), torch.arange(nb_channels), torch.arange(nb_channels))
+
+                indices = torch.cartesian_prod(
+                    torch.arange(nb_channels), 
+                    torch.arange(nb_channels), 
+                    torch.arange(nb_channels)
+                )
 
                 for index in indices:
-                    gain[:, :, index[0], index[1], :] = _mul_add(R[j][None, :, index[0], index[2], :].clone(), inv_Cxx[:, :, index[2], index[1], :], gain[:, :, index[0], index[1], :])
+                    gain[:, :, index[0], index[1], :] = _mul_add(
+                        R[j][None, :, index[0], index[2], :].clone(), 
+                        inv_Cxx[:, :, index[2], index[1], :], 
+                        gain[:, :, index[0], index[1], :]
+                    )
 
                 gain = gain * v[t, ..., None, None, None, j]
 
                 for i in range(nb_channels):
-                    y[t, ..., j] = _mul_add(gain[..., i, :], x[t, ..., i, None, :], y[t, ..., j])
+                    y[t, ..., j] = _mul_add(
+                        gain[..., i, :], 
+                        x[t, ..., i, None, :], 
+                        y[t, ..., j]
+                    )
 
     return y, v, R
 
-def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, residual = False, scale_factor = 10.0, eps = 1e-10):
-    if softmask: y = mix_stft[..., None] * (targets_spectrograms / (eps + targets_spectrograms.sum(dim=-1, keepdim=True).to(mix_stft.dtype)))[..., None, :]
+def wiener(
+    targets_spectrograms, 
+    mix_stft, 
+    iterations = 1, 
+    softmask = False, 
+    residual = False, 
+    scale_factor = 10.0, 
+    eps = 1e-10
+):
+    if softmask: 
+        y = mix_stft[..., None] * (
+            targets_spectrograms / (
+                eps + targets_spectrograms.sum(dim=-1, keepdim=True).to(mix_stft.dtype)
+            )
+        )[..., None, :]
     else:
         angle = atan2(mix_stft[..., 1], mix_stft[..., 0])[..., None]
         nb_sources = targets_spectrograms.shape[-1]
+
         y = torch.zeros(mix_stft.shape + (nb_sources,), dtype=mix_stft.dtype, device=mix_stft.device)
         y[..., 0, :] = targets_spectrograms * angle.cos()
         y[..., 1, :] = targets_spectrograms * angle.sin()
@@ -182,7 +261,12 @@ def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, res
     if residual: y = torch.cat([y, mix_stft[..., None] - y.sum(dim=-1, keepdim=True)], dim=-1)
     if iterations == 0: return y
 
-    max_abs = torch.as_tensor(1.0, dtype=mix_stft.dtype, device=mix_stft.device).max(_norm(mix_stft).sqrt().max() / scale_factor)
+    max_abs = torch.as_tensor(
+        1.0, 
+        dtype=mix_stft.dtype, 
+        device=mix_stft.device
+    ).max(_norm(mix_stft).sqrt().max() / scale_factor)
+
     mix_stft = mix_stft / max_abs
     y = y / max_abs
     y = expectation_maximization(y, mix_stft, iterations, eps=eps)[0]
@@ -193,11 +277,23 @@ def wiener(targets_spectrograms, mix_stft, iterations = 1, softmask = False, res
 def _covariance(y_j):
     (nb_frames, nb_bins, nb_channels) = y_j.shape[:-1]
 
-    Cj = torch.zeros((nb_frames, nb_bins, nb_channels, nb_channels, 2), dtype=y_j.dtype, device=y_j.device)
-    indices = torch.cartesian_prod(torch.arange(nb_channels), torch.arange(nb_channels))
+    Cj = torch.zeros(
+        (nb_frames, nb_bins, nb_channels, nb_channels, 2), 
+        dtype=y_j.dtype, 
+        device=y_j.device
+    )
+
+    indices = torch.cartesian_prod(
+        torch.arange(nb_channels), 
+        torch.arange(nb_channels)
+    )
 
     for index in indices:
-        Cj[:, :, index[0], index[1], :] = _mul_add(y_j[:, :, index[0], :], _conj(y_j[:, :, index[1], :]), Cj[:, :, index[0], index[1], :])
+        Cj[:, :, index[0], index[1], :] = _mul_add(
+            y_j[:, :, index[0], :], 
+            _conj(y_j[:, :, index[1], :]), 
+            Cj[:, :, index[0], index[1], :]
+        )
 
     return Cj
 
@@ -223,9 +319,18 @@ def pad1d(x, paddings, mode = "constant", value = 0.0):
     return out
 
 class ScaledEmbedding(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim, scale = 10.0, smooth=False):
+    def __init__(
+        self, 
+        num_embeddings, 
+        embedding_dim, 
+        scale = 10.0, 
+        smooth=False
+    ):
         super().__init__()
-        self.embedding = nn.Embedding(num_embeddings, embedding_dim)
+        self.embedding = nn.Embedding(
+            num_embeddings, 
+            embedding_dim
+        )
 
         if smooth:
             weight = torch.cumsum(self.embedding.weight.data, dim=0)
@@ -243,7 +348,22 @@ class ScaledEmbedding(nn.Module):
         return self.embedding(x) * self.scale
 
 class HEncLayer(nn.Module):
-    def __init__(self, chin, chout, kernel_size=8, stride=4, norm_groups=1, empty=False, freq=True, dconv=True, norm=True, context=0, dconv_kw={}, pad=True, rewrite=True):
+    def __init__(
+        self, 
+        chin, 
+        chout, 
+        kernel_size=8, 
+        stride=4, 
+        norm_groups=1, 
+        empty=False, 
+        freq=True, 
+        dconv=True, 
+        norm=True, 
+        context=0, 
+        dconv_kw={}, 
+        pad=True, 
+        rewrite=True
+    ):
         super().__init__()
         norm_fn = lambda d: nn.Identity()  
         if norm: norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  
@@ -312,7 +432,11 @@ class HEncLayer(nn.Module):
         return z
 
 class MultiWrap(nn.Module):
-    def __init__(self, layer, split_ratios):
+    def __init__(
+        self, 
+        layer, 
+        split_ratios
+    ):
         super().__init__()
         self.split_ratios = split_ratios
         self.layers = nn.ModuleList()
@@ -396,7 +520,24 @@ class MultiWrap(nn.Module):
         else: return out, None
 
 class HDecLayer(nn.Module):
-    def __init__(self, chin, chout, last=False, kernel_size=8, stride=4, norm_groups=1, empty=False, freq=True, dconv=True, norm=True, context=1, dconv_kw={}, pad=True, context_freq=True, rewrite=True):
+    def __init__(
+        self, 
+        chin, 
+        chout, 
+        last=False, 
+        kernel_size=8, 
+        stride=4, 
+        norm_groups=1, 
+        empty=False, 
+        freq=True, 
+        dconv=True, 
+        norm=True, 
+        context=1, 
+        dconv_kw={}, 
+        pad=True, 
+        context_freq=True, 
+        rewrite=True
+    ):
         super().__init__()
         norm_fn = lambda d: nn.Identity()  
 
@@ -452,7 +593,6 @@ class HDecLayer(nn.Module):
                     y = y.permute(0, 2, 1, 3).reshape(-1, C, T)
 
                 y = self.dconv(y)
-
                 if self.freq: y = y.view(B, Fr, C, T).permute(0, 2, 1, 3)
         else:
             y = x
@@ -575,7 +715,14 @@ class HDemucs(nn.Module):
                 "norm": norm,
                 "rewrite": rewrite,
                 "norm_groups": norm_groups,
-                "dconv_kw": {"lstm": lstm, "attn": attn, "depth": dconv_depth, "compress": dconv_comp, "init": dconv_init, "gelu": True},
+                "dconv_kw": {
+                    "lstm": lstm, 
+                    "attn": attn, 
+                    "depth": dconv_depth, 
+                    "compress": dconv_comp, 
+                    "init": dconv_init, 
+                    "gelu": True
+                },
             }
 
             kwt = dict(kw)
@@ -595,12 +742,30 @@ class HDemucs(nn.Module):
                 chout_z = max(chout, chout_z)
                 chout = chout_z
 
-            enc = HEncLayer(chin_z, chout_z, dconv=dconv_mode & 1, context=context_enc, **kw)
+            enc = HEncLayer(
+                chin_z, 
+                chout_z, 
+                dconv=dconv_mode & 1, 
+                context=context_enc, 
+                **kw
+            )
+
             if hybrid and freq:
-                tenc = HEncLayer(chin, chout, dconv=dconv_mode & 1, context=context_enc, empty=last_freq, **kwt)
+                tenc = HEncLayer(
+                    chin, 
+                    chout, 
+                    dconv=dconv_mode & 1, 
+                    context=context_enc, 
+                    empty=last_freq, 
+                    **kwt
+                )
                 self.tencoder.append(tenc)
 
-            if multi: enc = MultiWrap(enc, multi_freqs)
+            if multi: 
+                enc = MultiWrap(
+                    enc, 
+                    multi_freqs
+                )
 
             self.encoder.append(enc)
             if index == 0:
@@ -609,11 +774,31 @@ class HDemucs(nn.Module):
 
                 if self.cac: chin_z *= 2
 
-            dec = HDecLayer(chout_z, chin_z, dconv=dconv_mode & 2, last=index == 0, context=context, **kw_dec)
-            if multi: dec = MultiWrap(dec, multi_freqs)
+            dec = HDecLayer(
+                chout_z, 
+                chin_z, 
+                dconv=dconv_mode & 2, 
+                last=index == 0, 
+                context=context, 
+                **kw_dec
+            )
+
+            if multi: 
+                dec = MultiWrap(
+                    dec, 
+                    multi_freqs
+                )
 
             if hybrid and freq:
-                tdec = HDecLayer(chout, chin, dconv=dconv_mode & 2, empty=last_freq, last=index == 0, context=context, **kwt)
+                tdec = HDecLayer(
+                    chout, chin, 
+                    dconv=dconv_mode & 2, 
+                    empty=last_freq, 
+                    last=index == 0, 
+                    context=context, 
+                    **kwt
+                )
+
                 self.tdecoder.insert(0, tdec)
 
             self.decoder.insert(0, dec)
@@ -627,7 +812,13 @@ class HDemucs(nn.Module):
                 else: freqs //= stride
 
             if index == 0 and freq_emb:
-                self.freq_emb = ScaledEmbedding(freqs, chin_z, smooth=emb_smooth, scale=emb_scale)
+                self.freq_emb = ScaledEmbedding(
+                    freqs, 
+                    chin_z, 
+                    smooth=emb_smooth, 
+                    scale=emb_scale
+                )
+
                 self.freq_emb_scale = freq_emb
 
         if rescale: rescale_module(self, reference=rescale)
@@ -640,7 +831,14 @@ class HDemucs(nn.Module):
             assert hl == nfft // 4
             le = int(math.ceil(x.shape[-1] / hl))
             pad = hl // 2 * 3
-            x = pad1d(x, (pad, pad + le * hl - x.shape[-1]), mode="reflect") if not self.hybrid_old else pad1d(x, (pad, pad + le * hl - x.shape[-1]))
+            x = pad1d(
+                x, 
+                (pad, pad + le * hl - x.shape[-1]), 
+                mode="reflect"
+            ) if not self.hybrid_old else pad1d(
+                x, 
+                (pad, pad + le * hl - x.shape[-1])
+            )
 
         z = spectro(x, nfft, hl)[..., :-1, :]
         if self.hybrid:

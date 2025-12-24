@@ -17,7 +17,13 @@ def launch_tensorboard():
         logging.getLogger(l).setLevel(logging.ERROR)
 
     tb = program.TensorBoard()
-    tb.configure(argv=[None, "--logdir", config.configs["logs_path"], f"--port={config.configs['tensorboard_port']}"])
+    tb.configure(
+        argv=[
+            None, 
+            "--logdir", config.configs["logs_path"], 
+            f"--port={config.configs['tensorboard_port']}"
+        ]
+    )
     url = tb.launch()
 
     logger.info(f"{translations['tensorboard_url']}: {url}")

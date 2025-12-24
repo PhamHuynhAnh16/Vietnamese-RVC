@@ -9,9 +9,17 @@ sys.path.append(os.getcwd())
 from main.app.core.ui import gr_info, gr_warning
 from main.app.variables import translations, configs
 
-def stop_pid(pid_file, model_name=None, train=False):
+def stop_pid(
+    pid_file, 
+    model_name=None, 
+    train=False
+):
     try:
-        pid_file_path = os.path.join("assets", f"{pid_file}.txt") if model_name is None else os.path.join(configs["logs_path"], model_name, f"{pid_file}.txt")
+        pid_file_path = os.path.join(
+            "assets", f"{pid_file}.txt"
+        ) if model_name is None else os.path.join(
+            configs["logs_path"], model_name, f"{pid_file}.txt"
+        )
 
         if not os.path.exists(pid_file_path): return gr_warning(translations["not_found_pid"])
         else:
@@ -49,11 +57,26 @@ def google_translate(text, source='auto', target='vi'):
         import textwrap
 
         def translate_chunk(chunk):
-            response = requests.get(codecs.decode("uggcf://genafyngr.tbbtyrncvf.pbz/genafyngr_n/fvatyr", "rot13"), params={'client': 'gtx', 'sl': source, 'tl': target, 'dt': 't', 'q': chunk})
+            response = requests.get(
+                codecs.decode("uggcf://genafyngr.tbbtyrncvf.pbz/genafyngr_n/fvatyr", "rot13"), 
+                params={
+                    'client': 'gtx', 
+                    'sl': source, 
+                    'tl': target, 
+                    'dt': 't', 
+                    'q': chunk
+                }
+            )
+
             return ''.join([i[0] for i in response.json()[0]]) if response.status_code == 200 else chunk
 
         translated_text = ''
-        for chunk in textwrap.wrap(text, 5000, break_long_words=False, break_on_hyphens=False):
+        for chunk in textwrap.wrap(
+            text, 
+            5000, 
+            break_long_words=False, 
+            break_on_hyphens=False
+        ):
             translated_text += translate_chunk(chunk)
 
         return translated_text

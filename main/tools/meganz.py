@@ -37,19 +37,29 @@ def get_chunks(size):
 
 def aes_cbc_decrypt(data, key):
     aes_cipher = AES.new(key, AES.MODE_CBC, makebyte('\0' * 16))
+
     return aes_cipher.decrypt(data)
 
 def decrypt_attr(attr, key):
     attr = codecs.latin_1_decode(aes_cbc_decrypt(attr, a32_to_str(key)))[0].rstrip('\0')
+
     return json.loads(attr[4:]) if attr[:6] == 'MEGA{"' else False
 
 def _api_request(data):
     sequence_num = random.randint(0, 0xFFFFFFFF)
     params = {'id': sequence_num}
-    sequence_num += 1
 
+    sequence_num += 1
     if not isinstance(data, list): data = [data]
-    json_resp = json.loads(requests.post('{0}://g.api.{1}/cs'.format('https', 'mega.co.nz'), params=params, data=json.dumps(data), timeout=160).text)
+
+    response = requests.post(
+        '{0}://g.api.{1}/cs'.format('https', 'mega.co.nz'), 
+        params=params, 
+        data=json.dumps(data), 
+        timeout=160
+    )
+
+    json_resp = json.loads(response.text)
     if isinstance(json_resp, int): raise Exception(json_resp)
 
     return json_resp[0]
@@ -65,27 +75,45 @@ def base64_url_decode(data):
 def str_to_a32(b):
     if isinstance(b, str): b = makebyte(b)
     if len(b) % 4: b += b'\0' * (4 - len(b) % 4)
+
     return struct.unpack('>%dI' % (len(b) / 4), b)
 
 def base64_to_a32(s):
-    return str_to_a32(base64_url_decode(s))
+    return str_to_a32(
+        base64_url_decode(s)
+    )
 
 def mega_download_file(file_handle, file_key, dest_path=None):
     file_key = base64_to_a32(file_key)
     file_data = _api_request({'a': 'g', 'g': 1, 'p': file_handle})
 
-    k = (file_key[0] ^ file_key[4], file_key[1] ^ file_key[5], file_key[2] ^ file_key[6], file_key[3] ^ file_key[7])
-    iv = file_key[4:6] + (0, 0)
+    k = (
+        file_key[0] ^ file_key[4], 
+        file_key[1] ^ file_key[5], 
+        file_key[2] ^ file_key[6], 
+        file_key[3] ^ file_key[7]
+    )
 
+    iv = file_key[4:6] + (0, 0)
     if 'g' not in file_data: raise Exception(translations["file_not_access"])
 
     file_size = file_data['s']
     attribs = decrypt_attr(base64_url_decode(file_data['at']), k)
-    input_file = requests.get(file_data['g'], stream=True).raw
 
+    input_file = requests.get(file_data['g'], stream=True).raw
     temp_output_file = tempfile.NamedTemporaryFile(mode='w+b', prefix='megapy_', delete=False)
+
     k_str = a32_to_str(k)
-    aes = AES.new(k_str, AES.MODE_CTR, counter=Counter.new(128, initial_value=((iv[0] << 32) + iv[1]) << 64))
+    aes = AES.new(
+        k_str, 
+        AES.MODE_CTR, 
+        counter=Counter.new(
+            128, 
+            initial_value=(
+                (iv[0] << 32) + iv[1]
+            ) << 64
+        )
+    )
 
     mac_str = b'\0' * 16
     mac_encryptor = AES.new(k_str, AES.MODE_CBC, mac_str)
@@ -95,6 +123,7 @@ def mega_download_file(file_handle, file_key, dest_path=None):
         for _, chunk_size in get_chunks(file_size):
             chunk = aes.decrypt(input_file.read(chunk_size))
             temp_output_file.write(chunk)
+
             pbar.update(len(chunk))
             encryptor = AES.new(k_str, AES.MODE_CBC, iv_str)
 
@@ -104,8 +133,8 @@ def mega_download_file(file_handle, file_key, dest_path=None):
 
             i = (i + 16) if file_size > 16 else 0
             block = chunk[i:i + 16]
-            if len(block) % 16: block += b'\0' * (16 - (len(block) % 16))
 
+            if len(block) % 16: block += b'\0' * (16 - (len(block) % 16))
             mac_str = mac_encryptor.encrypt(encryptor.encrypt(block))
 
     file_mac = str_to_a32(mac_str)

@@ -19,6 +19,7 @@ def empty(tensor):
 def pad_to_multiple(tensor, multiple, dim=-1, value=0):
     seqlen = tensor.shape[dim]
     m = seqlen / multiple
+
     if m.is_integer(): return False, tensor
     return True, F.pad(tensor, (*((0,) * (-1 - dim) * 2), 0, (math.ceil(m) * multiple - seqlen)), value = value)
 
@@ -26,6 +27,7 @@ def look_around(x, backward = 1, forward = 0, pad_value = -1, dim = 2):
     t = x.shape[1]
     dims = (len(x.shape) - dim) * (0, 0)
     padded_x = F.pad(x, (*dims, backward, forward), value = pad_value)
+
     return torch.cat([padded_x[:, ind:(ind + t), ...] for ind in range(forward + backward + 1)], dim = dim)
 
 def rotate_half(x):
@@ -35,8 +37,10 @@ def rotate_half(x):
 def apply_rotary_pos_emb(q, k, freqs, scale = 1):
     q_len = q.shape[-2]
     q_freqs = freqs[..., -q_len:, :]
+
     inv_scale = scale ** -1
     if scale.ndim == 2: scale = scale[-q_len:, :]
+
     q = (q * q_freqs.cos() * scale) + (rotate_half(q) * q_freqs.sin() * scale)
     k = (k * freqs.cos() * inv_scale) + (rotate_half(k) * freqs.sin() * inv_scale)
 
@@ -44,8 +48,10 @@ def apply_rotary_pos_emb(q, k, freqs, scale = 1):
 
 def orthogonal_matrix_chunk(cols, qr_uniform_q=False, device=None):
     unstructured_block = torch.randn((cols, cols), device=device)
+
     q, r = torch.linalg.qr(unstructured_block.cpu(), mode="reduced")
     q, r = map(lambda t: t.to(device), (q, r))
+
     if qr_uniform_q:
         d = r.diag(0)
         q *= d.sign()
@@ -55,32 +61,75 @@ def orthogonal_matrix_chunk(cols, qr_uniform_q=False, device=None):
 def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform_q=False, device=None):
     nb_full_blocks = int(nb_rows / nb_columns)
     block_list = []
+
     for _ in range(nb_full_blocks):
         block_list.append(orthogonal_matrix_chunk(nb_columns, qr_uniform_q=qr_uniform_q, device=device))
 
     remaining_rows = nb_rows - nb_full_blocks * nb_columns
-    if remaining_rows > 0: block_list.append(orthogonal_matrix_chunk(nb_columns, qr_uniform_q=qr_uniform_q, device=device)[:remaining_rows])
-    if scaling == 0: multiplier = torch.randn((nb_rows, nb_columns), device=device).norm(dim=1)
-    elif scaling == 1: multiplier = math.sqrt((float(nb_columns))) * torch.ones((nb_rows,), device=device)
+
+    if remaining_rows > 0: 
+        block_list.append(
+            orthogonal_matrix_chunk(
+                nb_columns, 
+                qr_uniform_q=qr_uniform_q, 
+                device=device
+            )[:remaining_rows]
+        )
+    if scaling == 0: 
+        multiplier = torch.randn(
+            (nb_rows, nb_columns), 
+            device=device
+        ).norm(dim=1)
+    elif scaling == 1: 
+        multiplier = math.sqrt(
+            (float(nb_columns))
+        ) * torch.ones(
+            (nb_rows,), 
+            device=device
+        )
     else: raise ValueError(f"{scaling} != 0, 1")
 
     return multiplier.diag() @ torch.cat(block_list)
 
 def linear_attention(q, k, v):
-    return einsum("...ed,...nd->...ne", k, q) if v is None else einsum("...de,...nd,...n->...ne", einsum("...nd,...ne->...de", k, v), q, 1.0 / (einsum("...nd,...d->...n", q, k.sum(dim=-2).type_as(q)) + 1e-8))
+    return einsum(
+        "...ed,...nd->...ne", 
+        k, 
+        q
+    ) if v is None else einsum(
+        "...de,...nd,...n->...ne", 
+        einsum(
+            "...nd,...ne->...de", 
+            k, 
+            v
+        ), 
+        q, 
+        1.0 / (einsum(
+            "...nd,...d->...n", 
+            q, 
+            k.sum(dim=-2).type_as(q)
+        ) + 1e-8)
+    )
 
 def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4, device=None):
     b, h, *_ = data.shape
     
     data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.0
     ratio = projection_matrix.shape[0] ** -0.5
+
     data_dash = torch.einsum("...id,...jd->...ij", (data_normalizer * data), repeat(projection_matrix, "j d -> b h j d", b=b, h=h).type_as(data))
     diag_data = (((data**2).sum(dim=-1) / 2.0) * (data_normalizer**2)).unsqueeze(dim=-1)
 
     return (ratio * ((data_dash - diag_data - data_dash.max(dim=-1, keepdim=True).values).exp() + eps) if is_query else ratio * ((data_dash - diag_data + eps).exp())).type_as(data)
 
 class SinusoidalEmbeddings(nn.Module):
-    def __init__(self, dim, scale_base = None, use_xpos = False, theta = 10000):
+    def __init__(
+        self, 
+        dim, 
+        scale_base = None, 
+        use_xpos = False, 
+        theta = 10000
+    ):
         super().__init__()
         inv_freq = 1. / (theta ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer('inv_freq', inv_freq)
@@ -144,7 +193,29 @@ class LocalAttention(nn.Module):
         mask = default(mask, input_mask)
         assert not (exists(window_size) and not self.use_xpos)
 
-        _, autopad, pad_value, window_size, causal, look_backward, look_forward, shared_qk = q.shape, self.autopad, -1, default(window_size, self.window_size), self.causal, self.look_backward, self.look_forward, self.shared_qk
+        (
+            _, 
+            autopad, 
+            pad_value, 
+            window_size, 
+            causal, 
+            look_backward, 
+            look_forward, 
+            shared_qk
+        ) = (
+            q.shape, 
+            self.autopad, 
+            -1, 
+            default(
+                window_size, 
+                self.window_size
+            ), 
+            self.causal, 
+            self.look_backward, 
+            self.look_forward, 
+            self.shared_qk
+        )
+
         (q, packed_shape), (k, _), (v, _) = map(lambda t: pack([t], '* n d'), (q, k, v))
 
         if autopad:
@@ -200,7 +271,13 @@ class LocalAttention(nn.Module):
             sim = sim.masked_fill(causal_mask, mask_value)
             del causal_mask
 
-        sim = sim.masked_fill(((bq_k - (self.window_size * self.look_forward)) > bq_t) | (bq_t > (bq_k + (self.window_size * self.look_backward))) | pad_mask, mask_value) if not causal and self.exact_windowsize else sim.masked_fill(pad_mask, mask_value)
+        sim = sim.masked_fill(
+            ((bq_k - (self.window_size * self.look_forward)) > bq_t) | (bq_t > (bq_k + (self.window_size * self.look_backward))) | pad_mask, 
+            mask_value
+        ) if not causal and self.exact_windowsize else sim.masked_fill(
+            pad_mask, 
+            mask_value
+        )
 
         if exists(mask):
             batch = mask.shape[0]
@@ -209,25 +286,67 @@ class LocalAttention(nn.Module):
             h = b // mask.shape[0]
             if autopad: _, mask = pad_to_multiple(mask, window_size, dim = -1, value = False)
 
-            mask = repeat(rearrange(look_around(rearrange(mask, '... (w n) -> (...) w n', w = windows, n = window_size), **{**look_around_kwargs, 'pad_value': False}), '... j -> ... 1 j'), 'b ... -> (b h) ...', h = h)
-            sim = sim.masked_fill(~mask, mask_value)
+            mask = repeat(
+                rearrange(
+                    look_around(
+                        rearrange(
+                            mask, 
+                            '... (w n) -> (...) w n', 
+                            w = windows, 
+                            n = window_size
+                        ), 
+                        **{
+                            **look_around_kwargs, 
+                            'pad_value': False
+                        }
+                    ), 
+                    '... j -> ... 1 j'
+                ), 
+                'b ... -> (b h) ...', 
+                h = h
+            )
 
+            sim = sim.masked_fill(~mask, mask_value)
             del mask
 
-        out = rearrange(einsum('b h i j, b h j e -> b h i e', self.dropout(sim.softmax(dim = -1)), bv), 'b w n d -> b (w n) d')
-        if autopad: out = out[:, :orig_seq_len, :]
+        out = rearrange(
+            einsum(
+                'b h i j, b h j e -> b h i e', 
+                self.dropout(sim.softmax(dim = -1)), 
+                bv
+            ), 
+            'b w n d -> b (w n) d'
+        )
 
+        if autopad: out = out[:, :orig_seq_len, :]
         out, *_ = unpack(out, packed_shape, '* n d')
+
         return out
     
 class FastAttention(nn.Module):
-    def __init__(self, dim_heads, nb_features=None, ortho_scaling=0, causal=False, generalized_attention=False, kernel_fn=nn.ReLU(), qr_uniform_q=False, no_projection=False):
+    def __init__(
+        self, 
+        dim_heads, 
+        nb_features=None, 
+        ortho_scaling=0, 
+        causal=False, 
+        generalized_attention=False, 
+        kernel_fn=nn.ReLU(), 
+        qr_uniform_q=False, 
+        no_projection=False
+    ):
         super().__init__()
         nb_features = default(nb_features, int(dim_heads * math.log(dim_heads)))
         self.dim_heads = dim_heads
         self.nb_features = nb_features
         self.ortho_scaling = ortho_scaling
-        self.create_projection = partial(gaussian_orthogonal_random_matrix, nb_rows=self.nb_features, nb_columns=dim_heads, scaling=ortho_scaling, qr_uniform_q=qr_uniform_q)
+        self.create_projection = partial(
+            gaussian_orthogonal_random_matrix, 
+            nb_rows=self.nb_features, 
+            nb_columns=dim_heads, 
+            scaling=ortho_scaling, 
+            qr_uniform_q=qr_uniform_q
+        )
         projection_matrix = self.create_projection()
         self.register_buffer("projection_matrix", projection_matrix)
         self.generalized_attention = generalized_attention
@@ -251,15 +370,47 @@ class FastAttention(nn.Module):
         return attn_fn(q, k, None) if v is None else attn_fn(q, k, v)
 
 class SelfAttention(nn.Module):
-    def __init__(self, dim, causal=False, heads=8, dim_head=64, local_heads=0, local_window_size=256, nb_features=None, feature_redraw_interval=1000, generalized_attention=False, kernel_fn=nn.ReLU(), qr_uniform_q=False, dropout=0.0, no_projection=False):
+    def __init__(
+        self, 
+        dim, 
+        causal=False, 
+        heads=8, 
+        dim_head=64, 
+        local_heads=0, 
+        local_window_size=256, 
+        nb_features=None, 
+        feature_redraw_interval=1000, 
+        generalized_attention=False, 
+        kernel_fn=nn.ReLU(), 
+        qr_uniform_q=False, 
+        dropout=0.0, 
+        no_projection=False
+    ):
         super().__init__()
         assert dim % heads == 0
         dim_head = default(dim_head, dim // heads)
         inner_dim = dim_head * heads
-        self.fast_attention = FastAttention(dim_head, nb_features, causal=causal, generalized_attention=generalized_attention, kernel_fn=kernel_fn, qr_uniform_q=qr_uniform_q, no_projection=no_projection)
+        self.fast_attention = FastAttention(
+            dim_head, 
+            nb_features, 
+            causal=causal, 
+            generalized_attention=generalized_attention, 
+            kernel_fn=kernel_fn, 
+            qr_uniform_q=qr_uniform_q, 
+            no_projection=no_projection
+        )
         self.heads = heads
         self.global_heads = heads - local_heads
-        self.local_attn = (LocalAttention(window_size=local_window_size, causal=causal, autopad=True, dropout=dropout, look_forward=int(not causal), rel_pos_emb_config=(dim_head, local_heads)) if local_heads > 0 else None)
+        self.local_attn = (
+            LocalAttention(
+                window_size=local_window_size, 
+                causal=causal, 
+                autopad=True, 
+                dropout=dropout, 
+                look_forward=int(not causal), 
+                rel_pos_emb_config=(dim_head, local_heads)
+            ) if local_heads > 0 else None
+        )
         self.to_q = nn.Linear(dim, inner_dim)
         self.to_k = nn.Linear(dim, inner_dim)
         self.to_v = nn.Linear(dim, inner_dim)

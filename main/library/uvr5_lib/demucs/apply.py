@@ -11,13 +11,21 @@ from main.library.uvr5_lib.demucs.utils import center_trim
 
 class DummyPoolExecutor:
     class DummyResult:
-        def __init__(self, func, *args, **kwargs):
+        def __init__(
+            self, 
+            func, 
+            *args, 
+            **kwargs
+        ):
             self.func = func
             self.args = args
             self.kwargs = kwargs
 
         def result(self):
-            return self.func(*self.args, **self.kwargs)
+            return self.func(
+                *self.args, 
+                **self.kwargs
+            )
 
     def __init__(self, workers=0):
         pass
@@ -32,7 +40,12 @@ class DummyPoolExecutor:
         return
 
 class BagOfModels(torch.nn.Module):
-    def __init__(self, models, weights = None, segment = None):
+    def __init__(
+        self, 
+        models, 
+        weights = None, 
+        segment = None
+    ):
         super().__init__()
         assert len(models) > 0
         first = models[0]
@@ -62,7 +75,12 @@ class BagOfModels(torch.nn.Module):
         pass
 
 class TensorChunk:
-    def __init__(self, tensor, offset=0, length=None):
+    def __init__(
+        self, 
+        tensor, 
+        offset=0, 
+        length=None
+    ):
         total_length = tensor.shape[-1]
         assert offset >= 0
         assert offset < total_length
@@ -99,7 +117,10 @@ class TensorChunk:
         pad_left = correct_start - start
         pad_right = end - correct_end
 
-        out = torch.nn.functional.pad(self.tensor[..., correct_start:correct_end], (pad_left, pad_right))
+        out = torch.nn.functional.pad(
+            self.tensor[..., correct_start:correct_end], 
+            (pad_left, pad_right)
+        )
 
         assert out.shape[-1] == target_length
         return out
@@ -110,7 +131,20 @@ def tensor_chunk(tensor_or_chunk):
         assert isinstance(tensor_or_chunk, torch.Tensor)
         return TensorChunk(tensor_or_chunk)
 
-def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power=1.0, static_shifts=1, set_progress_bar=None, device=None, progress=False, num_workers=0, pool=None):
+def apply_model(
+    model, 
+    mix, 
+    shifts=1, 
+    split=True, 
+    overlap=0.25, 
+    transition_power=1.0, 
+    static_shifts=1, 
+    set_progress_bar=None, 
+    device=None, 
+    progress=False, 
+    num_workers=0, 
+    pool=None
+):
     global fut_length, bag_num, prog_bar
 
     device = mix.device if device is None else torch.device(device)

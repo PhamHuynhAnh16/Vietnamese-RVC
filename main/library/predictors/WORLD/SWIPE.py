@@ -7,8 +7,14 @@ from matplotlib import mlab
 from scipy import interpolate
 from decimal import Decimal, ROUND_HALF_UP
 
-
-def swipe(x, fs, f0_floor=50, f0_ceil=1100, frame_period=10, sTHR=0.3):
+def swipe(
+    x, 
+    fs, 
+    f0_floor=50, 
+    f0_ceil=1100, 
+    frame_period=10, 
+    sTHR=0.3
+):
     plim = np.array([f0_floor, f0_ceil])
     t = np.arange(0, int(1000 * len(x) / fs / (frame_period) + 1)) * (frame_period / 1000)
 
@@ -26,8 +32,16 @@ def swipe(x, fs, f0_floor=50, f0_ceil=1100, frame_period=10, sTHR=0.3):
     fERBs = erbs2hz(np.arange(hz2erbs(pc[0] / 4), hz2erbs(fs / 2), 0.1))
 
     for i in range(len(ws)):
-        dn = round_matlab(4 * fs / p0[i]) 
-        X, f, ti = mlab.specgram(x=np.r_[np.zeros(int(ws[i] / 2)), np.r_[x, np.zeros(int(dn + ws[i] / 2))]], NFFT=ws[i], Fs=fs, window=np.hanning(ws[i] + 2)[1:-1], noverlap=max(0, np.round(ws[i] - dn)), mode='complex')
+        dn = round_matlab(4 * fs / p0[i])
+
+        X, f, ti = mlab.specgram(
+            x=np.r_[np.zeros(int(ws[i] / 2)), np.r_[x, np.zeros(int(dn + ws[i] / 2))]], 
+            NFFT=ws[i], 
+            Fs=fs, 
+            window=np.hanning(ws[i] + 2)[1:-1], noverlap=max(0, np.round(ws[i] - dn)), 
+            mode='complex'
+        )
+
         ti = np.r_[0, ti[:-1]]
         M = np.maximum(0, interpolate.interp1d(f, np.abs(X.T), kind='cubic')(fERBs)).T
 
@@ -42,7 +56,15 @@ def swipe(x, fs, f0_floor=50, f0_ceil=1100, frame_period=10, sTHR=0.3):
             k = np.arange(len(j))
 
         Si = pitchStrengthAllCandidates(fERBs, np.sqrt(M), pc[j])
-        Si = interpolate.interp1d(ti, Si, bounds_error=False, fill_value='nan')(t) if Si.shape[1] > 1 else np.full((len(Si), len(t)), np.nan)
+        Si = interpolate.interp1d(
+            ti, 
+            Si, 
+            bounds_error=False, 
+            fill_value='nan'
+        )(t) if Si.shape[1] > 1 else np.full(
+            (len(Si), len(t)), 
+            np.nan
+        )
 
         mu = np.ones(j.shape)
         mu[k] = 1 - np.abs(d[j[k]] - i - 1)
@@ -75,7 +97,11 @@ def swipe(x, fs, f0_floor=50, f0_ceil=1100, frame_period=10, sTHR=0.3):
             if len(I_) < 2: c[idx] = (S[I, j])[0] / ntc[0]
             else: c[idx] = np.polyfit(ntc[idx], (S[I_, j]), 2)
 
-            pval = np.polyval(c, ((1 / (2 ** np.arange(np.log2(pc[I[0]]), np.log2(pc[I[2]]) + 1 / 12 / 64, 1 / 12 / 64))) / tc[1] - 1) * 2 * np.pi)
+            pval = np.polyval(
+                c, 
+                ((1 / (2 ** np.arange(np.log2(pc[I[0]]), np.log2(pc[I[2]]) + 1 / 12 / 64, 1 / 12 / 64))) / tc[1] - 1) * 2 * np.pi
+            )
+
             s[j] = np.max(pval)
             p[j] = 2 ** (np.log2(pc[I[0]]) + (np.argmax(pval)) / 12 / 64)
 

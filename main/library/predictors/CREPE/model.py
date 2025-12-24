@@ -3,7 +3,7 @@ import functools
 
 PITCH_BINS = 360
 
-class MODEL(torch.nn.Module):
+class CREPEE(torch.nn.Module):
     def __init__(self, model='full'):
         super().__init__()
         in_channels = {"full": [1, 1024, 128, 128, 128, 256], "large": [1, 768, 96, 96, 96, 192], "medium": [1, 512, 64, 64, 64, 128], "small": [1, 256, 32, 32, 32, 64], "tiny": [1, 128, 16, 16, 16, 32]}[model]

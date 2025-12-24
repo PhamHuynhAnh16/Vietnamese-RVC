@@ -59,7 +59,10 @@ def send_discord_rpc(pipe):
                     "activity": {
                         "buttons": [{
                             "label": "Github", 
-                            "url": codecs.decode("uggcf://tvguho.pbz/CunzUhlauNau16/Ivrganzrfr-EIP", "rot13")
+                            "url": codecs.decode(
+                                "uggcf://tvguho.pbz/CunzUhlauNau16/Ivrganzrfr-EIP", 
+                                "rot13"
+                            )
                         }],
                         "details": translations["details"],
                         "timestamps": {

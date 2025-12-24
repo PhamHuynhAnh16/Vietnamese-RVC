@@ -20,9 +20,34 @@ class ResBlock(nn.Module):
     def __init__(self, channels, kernel_size = 7, dilation = (1, 3, 5), leaky_relu_slope = 0.2):
         super().__init__()
         self.leaky_relu_slope = leaky_relu_slope
-        self.convs1 = nn.ModuleList([weight_norm(nn.Conv1d(channels, channels, kernel_size, stride=1, dilation=d, padding=get_padding(kernel_size, d))) for d in dilation])
+        self.convs1 = nn.ModuleList([
+            weight_norm(
+                nn.Conv1d(
+                    channels, 
+                    channels, 
+                    kernel_size, 
+                    stride=1, 
+                    dilation=d, 
+                    padding=get_padding(kernel_size, d)
+                )
+            ) 
+            for d in dilation
+        ])
         self.convs1.apply(init_weights)
-        self.convs2 = nn.ModuleList([weight_norm(nn.Conv1d(channels, channels, kernel_size, stride=1, dilation=1, padding=get_padding(kernel_size, 1))) for _ in dilation])
+
+        self.convs2 = nn.ModuleList([
+            weight_norm(
+                nn.Conv1d(
+                    channels, 
+                    channels, 
+                    kernel_size, 
+                    stride=1, 
+                    dilation=1, 
+                    padding=get_padding(kernel_size, 1)
+                )
+            ) 
+            for _ in dilation
+        ])
         self.convs2.apply(init_weights)
 
     def forward(self, x):
@@ -40,7 +65,12 @@ class ResBlock(nn.Module):
             else: remove_weight_norm(c2)
 
 class AdaIN(nn.Module):
-    def __init__(self, *, channels, leaky_relu_slope = 0.2):
+    def __init__(
+        self, 
+        *, 
+        channels, 
+        leaky_relu_slope = 0.2
+    ):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(channels) * 1e-4)
         self.activation = nn.LeakyReLU(leaky_relu_slope)
@@ -49,13 +79,37 @@ class AdaIN(nn.Module):
         return self.activation(x + (torch.randn_like(x) * self.weight[None, :, None]))
     
 class ParallelResBlock(nn.Module):
-    def __init__(self, *, in_channels, out_channels, kernel_sizes = (3, 7, 11), dilation = (1, 3, 5), leaky_relu_slope = 0.2):
+    def __init__(
+        self, 
+        *, 
+        in_channels, 
+        out_channels, 
+        kernel_sizes = (3, 7, 11), 
+        dilation = (1, 3, 5), 
+        leaky_relu_slope = 0.2
+    ):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.input_conv = nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=7, stride=1, padding=3)
         self.input_conv.apply(init_weights)
-        self.blocks = nn.ModuleList([nn.Sequential(AdaIN(channels=out_channels), ResBlock(out_channels, kernel_size=kernel_size, dilation=dilation, leaky_relu_slope=leaky_relu_slope), AdaIN(channels=out_channels)) for kernel_size in kernel_sizes])
+        self.blocks = nn.ModuleList([
+            nn.Sequential(
+                AdaIN(
+                    channels=out_channels
+                ),
+                ResBlock(
+                    out_channels, 
+                    kernel_size=kernel_size, 
+                    dilation=dilation, 
+                    leaky_relu_slope=leaky_relu_slope
+                ), 
+                AdaIN(
+                    channels=out_channels
+                )
+            ) 
+            for kernel_size in kernel_sizes
+        ])
 
     def forward(self, x):
         x = self.input_conv(x)
@@ -66,14 +120,21 @@ class ParallelResBlock(nn.Module):
         for block in self.blocks:
             block[1].remove_weight_norm()
 
-class SineGenerator(nn.Module):
-    def __init__(self, samp_rate, harmonic_num=0, sine_amp=0.1, noise_std=0.003, voiced_threshold=0):
-        super(SineGenerator, self).__init__()
+class SineGen(nn.Module):
+    def __init__(
+        self, 
+        sampling_rate, 
+        harmonic_num=0, 
+        sine_amp=0.1, 
+        noise_std=0.003, 
+        voiced_threshold=0
+    ):
+        super(SineGen, self).__init__()
         self.sine_amp = sine_amp
         self.noise_std = noise_std
         self.harmonic_num = harmonic_num
         self.dim = self.harmonic_num + 1
-        self.sampling_rate = samp_rate
+        self.sampling_rate = sampling_rate
         self.voiced_threshold = voiced_threshold
         self.merge = nn.Sequential(nn.Linear(self.dim, 1, bias=False), nn.Tanh())
 
@@ -113,13 +174,24 @@ class SineGenerator(nn.Module):
         return self.merge(sine_waves)
     
 class RefineGANGenerator(nn.Module):
-    def __init__(self, *, sample_rate = 44100, upsample_rates = (8, 8, 2, 2), leaky_relu_slope = 0.2, num_mels = 128, start_channels = 16, gin_channels = 256, checkpointing = False, upsample_initial_channel = 512):
+    def __init__(
+        self, 
+        *, 
+        sample_rate = 44100, 
+        upsample_rates = (8, 8, 2, 2), 
+        leaky_relu_slope = 0.2, 
+        num_mels = 128, 
+        start_channels = 16, 
+        gin_channels = 256, 
+        checkpointing = False, 
+        upsample_initial_channel = 512
+    ):
         super().__init__()
         self.upsample_rates = upsample_rates
         self.checkpointing = checkpointing
         self.leaky_relu_slope = leaky_relu_slope
         self.upp = np.prod(upsample_rates)
-        self.m_source = SineGenerator(sample_rate)
+        self.m_source = SineGen(sample_rate)
         self.pre_conv = weight_norm(nn.Conv1d(1, 16, 7, 1, padding=3))
         channels = start_channels
         size = self.upp
@@ -146,8 +218,21 @@ class RefineGANGenerator(nn.Module):
 
         for rate in upsample_rates:
             new_channels = channels // 2
-            self.upsample_blocks.append(nn.Upsample(scale_factor=rate, mode="linear"))
-            self.upsample_conv_blocks.append(ParallelResBlock(in_channels=channels + channels // 4, out_channels=new_channels, kernel_sizes=(3, 7, 11), dilation=(1, 3, 5), leaky_relu_slope=leaky_relu_slope))
+            self.upsample_blocks.append(
+                nn.Upsample(
+                    scale_factor=rate, 
+                    mode="linear"
+                )
+            )
+            self.upsample_conv_blocks.append(
+                ParallelResBlock(
+                    in_channels=channels + channels // 4, 
+                    out_channels=new_channels, 
+                    kernel_sizes=(3, 7, 11), 
+                    dilation=(1, 3, 5), 
+                    leaky_relu_slope=leaky_relu_slope
+                )
+            )
             channels = new_channels
 
         self.conv_post = weight_norm(nn.Conv1d(channels, 1, 7, 1, padding=3, bias=False))
@@ -162,7 +247,16 @@ class RefineGANGenerator(nn.Module):
         for block, (old_size, new_size) in zip(self.downsample_blocks, self.df0):
             x = F.leaky_relu(x, self.leaky_relu_slope)
             downs.append(x)
-            x = torchaudio.functional.resample(x.contiguous(), orig_freq=int(f0_size * old_size), new_freq=int(f0_size * new_size), lowpass_filter_width=64, rolloff=0.9475937167399596, resampling_method="sinc_interp_kaiser", beta=14.769656459379492)
+
+            x = torchaudio.functional.resample(
+                x.contiguous(), 
+                orig_freq=int(f0_size * old_size), 
+                new_freq=int(f0_size * new_size), 
+                lowpass_filter_width=64, 
+                rolloff=0.9475937167399596, 
+                resampling_method="sinc_interp_kaiser", 
+                beta=14.769656459379492
+            )
             x = block(x)
 
         mel = self.mel_conv(mel)

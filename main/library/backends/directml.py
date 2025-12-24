@@ -26,7 +26,13 @@ def is_available():
     return torch_directml.is_available() if torch_available else False
 
 def empty_cache():
-    empty_cache_path = os.path.join("main", "library", "backends", "dml_empty_cache", "empty_cache.exe")
+    empty_cache_path = os.path.join(
+        "main", 
+        "library", 
+        "backends", 
+        "dml_empty_cache", 
+        "empty_cache.exe"
+    )
 
     if torch_available and os.path.exists(empty_cache_path):
         subprocess.run([empty_cache_path], capture_output=True, text=True)

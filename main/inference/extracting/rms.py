@@ -17,7 +17,13 @@ from main.app.variables import logger, translations
 from main.inference.extracting.setup_path import setup_paths
 
 class RMSEnergyExtractor(nn.Module):
-    def __init__(self, frame_length=2048, hop_length=512, center=True, pad_mode = "reflect"):
+    def __init__(
+        self, 
+        frame_length=2048, 
+        hop_length=512, 
+        center=True, 
+        pad_mode = "reflect"
+    ):
         super().__init__()
         self.frame_length = frame_length
         self.hop_length = hop_length
@@ -47,7 +53,10 @@ def process_file_rms(files, device, threads):
     threads = max(1, threads)
 
     module = RMSEnergyExtractor(
-        frame_length=2048, hop_length=160, center=True, pad_mode = "reflect"
+        frame_length=2048, 
+        hop_length=160, 
+        center=True, 
+        pad_mode = "reflect"
     ).to(device).eval().float()
 
     def worker(file_info):
@@ -59,9 +68,15 @@ def process_file_rms(files, device, threads):
             feats = torch.from_numpy(load_audio(file, 16000)).unsqueeze(0)
 
             with torch.no_grad():
-                feats = module(feats if device.startswith(("ocl", "privateuseone")) else feats.to(device))
+                feats = module(
+                    feats if device.startswith(("ocl", "privateuseone")) else feats.to(device)
+                )
                 
-            np.save(out_file_path, feats.float().cpu().numpy(), allow_pickle=False)
+            np.save(
+                out_file_path, 
+                feats.float().cpu().numpy(), 
+                allow_pickle=False
+            )
         except:
             logger.debug(traceback.format_exc())
 
@@ -72,13 +87,29 @@ def process_file_rms(files, device, threads):
 
 def run_rms_extraction(exp_dir, num_processes, devices, rms_extract):
     if rms_extract:
-        wav_path, out_path = setup_paths(exp_dir, rms_extract=rms_extract)
-        paths = sorted([(os.path.join(wav_path, file), out_path) for file in os.listdir(wav_path) if file.endswith(".wav")])
+        wav_path, out_path = setup_paths(
+            exp_dir, 
+            rms_extract=rms_extract
+        )
+
+        paths = sorted([
+            (os.path.join(wav_path, file), out_path) 
+            for file in os.listdir(wav_path) 
+            if file.endswith(".wav")
+        ])
 
         start_time = time.time()
         logger.info(translations["rms_start_extract"].format(num_processes=num_processes))
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=len(devices)) as executor:
-            concurrent.futures.wait([executor.submit(process_file_rms, paths[i::len(devices)], devices[i], num_processes // len(devices)) for i in range(len(devices))])
+            concurrent.futures.wait([
+                executor.submit(
+                    process_file_rms, 
+                    paths[i::len(devices)], 
+                    devices[i], 
+                    num_processes // len(devices)
+                ) 
+                for i in range(len(devices))
+            ])
 
         logger.info(translations["rms_success_extract"].format(elapsed_time=f"{(time.time() - start_time):.2f}"))

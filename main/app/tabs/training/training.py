@@ -5,7 +5,11 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations, configs
+from main.app.variables import (
+    configs, 
+    translations 
+)
+
 from main.app.tabs.training.child.training import training_model_tab
 from main.app.tabs.training.child.create_dataset import create_dataset_tab
 from main.app.tabs.training.child.create_reference import create_reference_tab

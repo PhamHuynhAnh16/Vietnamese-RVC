@@ -24,26 +24,46 @@ def get_amd_gpu_windows():
     gpus = ""
 
     try:
-        gpus = subprocess.check_output("wmic path win32_VideoController get name", shell=True, stderr=subprocess.DEVNULL)
+        gpus = subprocess.check_output(
+            "wmic path win32_VideoController get name", 
+            shell=True, 
+            stderr=subprocess.DEVNULL
+        )
     except subprocess.CalledProcessError:
-        gpus = subprocess.check_output('powershell "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"', shell=True, stderr=subprocess.DEVNULL)
+        gpus = subprocess.check_output(
+            'powershell "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"', 
+            shell=True, 
+            stderr=subprocess.DEVNULL
+        )
 
-    return [gpu.strip() for gpu in gpus.decode().split('\n')[1:] if check_amd_gpu(gpu)]
+    return [
+        gpu.strip() 
+        for gpu in gpus.decode().split('\n')[1:] 
+        if check_amd_gpu(gpu)
+    ]
 
 def get_amd_gpu_linux():
     try:
-        return [gpu for gpu in subprocess.check_output("lspci | grep VGA", shell=True).decode().split('\n') if check_amd_gpu(gpu)]
+        return [
+            gpu.strip() 
+            for gpu in subprocess.check_output("lspci | grep VGA", shell=True).decode().split('\n') 
+            if check_amd_gpu(gpu)
+        ]
     except:
         return []
 
 def get_gpu_list():
-    return (get_amd_gpu_windows() if platform.system() == "Windows" else get_amd_gpu_linux()) if torch_available else []
+    return (
+        get_amd_gpu_windows() if platform.system() == "Windows" else get_amd_gpu_linux()
+    ) if torch_available else []
 
 def device_count():
     return len(get_gpu_list()) if torch_available else 0
 
 def device_name(device_id = 0):
-    return (get_gpu_list()[device_id] if device_id >= 0 and device_id < device_count() else "") if torch_available else ""
+    return (
+        get_gpu_list()[device_id] if device_id >= 0 and device_id < device_count() else ""
+    ) if torch_available else ""
 
 def is_available():
     return (device_count() > 0) if torch_available else False

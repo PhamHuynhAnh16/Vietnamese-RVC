@@ -25,7 +25,17 @@ def get_padding_elem(L_in, stride, kernel_size, dilation):
     return padding
 
 class _BatchNorm1d(nn.Module):
-    def __init__(self, input_shape=None, input_size=None, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True, combine_batch_time=False, skip_transpose=False):
+    def __init__(
+        self, 
+        input_shape=None, 
+        input_size=None, 
+        eps=1e-05, 
+        momentum=0.1, 
+        affine=True, 
+        track_running_stats=True, 
+        combine_batch_time=False, 
+        skip_transpose=False
+    ):
         super().__init__()
         self.combine_batch_time = combine_batch_time
         self.skip_transpose = skip_transpose
@@ -33,12 +43,23 @@ class _BatchNorm1d(nn.Module):
         if input_size is None and skip_transpose: input_size = input_shape[1]
         elif input_size is None: input_size = input_shape[-1]
 
-        self.norm = nn.BatchNorm1d(input_size, eps=eps, momentum=momentum, affine=affine, track_running_stats=track_running_stats)
+        self.norm = nn.BatchNorm1d(
+            input_size, 
+            eps=eps, 
+            momentum=momentum, 
+            affine=affine, 
+            track_running_stats=track_running_stats
+        )
 
     def forward(self, x):
         shape_or = x.shape
 
-        if self.combine_batch_time:x = x.reshape(shape_or[0] * shape_or[1], shape_or[2]) if x.ndim == 3 else x.reshape(shape_or[0] * shape_or[1], shape_or[3], shape_or[2])
+        if self.combine_batch_time: 
+            x = (
+                x.reshape(shape_or[0] * shape_or[1], shape_or[2]) 
+            ) if x.ndim == 3 else (
+                x.reshape(shape_or[0] * shape_or[1], shape_or[3], shape_or[2])
+            )
         elif not self.skip_transpose: x = x.transpose(-1, 1)
 
         x_n = self.norm(x)
@@ -49,7 +70,23 @@ class _BatchNorm1d(nn.Module):
         return x_n
 
 class _Conv1d(nn.Module):
-    def __init__(self, out_channels, kernel_size, input_shape=None, in_channels=None, stride=1, dilation=1, padding="same", groups=1, bias=True, padding_mode="reflect", skip_transpose=False, weight_norm=False, conv_init=None, default_padding=0):
+    def __init__(
+        self, 
+        out_channels, 
+        kernel_size, 
+        input_shape=None, 
+        in_channels=None, 
+        stride=1, 
+        dilation=1, 
+        padding="same", 
+        groups=1, 
+        bias=True, 
+        padding_mode="reflect", 
+        skip_transpose=False, 
+        weight_norm=False,
+        conv_init=None, 
+        default_padding=0
+    ):
         super().__init__()
         self.kernel_size = kernel_size
         self.stride = stride
@@ -63,7 +100,16 @@ class _Conv1d(nn.Module):
         if in_channels is None: in_channels = self._check_input_shape(input_shape)
 
         self.in_channels = in_channels
-        self.conv = nn.Conv1d(in_channels, out_channels, self.kernel_size, stride=self.stride, dilation=self.dilation, padding=default_padding, groups=groups, bias=bias)
+        self.conv = nn.Conv1d(
+            in_channels, 
+            out_channels, 
+            self.kernel_size, 
+            stride=self.stride, 
+            dilation=self.dilation, 
+            padding=default_padding, 
+            groups=groups, 
+            bias=bias
+        )
 
         if conv_init == "kaiming": nn.init.kaiming_normal_(self.conv.weight)
         elif conv_init == "zero": nn.init.zeros_(self.conv.weight)
@@ -75,8 +121,18 @@ class _Conv1d(nn.Module):
         if not self.skip_transpose: x = x.transpose(1, -1)
         if self.unsqueeze: x = x.unsqueeze(1)
 
-        if self.padding == "same": x = self._manage_padding(x, self.kernel_size, self.dilation, self.stride)
-        elif self.padding == "causal": x = F.pad(x, ((self.kernel_size - 1) * self.dilation, 0))
+        if self.padding == "same": 
+            x = self._manage_padding(
+                x, 
+                self.kernel_size, 
+                self.dilation, 
+                self.stride
+            )
+        elif self.padding == "causal": 
+            x = F.pad(
+                x, 
+                ((self.kernel_size - 1) * self.dilation, 0)
+            )
         elif self.padding == "valid": pass
         else: raise ValueError
 
@@ -88,7 +144,16 @@ class _Conv1d(nn.Module):
         return wx
 
     def _manage_padding(self, x, kernel_size, dilation, stride):
-        return F.pad(x, get_padding_elem(self.in_channels, stride, kernel_size, dilation), mode=self.padding_mode)
+        return F.pad(
+            x, 
+            get_padding_elem(
+                self.in_channels, 
+                stride, 
+                kernel_size, 
+                dilation
+            ), 
+            mode=self.padding_mode
+        )
 
     def _check_input_shape(self, shape):
         if len(shape) == 2:
@@ -105,7 +170,15 @@ class _Conv1d(nn.Module):
         self.conv = nn.utils.remove_weight_norm(self.conv)
 
 class Linear(torch.nn.Module):
-    def __init__(self, n_neurons, input_shape=None, input_size=None, bias=True, max_norm=None, combine_dims=False):
+    def __init__(
+        self, 
+        n_neurons, 
+        input_shape=None, 
+        input_size=None, 
+        bias=True, 
+        max_norm=None, 
+        combine_dims=False
+    ):
         super().__init__()
         self.max_norm = max_norm
         self.combine_dims = combine_dims
@@ -124,17 +197,49 @@ class Linear(torch.nn.Module):
         return self.w(x)
 
 class Conv1d(_Conv1d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(skip_transpose=True, *args, **kwargs)
+    def __init__(
+        self, 
+        *args, 
+        **kwargs
+    ):
+        super().__init__(
+            skip_transpose=True, 
+            *args, 
+            **kwargs
+        )
 
 class BatchNorm1d(_BatchNorm1d):
-    def __init__(self, *args, **kwargs):
-        super().__init__(skip_transpose=True, *args, **kwargs)
+    def __init__(
+        self, 
+        *args, 
+        **kwargs
+    ):
+        super().__init__(
+            skip_transpose=True, 
+            *args, 
+            **kwargs
+        )
 
 class TDNNBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, dilation, activation=nn.ReLU, groups=1, dropout=0.0):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        kernel_size, 
+        dilation, 
+        activation=nn.ReLU, 
+        groups=1, 
+        dropout=0.0
+    ):
         super().__init__()
-        self.conv = Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, dilation=dilation, groups=groups)
+        self.conv = Conv1d(
+            in_channels=in_channels, 
+            out_channels=out_channels, 
+            kernel_size=kernel_size, 
+            dilation=dilation, 
+            groups=groups
+        )
+
         self.activation = activation()
         self.norm = BatchNorm1d(input_size=out_channels)
         self.dropout = nn.Dropout1d(p=dropout)
@@ -143,13 +248,30 @@ class TDNNBlock(nn.Module):
         return self.dropout(self.norm(self.activation(self.conv(x))))
 
 class Res2NetBlock(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, scale=8, kernel_size=3, dilation=1, dropout=0.0):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        scale=8, 
+        kernel_size=3, 
+        dilation=1, 
+        dropout=0.0
+    ):
         super().__init__()
         assert in_channels % scale == 0
         assert out_channels % scale == 0
         in_channel = in_channels // scale
         hidden_channel = out_channels // scale
-        self.blocks = nn.ModuleList([TDNNBlock(in_channel, hidden_channel, kernel_size=kernel_size, dilation=dilation, dropout=dropout) for _ in range(scale - 1)])
+        self.blocks = nn.ModuleList([
+            TDNNBlock(
+                in_channel, 
+                hidden_channel, 
+                kernel_size=kernel_size, 
+                dilation=dilation, 
+                dropout=dropout
+            ) 
+            for _ in range(scale - 1)
+        ])
         self.scale = scale
 
     def forward(self, x):
@@ -165,32 +287,74 @@ class Res2NetBlock(torch.nn.Module):
         return torch.cat(y, dim=1)
 
 class SEBlock(nn.Module):
-    def __init__(self, in_channels, se_channels, out_channels):
+    def __init__(
+        self, 
+        in_channels, 
+        se_channels, 
+        out_channels
+    ):
         super().__init__()
 
-        self.conv1 = Conv1d(in_channels=in_channels, out_channels=se_channels, kernel_size=1)
+        self.conv1 = Conv1d(
+            in_channels=in_channels, 
+            out_channels=se_channels, 
+            kernel_size=1
+        )
         self.relu = torch.nn.ReLU(inplace=True)
-        self.conv2 = Conv1d(in_channels=se_channels, out_channels=out_channels, kernel_size=1)
+
+        self.conv2 = Conv1d(
+            in_channels=se_channels, 
+            out_channels=out_channels, 
+            kernel_size=1
+        )
         self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self, x, lengths=None):
         L = x.shape[-1]
 
         if lengths is not None:
-            mask = length_to_mask(lengths * L, max_len=L, device=x.device).unsqueeze(1)
+            mask = length_to_mask(
+                lengths * L, 
+                max_len=L, 
+                device=x.device
+            ).unsqueeze(1)
+
             s = (x * mask).sum(dim=2, keepdim=True) / mask.sum(dim=2, keepdim=True)
         else: s = x.mean(dim=2, keepdim=True)
 
         return self.sigmoid(self.conv2(self.relu(self.conv1(s)))) * x
 
 class AttentiveStatisticsPooling(nn.Module):
-    def __init__(self, channels, attention_channels=128, global_context=True):
+    def __init__(
+        self, 
+        channels, 
+        attention_channels=128, 
+        global_context=True
+    ):
         super().__init__()
         self.eps = 1e-12
         self.global_context = global_context
-        self.tdnn = TDNNBlock(channels * 3, attention_channels, 1, 1) if global_context else TDNNBlock(channels, attention_channels, 1, 1)
+        self.tdnn = (
+            TDNNBlock(
+                channels * 3, 
+                attention_channels, 
+                1, 
+                1
+            )
+        ) if global_context else (
+            TDNNBlock(
+                channels, 
+                attention_channels, 
+                1, 
+                1
+            )
+        )
         self.tanh = nn.Tanh()
-        self.conv = Conv1d(in_channels=attention_channels, out_channels=channels, kernel_size=1)
+        self.conv = Conv1d(
+            in_channels=attention_channels, 
+            out_channels=channels, 
+            kernel_size=1
+        )
 
     def forward(self, x, lengths=None):
         L = x.shape[-1]
@@ -203,30 +367,90 @@ class AttentiveStatisticsPooling(nn.Module):
         mask = length_to_mask(lengths * L, max_len=L, device=x.device).unsqueeze(1)
 
         if self.global_context:
-            mean, std = _compute_statistics(x, mask / mask.sum(dim=2, keepdim=True).float())
-            attn = torch.cat([x, mean.unsqueeze(2).repeat(1, 1, L), std.unsqueeze(2).repeat(1, 1, L)], dim=1)
+            mean, std = _compute_statistics(
+                x, 
+                mask / mask.sum(dim=2, keepdim=True).float()
+            )
+
+            attn = torch.cat([
+                x, 
+                mean.unsqueeze(2).repeat(1, 1, L), 
+                std.unsqueeze(2).repeat(1, 1, L)
+            ], dim=1)
         else: attn = x
 
-        mean, std = _compute_statistics(x, F.softmax(self.conv(self.tanh(self.tdnn(attn))).masked_fill(mask == 0, float("-inf")), dim=2))
+        mean, std = _compute_statistics(
+            x, 
+            F.softmax(
+                self.conv(
+                    self.tanh(self.tdnn(attn))
+                ).masked_fill(mask == 0, float("-inf")), 
+                dim=2
+            )
+        )
         return torch.cat((mean, std), dim=1).unsqueeze(2)
 
 class SERes2NetBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, res2net_scale=8, se_channels=128, kernel_size=1, dilation=1, activation=torch.nn.ReLU, groups=1, dropout=0.0):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        res2net_scale=8, 
+        se_channels=128, 
+        kernel_size=1, 
+        dilation=1, 
+        activation=torch.nn.ReLU, 
+        groups=1, 
+        dropout=0.0
+    ):
         super().__init__()
         self.out_channels = out_channels
-        self.tdnn1 = TDNNBlock(in_channels, out_channels, kernel_size=1, dilation=1, activation=activation, groups=groups, dropout=dropout)
-        self.res2net_block = Res2NetBlock(out_channels, out_channels, res2net_scale, kernel_size, dilation)
-        self.tdnn2 = TDNNBlock(out_channels, out_channels, kernel_size=1, dilation=1, activation=activation, groups=groups, dropout=dropout)
-        self.se_block = SEBlock(out_channels, se_channels, out_channels)
+        self.tdnn1 = TDNNBlock(
+            in_channels, 
+            out_channels, 
+            kernel_size=1, 
+            dilation=1, 
+            activation=activation, 
+            groups=groups, dropout=dropout
+        )
+        self.res2net_block = Res2NetBlock(
+            out_channels, 
+            out_channels, 
+            res2net_scale, 
+            kernel_size, 
+            dilation
+        )
+        self.tdnn2 = TDNNBlock(
+            out_channels, 
+            out_channels, 
+            kernel_size=1, 
+            dilation=1, 
+            activation=activation, 
+            groups=groups, 
+            dropout=dropout
+        )
+        self.se_block = SEBlock(
+            out_channels, 
+            se_channels, 
+            out_channels
+        )
 
         self.shortcut = None
-        if in_channels != out_channels: self.shortcut = Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
+        if in_channels != out_channels: 
+            self.shortcut = Conv1d(
+                in_channels=in_channels, 
+                out_channels=out_channels, 
+                kernel_size=1
+            )
 
     def forward(self, x, lengths=None):
         residual = x
         if self.shortcut: residual = self.shortcut(x)
 
-        return self.se_block(self.tdnn2(self.res2net_block(self.tdnn1(x))), lengths) + residual
+        return self.se_block(
+            self.tdnn2(self.res2net_block(self.tdnn1(x))), 
+            lengths
+        ) + residual
 
 class ECAPA_TDNN(torch.nn.Module):
     def __init__(
@@ -251,15 +475,58 @@ class ECAPA_TDNN(torch.nn.Module):
 
         self.channels = channels
         self.blocks = nn.ModuleList()
-        self.blocks.append(TDNNBlock(input_size, channels[0], kernel_sizes[0], dilations[0], activation, groups[0], dropout))
+        self.blocks.append(
+            TDNNBlock(
+                input_size, 
+                channels[0], 
+                kernel_sizes[0], 
+                dilations[0], 
+                activation, 
+                groups[0], 
+                dropout
+            )
+        )
 
         for i in range(1, len(channels) - 1):
-            self.blocks.append(SERes2NetBlock(channels[i - 1], channels[i], res2net_scale=res2net_scale, se_channels=se_channels, kernel_size=kernel_sizes[i], dilation=dilations[i], activation=activation, groups=groups[i], dropout=dropout))
+            self.blocks.append(
+                SERes2NetBlock(
+                    channels[i - 1], 
+                    channels[i], 
+                    res2net_scale=res2net_scale, 
+                    se_channels=se_channels, 
+                    kernel_size=kernel_sizes[i], 
+                    dilation=dilations[i], 
+                    activation=activation, 
+                    groups=groups[i], 
+                    dropout=dropout
+                )
+            )
 
-        self.mfa = TDNNBlock(channels[-2] * (len(channels) - 2), channels[-1], kernel_sizes[-1], dilations[-1], activation, groups=groups[-1], dropout=dropout)
-        self.asp = AttentiveStatisticsPooling(channels[-1], attention_channels=attention_channels, global_context=global_context)
-        self.asp_bn = BatchNorm1d(input_size=channels[-1] * 2)
-        self.fc = Conv1d(in_channels=channels[-1] * 2, out_channels=lin_neurons, kernel_size=1)
+        self.mfa = TDNNBlock(
+            channels[-2] * (len(channels) - 2), 
+            channels[-1], 
+            kernel_sizes[-1], 
+            dilations[-1], 
+            activation, 
+            groups=groups[-1], 
+            dropout=dropout
+        )
+
+        self.asp = AttentiveStatisticsPooling(
+            channels[-1], 
+            attention_channels=attention_channels, 
+            global_context=global_context
+        )
+
+        self.asp_bn = BatchNorm1d(
+            input_size=channels[-1] * 2
+        )
+
+        self.fc = Conv1d(
+            in_channels=channels[-1] * 2, 
+            out_channels=lin_neurons, 
+            kernel_size=1
+        )
 
     def forward(self, x, lengths=None):
         x = x.transpose(1, 2)
@@ -273,22 +540,44 @@ class ECAPA_TDNN(torch.nn.Module):
 
             xl.append(x)
 
-        return self.fc(self.asp_bn(self.asp(self.mfa(torch.cat(xl[1:], dim=1)), lengths=lengths))).transpose(1, 2)
+        return self.fc(
+            self.asp_bn(self.asp(self.mfa(torch.cat(xl[1:], dim=1)), lengths=lengths))
+        ).transpose(1, 2)
 
 class Classifier(torch.nn.Module):
-    def __init__(self, input_size, device="cpu", lin_blocks=0, lin_neurons=192, out_neurons=1211):
+    def __init__(
+        self, 
+        input_size, 
+        device="cpu", 
+        lin_blocks=0, 
+        lin_neurons=192, 
+        out_neurons=1211
+    ):
         super().__init__()
         self.blocks = nn.ModuleList()
 
         for _ in range(lin_blocks):
-            self.blocks.extend([_BatchNorm1d(input_size=input_size), Linear(input_size=input_size, n_neurons=lin_neurons)])
+            self.blocks.extend([
+                _BatchNorm1d(input_size=input_size), 
+                Linear(input_size=input_size, n_neurons=lin_neurons)
+            ])
             input_size = lin_neurons
 
-        self.weight = nn.Parameter(torch.FloatTensor(out_neurons, input_size, device=device))
+        self.weight = nn.Parameter(
+            torch.FloatTensor(
+                out_neurons, 
+                input_size, 
+                device=device
+            )
+        )
+
         nn.init.xavier_uniform_(self.weight)
 
     def forward(self, x):
         for layer in self.blocks:
             x = layer(x)
 
-        return F.linear(F.normalize(x.squeeze(1)), F.normalize(self.weight)).unsqueeze(1)
+        return F.linear(
+            F.normalize(x.squeeze(1)), 
+            F.normalize(self.weight)
+        ).unsqueeze(1)

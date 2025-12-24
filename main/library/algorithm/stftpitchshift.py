@@ -197,6 +197,7 @@ class StftPitchShift:
 
         if np.issubdtype(dtype, np.integer):
             a, b = np.iinfo(dtype).min, np.iinfo(dtype).max
+
             input = ((input.astype(float) - a) / (b - a)) * 2 - 1
         elif not np.issubdtype(dtype, np.floating): raise TypeError('not np.issubdtype(dtype, np.floating)')
 
@@ -210,7 +211,16 @@ class StftPitchShift:
         factors = np.asarray(factors).flatten()
         quefrency = int(quefrency * samplerate)
 
-        frames = encode(stft(input, framesize, hopsize), framesize, hopsize, samplerate)
+        frames = encode(
+            stft(
+                input, 
+                framesize, 
+                hopsize
+            ), 
+            framesize, 
+            hopsize, 
+            samplerate
+        )
 
         if normalization: frames0 = frames.copy()
 
@@ -229,18 +239,28 @@ class StftPitchShift:
 
                 mask = isnotnormal(envelopes)
 
-            frames = shiftpitch(frames, factors, samplerate)
+            frames = shiftpitch(
+                frames, 
+                factors, 
+                samplerate
+            )
+
             frames.real *= envelopes
             frames.real[mask] = 0
         else: frames = shiftpitch(frames, factors, samplerate)
 
-        if normalization: frames = normalize(frames, frames0)
+        if normalization: 
+            frames = normalize(
+                frames, 
+                frames0
+            )
 
         output = istft(decode(frames, framesize, hopsize, samplerate), framesize, hopsize)
         output.resize(shape, refcheck=False)
 
         if np.issubdtype(dtype, np.integer):
             a, b = np.iinfo(dtype).min, np.iinfo(dtype).max
+
             output = (((output + 1) / 2) * (b - a) + a).clip(a, b).astype(dtype)
         elif output.dtype != dtype: output = output.astype(dtype)
 

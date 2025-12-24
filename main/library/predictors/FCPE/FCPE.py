@@ -102,7 +102,16 @@ def cents_local_decoder(cent_table, y, n_out, confidence, threshold = 0.05, mask
     return (rtn, confident) if confidence else rtn
 
 class PCmer(nn.Module):
-    def __init__(self, num_layers, num_heads, dim_model, dim_keys, dim_values, residual_dropout, attention_dropout):
+    def __init__(
+        self, 
+        num_layers, 
+        num_heads, 
+        dim_model, 
+        dim_keys, 
+        dim_values, 
+        residual_dropout, 
+        attention_dropout
+    ):
         super().__init__()
         self.num_layers = num_layers
         self.num_heads = num_heads
@@ -120,7 +129,21 @@ class PCmer(nn.Module):
         return phone
 
 class CFNaiveMelPE(nn.Module):
-    def __init__(self, input_channels, out_dims, hidden_dims = 512, n_layers = 6, n_heads = 8, f0_max = 1975.5, f0_min = 32.70, use_fa_norm = False, conv_only = False, conv_dropout = 0, atten_dropout = 0, use_harmonic_emb = False):
+    def __init__(
+        self, 
+        input_channels, 
+        out_dims, 
+        hidden_dims = 512, 
+        n_layers = 6, 
+        n_heads = 8, 
+        f0_max = 1975.5, 
+        f0_min = 32.70, 
+        use_fa_norm = False, 
+        conv_only = False, 
+        conv_dropout = 0, 
+        atten_dropout = 0, 
+        use_harmonic_emb = False
+    ):
         super().__init__()
         self.input_channels = input_channels
         self.out_dims = out_dims
@@ -133,8 +156,36 @@ class CFNaiveMelPE(nn.Module):
         self.residual_dropout = 0.1  
         self.attention_dropout = 0.1  
         self.harmonic_emb = nn.Embedding(9, hidden_dims) if use_harmonic_emb else None
-        self.input_stack = nn.Sequential(nn.Conv1d(input_channels, hidden_dims, 3, 1, 1), nn.GroupNorm(4, hidden_dims), nn.LeakyReLU(), nn.Conv1d(hidden_dims, hidden_dims, 3, 1, 1))
-        self.net = ConformerNaiveEncoder(num_layers=n_layers, num_heads=n_heads, dim_model=hidden_dims, use_norm=use_fa_norm, conv_only=conv_only, conv_dropout=conv_dropout, atten_dropout=atten_dropout)
+        self.input_stack = nn.Sequential(
+            nn.Conv1d(
+                input_channels, 
+                hidden_dims, 
+                3, 
+                1, 
+                1
+            ), 
+            nn.GroupNorm(
+                4, 
+                hidden_dims
+            ), 
+            nn.LeakyReLU(), 
+            nn.Conv1d(
+                hidden_dims, 
+                hidden_dims, 
+                3, 
+                1, 
+                1
+            )
+        )
+        self.net = ConformerNaiveEncoder(
+            num_layers=n_layers, 
+            num_heads=n_heads, 
+            dim_model=hidden_dims, 
+            use_norm=use_fa_norm, 
+            conv_only=conv_only, 
+            conv_dropout=conv_dropout, 
+            atten_dropout=atten_dropout
+        )
         self.norm = nn.LayerNorm(hidden_dims)
         self.output_proj = weight_norm(nn.Linear(hidden_dims, out_dims))
         self.cent_table_b = torch.linspace(f0_to_cent(torch.Tensor([f0_min]))[0], f0_to_cent(torch.Tensor([f0_max]))[0], out_dims).detach()
@@ -144,13 +195,35 @@ class CFNaiveMelPE(nn.Module):
 
     def forward(self, x, _h_emb=None):
         x = self.input_stack(x.transpose(-1, -2)).transpose(-1, -2)
-        if self.harmonic_emb is not None: x = x + self.harmonic_emb(torch.LongTensor([0]).to(x.device)) if _h_emb is None else x + self.harmonic_emb(torch.LongTensor([int(_h_emb)]).to(x.device))
+
+        if self.harmonic_emb is not None:
+            if _h_emb is None:
+                x += self.harmonic_emb(torch.LongTensor([0]).to(x.device))
+            else:
+                x += self.harmonic_emb(torch.LongTensor([int(_h_emb)]).to(x.device))
+
         return self.output_proj(self.norm(self.net(x))).sigmoid()
 
     @torch.no_grad()
     def infer(self, mel, decoder = "local_argmax", threshold = 0.05):
         latent = self.forward(mel)
-        return cent_to_f0(latent2cents_decoder(self.cent_table, latent, threshold=threshold) if decoder == "argmax" else latent2cents_local_decoder(self.cent_table, self.out_dims, latent, threshold=threshold))
+
+        return cent_to_f0(
+            (
+                latent2cents_decoder(
+                    self.cent_table, 
+                    latent, 
+                    threshold=threshold
+                )
+            ) if decoder == "argmax" else (
+                latent2cents_local_decoder(
+                    self.cent_table, 
+                    self.out_dims, 
+                    latent, 
+                    threshold=threshold
+                )
+            )
+        )
 
 class FCPE_LEGACY(nn.Module):
     def __init__(
@@ -194,24 +267,64 @@ class FCPE_LEGACY(nn.Module):
 
         if not infer:
             loss_all = self.loss_mse_scale * F.binary_cross_entropy(x, self.gaussian_blurred_cent(f0_to_cent(gt_f0)))
-            if self.loss_l2_regularization: loss_all = loss_all + l2_regularization(model=self, l2_alpha=self.loss_l2_regularization_scale)
+
+            if self.loss_l2_regularization: 
+                loss_all += l2_regularization(
+                    model=self, 
+                    l2_alpha=self.loss_l2_regularization_scale
+                )
+
             x = loss_all
         else:
-            x = cent_to_f0(cents_decoder(self.cent_table, x, self.confidence, threshold=self.threshold, mask=True) if cdecoder == "argmax" else cents_local_decoder(self.cent_table, x, self.n_out, self.confidence, threshold=self.threshold, mask=True))
+            x = cent_to_f0(
+                (
+                    cents_decoder(
+                        self.cent_table, 
+                        x, 
+                        self.confidence, 
+                        threshold=self.threshold, 
+                        mask=True
+                    )
+                ) if cdecoder == "argmax" else (
+                    cents_local_decoder(
+                        self.cent_table, 
+                        x, 
+                        self.n_out, 
+                        self.confidence, 
+                        threshold=self.threshold, 
+                        mask=True
+                    )
+                )
+            )
+
             x = (1 + x / 700).log() if not return_hz_f0 else x
 
         if output_interp_target_length is not None: 
-            x = F.interpolate(torch.where(x == 0, float("nan"), x).transpose(1, 2), size=int(output_interp_target_length), mode="linear").transpose(1, 2)
+            x = F.interpolate(
+                torch.where(x == 0, float("nan"), x).transpose(1, 2), 
+                size=int(output_interp_target_length), 
+                mode="linear"
+            ).transpose(1, 2)
+
             x = torch.where(x.isnan(), float(0.0), x)
 
         return x
 
     def gaussian_blurred_cent(self, cents):
         B, N, _ = cents.size()
-        return (-(self.cent_table[None, None, :].expand(B, N, -1) - cents).square() / 1250).exp() * (cents > 0.1) & (cents < (1200.0 * np.log2(self.f0_max / 10.0))).float()
+
+        return (
+            -(self.cent_table[None, None, :].expand(B, N, -1) - cents).square() / 1250
+        ).exp() * (cents > 0.1) & (
+            cents < (1200.0 * np.log2(self.f0_max / 10.0))
+        ).float()
 
 class InferCFNaiveMelPE(torch.nn.Module):
-    def __init__(self, args, state_dict):
+    def __init__(
+        self, 
+        args, 
+        state_dict
+    ):
         super().__init__()
         self.model = CFNaiveMelPE(
             input_channels=args.mel.num_mels, 
@@ -238,24 +351,55 @@ class InferCFNaiveMelPE(torch.nn.Module):
 
         return f0s 
 
-    def infer(self, mel, decoder_mode = "local_argmax", threshold = 0.006, f0_min = None, f0_max = None, interp_uv = False, output_interp_target_length = None, return_uv = False):
+    def infer(
+        self, 
+        mel, 
+        decoder_mode = "local_argmax", 
+        threshold = 0.006, 
+        f0_min = None, 
+        f0_max = None, 
+        interp_uv = False, 
+        output_interp_target_length = None, 
+        return_uv = False
+    ):
         f0 = self.__call__(mel, decoder_mode, threshold)
         f0_for_uv = f0
 
         uv = (f0_for_uv < f0_min).type(f0_for_uv.dtype)
         f0 = f0 * (1 - uv)
 
-        if interp_uv: f0 = batch_interp_with_replacement_detach(uv.squeeze(-1).bool(), f0.squeeze(-1)).unsqueeze(-1)
+        if interp_uv: 
+            f0 = batch_interp_with_replacement_detach(
+                uv.squeeze(-1).bool(), 
+                f0.squeeze(-1)
+            ).unsqueeze(-1)
+
         if f0_max is not None: f0[f0 > f0_max] = f0_max
+
         if output_interp_target_length is not None: 
-            f0 = F.interpolate(torch.where(f0 == 0, float("nan"), f0).transpose(1, 2), size=int(output_interp_target_length), mode="linear").transpose(1, 2)
+            f0 = F.interpolate(
+                torch.where(f0 == 0, float("nan"), f0).transpose(1, 2), 
+                size=int(output_interp_target_length), 
+                mode="linear"
+            ).transpose(1, 2)
+
             f0 = torch.where(f0.isnan(), float(0.0), f0)
 
         if return_uv: return f0, F.interpolate(uv.transpose(1, 2), size=int(output_interp_target_length), mode="nearest").transpose(1, 2)
         else: return f0
 
 class FCPEInfer_LEGACY:
-    def __init__(self, configs, model_path, device=None, dtype=torch.float32, providers=None, onnx=False, f0_min=50, f0_max=1100):
+    def __init__(
+        self, 
+        configs, 
+        model_path, 
+        device=None, 
+        dtype=torch.float32, 
+        providers=None, 
+        onnx=False, 
+        f0_min=50, 
+        f0_max=1100
+    ):
         if device is None: device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.dtype = dtype
@@ -318,7 +462,17 @@ class FCPEInfer_LEGACY:
             )
 
 class FCPEInfer:
-    def __init__(self, configs, model_path, device=None, dtype=torch.float32, providers=None, onnx=False, f0_min=50, f0_max=1100):
+    def __init__(
+        self, 
+        configs, 
+        model_path, 
+        device=None, 
+        dtype=torch.float32, 
+        providers=None, 
+        onnx=False, 
+        f0_min=50, 
+        f0_max=1100
+    ):
         if device is None: device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.dtype = dtype
@@ -365,7 +519,21 @@ class FCPEInfer:
             )
 
 class FCPE:
-    def __init__(self, configs, model_path, hop_length=512, f0_min=50, f0_max=1100, dtype=torch.float32, device=None, sample_rate=16000, threshold=0.05, providers=None, onnx=False, legacy=False):
+    def __init__(
+        self, 
+        configs, 
+        model_path, 
+        hop_length=512, 
+        f0_min=50, 
+        f0_max=1100, 
+        dtype=torch.float32, 
+        device=None, 
+        sample_rate=16000, 
+        threshold=0.05, 
+        providers=None, 
+        onnx=False, 
+        legacy=False
+    ):
         self.model = FCPEInfer_LEGACY if legacy else FCPEInfer
         self.fcpe = self.model(configs, model_path, device=device, dtype=dtype, providers=providers, onnx=onnx, f0_min=f0_min, f0_max=f0_max)
         self.hop_length = hop_length

@@ -7,13 +7,21 @@ class Timeline:
     def from_df(cls, df, uri = None):
         return cls(segments=list(df['segment']), uri=uri)
 
-    def __init__(self, segments = None, uri = None):
+    def __init__(
+        self, 
+        segments = None, 
+        uri = None
+    ):
         if segments is None: segments = ()
         segments_set = set([segment for segment in segments if segment])
 
         self.segments_set_ = segments_set
         self.segments_list_ = SortedList(segments_set)
-        self.segments_boundaries_ = SortedList((boundary for segment in segments_set for boundary in segment))
+        self.segments_boundaries_ = SortedList((
+            boundary 
+            for segment in segments_set 
+            for boundary in segment
+        ))
         self.uri = uri
 
     def __len__(self):
@@ -77,7 +85,11 @@ class Timeline:
         segments_set |= timeline.segments_set_
 
         self.segments_list_ = SortedList(segments_set)
-        self.segments_boundaries_ = SortedList((boundary for segment in segments_set for boundary in segment))
+        self.segments_boundaries_ = SortedList((
+            boundary 
+            for segment in segments_set 
+            for boundary in segment
+        ))
 
         return self
 
@@ -85,7 +97,10 @@ class Timeline:
         return self.union(timeline)
 
     def union(self, timeline):
-        return Timeline(segments=self.segments_set_ | timeline.segments_set_, uri=self.uri)
+        return Timeline(
+            segments=self.segments_set_ | timeline.segments_set_, 
+            uri=self.uri
+        )
 
     def co_iter(self, other):
         for segment in self.segments_list_:
@@ -99,9 +114,16 @@ class Timeline:
         if not isinstance(support, (Segment, Timeline)): raise TypeError
 
         if isinstance(support, Segment):
-            support = Timeline(segments=([support] if support else []), uri=self.uri)
+            support = Timeline(
+                segments=([support] if support else []), 
+                uri=self.uri
+            )
 
-            for yielded in self.crop_iter(support, mode=mode, returns_mapping=returns_mapping):
+            for yielded in self.crop_iter(
+                support, 
+                mode=mode, 
+                returns_mapping=returns_mapping
+            ):
                 yield yielded
 
             return
@@ -131,7 +153,11 @@ class Timeline:
         if mode == 'intersection' and returns_mapping:
             segments, mapping = [], {}
             
-            for segment, mapped_to in self.crop_iter(support, mode='intersection', returns_mapping=True):
+            for segment, mapped_to in self.crop_iter(
+                support, 
+                mode='intersection', 
+                returns_mapping=True
+            ):
                 segments.append(mapped_to)
                 mapping[mapped_to] = mapping.get(mapped_to, list()) + [segment]
 
@@ -162,7 +188,15 @@ class Timeline:
         if mode == "loose": mode = "strict"
         elif mode == "strict": mode = "loose"
 
-        return self.crop(removed.gaps(support=Timeline([self.extent()], uri=self.uri)), mode=mode)
+        return self.crop(
+            removed.gaps(
+                support=Timeline(
+                    [self.extent()], 
+                    uri=self.uri
+                )
+            ), 
+            mode=mode
+        )
 
     def __str__(self):
         n = len(self.segments_list_)
@@ -333,7 +367,13 @@ class Segment:
         return Segment(start=max(self.start, other.start), end=min(self.end, other.end))
 
     def intersects(self, other):
-        return (self.start < other.start and other.start < self.end - SEGMENT_PRECISION) or (self.start > other.start and self.start < other.end - SEGMENT_PRECISION) or (self.start == other.start)
+        return (
+            self.start < other.start and other.start < self.end - SEGMENT_PRECISION
+        ) or (
+            self.start > other.start and self.start < other.end - SEGMENT_PRECISION
+        ) or (
+            self.start == other.start
+        )
 
     def overlaps(self, t):
         return self.start <= t and self.end >= t
@@ -342,12 +382,18 @@ class Segment:
         if not self: return other
         if not other: return self
 
-        return Segment(start=min(self.start, other.start), end=max(self.end, other.end))
+        return Segment(
+            start=min(self.start, other.start), 
+            end=max(self.end, other.end)
+        )
 
     def __xor__(self, other):
         if (not self) or (not other): raise ValueError
 
-        return Segment(start=min(self.end, other.end), end=max(self.start, other.start))
+        return Segment(
+            start=min(self.end, other.end), 
+            end=max(self.start, other.start)
+        )
 
     def _str_helper(self, seconds):
         from datetime import timedelta
@@ -371,7 +417,13 @@ class Segment:
         return None
 
 class SlidingWindow:
-    def __init__(self, duration=0.030, step=0.010, start=0.000, end=None):
+    def __init__(
+        self, 
+        duration=0.030, 
+        step=0.010, 
+        start=0.000, 
+        end=None
+    ):
         if duration <= 0: raise ValueError
         self.__duration = duration
         if step <= 0: raise ValueError
@@ -427,7 +479,17 @@ class SlidingWindow:
 
                 return ranges
 
-            return np.unique(np.hstack([self.crop(s, mode=mode, fixed=fixed, return_ranges=False) for s in focus.support()]))
+            return np.unique(
+                np.hstack([
+                    self.crop(
+                        s, 
+                        mode=mode, 
+                        fixed=fixed, 
+                        return_ranges=False
+                    ) 
+                    for s in focus.support()
+                ])
+            )
 
         if mode == 'loose':
             i = int(np.ceil((focus.start - self.duration - self.start) / self.step))
@@ -519,7 +581,12 @@ class SlidingWindow:
         return length
 
     def copy(self):
-        return self.__class__(duration=self.duration, step=self.step, start=self.start, end=self.end)
+        return self.__class__(
+            duration=self.duration, 
+            step=self.step, 
+            start=self.start, 
+            end=self.end
+        )
 
     def __call__(self, support, align_last = False):
         if isinstance(support, Timeline): segments = support
@@ -529,7 +596,12 @@ class SlidingWindow:
         for segment in segments:
             if segment.duration < self.duration: continue
 
-            for s in SlidingWindow(duration=self.duration, step=self.step, start=segment.start, end=segment.end):
+            for s in SlidingWindow(
+                duration=self.duration, 
+                step=self.step, 
+                start=segment.start, 
+                end=segment.end
+            ):
                 if s in segment:
                     yield s
                     last = s

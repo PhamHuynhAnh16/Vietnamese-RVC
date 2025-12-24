@@ -31,7 +31,7 @@ def parse_arguments():
     parser.add_argument("--embedder_model", type=str, default="hubert_base")
     parser.add_argument("--embedders_mode", type=str, default="fairseq")
     parser.add_argument("--f0_method", type=str, default="rmvpe")
-    parser.add_argument("--f0_onnx", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--predictor_onnx", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--f0_up_key", type=int, default=0)
     parser.add_argument("--filter_radius", type=int, default=3)
     parser.add_argument("--f0_autotune", type=lambda x: bool(strtobool(x)), default=False)
@@ -53,7 +53,7 @@ def main():
         version, embedder_model, 
         embedders_mode, 
         f0_method, 
-        f0_onnx, 
+        predictor_onnx, 
         f0_up_key, 
         filter_radius, 
         f0_autotune, 
@@ -70,7 +70,7 @@ def main():
         args.embedder_model, 
         args.embedders_mode, 
         args.f0_method, 
-        args.f0_onnx, 
+        args.predictor_onnx, 
         args.f0_up_key, 
         args.filter_radius, 
         args.f0_autotune, 
@@ -89,7 +89,7 @@ def main():
         embedder_model, 
         embedders_mode, 
         f0_method, 
-        f0_onnx, 
+        predictor_onnx, 
         f0_up_key, 
         filter_radius, 
         f0_autotune, 
@@ -108,7 +108,7 @@ def create_reference(
     embedder_model = "hubert_base", 
     embedders_mode = "fairseq", 
     f0_method = "rmvpe",
-    f0_onnx = False,
+    predictor_onnx = False,
     f0_up_key = 0,
     filter_radius = 3,
     f0_autotune = False,
@@ -124,10 +124,14 @@ def create_reference(
         logger.warning(translations["not_found_audio"])
         sys.exit(1)
 
-    output_reference = os.path.join(configs["reference_path"], f"{reference_name}_{version}_{embedder_model}_{pitch_guidance}_{use_energy}")
+    output_reference = os.path.join(
+        configs["reference_path"], 
+        f"{reference_name}_{version}_{embedder_model}_{pitch_guidance}_{use_energy}"
+    )
+
     if os.path.exists(output_reference): shutil.rmtree(reference_name, ignore_errors=True)
 
-    os.makedirs(output_reference)
+    os.makedirs(output_reference, exist_ok=True)
     logger.info(translations["start_create_reference"])
     start_time = time.time()
 
@@ -151,12 +155,23 @@ def create_reference(
         pbar.update(1)
 
         embedder = load_embedders_model(embedder_model, embedders_mode)
-        if isinstance(embedder, torch.nn.Module): embedder = embedder.to(torch.float16 if is_half else torch.float32).eval().to(device)
+        if isinstance(embedder, torch.nn.Module): 
+            embedder = embedder.to(torch.float16 if is_half else torch.float32).eval().to(device)
 
         with torch.no_grad():
-            feats = extract_features(embedder, audio_pad.view(1, -1), version, device=device)
+            feats = extract_features(
+                embedder, 
+                audio_pad.view(1, -1), 
+                version, 
+                device=device
+            )
 
-        np.save(os.path.join(output_reference, "feats.npy"), feats.squeeze(0).float().cpu().numpy(), allow_pickle=False)
+        np.save(
+            os.path.join(output_reference, "feats.npy"), 
+            feats.squeeze(0).float().cpu().numpy(), 
+            allow_pickle=False
+        )
+
         pbar.update(1)
 
         if pitch_guidance:
@@ -170,8 +185,8 @@ def create_reference(
                 alpha=alpha, 
                 is_half=is_half, 
                 device=device, 
-                f0_onnx_mode=f0_onnx, 
-                del_onnx_model=True
+                predictor_onnx=predictor_onnx, 
+                delete_predictor_onnx=True
             )
 
             pitch, pitchf = generator.calculator(
@@ -188,19 +203,38 @@ def create_reference(
                 proposal_pitch_threshold=proposal_pitch_threshold
             )
 
-            np.save(os.path.join(output_reference, "pitch_coarse.npy"), pitch, allow_pickle=False)
-            np.save(os.path.join(output_reference, "pitch_fine.npy"), pitchf, allow_pickle=False)
+            np.save(
+                os.path.join(output_reference, "pitch_coarse.npy"), 
+                pitch, 
+                allow_pickle=False
+            )
+
+            np.save(
+                os.path.join(output_reference, "pitch_fine.npy"), 
+                pitchf, 
+                allow_pickle=False
+            )
 
         pbar.update(1)
 
         if use_energy:
             from main.inference.extracting.rms import RMSEnergyExtractor
-            rms = RMSEnergyExtractor(frame_length=FRAME_LENGTH, hop_length=HOP_SIZE, center=True, pad_mode="reflect").to(device).eval()
+
+            rms = RMSEnergyExtractor(
+                frame_length=FRAME_LENGTH, 
+                hop_length=HOP_SIZE, 
+                center=True, 
+                pad_mode="reflect"
+            ).to(device).eval()
 
             with torch.no_grad():
                 energy = rms(audio_pad)
 
-            np.save(os.path.join(output_reference, "energy.npy"), energy.float().cpu().numpy(), allow_pickle=False)
+            np.save(
+                os.path.join(output_reference, "energy.npy"), 
+                energy.float().cpu().numpy(), 
+                allow_pickle=False
+            )
 
         pbar.update(1)
 

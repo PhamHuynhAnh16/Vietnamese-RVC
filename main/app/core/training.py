@@ -27,13 +27,23 @@ def log_read(done, name):
 
     while 1:
         with open(log_file, "r", encoding="utf-8") as f:
-            yield "".join(line for line in f.readlines() if "DEBUG" not in line and name in line and line.strip() != "")
+            yield "".join(
+                line for line in f.readlines() 
+                if (
+                    "DEBUG" not in line and 
+                    name in line and 
+                    line.strip() != ""
+                )
+            )
 
         time.sleep(1)
         if done[0]: break
 
     with open(log_file, "r", encoding="utf-8") as f:
-        log = "".join(line for line in f.readlines() if "DEBUG" not in line and line.strip() != "")
+        log = "".join(
+            line for line in f.readlines() 
+            if "DEBUG" not in line and line.strip() != ""
+        )
 
     yield log
 
@@ -66,7 +76,36 @@ def create_dataset(
 ):
     gr_info(translations["start"].format(start=translations["create"]))
 
-    p = subprocess.Popen(f'{python} {configs["create_dataset_path"]} --input_data "{input_data}" --output_dirs "{output_dirs}" --skip_seconds {skip_seconds} --skip_start_audios "{skip_start_audios}" --skip_end_audios "{skip_end_audios}" --separate {separate} --model_name "{model_name}" --reverb_model "{reverb_model}" --denoise_model "{denoise_model}" --sample_rate {sample_rate} --shifts {shifts} --batch_size {batch_size} --overlap {overlap} --aggression {aggression} --hop_length {hop_length} --window_size {window_size} --segments_size {segments_size} --post_process_threshold {post_process_threshold} --enable_tta {enable_tta} --enable_denoise {enable_denoise} --high_end_process {high_end_process} --enable_post_process {enable_post_process} --separate_reverb {separate_reverb} --clean_dataset {clean_dataset} --clean_strength {clean_strength}', shell=True)
+    p = subprocess.Popen([
+        python,
+        configs["create_dataset_path"],
+        "--input_data", input_data,
+        "--output_dirs", output_dirs,
+        "--skip_seconds", str(skip_seconds),
+        "--skip_start_audios", str(skip_start_audios),
+        "--skip_end_audios", str(skip_end_audios),
+        "--separate", str(separate),
+        "--model_name", model_name,
+        "--reverb_model", reverb_model,
+        "--denoise_model", denoise_model,
+        "--sample_rate", str(sample_rate),
+        "--shifts", str(shifts),
+        "--batch_size", str(batch_size),
+        "--overlap", str(overlap),
+        "--aggression", str(aggression),
+        "--hop_length", str(hop_length),
+        "--window_size", str(window_size),
+        "--segments_size", str(segments_size),
+        "--post_process_threshold", str(post_process_threshold),
+        "--enable_tta", str(enable_tta),
+        "--enable_denoise", str(enable_denoise),
+        "--high_end_process", str(high_end_process),
+        "--enable_post_process", str(enable_post_process),
+        "--separate_reverb", str(separate_reverb),
+        "--clean_dataset", str(clean_dataset),
+        "--clean_strength", str(clean_strength),
+    ])
+
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()
@@ -74,10 +113,47 @@ def create_dataset(
     for log in log_read(done, "create_dataset"):
         yield log
 
-def create_reference(audio_path, reference_name, pitch_guidance, use_energy, version, embedder_model, embedders_mode, f0_method, f0_onnx, f0_up_key, filter_radius, f0_autotune, f0_autotune_strength, proposal_pitch, proposal_pitch_threshold, alpha=0.5):
+def create_reference(
+    audio_path, 
+    reference_name, 
+    pitch_guidance, 
+    use_energy, 
+    version, 
+    embedder_model, 
+    embedders_mode, 
+    f0_method, 
+    predictor_onnx, 
+    f0_up_key, 
+    filter_radius, 
+    f0_autotune, 
+    f0_autotune_strength, 
+    proposal_pitch, 
+    proposal_pitch_threshold, 
+    alpha=0.5
+):
     gr_info(translations["start"].format(start=translations["create_reference"]))
 
-    p = subprocess.Popen(f'{python} {configs["create_reference_path"]} --audio_path "{audio_path}" --reference_name "{reference_name}" --pitch_guidance {pitch_guidance} --use_energy {use_energy} --version {version} --embedder_model {embedder_model} --embedders_mode {embedders_mode} --f0_method {f0_method} --f0_onnx {f0_onnx} --f0_up_key {f0_up_key} --filter_radius {filter_radius} --f0_autotune {f0_autotune} --f0_autotune_strength {f0_autotune_strength} --proposal_pitch {proposal_pitch} --proposal_pitch_threshold {proposal_pitch_threshold} --alpha {alpha}', shell=True)
+    p = subprocess.Popen([
+        python,
+        configs["create_reference_path"],
+        "--audio_path", audio_path,
+        "--reference_name", reference_name,
+        "--pitch_guidance", str(pitch_guidance),
+        "--use_energy", str(use_energy),
+        "--version", version,
+        "--embedder_model", embedder_model,
+        "--embedders_mode", embedders_mode,
+        "--f0_method", f0_method,
+        "--predictor_onnx", str(predictor_onnx),
+        "--f0_up_key", str(f0_up_key),
+        "--filter_radius", str(filter_radius),
+        "--f0_autotune", str(f0_autotune),
+        "--f0_autotune_strength", str(f0_autotune_strength),
+        "--proposal_pitch", str(proposal_pitch),
+        "--proposal_pitch_threshold", str(proposal_pitch_threshold),
+        "--alpha", str(alpha),
+    ])
+
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()
@@ -85,16 +161,52 @@ def create_reference(audio_path, reference_name, pitch_guidance, use_energy, ver
     for log in log_read(done, "create_reference"):
         yield log
 
-def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effects, dataset, clean_dataset, clean_strength, chunk_len=3.0, overlap_len=0.3, normalization_mode="none"):
+def preprocess(
+    model_name, 
+    sample_rate, 
+    cpu_core, 
+    cut_preprocess, 
+    process_effects, 
+    dataset, 
+    clean_dataset, 
+    clean_strength, 
+    chunk_len=3.0, 
+    overlap_len=0.3, 
+    normalization_mode="none"
+):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
 
     if not model_name: return gr_warning(translations["provide_name"])
-    if not os.path.exists(dataset) or not any(f.lower().endswith(tuple(file_types)) for f in os.listdir(dataset) if os.path.isfile(os.path.join(dataset, f))): return gr_warning(translations["not_found_data"])
+
+    try:
+        if not os.path.exists(dataset) or not any(
+            f.lower().endswith(tuple(file_types)) 
+            for f in os.listdir(dataset) 
+            if os.path.isfile(os.path.join(dataset, f))
+        ): 
+            return gr_warning(translations["not_found_data"])
+    except:
+        return gr_warning(translations["not_found_data"])
     
     model_dir = os.path.join(configs["logs_path"], model_name)
     if os.path.exists(model_dir): shutil.rmtree(model_dir, ignore_errors=True)
 
-    p = subprocess.Popen(f'{python} {configs["preprocess_path"]} --model_name "{model_name}" --dataset_path "{dataset}" --sample_rate {sr} --cpu_cores {cpu_core} --cut_preprocess {cut_preprocess} --process_effects {process_effects} --clean_dataset {clean_dataset} --clean_strength {clean_strength} --chunk_len {chunk_len} --overlap_len {overlap_len} --normalization_mode {normalization_mode}', shell=True)
+    p = subprocess.Popen([
+        python,
+        configs["preprocess_path"],
+        "--model_name", model_name,
+        "--dataset_path", dataset,
+        "--sample_rate", str(sr),
+        "--cpu_cores", str(cpu_core),
+        "--cut_preprocess", cut_preprocess,
+        "--process_effects", str(process_effects),
+        "--clean_dataset", str(clean_dataset),
+        "--clean_strength", str(clean_strength),
+        "--chunk_len", str(chunk_len),
+        "--overlap_len", str(overlap_len),
+        "--normalization_mode", normalization_mode,
+    ])
+
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()
@@ -103,8 +215,31 @@ def preprocess(model_name, sample_rate, cpu_core, cut_preprocess, process_effect
     for log in log_read(done, "preprocess"):
         yield log
 
-def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, gpu, sample_rate, embedders, custom_embedders, onnx_f0_mode, embedders_mode, f0_autotune, f0_autotune_strength, hybrid_method, rms_extract, alpha=0.5):
-    f0method, embedder_model = (method if method != "hybrid" else hybrid_method), (embedders if embedders != "custom" else custom_embedders)
+def extract(
+    model_name, 
+    version, 
+    method, 
+    pitch_guidance, 
+    hop_length, 
+    cpu_cores, 
+    gpu, 
+    sample_rate, 
+    embedders, 
+    custom_embedders, 
+    predictor_onnx, 
+    embedders_mode, 
+    f0_autotune, 
+    f0_autotune_strength, 
+    hybrid_method, 
+    rms_extract, 
+    alpha=0.5, 
+    include_mutes=2
+):
+    f0_method, embedder_model = (
+        method if method != "hybrid" else hybrid_method, 
+        embedders if embedders != "custom" else custom_embedders
+    )
+
     sr = int(float(sample_rate.rstrip("k")) * 1000)
 
     if not model_name: return gr_warning(translations["provide_name"])
@@ -122,7 +257,27 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
     except:
         return gr_warning(translations["not_found_data_preprocess"])
     
-    p = subprocess.Popen(f'{python} {configs["extract_path"]} --model_name "{model_name}" --rvc_version {version} --f0_method {f0method} --pitch_guidance {pitch_guidance} --hop_length {hop_length} --cpu_cores {cpu_cores} --gpu {gpu} --sample_rate {sr} --embedder_model {embedder_model} --f0_onnx {onnx_f0_mode} --embedders_mode {embedders_mode} --f0_autotune {f0_autotune} --f0_autotune_strength {f0_autotune_strength} --rms_extract {rms_extract} --alpha {alpha}', shell=True)
+    p = subprocess.Popen([
+        python,
+        configs["extract_path"],
+        "--model_name", model_name,
+        "--rvc_version", version,
+        "--f0_method", f0_method,
+        "--pitch_guidance", str(pitch_guidance),
+        "--hop_length", str(hop_length),
+        "--cpu_cores", str(cpu_cores),
+        "--gpu", str(gpu),
+        "--sample_rate", str(sr),
+        "--embedder_model", embedder_model,
+        "--predictor_onnx", str(predictor_onnx),
+        "--embedders_mode", embedders_mode,
+        "--f0_autotune", str(f0_autotune),
+        "--f0_autotune_strength", str(f0_autotune_strength),
+        "--rms_extract", str(rms_extract),
+        "--alpha", str(alpha),
+        "--include_mutes", str(include_mutes),
+    ])
+    
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()
@@ -131,16 +286,31 @@ def extract(model_name, version, method, pitch_guidance, hop_length, cpu_cores, 
     for log in log_read(done, "extract"):
         yield log
 
-def create_index(model_name, rvc_version, index_algorithm):
+def create_index(
+    model_name, 
+    rvc_version, 
+    index_algorithm
+):
     if not model_name: return gr_warning(translations["provide_name"])
     model_dir = os.path.join(configs["logs_path"], model_name)
     
     try:
-        if not any(os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))): return gr_warning(translations["not_found_data_extract"])
+        if not any(
+            os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) 
+            for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))
+        ): 
+            return gr_warning(translations["not_found_data_extract"])
     except:
         return gr_warning(translations["not_found_data_extract"])
     
-    p = subprocess.Popen(f'{python} {configs["create_index_path"]} --model_name "{model_name}" --rvc_version {rvc_version} --index_algorithm {index_algorithm}', shell=True)
+    p = subprocess.Popen([
+        python, 
+        configs["create_index_path"], 
+        "--model_name", model_name, 
+        "--rvc_version", rvc_version,
+        "--index_algorithm", index_algorithm
+    ])
+
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()
@@ -183,17 +353,30 @@ def training(
     if not model_name: return gr_warning(translations["provide_name"])
 
     model_dir = os.path.join(configs["logs_path"], model_name)
-    if os.path.exists(os.path.join(model_dir, "train_pid.txt")): os.remove(os.path.join(model_dir, "train_pid.txt"))
+    if os.path.exists(os.path.join(model_dir, "train_pid.txt")): 
+        os.remove(os.path.join(model_dir, "train_pid.txt"))
     
     try:
-        if not any(os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))): return gr_warning(translations["not_found_data_extract"])
+        if not any(
+            os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) 
+            for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))
+        ): 
+            return gr_warning(translations["not_found_data_extract"])
     except:
         return gr_warning(translations["not_found_data_extract"])
     
     if not not_pretrain:
         if not custom_pretrained: 
-            pretrain_dir = configs["pretrained_v2_path"] if rvc_version == 'v2' else configs["pretrained_v1_path"]
-            download_version = codecs.decode(f"uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cergenvarq_", "rot13") + f"{rvc_version}/"
+            pretrain_dir = (
+                configs["pretrained_v2_path"] 
+                if rvc_version == 'v2' else 
+                configs["pretrained_v1_path"]
+            )
+
+            download_version = codecs.decode(
+                f"uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cergenvarq_", 
+                "rot13"
+            ) + f"{rvc_version}/"
 
             pretrained_selector = {
                 True: {
@@ -260,17 +443,23 @@ def training(
                 gr_warning(translations["not_use_pretrain_error_download"])
                 pretrained_G = pretrained_D = None
         else:
-            if not pretrain_g: return gr_warning(translations["provide_pretrained"].format(dg="G"))
-            if not pretrain_d: return gr_warning(translations["provide_pretrained"].format(dg="D"))
+            if not pretrain_g: 
+                return gr_warning(translations["provide_pretrained"].format(dg="G"))
+
+            if not pretrain_d: 
+                return gr_warning(translations["provide_pretrained"].format(dg="D"))
             
             pg2, pd2 = pretrain_g, pretrain_d
             pretrained_G, pretrained_D = (
-                (os.path.join(configs["pretrained_custom_path"], pg2) if not os.path.exists(pg2) else pg2), 
-                (os.path.join(configs["pretrained_custom_path"], pd2) if not os.path.exists(pd2) else pd2)
+                os.path.join(configs["pretrained_custom_path"], pg2) if not os.path.exists(pg2) else pg2, 
+                os.path.join(configs["pretrained_custom_path"], pd2) if not os.path.exists(pd2) else pd2
             )
 
-            if not os.path.exists(pretrained_G): return gr_warning(translations["not_found_pretrain"].format(dg="G"))
-            if not os.path.exists(pretrained_D): return gr_warning(translations["not_found_pretrain"].format(dg="D"))
+            if not os.path.exists(pretrained_G): 
+                return gr_warning(translations["not_found_pretrain"].format(dg="G"))
+
+            if not os.path.exists(pretrained_D): 
+                return gr_warning(translations["not_found_pretrain"].format(dg="D"))
     else: 
         pretrained_G = pretrained_D = None
         gr_warning(translations["not_use_pretrain"])
@@ -287,7 +476,36 @@ def training(
 
     gr_info(translations["start"].format(start=translations["training"]))
 
-    p = subprocess.Popen(f'{python} {configs["train_path"]} --model_name "{model_name}" --rvc_version {rvc_version} --save_every_epoch {save_every_epoch} --save_only_latest {save_only_latest} --save_every_weights {save_every_weights} --total_epoch {total_epoch} --batch_size {batch_size} --gpu {gpu} --pitch_guidance {pitch_guidance} --overtraining_detector {detector} --overtraining_threshold {threshold} --cleanup {clean_up} --cache_data_in_gpu {cache} --g_pretrained_path "{pretrained_G}" --d_pretrained_path "{pretrained_D}" --model_author "{model_author}" --vocoder "{vocoder}" --checkpointing {checkpointing} --deterministic {deterministic} --benchmark {benchmark} --optimizer {optimizer} --energy_use {energy_use} --use_custom_reference {custom_reference} --reference_path {reference_path} --multiscale_mel_loss {multiscale_mel_loss}', shell=True)
+    p = subprocess.Popen([
+        python,
+        configs["train_path"],
+        "--model_name", model_name,
+        "--rvc_version", rvc_version,
+        "--save_every_epoch", str(save_every_epoch),
+        "--save_only_latest", str(save_only_latest),
+        "--save_every_weights", str(save_every_weights),
+        "--total_epoch", str(total_epoch),
+        "--batch_size", str(batch_size),
+        "--gpu", str(gpu),
+        "--pitch_guidance", str(pitch_guidance),
+        "--overtraining_detector", str(detector),
+        "--overtraining_threshold", str(threshold),
+        "--cleanup", str(clean_up),
+        "--cache_data_in_gpu", str(cache),
+        "--g_pretrained_path", pretrained_G,
+        "--d_pretrained_path", pretrained_D,
+        "--model_author", model_author,
+        "--vocoder", vocoder,
+        "--checkpointing", str(checkpointing),
+        "--deterministic", str(deterministic),
+        "--benchmark", str(benchmark),
+        "--optimizer", optimizer,
+        "--energy_use", str(energy_use),
+        "--use_custom_reference", str(custom_reference),
+        "--reference_path", reference_path,
+        "--multiscale_mel_loss", str(multiscale_mel_loss),
+    ])
+
     done = [False]
 
     with open(os.path.join(model_dir, "train_pid.txt"), "w") as pid_file:
@@ -297,5 +515,8 @@ def training(
 
     for log in log_read(done, "train"):
         lines = log.splitlines()
-        if len(lines) > 50: log = "\n".join(lines[-50:])
+
+        if len(lines) > 50: 
+            log = "\n".join(lines[-50:])
+
         yield log

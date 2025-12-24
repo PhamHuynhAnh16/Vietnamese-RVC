@@ -15,7 +15,11 @@ class CategoricalEncoder:
     VALUE_SEPARATOR = " => "
     EXTRAS_SEPARATOR = "================\n"
 
-    def __init__(self, starting_index=0, **special_labels):
+    def __init__(
+        self, 
+        starting_index=0, 
+        **special_labels
+    ):
         self.lab2ind = {}
         self.ind2lab = {}
         self.starting_index = starting_index
@@ -40,9 +44,18 @@ class CategoricalEncoder:
 
     def update_from_didataset(self, didataset, output_key, sequence_input=False):
         with didataset.output_keys_as([output_key]):
-            self.update_from_iterable((data_point[output_key] for data_point in didataset), sequence_input=sequence_input)
+            self.update_from_iterable(
+                (data_point[output_key] for data_point in didataset), 
+                sequence_input=sequence_input
+            )
 
-    def limited_labelset_from_iterable(self, iterable, sequence_input=False, n_most_common=None, min_count=1):
+    def limited_labelset_from_iterable(
+        self, 
+        iterable, 
+        sequence_input=False, 
+        n_most_common=None, 
+        min_count=1
+    ):
         label_iterator = itertools.chain.from_iterable(iterable) if sequence_input else iter(iterable)
         counts = collections.Counter(label_iterator)
 
@@ -52,7 +65,15 @@ class CategoricalEncoder:
 
         return counts
 
-    def load_or_create(self, path, from_iterables=[], from_didatasets=[], sequence_input=False, output_key=None, special_labels={}):
+    def load_or_create(
+        self, 
+        path, 
+        from_iterables=[], 
+        from_didatasets=[], 
+        sequence_input=False, 
+        output_key=None, 
+        special_labels={}
+    ):
         try:
             if if_main_process():
                 if not self.load_if_possible(path):
@@ -233,13 +254,22 @@ class CategoricalEncoder:
         with open(path, encoding="utf-8") as f:
             for line in f:
                 if line == CategoricalEncoder.EXTRAS_SEPARATOR: break
-                literal, ind = line.strip().split(CategoricalEncoder.VALUE_SEPARATOR, maxsplit=1)
+
+                literal, ind = line.strip().split(
+                    CategoricalEncoder.VALUE_SEPARATOR, 
+                    maxsplit=1
+                )
+
                 label = ast.literal_eval(literal)
                 lab2ind[label] = int(ind)
                 ind2lab[ind] = label
 
             for line in f:
-                literal_key, literal_value = line.strip().split(CategoricalEncoder.VALUE_SEPARATOR, maxsplit=1)
+                literal_key, literal_value = line.strip().split(
+                    CategoricalEncoder.VALUE_SEPARATOR, 
+                    maxsplit=1
+                )
+
                 extras[ast.literal_eval(literal_key)] = ast.literal_eval(literal_value)
                 
         return lab2ind, ind2lab, extras

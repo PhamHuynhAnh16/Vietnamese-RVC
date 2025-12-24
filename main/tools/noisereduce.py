@@ -12,12 +12,29 @@ def temperature_sigmoid(x, x0, temp_coeff):
 
 @torch.no_grad()
 def linspace(start, stop, num = 50, endpoint = True, **kwargs):
-    return torch.linspace(start, stop, num, **kwargs) if endpoint else torch.linspace(start, stop, num + 1, **kwargs)[:-1]
+    return (
+        torch.linspace(
+            start, 
+            stop, 
+            num, 
+            **kwargs
+        )
+    ) if endpoint else (
+        torch.linspace(
+            start, 
+            stop, 
+            num + 1, 
+            **kwargs
+        )[:-1]
+    )
 
 @torch.no_grad()
 def amp_to_db(x, eps=torch.finfo(torch.float32).eps, top_db=40):
     x_db = 20 * (x + eps).log10()
-    return x_db.max((x_db.max(-1).values - top_db).unsqueeze(-1))
+
+    return x_db.max(
+        (x_db.max(-1).values - top_db).unsqueeze(-1)
+    )
 
 class TorchGate(torch.nn.Module):
     @torch.no_grad()
@@ -82,8 +99,23 @@ class TorchGate(torch.nn.Module):
 
     @torch.no_grad()
     def _nonstationary_mask(self, X_abs):
-        X_smoothed = (conv1d(X_abs.reshape(-1, 1, X_abs.shape[-1]), torch.ones(self.n_movemean_nonstationary, dtype=X_abs.dtype, device=X_abs.device).view(1, 1, -1), padding="same").view(X_abs.shape) / self.n_movemean_nonstationary)
-        return temperature_sigmoid(((X_abs - X_smoothed) / X_smoothed), self.n_thresh_nonstationary, self.temp_coeff_nonstationary)
+        X_smoothed = (
+            conv1d(
+                X_abs.reshape(-1, 1, X_abs.shape[-1]), 
+                torch.ones(
+                    self.n_movemean_nonstationary, 
+                    dtype=X_abs.dtype, 
+                    device=X_abs.device
+                ).view(1, 1, -1), 
+                padding="same"
+            ).view(X_abs.shape) / self.n_movemean_nonstationary
+        )
+
+        return temperature_sigmoid(
+            ((X_abs - X_smoothed) / X_smoothed), 
+            self.n_thresh_nonstationary, 
+            self.temp_coeff_nonstationary
+        )
 
     def forward(self, x):
         assert x.ndim == 2
@@ -92,13 +124,55 @@ class TorchGate(torch.nn.Module):
         if str(x.device).startswith(("ocl", "privateuseone")):
             if not hasattr(self, "stft"): 
                 from main.library.backends.utils import STFT
-                self.stft = STFT(filter_length=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, pad_mode="constant").to(x.device)
-            X, phase = self.stft.transform(x, eps=1e-9, return_phase=True)
+
+                self.stft = STFT(
+                    filter_length=self.n_fft, 
+                    hop_length=self.hop_length, 
+                    win_length=self.win_length, 
+                    pad_mode="constant"
+                ).to(x.device)
+
+            X, phase = self.stft.transform(
+                x, 
+                eps=1e-9, 
+                return_phase=True
+            )
         else:
-            X = torch.stft(x, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, return_complex=True, pad_mode="constant", center=True, window=torch.hann_window(self.win_length).to(x.device))
+            X = torch.stft(
+                x, 
+                n_fft=self.n_fft, 
+                hop_length=self.hop_length, 
+                win_length=self.win_length, 
+                return_complex=True, 
+                pad_mode="constant", 
+                center=True, 
+                window=torch.hann_window(self.win_length).to(x.device)
+            )
             
-        sig_mask = self.prop_decrease * ((self._nonstationary_mask(X.abs()) if self.nonstationary else self._stationary_mask(amp_to_db(X.abs()))).float() * 1.0 - 1.0) + 1.0
-        if self.smoothing_filter is not None: sig_mask = conv2d(sig_mask.unsqueeze(1), self.smoothing_filter.to(sig_mask.dtype), padding="same")
+        sig_mask = self._nonstationary_mask(X.abs()) if self.nonstationary else self._stationary_mask(amp_to_db(X.abs()))
+        sig_mask = self.prop_decrease * (sig_mask.float() * 1.0 - 1.0) + 1.0
+
+        if self.smoothing_filter is not None: 
+            sig_mask = conv2d(
+                sig_mask.unsqueeze(1), 
+                self.smoothing_filter.to(sig_mask.dtype), 
+                padding="same"
+            )
+
         Y = X * sig_mask.squeeze(1)
 
-        return self.stft.inverse(Y, phase) if hasattr(self, "stft") else torch.istft(Y, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, center=True, window=torch.hann_window(self.win_length).to(Y.device)).to(dtype=x.dtype)
+        return (
+            self.stft.inverse(
+                Y, 
+                phase
+            )
+        ) if hasattr(self, "stft") else (
+            torch.istft(
+                Y, 
+                n_fft=self.n_fft, 
+                hop_length=self.hop_length, 
+                win_length=self.win_length, 
+                center=True, 
+                window=torch.hann_window(self.win_length).to(Y.device)
+            ).to(dtype=x.dtype)
+        )

@@ -227,13 +227,37 @@ def spectrogram_to_wave(spec, hop_length=1024, mp={}, band=0, is_v51_model=True)
     if is_v51_model:
         cc = mp.param["band"][str(band)].get("convert_channels")
 
-        if "mid_side_c" == cc: return np.asfortranarray([np.subtract(wave_left / 1.0625, wave_right / 4.25), np.add(wave_right / 1.0625, wave_left / 4.25)])
-        elif "mid_side" == cc: return np.asfortranarray([np.add(wave_left, wave_right / 2), np.subtract(wave_left, wave_right / 2)])
-        elif "stereo_n" == cc: return np.asfortranarray([np.subtract(wave_left, wave_right * 0.25), np.subtract(wave_right, wave_left * 0.25)])
+        if "mid_side_c" == cc: 
+            return np.asfortranarray([
+                np.subtract(wave_left / 1.0625, wave_right / 4.25), 
+                np.add(wave_right / 1.0625, wave_left / 4.25)
+            ])
+        elif "mid_side" == cc: 
+            return np.asfortranarray([
+                np.add(wave_left, wave_right / 2), 
+                np.subtract(wave_left, wave_right / 2)
+            ])
+        elif "stereo_n" == cc: 
+            return np.asfortranarray([
+                np.subtract(wave_left, wave_right * 0.25), 
+                np.subtract(wave_right, wave_left * 0.25)
+            ])
     else:
-        if mp.param["reverse"]: return np.asfortranarray([np.flip(wave_left), np.flip(wave_right)])
-        elif mp.param["mid_side"]: return np.asfortranarray([np.add(wave_left, wave_right / 2), np.subtract(wave_left, wave_right / 2)])
-        elif mp.param["mid_side_b2"]: return np.asfortranarray([np.add(wave_right / 1.25, 0.4 * wave_left), np.subtract(wave_left / 1.25, 0.4 * wave_right)])
+        if mp.param["reverse"]: 
+            return np.asfortranarray([
+                np.flip(wave_left), 
+                np.flip(wave_right)
+            ])
+        elif mp.param["mid_side"]: 
+            return np.asfortranarray([
+                np.add(wave_left, wave_right / 2), 
+                np.subtract(wave_left, wave_right / 2)
+            ])
+        elif mp.param["mid_side_b2"]: 
+            return np.asfortranarray([
+                np.add(wave_right / 1.25, 0.4 * wave_left), 
+                np.subtract(wave_left / 1.25, 0.4 * wave_right)
+            ])
 
     return np.asfortranarray([wave_left, wave_right])
 
@@ -257,28 +281,92 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
                 if is_v51_model: spec_s *= get_hp_filter_mask(spec_s.shape[1], bp["hpf_start"], bp["hpf_stop"] - 1)
                 else: spec_s = fft_hp_filter(spec_s, bp["hpf_start"], bp["hpf_stop"] - 1)
 
-            wave = spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model) if bands_n == 1 else np.add(wave, spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model))
+            wave = (
+                spectrogram_to_wave(
+                    spec_s, 
+                    bp["hl"], 
+                    mp, 
+                    d, 
+                    is_v51_model
+                )
+            ) if bands_n == 1 else (
+                np.add(
+                    wave, 
+                    spectrogram_to_wave(
+                        spec_s, 
+                        bp["hl"], 
+                        mp, 
+                        d, 
+                        is_v51_model
+                    )
+                )
+            )
         else:
             sr = mp.param["band"][str(d + 1)]["sr"]
+
             if d == 1: 
-                if is_v51_model: spec_s *= get_lp_filter_mask(spec_s.shape[1], bp["lpf_start"], bp["lpf_stop"])
-                else: spec_s = fft_lp_filter(spec_s, bp["lpf_start"], bp["lpf_stop"])
+                if is_v51_model: 
+                    spec_s *= get_lp_filter_mask(
+                        spec_s.shape[1], 
+                        bp["lpf_start"], 
+                        bp["lpf_stop"]
+                    )
+                else: 
+                    spec_s = fft_lp_filter(
+                        spec_s, 
+                        bp["lpf_start"], 
+                        bp["lpf_stop"]
+                    )
 
                 try:
-                    wave = librosa.resample(spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model), orig_sr=bp["sr"], target_sr=sr, res_type="soxr_vhq")
+                    wave = librosa.resample(
+                        spectrogram_to_wave(
+                            spec_s, 
+                            bp["hl"], 
+                            mp, 
+                            d, 
+                            is_v51_model
+                        ), 
+                        orig_sr=bp["sr"], 
+                        target_sr=sr, 
+                        res_type="soxr_vhq"
+                    )
                 except ValueError as e:
                     logger.error(f"{translations['resample_error']}: {e}")
                     logger.error(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
             else:  
                 if is_v51_model:
-                    spec_s *= get_hp_filter_mask(spec_s.shape[1], bp["hpf_start"], bp["hpf_stop"] - 1)
-                    spec_s *= get_lp_filter_mask(spec_s.shape[1], bp["lpf_start"], bp["lpf_stop"])
+                    spec_s *= get_hp_filter_mask(
+                        spec_s.shape[1], 
+                        bp["hpf_start"], 
+                        bp["hpf_stop"] - 1
+                    )
+
+                    spec_s *= get_lp_filter_mask(
+                        spec_s.shape[1], 
+                        bp["lpf_start"], 
+                        bp["lpf_stop"]
+                    )
                 else:
-                    spec_s = fft_hp_filter(spec_s, bp["hpf_start"], bp["hpf_stop"] - 1)
-                    spec_s = fft_lp_filter(spec_s, bp["lpf_start"], bp["lpf_stop"])
+                    spec_s = fft_hp_filter(
+                        spec_s, 
+                        bp["hpf_start"], 
+                        bp["hpf_stop"] - 1
+                    )
+
+                    spec_s = fft_lp_filter(
+                        spec_s, 
+                        bp["lpf_start"], 
+                        bp["lpf_stop"]
+                    )
 
                 try:
-                    wave = librosa.resample(np.add(wave, spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model)), orig_sr=bp["sr"], target_sr=sr, res_type="soxr_vhq")
+                    wave = librosa.resample(
+                        np.add(wave, spectrogram_to_wave(spec_s, bp["hl"], mp, d, is_v51_model)), 
+                        orig_sr=bp["sr"], 
+                        target_sr=sr, 
+                        res_type="soxr_vhq"
+                    )
                 except ValueError as e:
                     logger.error(f"{translations['resample_error']}: {e}")
                     logger.error(f"{translations['shapes']} Spec_s: {spec_s.shape}, SR: {sr}, {translations['wav_resolution']}: {wav_resolution}")
@@ -286,10 +374,18 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None, is_v
     return wave
 
 def get_lp_filter_mask(n_bins, bin_start, bin_stop):
-    return np.concatenate([np.ones((bin_start - 1, 1)), np.linspace(1, 0, bin_stop - bin_start + 1)[:, None], np.zeros((n_bins - bin_stop, 1))], axis=0)
+    return np.concatenate([
+        np.ones((bin_start - 1, 1)), 
+        np.linspace(1, 0, bin_stop - bin_start + 1)[:, None], 
+        np.zeros((n_bins - bin_stop, 1))
+    ], axis=0)
 
 def get_hp_filter_mask(n_bins, bin_start, bin_stop):
-    return np.concatenate([np.zeros((bin_stop + 1, 1)), np.linspace(0, 1, 1 + bin_start - bin_stop)[:, None], np.ones((n_bins - bin_start - 2, 1))], axis=0)
+    return np.concatenate([
+        np.zeros((bin_stop + 1, 1)), 
+        np.linspace(0, 1, 1 + bin_start - bin_stop)[:, None], 
+        np.ones((n_bins - bin_start - 2, 1))
+    ], axis=0)
 
 def fft_lp_filter(spec, bin_start, bin_stop):
     g = 1.0
@@ -312,22 +408,53 @@ def fft_hp_filter(spec, bin_start, bin_stop):
     return spec
 
 def spectrogram_to_wave_old(spec, hop_length=1024):
-    if spec.ndim == 2: wave = librosa.istft(spec, hop_length=hop_length)
-    elif spec.ndim == 3: wave = np.asfortranarray([librosa.istft(np.asfortranarray(spec[0]), hop_length=hop_length), librosa.istft(np.asfortranarray(spec[1]), hop_length=hop_length)])
+    if spec.ndim == 2: 
+        wave = librosa.istft(
+            spec, 
+            hop_length=hop_length
+        )
+    elif spec.ndim == 3: 
+        wave = np.asfortranarray([
+            librosa.istft(
+                np.asfortranarray(spec[0]), 
+                hop_length=hop_length
+            ), 
+            librosa.istft(
+                np.asfortranarray(spec[1]), 
+                hop_length=hop_length
+            )
+        ])
 
     return wave
 
 def wave_to_spectrogram_old(wave, hop_length, n_fft):
-    return np.asfortranarray([librosa.stft(np.asfortranarray(wave[0]), n_fft=n_fft, hop_length=hop_length), librosa.stft(np.asfortranarray(wave[1]), n_fft=n_fft, hop_length=hop_length)])
+    return np.asfortranarray([
+        librosa.stft(
+            np.asfortranarray(wave[0]), 
+            n_fft=n_fft, 
+            hop_length=hop_length
+        ), 
+        librosa.stft(
+            np.asfortranarray(wave[1]), 
+            n_fft=n_fft, 
+            hop_length=hop_length
+        )
+    ])
 
 def mirroring(a, spec_m, input_high_end, mp):
     if "mirroring" == a:
-        mirror = np.flip(np.abs(spec_m[:, mp.param["pre_filter_start"] - 10 - input_high_end.shape[1] : mp.param["pre_filter_start"] - 10, :]), 1) * np.exp(1.0j * np.angle(input_high_end))
+        mirror = np.flip(
+            np.abs(spec_m[:, mp.param["pre_filter_start"] - 10 - input_high_end.shape[1] : mp.param["pre_filter_start"] - 10, :]), 1
+        ) * np.exp(1.0j * np.angle(input_high_end))
 
         return np.where(np.abs(input_high_end) <= np.abs(mirror), input_high_end, mirror)
 
     if "mirroring2" == a:
-        mi = np.multiply(np.flip(np.abs(spec_m[:, mp.param["pre_filter_start"] - 10 - input_high_end.shape[1] : mp.param["pre_filter_start"] - 10, :]), 1), input_high_end * 1.7)
+        mi = np.multiply(
+            np.flip(
+                np.abs(spec_m[:, mp.param["pre_filter_start"] - 10 - input_high_end.shape[1] : mp.param["pre_filter_start"] - 10, :]), 1
+            ), input_high_end * 1.7
+        )
 
         return np.where(np.abs(input_high_end) <= np.abs(mi), input_high_end, mi)
 
@@ -353,10 +480,30 @@ def adjust_aggr(mask, is_non_accom_stem, aggressiveness):
     return mask
 
 def stft(wave, nfft, hl):
-    return np.asfortranarray([librosa.stft(np.asfortranarray(wave[0]), n_fft=nfft, hop_length=hl), librosa.stft(np.asfortranarray(wave[1]), n_fft=nfft, hop_length=hl)])
+    return np.asfortranarray([
+        librosa.stft(
+            np.asfortranarray(wave[0]), 
+            n_fft=nfft, 
+            hop_length=hl
+        ), 
+        librosa.stft(
+            np.asfortranarray(wave[1]), 
+            n_fft=nfft, 
+            hop_length=hl
+        )
+    ])
 
 def istft(spec, hl):
-    return np.asfortranarray([librosa.istft(np.asfortranarray(spec[0]), hop_length=hl), librosa.istft(np.asfortranarray(spec[1]), hop_length=hl)])
+    return np.asfortranarray([
+        librosa.istft(
+            np.asfortranarray(spec[0]), 
+            hop_length=hl
+        ), 
+        librosa.istft(
+            np.asfortranarray(spec[1]), 
+            hop_length=hl
+        )
+    ])
 
 def spec_effects(wave, algorithm="Default", value=None):
     if np.isnan(wave).any() or np.isinf(wave).any(): logger.warning(f"{translations['warnings_2']}: {wave.shape}")
@@ -640,7 +787,24 @@ def rerun_mp3(audio_file):
 
     return track_length
 
-def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_save_aligned, command_Text, save_format, align_window, align_intro_val, db_analysis, set_progress_bar, phase_option, phase_shifts, is_match_silence, is_spec_match):
+def align_audio(
+    file1, 
+    file2, 
+    file2_aligned, 
+    file_subtracted, 
+    wav_type_set, 
+    is_save_aligned, 
+    command_Text, 
+    save_format, 
+    align_window, 
+    align_intro_val, 
+    db_analysis, 
+    set_progress_bar, 
+    phase_option, 
+    phase_shifts, 
+    is_match_silence, 
+    is_spec_match
+):
     global progress_value
     progress_value = 0
     is_mono = False
@@ -717,7 +881,17 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_s
         wav2_aligned = match_mono_array_shapes(s, wav1) if is_mono else match_array_shapes(s, wav1, is_swap=True)
 
         if align_window:
-            wav_sub = time_correction(wav1, wav2_aligned, seconds_length, align_window=align_window, db_analysis=db_analysis, progress_bar=progress_bar, unique_sources=unique_sources, phase_shifts=phase_shifts)
+            wav_sub = time_correction(
+                wav1, 
+                wav2_aligned, 
+                seconds_length, 
+                align_window=align_window, 
+                db_analysis=db_analysis, 
+                progress_bar=progress_bar, 
+                unique_sources=unique_sources, 
+                phase_shifts=phase_shifts
+            )
+
             sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{np.abs(wav_sub).mean(): wav_sub}}
         else:
             wav2_aligned = wav2_aligned * np.power(10, db_analysis[0] / 20)
@@ -725,9 +899,13 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_s
             for db_adjustment in db_analysis[1]:
                 sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{np.abs(wav_sub).mean(): wav1 - (wav2_aligned * (10 ** (db_adjustment / 20)))}}
 
-    wav_sub = ensemble_for_align(list(sub_mapper_big_mapper.values())) if is_spec_match and len(list(sub_mapper_big_mapper.values())) >= 2 else ensemble_wav(list(sub_mapper_big_mapper.values()))
-    wav_sub = np.clip(wav_sub, -1, +1)
+    wav_sub = ensemble_for_align(
+        list(sub_mapper_big_mapper.values())
+    ) if is_spec_match and len(list(sub_mapper_big_mapper.values())) >= 2 else ensemble_wav(
+        list(sub_mapper_big_mapper.values())
+    )
 
+    wav_sub = np.clip(wav_sub, -1, +1)
     command_Text(translations["save_instruments"])
 
     if is_save_aligned or is_spec_match:
@@ -766,7 +944,17 @@ def get_phase_shifted_tracks(track, phase_shift):
 
     return flipped_list
 
-def time_correction(mix, instrumental, seconds_length, align_window, db_analysis, sr=44100, progress_bar=None, unique_sources=None, phase_shifts=NONE_P):
+def time_correction(
+    mix, 
+    instrumental, 
+    seconds_length, 
+    align_window, 
+    db_analysis, 
+    sr=44100, 
+    progress_bar=None, 
+    unique_sources=None, 
+    phase_shifts=NONE_P
+):
     def align_tracks(track1, track2):
         shifted_tracks = {}
         track2 = track2 * np.power(10, db_analysis[0] / 20)

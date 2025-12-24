@@ -67,16 +67,16 @@ def save_presets(
     protect, 
     split_audio, 
     f0_autotune_strength, 
-    cleaner_chbox, 
-    autotune_chbox, 
-    pitch_chbox, 
-    index_strength_chbox, 
-    resample_sr_chbox, 
-    filter_radius_chbox, 
-    rms_mix_rate_chbox, 
-    protect_chbox, 
-    split_audio_chbox, 
-    formant_shifting_chbox, 
+    cleaner_checkbox, 
+    autotune_checkbox, 
+    pitch_checkbox, 
+    index_strength_checkbox, 
+    resample_sr_checkbox, 
+    filter_radius_checkbox, 
+    rms_mix_rate_checkbox, 
+    protect_checkbox, 
+    split_audio_checkbox, 
+    formant_shifting_checkbox, 
     formant_shifting, 
     formant_qfrency, 
     formant_timbre, 
@@ -84,11 +84,67 @@ def save_presets(
     proposal_pitch_threshold
 ):  
     if not name: return gr_warning(translations["provide_filename_settings"])
-    if not any([cleaner_chbox, autotune_chbox, pitch_chbox, index_strength_chbox, resample_sr_chbox, filter_radius_chbox, rms_mix_rate_chbox, protect_chbox, split_audio_chbox, formant_shifting_chbox]): return gr_warning(translations["choose1"])
+
+    if not any([
+        cleaner_checkbox, 
+        autotune_checkbox, 
+        pitch_checkbox, 
+        index_strength_checkbox, 
+        resample_sr_checkbox, 
+        filter_radius_checkbox, 
+        rms_mix_rate_checkbox, 
+        protect_checkbox, 
+        split_audio_checkbox, 
+        formant_shifting_checkbox
+    ]): 
+        return gr_warning(translations["choose1"])
 
     settings = {}
 
-    for checkbox, data in [(cleaner_chbox, {"cleaner": cleaner, "clean_strength": clean_strength}), (autotune_chbox, {"autotune": autotune, "f0_autotune_strength": f0_autotune_strength}), (pitch_chbox, {"pitch": pitch}), (index_strength_chbox, {"index_strength": index_strength}), (resample_sr_chbox, {"resample_sr": resample_sr}), (filter_radius_chbox, {"filter_radius": filter_radius}), (rms_mix_rate_chbox, {"rms_mix_rate": rms_mix_rate}), (protect_chbox, {"protect": protect}), (split_audio_chbox, {"split_audio": split_audio}), (formant_shifting_chbox, {"formant_shifting": formant_shifting, "formant_qfrency": formant_qfrency, "formant_timbre": formant_timbre}), (proposal_pitch, {"proposal_pitch": proposal_pitch, "proposal_pitch_threshold": proposal_pitch_threshold})]:
+    for checkbox, data in [
+        (
+            cleaner_checkbox, 
+            {"cleaner": cleaner, "clean_strength": clean_strength}
+        ), 
+        (
+            autotune_checkbox, 
+            {"autotune": autotune, "f0_autotune_strength": f0_autotune_strength}), 
+        (
+            pitch_checkbox, 
+            {"pitch": pitch}
+        ), 
+        (
+            index_strength_checkbox, 
+            {"index_strength": index_strength}
+        ), 
+        (
+            resample_sr_checkbox, 
+            {"resample_sr": resample_sr}
+        ), 
+        (
+            filter_radius_checkbox, 
+            {"filter_radius": filter_radius}
+        ), 
+        (
+            rms_mix_rate_checkbox, 
+            {"rms_mix_rate": rms_mix_rate}
+        ), 
+        (
+            protect_checkbox, 
+            {"protect": protect}
+        ), 
+        (
+            split_audio_checkbox,
+            {"split_audio": split_audio}
+        ), 
+        (
+            formant_shifting_checkbox, 
+            {"formant_shifting": formant_shifting, "formant_qfrency": formant_qfrency, "formant_timbre": formant_timbre}), 
+        (
+            proposal_pitch, 
+            {"proposal_pitch": proposal_pitch, "proposal_pitch_threshold": proposal_pitch_threshold}
+        )
+    ]:
         if checkbox: settings.update(data)
 
     with open(os.path.join(configs["presets_path"], name + ".conversion.json"), "w") as f:
@@ -266,9 +322,24 @@ def audio_effect_save_presets(
     fade
 ):
     if not name: return gr_warning(translations["provide_filename_settings"])
+
     if not any([
-        resample_checkbox, chorus_check_box, distortion_checkbox, reverb_check_box, delay_check_box, compressor_check_box, limiter, gain_checkbox, bitcrush_checkbox, clipping_checkbox, phaser_check_box, bass_or_treble, fade, pitch_shift_semitones != 0
-    ]): return gr_warning(translations["choose1"])
+        resample_checkbox, 
+        chorus_check_box, 
+        distortion_checkbox, 
+        reverb_check_box, 
+        delay_check_box, 
+        compressor_check_box, 
+        limiter, 
+        gain_checkbox, 
+        bitcrush_checkbox, 
+        clipping_checkbox, 
+        phaser_check_box, 
+        bass_or_treble, 
+        fade, 
+        pitch_shift_semitones != 0
+    ]): 
+        return gr_warning(translations["choose1"])
 
     settings = {}
 

@@ -15,7 +15,15 @@ MAIN_PROC_ONLY = 0
 def fetch(filename, source):
     return os.path.abspath(os.path.join(source, filename))
 
-def run_on_main(func, args=None, kwargs=None, post_func=None, post_args=None, post_kwargs=None, run_post_on_main=False):
+def run_on_main(
+    func, 
+    args=None, 
+    kwargs=None, 
+    post_func=None, 
+    post_args=None, 
+    post_kwargs=None, 
+    run_post_on_main=False
+):
     if args is None: args = []
     if kwargs is None: kwargs = {}
     if post_args is None: post_args = []
@@ -31,7 +39,10 @@ def run_on_main(func, args=None, kwargs=None, post_func=None, post_args=None, po
             ddp_barrier()
 
 def is_distributed_initialized():
-    return (torch.distributed.is_available() and torch.distributed.is_initialized())
+    return (
+        torch.distributed.is_available() and 
+        torch.distributed.is_initialized()
+    )
 
 def if_main_process():
     if is_distributed_initialized(): return torch.distributed.get_rank() == 0
@@ -60,16 +71,30 @@ def main_process_only(function):
 def ddp_barrier():
     if MAIN_PROC_ONLY >= 1 or not is_distributed_initialized(): return
 
-    if torch.distributed.get_backend() == torch.distributed.Backend.NCCL: torch.distributed.barrier(device_ids=[torch.cuda.current_device()])
+    if torch.distributed.get_backend() == torch.distributed.Backend.NCCL: 
+        torch.distributed.barrier(
+            device_ids=[torch.cuda.current_device()]
+        )
     else: torch.distributed.barrier()
 
 class Resample(torch.nn.Module):
-    def __init__(self, orig_freq=16000, new_freq=16000, *args, **kwargs):
+    def __init__(
+        self, 
+        orig_freq=16000, 
+        new_freq=16000, 
+        *args, 
+        **kwargs
+    ):
         super().__init__()
 
         self.orig_freq = orig_freq
         self.new_freq = new_freq
-        self.resampler = torchaudio.transforms.Resample(orig_freq=orig_freq, new_freq=new_freq, *args, **kwargs)
+        self.resampler = torchaudio.transforms.Resample(
+            orig_freq=orig_freq, 
+            new_freq=new_freq, 
+            *args, 
+            **kwargs
+        )
 
     def forward(self, waveforms):
         if self.orig_freq == self.new_freq: return waveforms
@@ -87,7 +112,11 @@ class Resample(torch.nn.Module):
         return resampled_waveform.squeeze(1) if unsqueezed else resampled_waveform.transpose(1, 2)
 
 class AudioNormalizer:
-    def __init__(self, sample_rate=16000, mix="avg-to-mono"):
+    def __init__(
+        self, 
+        sample_rate=16000, 
+        mix="avg-to-mono"
+    ):
         self.sample_rate = sample_rate
 
         if mix not in ["avg-to-mono", "keep"]: raise ValueError
@@ -96,8 +125,17 @@ class AudioNormalizer:
         self._cached_resamplers = {}
 
     def __call__(self, audio, sample_rate):
-        if sample_rate not in self._cached_resamplers: self._cached_resamplers[sample_rate] = Resample(sample_rate, self.sample_rate)
-        return self._mix(self._cached_resamplers[sample_rate](audio.unsqueeze(0)).squeeze(0))
+        if sample_rate not in self._cached_resamplers: 
+            self._cached_resamplers[
+                sample_rate
+            ] = Resample(
+                sample_rate, 
+                self.sample_rate
+            )
+
+        return self._mix(
+            self._cached_resamplers[sample_rate](audio.unsqueeze(0)).squeeze(0)
+        )
 
     def _mix(self, audio):
         flat_input = audio.dim() == 1
@@ -110,7 +148,14 @@ class AudioNormalizer:
 
 class Pretrained(torch.nn.Module):
     HPARAMS_NEEDED, MODULES_NEEDED = [], []
-    def __init__(self, modules=None, hparams=None, run_opts=None, freeze_params=True):
+
+    def __init__(
+        self, 
+        modules=None, 
+        hparams=None, 
+        run_opts=None, 
+        freeze_params=True
+    ):
         super().__init__()
 
         for arg, default in {
@@ -171,7 +216,12 @@ class Pretrained(torch.nn.Module):
 
         for name in compile_module_keys:
             try:
-                module = torch.compile(self.mods[name], mode=self.compile_mode, fullgraph=self.compile_using_fullgraph, dynamic=self.compile_using_dynamic_shape_tracing)
+                module = torch.compile(
+                    self.mods[name], 
+                    mode=self.compile_mode, 
+                    fullgraph=self.compile_using_fullgraph, 
+                    dynamic=self.compile_using_dynamic_shape_tracing
+                )
             except Exception:
                 continue
 
@@ -189,15 +239,39 @@ class Pretrained(torch.nn.Module):
         if not self.distributed_launch and not self.data_parallel_backend: return
         elif self.distributed_launch:
             for name, module in self.mods.items():
-                if any(p.requires_grad for p in module.parameters()): self.mods[name] = DDP(SyncBatchNorm.convert_sync_batchnorm(module), device_ids=[self.device])
+                if any(p.requires_grad for p in module.parameters()): 
+                    self.mods[name] = DDP(
+                        SyncBatchNorm.convert_sync_batchnorm(module), 
+                        device_ids=[self.device]
+                    )
         else:
             for name, module in self.mods.items():
-                if any(p.requires_grad for p in module.parameters()): self.mods[name] = DP(module) if self.data_parallel_count == -1 else DP(module, [i for i in range(self.data_parallel_count)])
+                if any(p.requires_grad for p in module.parameters()): 
+                    self.mods[name] = (
+                        DP(module)
+                    ) if self.data_parallel_count == -1 else (
+                        DP(
+                            module, 
+                            [i for i in range(self.data_parallel_count)]
+                        )
+                    )
 
     @classmethod
-    def from_hparams(cls, source, hparams_file="hyperparams.yaml", overrides={}, download_only=False, overrides_must_match=True, **kwargs):
+    def from_hparams(
+        cls, 
+        source, 
+        hparams_file="hyperparams.yaml", 
+        overrides={}, 
+        download_only=False, 
+        overrides_must_match=True, 
+        **kwargs
+    ):
         with open(fetch(filename=hparams_file, source=source)) as fin:
-            hparams = load_hyperpyyaml(fin, overrides, overrides_must_match=overrides_must_match)
+            hparams = load_hyperpyyaml(
+                fin, 
+                overrides, 
+                overrides_must_match=overrides_must_match
+            )
 
         pretrainer = hparams.get("pretrainer", None)
 
@@ -209,7 +283,12 @@ class Pretrained(torch.nn.Module):
         else: return cls(hparams["modules"], hparams, **kwargs)
 
 class EncoderClassifier(Pretrained):
-    MODULES_NEEDED = ["compute_features", "mean_var_norm", "embedding_model", "classifier"]
+    MODULES_NEEDED = [
+        "compute_features", 
+        "mean_var_norm", 
+        "embedding_model", 
+        "classifier"
+    ]
 
     def encode_batch(self, wavs, wav_lens=None, normalize=False):
         if len(wavs.shape) == 1: wavs = wavs.unsqueeze(0)
@@ -218,9 +297,20 @@ class EncoderClassifier(Pretrained):
         wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         wavs = wavs.float()
 
-        embeddings = self.mods.embedding_model(self.mods.mean_var_norm(self.mods.compute_features(wavs), wav_lens), wav_lens)
+        embeddings = self.mods.embedding_model(
+            self.mods.mean_var_norm(
+                self.mods.compute_features(wavs), 
+                wav_lens
+            ), 
+            wav_lens
+        )
 
-        if normalize: embeddings = self.hparams.mean_var_norm_emb(embeddings, torch.ones(embeddings.shape[0], device=self.device))
+        if normalize: 
+            embeddings = self.hparams.mean_var_norm_emb(
+                embeddings, 
+                torch.ones(embeddings.shape[0], device=self.device)
+            )
+
         return embeddings
 
     def classify_batch(self, wavs, wav_lens=None):

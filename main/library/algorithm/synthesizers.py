@@ -152,8 +152,59 @@ class Synthesizer(torch.nn.Module):
         return o, x_mask, (z, z_p, m_p, logs_p)
     
 class SynthesizerONNX(Synthesizer):
-    def __init__(self, spec_channels, segment_size, inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, spk_embed_dim, gin_channels, sr, use_f0, text_enc_hidden_dim=768, vocoder="Default", checkpointing=False, energy=False, **kwargs):
-        super().__init__(spec_channels, segment_size, inter_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, resblock, resblock_kernel_sizes, resblock_dilation_sizes, upsample_rates, upsample_initial_channel, upsample_kernel_sizes, spk_embed_dim, gin_channels, sr, use_f0, text_enc_hidden_dim, vocoder, checkpointing, True, energy)
+    def __init__(
+        self, 
+        spec_channels, 
+        segment_size, 
+        inter_channels, 
+        hidden_channels, 
+        filter_channels, 
+        n_heads, 
+        n_layers, 
+        kernel_size, 
+        p_dropout, 
+        resblock, 
+        resblock_kernel_sizes, 
+        resblock_dilation_sizes, 
+        upsample_rates, 
+        upsample_initial_channel, 
+        upsample_kernel_sizes, 
+        spk_embed_dim, 
+        gin_channels, 
+        sr, 
+        use_f0, 
+        text_enc_hidden_dim=768, 
+        vocoder="Default", 
+        checkpointing=False, 
+        energy=False, 
+        **kwargs
+    ):
+        super().__init__(
+            spec_channels, 
+            segment_size, 
+            inter_channels, 
+            hidden_channels, 
+            filter_channels, 
+            n_heads, 
+            n_layers, 
+            kernel_size, 
+            p_dropout, 
+            resblock, 
+            resblock_kernel_sizes, 
+            resblock_dilation_sizes, 
+            upsample_rates, 
+            upsample_initial_channel, 
+            upsample_kernel_sizes, 
+            spk_embed_dim, 
+            gin_channels, 
+            sr, 
+            use_f0, 
+            text_enc_hidden_dim, 
+            vocoder, 
+            checkpointing, 
+            True, 
+            energy
+        )
 
     def forward(self, phone, phone_lengths, g=None, rnd=None, pitch=None, nsff0=None, energy=None):
         g = self.emb_g(g).unsqueeze(-1)

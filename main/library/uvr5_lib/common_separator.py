@@ -29,8 +29,28 @@ class CommonSeparator:
     LEAD_VOCAL_STEM = "lead_only"
     BV_VOCAL_STEM = "backing_only"
     NO_STEM = "No "
-    STEM_PAIR_MAPPER = {VOCAL_STEM: INST_STEM, INST_STEM: VOCAL_STEM, LEAD_VOCAL_STEM: BV_VOCAL_STEM, BV_VOCAL_STEM: LEAD_VOCAL_STEM, PRIMARY_STEM: SECONDARY_STEM}
-    NON_ACCOM_STEMS = (VOCAL_STEM, OTHER_STEM, BASS_STEM, DRUM_STEM, GUITAR_STEM, PIANO_STEM, SYNTH_STEM, STRINGS_STEM, WOODWINDS_STEM, BRASS_STEM, WIND_INST_STEM)
+
+    STEM_PAIR_MAPPER = {
+        VOCAL_STEM: INST_STEM, 
+        INST_STEM: VOCAL_STEM, 
+        LEAD_VOCAL_STEM: BV_VOCAL_STEM, 
+        BV_VOCAL_STEM: LEAD_VOCAL_STEM, 
+        PRIMARY_STEM: SECONDARY_STEM
+    }
+
+    NON_ACCOM_STEMS = (
+        VOCAL_STEM, 
+        OTHER_STEM, 
+        BASS_STEM, 
+        DRUM_STEM, 
+        GUITAR_STEM, 
+        PIANO_STEM, 
+        SYNTH_STEM, 
+        STRINGS_STEM, 
+        WOODWINDS_STEM, 
+        BRASS_STEM, 
+        WIND_INST_STEM
+    )
 
     def __init__(self, config):
         self.logger = config.get("logger")

@@ -20,4 +20,4 @@ RUN python3 -m venv /app/.venv && \
 VOLUME [ "/app/assets" ]
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["python3", "main/app/app.py"]
+CMD ["python3", "main/app/app.py", "--client"]

@@ -201,7 +201,7 @@ js_code = """
         model_pth,
         model_index,
         index_strength,
-        onnx_f0_mode,
+        predictor_onnx,
         f0_method,
         hop_length,
         embed_mode,
@@ -223,6 +223,7 @@ js_code = """
         clean_strength,
         exclusive_mode,
         post_process,
+        sid,
         chorus,
         distortion,
         reverb,
@@ -351,7 +352,7 @@ js_code = """
                         extra_convert_size: extra_convert_size,
                         model_index: model_index,
                         f0_method: f0_method,
-                        f0_onnx: onnx_f0_mode,
+                        predictor_onnx: predictor_onnx,
                         embedders_mode: embed_mode,
                         hop_length: hop_length,
                         silent_threshold: silent_threshold,
@@ -371,6 +372,7 @@ js_code = """
                         proposal_pitch_threshold: proposal_pitch_threshold,
                         input_audio_gain: input_audio_gain,
                         post_process: post_process,
+                        sid: sid,
                         kwargs: {
                             chorus: chorus,
                             distortion: distortion,
@@ -522,13 +524,46 @@ js_code = """
     "__PROVIDE_MODEL__", translations["provide_file"].format(filename=translations["model"])
 )
 
+css = """
+<style>
+  @import url('{font_urls}');
+
+  * {{
+    font-family: '{fonts}', cursive !important;
+  }}
+
+  html,
+  body {{
+    font-family: '{fonts}', cursive !important;
+  }}
+
+  h1, h2, h3, h4, h5, h6,
+  p,
+  button,
+  input,
+  textarea,
+  label,
+  span,
+  div,
+  select {{
+    font-family: '{fonts}', cursive !important;
+  }}
+</style>
+""".format(
+    font_urls=font or "https://fonts.googleapis.com/css2?family=Saira&display=swap",
+    fonts=(
+        font or "https://fonts.googleapis.com/css2?family=Saira&display=swap"
+    ).replace("https://fonts.googleapis.com/css2?family=", "").replace("+", " ").split(":")[0].split("&")[0]
+
+)
+
 client_mode = "--client" in sys.argv
 
 with gr.Blocks(
     title="📱 Vietnamese-RVC GUI BY ANH", 
     js=js_code if client_mode else None, 
     theme=theme, 
-    css="<style> @import url('{fonts}'); * {{font-family: 'Courgette', cursive !important;}} body, html {{font-family: 'Courgette', cursive !important;}} h1, h2, h3, h4, h5, h6, p, button, input, textarea, label, span, div, select {{font-family: 'Courgette', cursive !important;}} </style>".format(fonts=font or "https://fonts.googleapis.com/css2?family=Courgette&display=swap")
+    css=css
 ) as app:
     gr.HTML("<h1 style='text-align: center;'>🎵VIETNAMESE RVC BY ANH🎵</h1>")
     gr.HTML(f"<h3 style='text-align: center;'>{translations['title']}</h3>")
@@ -549,7 +584,11 @@ with gr.Blocks(
         extra_tab(app)
 
     with gr.Row(): 
-        gr.Markdown(translations["rick_roll"].format(rickroll=codecs.decode('uggcf://jjj.lbhghor.pbz/jngpu?i=qDj4j9JtKpD', 'rot13')))
+        gr.Markdown(
+            translations["rick_roll"].format(
+                rickroll=codecs.decode('uggcf://jjj.lbhghor.pbz/jngpu?i=qDj4j9JtKpD', 'rot13')
+            )
+        )
 
     with gr.Row(): 
         gr.Markdown(translations["terms_of_use"])
@@ -591,7 +630,7 @@ with gr.Blocks(
                 sys.exit(1)
 
         if client_mode:
-            from main.app.core.realtime_client import app as fastapi_app
+            from main.inference.realtime.client import app as fastapi_app
             gradio_app.mount("/api", fastapi_app)
         
         sys.stdout = original_stdout

@@ -5,7 +5,11 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations, configs
+from main.app.variables import (
+    configs, 
+    translations 
+)
+
 from main.app.tabs.extra.child.fushion import fushion_tab
 from main.app.tabs.extra.child.settings import settings_tab
 from main.app.tabs.extra.child.read_model import read_model_tab

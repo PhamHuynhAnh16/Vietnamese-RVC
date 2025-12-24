@@ -16,6 +16,7 @@ from main.app.variables import translations
 def parse_url(url):
     parsed = urlparse(url)
     is_download_link = parsed.path.endswith("/uc")
+
     if not parsed.hostname in ("drive.google.com", "docs.google.com"): return None, is_download_link
     file_id = parse_qs(parsed.query).get("id", [None])[0]
 
@@ -31,23 +32,46 @@ def parse_url(url):
             r"^/spreadsheets/u/[0-9]+/d/(.*?)/(edit|htmlview|view)$"
         ):
             match = re.match(pattern, parsed.path)
+
             if match:
                 file_id = match.group(1)
                 break
+
     return file_id, is_download_link
 
 def get_url_from_gdrive_confirmation(contents):
-    for pattern in (r'href="(\/uc\?export=download[^"]+)', r'href="/open\?id=([^"]+)"', r'"downloadUrl":"([^"]+)'):
+    for pattern in (
+        r'href="(\/uc\?export=download[^"]+)', 
+        r'href="/open\?id=([^"]+)"', 
+        r'"downloadUrl":"([^"]+)'
+    ):
         match = re.search(pattern, contents)
+
         if match:
             url = match.group(1)
-            if pattern == r'href="/open\?id=([^"]+)"': url = (codecs.decode("uggcf://qevir.hfrepbagrag.tbbtyr.pbz/qbjaybnq?vq=", "rot13") + url + "&confirm=t&uuid=" + re.search(r'<input\s+type="hidden"\s+name="uuid"\s+value="([^"]+)"', contents).group(1))
-            elif pattern == r'"downloadUrl":"([^"]+)': url = url.replace("\\u003d", "=").replace("\\u0026", "&")
-            else: url = codecs.decode("uggcf://qbpf.tbbtyr.pbz", "rot13") + url.replace("&", "&")
+
+            if pattern == r'href="/open\?id=([^"]+)"': 
+                url = (
+                    codecs.decode("uggcf://qevir.hfrepbagrag.tbbtyr.pbz/qbjaybnq?vq=", "rot13") + 
+                    url + 
+                    "&confirm=t&uuid=" + 
+                    re.search(r'<input\s+type="hidden"\s+name="uuid"\s+value="([^"]+)"', contents).group(1)
+                )
+            elif pattern == r'"downloadUrl":"([^"]+)': 
+                url = (
+                    url.replace("\\u003d", "=").replace("\\u0026", "&")
+                )
+            else: 
+                url = (
+                    codecs.decode("uggcf://qbpf.tbbtyr.pbz", "rot13") + 
+                    url.replace("&", "&")
+                )
+
             return url
 
     match = re.search(r'<p class="uc-error-subcaption">(.*)</p>', contents)
     if match: raise Exception(match.group(1))
+
     raise Exception(translations["gdown_error"])
 
 def _get_session(use_cookies, return_cookies_file=False):
@@ -59,16 +83,19 @@ def _get_session(use_cookies, return_cookies_file=False):
         with open(cookies_file) as f:
             for k, v in json.load(f):
                 sess.cookies[k] = v
+
     return (sess, cookies_file) if return_cookies_file else sess
 
 def gdown_download(url=None, output=None):
     file_id = None
-
     if url is None: raise ValueError(translations["gdown_value_error"])
 
-    if "/file/d/" in url: file_id = url.split("/d/")[1].split("/")[0]
-    elif "open?id=" in url: file_id = url.split("open?id=")[1].split("/")[0]
-    elif "/download?id=" in url: file_id = url.split("/download?id=")[1].split("&")[0]
+    if "/file/d/" in url: 
+        file_id = url.split("/d/")[1].split("/")[0]
+    elif "open?id=" in url: 
+        file_id = url.split("open?id=")[1].split("/")[0]
+    elif "/download?id=" in url: 
+        file_id = url.split("/download?id=")[1].split("&")[0]
 
     if file_id:
         url = f"{codecs.decode('uggcf://qevir.tbbtyr.pbz/hp?vq=', 'rot13')}{file_id}"
@@ -90,10 +117,13 @@ def gdown_download(url=None, output=None):
 
             os.makedirs(os.path.dirname(cookies_file), exist_ok=True)
             with open(cookies_file, "w") as f:
-                json.dump([(k, v) for k, v in sess.cookies.items() if not k.startswith("download_warning_")], f, indent=2)
+                json.dump(
+                    [(k, v) for k, v in sess.cookies.items() if not k.startswith("download_warning_")], 
+                    f, 
+                    indent=2
+                )
 
-            if "Content-Disposition" in res.headers: break
-            if not (gdrive_file_id and is_gdrive_download_link): break
+            if ("Content-Disposition" in res.headers) or (not (gdrive_file_id and is_gdrive_download_link)): break
 
             try:
                 url = get_url_from_gdrive_confirmation(res.text)
@@ -102,17 +132,34 @@ def gdown_download(url=None, output=None):
 
         if gdrive_file_id and is_gdrive_download_link:
             content_disposition = unquote(res.headers["Content-Disposition"])
-            filename_from_url = (re.search(r"filename\*=UTF-8''(.*)", content_disposition) or re.search(r'filename=["\']?(.*?)["\']?$', content_disposition)).group(1).replace(os.path.sep, "_")
-        else: filename_from_url = os.path.basename(url)
+
+            filename_from_url = (
+                re.search(r"filename\*=UTF-8''(.*)", content_disposition) or re.search(r'filename=["\']?(.*?)["\']?$', content_disposition)
+            ).group(1).replace(os.path.sep, "_")
+        else: 
+            filename_from_url = os.path.basename(url)
 
         output = os.path.join(output or ".", filename_from_url)
         tmp_file = tempfile.mktemp(suffix=tempfile.template, prefix=os.path.basename(output), dir=os.path.dirname(output))
         f = open(tmp_file, "ab")
 
-        if tmp_file is not None and f.tell() != 0: res = sess.get(url, headers={"Range": f"bytes={f.tell()}-"}, stream=True, verify=True)
+        if tmp_file is not None and f.tell() != 0: 
+            res = sess.get(
+                url, 
+                headers={
+                    "Range": f"bytes={f.tell()}-"
+                }, 
+                stream=True, 
+                verify=True
+            )
 
         try:
-            with tqdm.tqdm(desc=os.path.basename(output), total=int(res.headers.get("Content-Length", 0)), ncols=100, unit="byte") as pbar:
+            with tqdm.tqdm(
+                desc=os.path.basename(output), 
+                total=int(res.headers.get("Content-Length", 0)), 
+                ncols=100, 
+                unit="byte"
+            ) as pbar:
                 for chunk in res.iter_content(chunk_size=512 * 1024):
                     f.write(chunk)
                     pbar.update(len(chunk))
@@ -124,4 +171,5 @@ def gdown_download(url=None, output=None):
             sess.close()
 
         return output
+
     return None

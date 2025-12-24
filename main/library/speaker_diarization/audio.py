@@ -14,9 +14,18 @@ class Audio:
 
     @staticmethod
     def validate_file(file):
-        if isinstance(file, (str, os.PathLike)): file = {"audio": str(file), "uri": os.path.splitext(os.path.basename(file))[0]}
-        elif isinstance(file, IOBase): return {"audio": file, "uri": "stream"}
-        else: raise ValueError
+        if isinstance(file, (str, os.PathLike)): 
+            file = {
+                "audio": str(file), 
+                "uri": os.path.splitext(os.path.basename(file))[0]
+            }
+        elif isinstance(file, IOBase): 
+            return {
+                "audio": file, 
+                "uri": "stream"
+            }
+        else: 
+            raise ValueError
 
         if "waveform" in file:
             waveform = file["waveform"]
@@ -26,18 +35,22 @@ class Audio:
             if sample_rate is None: raise ValueError
 
             file.setdefault("uri", "waveform")
-
         elif "audio" in file:
             if isinstance(file["audio"], IOBase): return file
 
             path = os.path.abspath(file["audio"])
             file.setdefault("uri", os.path.splitext(os.path.basename(path))[0])
-
-        else: raise ValueError
+        else: 
+            raise ValueError
 
         return file
 
-    def __init__(self, sample_rate = None, mono=None, backend = None):
+    def __init__(
+        self, 
+        sample_rate = None, 
+        mono=None, 
+        backend = None
+    ):
         super().__init__()
         self.sample_rate = sample_rate
         self.mono = mono
@@ -52,10 +65,16 @@ class Audio:
             if self.mono == "random":
                 channel = random.randint(0, num_channels - 1)
                 waveform = waveform[channel : channel + 1]
-            elif self.mono == "downmix": waveform = waveform.mean(dim=0, keepdim=True)
+            elif self.mono == "downmix": 
+                waveform = waveform.mean(dim=0, keepdim=True)
 
         if (self.sample_rate is not None) and (self.sample_rate != sample_rate):
-            waveform = torchaudio.functional.resample(waveform, sample_rate, self.sample_rate)
+            waveform = torchaudio.functional.resample(
+                waveform, 
+                sample_rate, 
+                self.sample_rate
+            )
+
             sample_rate = self.sample_rate
 
         return waveform, sample_rate
@@ -66,7 +85,9 @@ class Audio:
         if "waveform" in file:
             frames = len(file["waveform"].T)
             sample_rate = file["sample_rate"]
-        else: return librosa.get_duration(file, sr=None)
+        else: 
+            return librosa.get_duration(file, sr=None)
+
         return frames / sample_rate
 
     def get_num_samples(self, duration, sample_rate = None):
@@ -134,10 +155,17 @@ class Audio:
 
             num_frames = end_frame - start_frame
 
-        if "waveform" in file: data = file["waveform"][:, start_frame:end_frame]
+        if "waveform" in file: 
+            data = file["waveform"][:, start_frame:end_frame]
         else:
             try:
-                data, _ = torchaudio.load(file["audio"], frame_offset=start_frame, num_frames=num_frames, backend=self.backend)
+                data, _ = torchaudio.load(
+                    file["audio"], 
+                    frame_offset=start_frame, 
+                    num_frames=num_frames, 
+                    backend=self.backend
+                )
+
                 if isinstance(file["audio"], IOBase): file["audio"].seek(0)
             except RuntimeError:
                 if isinstance(file["audio"], IOBase): raise RuntimeError

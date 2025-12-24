@@ -11,9 +11,20 @@ from main.library.predictors.RMVPE.deepunet import DeepUnet, HPADeepUnet
 N_MELS, N_CLASS = 128, 360
 
 class BiGRU(nn.Module):
-    def __init__(self, input_features, hidden_features, num_layers):
+    def __init__(
+        self, 
+        input_features, 
+        hidden_features, 
+        num_layers
+    ):
         super(BiGRU, self).__init__()
-        self.gru = nn.GRU(input_features, hidden_features, num_layers=num_layers, batch_first=True, bidirectional=True)
+        self.gru = nn.GRU(
+            input_features, 
+            hidden_features, 
+            num_layers=num_layers, 
+            batch_first=True, 
+            bidirectional=True
+        )
 
     def forward(self, x):
         try:
@@ -23,7 +34,17 @@ class BiGRU(nn.Module):
             return self.gru(x)[0]
         
 class E2E(nn.Module):
-    def __init__(self, n_blocks, n_gru, kernel_size, en_de_layers=5, inter_layers=4, in_channels=1, en_out_channels=16, hpa=False):
+    def __init__(
+        self, 
+        n_blocks, 
+        n_gru, 
+        kernel_size, 
+        en_de_layers=5, 
+        inter_layers=4, 
+        in_channels=1, 
+        en_out_channels=16, 
+        hpa=False
+    ):
         super(E2E, self).__init__()
         self.unet = (
             HPADeepUnet(
@@ -63,4 +84,10 @@ class E2E(nn.Module):
         )
 
     def forward(self, mel):
-        return self.fc(self.cnn(self.unet(mel.transpose(-1, -2).unsqueeze(1))).transpose(1, 2).flatten(-2))
+        return self.fc(
+            self.cnn(
+                self.unet(
+                    mel.transpose(-1, -2).unsqueeze(1)
+                )
+            ).transpose(1, 2).flatten(-2)
+        )

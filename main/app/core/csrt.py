@@ -8,7 +8,12 @@ from main.library.utils import check_spk_diarization
 from main.app.core.ui import gr_info, gr_warning, process_output
 from main.app.variables import config, translations, configs, logger
 
-def create_srt(model_size, input_audio, output_file, word_timestamps):
+def create_srt(
+    model_size, 
+    input_audio, 
+    output_file, 
+    word_timestamps
+):
     import multiprocessing as mp
 
     if not input_audio or not os.path.exists(input_audio) or os.path.isdir(input_audio): 
@@ -36,9 +41,19 @@ def create_srt(model_size, input_audio, output_file, word_timestamps):
         pass
 
     whisper_queue = mp.Queue()
-    whisperprocess = mp.Process(target=whisper_process, args=(model_size, input_audio, configs, config.device, whisper_queue, word_timestamps))
-    whisperprocess.start()
+    whisperprocess = mp.Process(
+        target=whisper_process, 
+        args=(
+            model_size, 
+            input_audio, 
+            configs, 
+            config.device, 
+            whisper_queue, 
+            word_timestamps
+        )
+    )
 
+    whisperprocess.start()
     segments = whisper_queue.get()
 
     with open(output_file, "w", encoding="utf-8") as f:

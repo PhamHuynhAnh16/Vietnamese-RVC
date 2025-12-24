@@ -56,16 +56,26 @@ class Separator:
     ):
         self.logger = logger
         self.logger.info(translations["separator_info"].format(output_dir=output_dir, output_format=output_format))
+
         self.model_file_dir = model_file_dir
         self.output_dir = output_dir if output_dir is not None else now_dir
+
         os.makedirs(self.model_file_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
+
         self.output_format = output_format if output_format is not None else "wav"
         self.output_bitrate = output_bitrate
         self.normalization_threshold = normalization_threshold
+
         if normalization_threshold <= 0 or normalization_threshold > 1: raise ValueError
         self.sample_rate = int(sample_rate)
-        self.arch_specific_params = {"MDX": mdx_params, "Demucs": demucs_params, "VR": vr_params}
+
+        self.arch_specific_params = {
+            "MDX": mdx_params, 
+            "Demucs": demucs_params, 
+            "VR": vr_params
+        }
+
         self.torch_device = None
         self.torch_device_cpu = None
         self.torch_device_mps = None
@@ -101,7 +111,8 @@ class Separator:
         if "CUDAExecutionProvider" in ort_providers:
             self.logger.info(translations["onnx_have"].format(have='CUDAExecutionProvider'))
             self.onnx_execution_provider = ["CUDAExecutionProvider"]
-        else: self.logger.warning(translations["onnx_not_have"].format(have='CUDAExecutionProvider'))
+        else: 
+            self.logger.warning(translations["onnx_not_have"].format(have='CUDAExecutionProvider'))
 
     def configure_amd(self, ort_providers):
         self.logger.info(translations["running_in_amd"])
@@ -110,7 +121,8 @@ class Separator:
         if "DmlExecutionProvider" in ort_providers:
             self.logger.info(translations["onnx_have"].format(have='DmlExecutionProvider'))
             self.onnx_execution_provider = ["DmlExecutionProvider"]
-        else: self.logger.warning(translations["onnx_not_have"].format(have='DmlExecutionProvider'))
+        else: 
+            self.logger.warning(translations["onnx_not_have"].format(have='DmlExecutionProvider'))
 
     def configure_mps(self, ort_providers):
         self.logger.info(translations["set_torch_mps"])
@@ -120,12 +132,14 @@ class Separator:
         if "CoreMLExecutionProvider" in ort_providers:
             self.logger.info(translations["onnx_have"].format(have='CoreMLExecutionProvider'))
             self.onnx_execution_provider = ["CoreMLExecutionProvider"]
-        else: self.logger.warning(translations["onnx_not_have"].format(have='CoreMLExecutionProvider'))
+        else: 
+            self.logger.warning(translations["onnx_not_have"].format(have='CoreMLExecutionProvider'))
 
     def get_model_hash(self, model_path):
         try:
             with open(model_path, "rb") as f:
                 f.seek(-10000 * 1024, 2)
+
                 return hashlib.md5(f.read()).hexdigest()
         except IOError as e:
             return hashlib.md5(open(model_path, "rb").read()).hexdigest()
@@ -135,7 +149,13 @@ class Separator:
         HF_download_file(url, output_path)
 
     def list_supported_model_files(self):
-        response = requests.get(codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/enj/znva/wfba/hie_zbqryf.wfba", "rot13"))
+        response = requests.get(
+            codecs.decode(
+                "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/enj/znva/wfba/hie_zbqryf.wfba", 
+                "rot13"
+            )
+        )
+
         response.raise_for_status()
         model_downloads_list = response.json()
 
@@ -144,7 +164,10 @@ class Separator:
                 **model_downloads_list["mdx_download_list"], 
                 **model_downloads_list["mdx_download_vip_list"]
             }, 
-            "Demucs": {key: value for key, value in model_downloads_list["demucs_download_list"].items() if key.startswith("Demucs v4")},
+            "Demucs": {
+                key: value for key, value in model_downloads_list["demucs_download_list"].items() 
+                if key.startswith("Demucs v4")
+            },
             "VR": {
                 **model_downloads_list["vr_download_list"]
             }
@@ -153,18 +176,31 @@ class Separator:
     def download_model_files(self, model_filename):
         model_path = os.path.join(self.model_file_dir, model_filename)
         supported_models = self.list_supported_model_files()
-        model_repo = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/hie5_zbqryf", "rot13")
+
+        model_repo = codecs.decode(
+            "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/hie5_zbqryf", 
+            "rot13"
+        )
 
         for model_type, model_list in supported_models.items():
             for _, files in model_list.items():
                 if isinstance(files, str) and files == model_filename:
                     try:
-                        self.download_file_if_not_exists(f"{model_repo}/MDX/{model_filename}", model_path)
+                        self.download_file_if_not_exists(
+                            f"{model_repo}/MDX/{model_filename}", 
+                            model_path
+                        )
                     except:
                         try:
-                            self.download_file_if_not_exists(f"{model_repo}/VR/{model_filename}", model_path)
+                            self.download_file_if_not_exists(
+                                f"{model_repo}/VR/{model_filename}", 
+                                model_path
+                            )
                         except:
-                            self.download_file_if_not_exists(f"{model_repo}/Demucs/{model_filename}", model_path)
+                            self.download_file_if_not_exists(
+                                f"{model_repo}/Demucs/{model_filename}", 
+                                model_path
+                            )
 
                     return model_filename, model_type, model_path
 
@@ -173,23 +209,41 @@ class Separator:
                         out_path = os.path.join(self.model_file_dir, file_key)
 
                         if file_val.startswith("http"):
-                            self.download_file_if_not_exists(file_val, out_path)
+                            self.download_file_if_not_exists(
+                                file_val, 
+                                out_path
+                            )
                         else:
-                            self.download_file_if_not_exists(f"{model_repo}/Demucs/{file_val}", os.path.join(self.model_file_dir, file_val))
+                            self.download_file_if_not_exists(
+                                f"{model_repo}/Demucs/{file_val}", 
+                                os.path.join(self.model_file_dir, file_val)
+                            )
 
                     return model_filename, model_type, model_path
 
         raise ValueError
 
     def load_model_data_from_yaml(self, yaml_config_filename):
-        model_data_yaml_filepath = os.path.join(self.model_file_dir, yaml_config_filename) if not os.path.exists(yaml_config_filename) else yaml_config_filename
-        model_data = yaml.load(open(model_data_yaml_filepath, encoding="utf-8"), Loader=yaml.FullLoader)
+        model_data_yaml_filepath = os.path.join(
+            self.model_file_dir, yaml_config_filename
+        ) if not os.path.exists(yaml_config_filename) else yaml_config_filename
+
+        model_data = yaml.load(
+            open(model_data_yaml_filepath, encoding="utf-8"), 
+            Loader=yaml.FullLoader
+        )
 
         return model_data
 
     def load_model_data_using_hash(self, model_path):
         model_hash = self.get_model_hash(model_path)
-        response = requests.get(codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/enj/znva/wfba/zbqry_qngn.wfba", "rot13"))
+        response = requests.get(
+            codecs.decode(
+                "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/enj/znva/wfba/zbqry_qngn.wfba", 
+                "rot13"
+            )
+        )
+
         response.raise_for_status()
         model_data_object = response.json()
 
@@ -212,7 +266,11 @@ class Separator:
             "onnx_execution_provider": self.onnx_execution_provider, 
             "model_name": model_filename.split(".")[0], 
             "model_path": model_path, 
-            "model_data": self.load_model_data_from_yaml(yaml_config_filename) if yaml_config_filename is not None else self.load_model_data_using_hash(model_path), 
+            "model_data": (
+                self.load_model_data_from_yaml(yaml_config_filename) 
+                if yaml_config_filename is not None else 
+                self.load_model_data_using_hash(model_path)
+            ), 
             "output_format": self.output_format, 
             "output_bitrate": self.output_bitrate, 
             "output_dir": self.output_dir, 
@@ -221,9 +279,14 @@ class Separator:
             "invert_using_spec": False, 
             "sample_rate": self.sample_rate
         }
-        separator_classes = {"MDX": "mdx_separator.MDXSeparator", "Demucs": "demucs_separator.DemucsSeparator", "VR": "vr_separator.VRSeparator"}
+        separator_classes = {
+            "MDX": "mdx_separator.MDXSeparator", 
+            "Demucs": "demucs_separator.DemucsSeparator", 
+            "VR": "vr_separator.VRSeparator"
+        }
 
-        if model_type not in self.arch_specific_params or model_type not in separator_classes: raise ValueError(translations["model_type_not_support"].format(model_type=model_type))
+        if model_type not in self.arch_specific_params or model_type not in separator_classes: 
+            raise ValueError(translations["model_type_not_support"].format(model_type=model_type))
 
         module_name, class_name = separator_classes[model_type].split(".")
         separator_class = getattr(import_module(f"main.library.architectures.{module_name}"), class_name)
@@ -233,7 +296,11 @@ class Separator:
         self.logger.info(f"{translations['starting_separator']}: {audio_file_path}")
         separate_start_time = time.perf_counter()
 
-        with torch.amp.autocast(self.torch_device.type if self.torch_device.type != "ocl" else "cpu", enabled=config.is_half, dtype=torch.float16 if config.is_half else torch.float32):
+        with torch.amp.autocast(
+            self.torch_device.type if self.torch_device.type != "ocl" else "cpu", 
+            enabled=config.is_half, 
+            dtype=torch.float16 if config.is_half else torch.float32
+        ):
             output_files = self.model_instance.separate(audio_file_path)
 
         clear_gpu_cache()
@@ -241,4 +308,5 @@ class Separator:
 
         self.logger.debug(translations["separator_success_3"])
         self.logger.info(f"{translations['separator_duration']}: {time.strftime('%H:%M:%S', time.gmtime(int(time.perf_counter() - separate_start_time)))}")
+
         return output_files

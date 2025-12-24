@@ -9,14 +9,27 @@ sys.path.append(os.getcwd())
 from main.app.core.ui import gr_info, gr_warning, gr_error
 from main.app.variables import config, logger, translations, configs
 
-def fushion_model_pth(name, pth_1, pth_2, ratio):
+def fushion_model_pth(
+    name, 
+    model_path_1, 
+    model_path_2, 
+    ratio
+):
     if not name.endswith(".pth"): name = name + ".pth"
 
-    if not pth_1 or not os.path.exists(pth_1) or not pth_1.endswith(".pth"):
+    if (
+        not model_path_1 or 
+        not os.path.exists(model_path_1) or 
+        not model_path_1.endswith(".pth")
+    ):
         gr_warning(translations["provide_file"].format(filename=translations["model"] + " 1"))
         return [translations["provide_file"].format(filename=translations["model"] + " 1"), None]
     
-    if not pth_2 or not os.path.exists(pth_2) or not pth_2.endswith(".pth"):
+    if (
+        not model_path_2 or 
+        not os.path.exists(model_path_2) or 
+        not model_path_2.endswith(".pth")
+    ):
         gr_warning(translations["provide_file"].format(filename=translations["model"] + " 2"))
         return [translations["provide_file"].format(filename=translations["model"] + " 2"), None]
 
@@ -35,8 +48,8 @@ def fushion_model_pth(name, pth_1, pth_2, ratio):
         return opt
     
     try:
-        ckpt1 = torch.load(pth_1, map_location="cpu", weights_only=True)
-        ckpt2 = torch.load(pth_2, map_location="cpu", weights_only=True)
+        ckpt1 = torch.load(model_path_1, map_location="cpu", weights_only=True)
+        ckpt2 = torch.load(model_path_2, map_location="cpu", weights_only=True)
 
         if ckpt1["sr"] != ckpt2["sr"]: 
             gr_warning(translations["sr_not_same"])
@@ -55,6 +68,7 @@ def fushion_model_pth(name, pth_1, pth_2, ratio):
 
         if sorted(list(ckpt1.keys())) != sorted(list(ckpt2.keys())): 
             gr_warning(translations["architectures_not_same"])
+
             return [translations["architectures_not_same"], None]
          
         gr_info(translations["start"].format(start=translations["fushion_model"]))
@@ -65,14 +79,27 @@ def fushion_model_pth(name, pth_1, pth_2, ratio):
         for key in ckpt1.keys():
             if key == "emb_g.weight" and ckpt1[key].shape != ckpt2[key].shape:
                 min_shape0 = min(ckpt1[key].shape[0], ckpt2[key].shape[0])
-                opt["weight"][key] = (ratio * (ckpt1[key][:min_shape0].float()) + (1 - ratio) * (ckpt2[key][:min_shape0].float())).half()
-            else: opt["weight"][key] = (ratio * (ckpt1[key].float()) + (1 - ratio) * (ckpt2[key].float())).half()
+
+                opt["weight"][key] = (
+                    ratio * (ckpt1[key][:min_shape0].float()) + (1 - ratio) * (ckpt2[key][:min_shape0].float())
+                ).half()
+            else: 
+                opt["weight"][key] = (
+                    ratio * (ckpt1[key].float()) + (1 - ratio) * (ckpt2[key].float())
+                ).half()
 
         opt["config"] = cfg
         opt["sr"] = cfg_sr
         opt["f0"] = cfg_f0
         opt["version"] = cfg_version
-        opt["infos"] = translations["model_fushion_info"].format(name=name, pth_1=pth_1, pth_2=pth_2, ratio=ratio)
+
+        opt["infos"] = translations["model_fushion_info"].format(
+            name=name, 
+            model_path_1=model_path_1, 
+            model_path_2=model_path_2, 
+            ratio=ratio
+        )
+
         opt["vocoder"] = vocoder
         opt["energy"] = rms_extract
 
@@ -87,48 +114,81 @@ def fushion_model_pth(name, pth_1, pth_2, ratio):
         gr_error(message=translations["error_occurred"].format(e=e))
         return [e, None]
 
-def fushion_model(name, path_1, path_2, ratio):
-    if not name:
+def fushion_model(
+    modelname, 
+    model_path_1, 
+    model_path_2, 
+    ratio
+):
+    if not modelname:
         gr_warning(translations["provide_name_is_save"]) 
         return [translations["provide_name_is_save"], None]
 
-    if path_1.endswith(".pth") and path_2.endswith(".pth"): return fushion_model_pth(name, path_1, path_2, ratio)
+    if model_path_1.endswith(".pth") and model_path_2.endswith(".pth"): 
+        return fushion_model_pth(
+            modelname, 
+            model_path_1, 
+            model_path_2, 
+            ratio
+        )
     else:
         gr_warning(translations["format_not_valid"])
         return [None, None]
     
 def onnx_export(model_path):    
     if not model_path.endswith(".pth"): model_path += ".pth"
-    if not model_path or not os.path.exists(model_path) or not model_path.endswith(".pth"): return gr_warning(translations["provide_file"].format(filename=translations["model"]))
+
+    if (
+        not model_path or 
+        not os.path.exists(model_path) or 
+        not model_path.endswith(".pth")
+    ): 
+        return gr_warning(translations["provide_file"].format(filename=translations["model"]))
     
     try:
         gr_info(translations["start_onnx_export"])
 
         from main.library.onnx.onnx_export import onnx_exporter
-        output = onnx_exporter(model_path, model_path.replace(".pth", ".onnx"), is_half=config.is_half, device=config.device)
+
+        output = onnx_exporter(
+            model_path, 
+            model_path.replace(".pth", ".onnx"), 
+            is_half=config.is_half, 
+            device=config.device
+        )
 
         gr_info(translations["success"])
         return output
     except Exception as e:
         return gr_error(e)
     
-def model_info(path):
-    if not path or not os.path.exists(path) or os.path.isdir(path) or not path.endswith((".pth", ".onnx")): return gr_warning(translations["provide_file"].format(filename=translations["model"]))
+def model_info(model_path):
+    if (
+        not model_path or 
+        not os.path.exists(model_path) or 
+        os.path.isdir(model_path) or 
+        not model_path.endswith((".pth", ".onnx"))
+    ): 
+        return gr_warning(translations["provide_file"].format(filename=translations["model"]))
     
     def prettify_date(date_str):
         if date_str == translations["not_found_create_time"]: return None
 
         try:
-            return datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
+            return datetime.datetime.strptime(
+                date_str, 
+                "%Y-%m-%dT%H:%M:%S.%f"
+            ).strftime("%Y-%m-%d %H:%M:%S")
         except ValueError as e:
             logger.debug(e)
             return translations["format_not_valid"]
     
-    if path.endswith(".pth"): model_data = torch.load(path, map_location="cpu")
+    if model_path.endswith(".pth"): 
+        model_data = torch.load(model_path, map_location="cpu")
     else:        
         import onnx
 
-        model = onnx.load(path)
+        model = onnx.load(model_path)
         model_data = None
 
         for prop in model.metadata_props:
@@ -141,9 +201,11 @@ def model_info(path):
     epochs = model_data.get("epoch", None)
     if epochs is None: 
         epochs = model_data.get("info", None)
+
         try:
             epoch = epochs.replace("epoch", "").replace("e", "").isdigit()
-            if epoch and epochs is None: epochs = translations["not_found"].format(name=translations["epoch"])
+            if epoch and epochs is None: 
+                epochs = translations["not_found"].format(name=translations["epoch"])
         except: 
             pass
 
@@ -161,6 +223,7 @@ def model_info(path):
     rms_extract = model_data.get("energy", False)
 
     gr_info(translations["success"])
+
     return translations["model_info"].format(
         model_name=model_name, 
         model_author=model_author, 

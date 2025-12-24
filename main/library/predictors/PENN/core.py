@@ -35,23 +35,46 @@ def interpolate(pitch, periodicity, value):
     pitch[..., -1] = pitch[voiced][..., -1]
     voiced[..., 0] = True
     voiced[..., -1] = True
-    pitch[~voiced] = _interpolate(torch.where(~voiced[0])[0][None], torch.where(voiced[0])[0][None], pitch[voiced][None])
+
+    pitch[~voiced] = _interpolate(
+        torch.where(~voiced[0])[0][None], 
+        torch.where(voiced[0])[0][None], 
+        pitch[voiced][None]
+    )
 
     return 2 ** pitch
 
 def _interpolate(x, xp, fp):
     if xp.shape[-1] == 0: return x
-    if xp.shape[-1] == 1: return torch.full(x.shape, fp.squeeze(), device=fp.device, dtype=fp.dtype)
+
+    if xp.shape[-1] == 1: 
+        return torch.full(
+            x.shape, 
+            fp.squeeze(), 
+            device=fp.device, 
+            dtype=fp.dtype
+        )
 
     m = (fp[:, 1:] - fp[:, :-1]) / (xp[:, 1:] - xp[:, :-1])
     b = fp[:, :-1] - (m.mul(xp[:, :-1]))
 
     indicies = x[:, :, None].ge(xp[:, None, :]).sum(-1) - 1
     indicies = indicies.clamp(0, m.shape[-1] - 1)
-    line_idx = torch.linspace(0, indicies.shape[0], 1, device=indicies.device).to(torch.long).expand(indicies.shape)
+
+    line_idx = torch.linspace(
+        0, 
+        indicies.shape[0], 
+        1, 
+        device=indicies.device
+    ).to(torch.long).expand(indicies.shape)
 
     return m[line_idx, indicies].mul(x) + b[line_idx, indicies]
 
 def entropy(logits):
     distribution = F.softmax(logits, dim=1)
-    return (1 + 1 / math.log(PITCH_BINS) * (distribution * (distribution + 1e-7).log()).sum(dim=1))
+
+    return (
+        1 + 1 / math.log(PITCH_BINS) * (
+            distribution * (distribution + 1e-7).log()
+        ).sum(dim=1)
+    )

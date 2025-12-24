@@ -13,16 +13,23 @@ if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"
             fourier_basis = torch.fft.fft(torch.eye(n_fft, device="cpu")).to(
                 self.device
             )
-
             cutoff = n_fft // 2 + 1
-            fourier_basis = torch.cat(
-                [fourier_basis.real[:cutoff], fourier_basis.imag[:cutoff]], dim=0
-            )
+
+            fourier_basis = torch.cat([
+                fourier_basis.real[:cutoff], 
+                fourier_basis.imag[:cutoff]
+            ], dim=0)
 
             self.fourier_bases[n_fft] = fourier_basis
             return fourier_basis
 
-        def transform(self, input, n_fft, hop_length, window):
+        def transform(
+            self, 
+            input, 
+            n_fft, 
+            hop_length, 
+            window
+        ):
             fourier_basis = self._get_fourier_basis(n_fft)
             fourier_basis = fourier_basis * window
 
@@ -36,7 +43,8 @@ if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"
             cutoff = n_fft // 2 + 1
 
             return torch.complex(
-                fourier_transform[:, :cutoff, :], fourier_transform[:, cutoff:, :]
+                fourier_transform[:, :cutoff, :], 
+                fourier_transform[:, cutoff:, :]
             )
 
     stft = STFT()

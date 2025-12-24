@@ -4,7 +4,13 @@ import torch
 from functools import partial
 
 class PPESTO(torch.nn.Module):
-    def __init__(self, encoder, preprocessor, crop_kwargs = None, reduction = "alwa"):
+    def __init__(
+        self, 
+        encoder, 
+        preprocessor, 
+        crop_kwargs = None, 
+        reduction = "alwa"
+    ):
         super(PPESTO, self).__init__()
         self.encoder = encoder
         self.preprocessor = preprocessor
@@ -60,9 +66,15 @@ class PPESTO(torch.nn.Module):
         if self.reduction == "mean": return activations.matmul(all_pitches)
 
         if self.reduction == "alwa":
-            indices = (activations.argmax(dim=-1, keepdim=True) + (torch.arange(1, 2 * bps, device=device) - bps)).clip_(min=0, max=num_bins - 1)
+            indices = (
+                activations.argmax(dim=-1, keepdim=True) + 
+                (torch.arange(1, 2 * bps, device=device) - bps)
+            ).clip_(min=0, max=num_bins - 1)
             cropped_activations = activations.gather(-1, indices)
-            return (cropped_activations * all_pitches.unsqueeze(0).expand_as(activations).gather(-1, indices)).sum(dim=-1) / cropped_activations.sum(dim=-1)
+
+            return (
+                cropped_activations * all_pitches.unsqueeze(0).expand_as(activations).gather(-1, indices)
+            ).sum(dim=-1) / cropped_activations.sum(dim=-1)
 
         raise ValueError
     
@@ -73,7 +85,17 @@ class ConfidenceClassifier(torch.nn.Module):
         self.linear = torch.nn.Linear(72, 1)
 
     def forward(self, x):
-        return self.linear(torch.cat((torch.nn.functional.relu(self.conv(x.unsqueeze(1)).squeeze(1)), x.log().mean(dim=-1, keepdim=True).exp() / x.mean(dim=-1, keepdim=True).clip_(min=1e-8)), dim=-1)).sigmoid().squeeze(-1)
+        return self.linear(
+            torch.cat(
+                (
+                    torch.nn.functional.relu(
+                        self.conv(x.unsqueeze(1)).squeeze(1)
+                    ), 
+                    x.log().mean(dim=-1, keepdim=True).exp() / x.mean(dim=-1, keepdim=True).clip_(min=1e-8)
+                ), 
+                dim=-1
+            )
+        ).sigmoid().squeeze(-1)
 
 class CropCQT(torch.nn.Module):
     def __init__(self, min_steps, max_steps):
@@ -86,7 +108,20 @@ class CropCQT(torch.nn.Module):
         return spectrograms[..., self.max_steps: self.min_steps]
     
 class Resnet1d(torch.nn.Module):
-    def __init__(self, n_chan_input=1, n_chan_layers=(20, 20, 10, 1), n_prefilt_layers=1, prefilt_kernel_size=15, residual=False, n_bins_in=216, output_dim=128, activation_fn = "leaky", a_lrelu=0.3, p_dropout=0.2, **unused):
+    def __init__(
+        self, 
+        n_chan_input=1, 
+        n_chan_layers=(20, 20, 10, 1), 
+        n_prefilt_layers=1, 
+        prefilt_kernel_size=15, 
+        residual=False, 
+        n_bins_in=216, 
+        output_dim=128, 
+        activation_fn = "leaky", 
+        a_lrelu=0.3, 
+        p_dropout=0.2, 
+        **unused
+    ):
         super(Resnet1d, self).__init__()
         self.hparams = dict(
             n_chan_input=n_chan_input, 
@@ -117,21 +152,49 @@ class Resnet1d(torch.nn.Module):
         self.layernorm = torch.nn.LayerNorm(normalized_shape=[n_in, n_bins_in])
         prefilt_padding = prefilt_kernel_size // 2
 
-        self.conv1 = torch.nn.Sequential(torch.nn.Conv1d(in_channels=n_in, out_channels=n_ch[0], kernel_size=prefilt_kernel_size, padding=prefilt_padding, stride=1), activation_layer(), torch.nn.Dropout(p=p_dropout))
+        self.conv1 = torch.nn.Sequential(
+            torch.nn.Conv1d(
+                in_channels=n_in, 
+                out_channels=n_ch[0], 
+                kernel_size=prefilt_kernel_size, 
+                padding=prefilt_padding, 
+                stride=1
+            ), 
+            activation_layer(), 
+            torch.nn.Dropout(p=p_dropout)
+        )
+
         self.n_prefilt_layers = n_prefilt_layers
         self.prefilt_layers = torch.nn.ModuleList([
             torch.nn.Sequential(
-                torch.nn.Conv1d(in_channels=n_ch[0], out_channels=n_ch[0], kernel_size=prefilt_kernel_size, padding=prefilt_padding, stride=1), 
+                torch.nn.Conv1d(
+                    in_channels=n_ch[0], 
+                    out_channels=n_ch[0], 
+                    kernel_size=prefilt_kernel_size, 
+                    padding=prefilt_padding, 
+                    stride=1
+                ), 
                 activation_layer(), 
                 torch.nn.Dropout(p=p_dropout)
             ) 
             for _ in range(n_prefilt_layers-1)
         ])
+
         self.residual = residual
         conv_layers = []
 
         for i in range(len(n_chan_layers)-1):
-            conv_layers.extend([torch.nn.Conv1d(in_channels=n_ch[i], out_channels=n_ch[i + 1], kernel_size=1, padding=0, stride=1), activation_layer(), torch.nn.Dropout(p=p_dropout)])
+            conv_layers.extend([
+                torch.nn.Conv1d(
+                    in_channels=n_ch[i], 
+                    out_channels=n_ch[i + 1], 
+                    kernel_size=1, 
+                    padding=0, 
+                    stride=1
+                ), 
+                activation_layer(), 
+                torch.nn.Dropout(p=p_dropout)
+            ])
 
         self.conv_layers = torch.nn.Sequential(*conv_layers)
         self.flatten = torch.nn.Flatten(start_dim=1)
@@ -152,8 +215,18 @@ class Resnet1d(torch.nn.Module):
         return self.final_norm(self.fc(self.flatten(self.conv_layers(x))))
     
 class ToeplitzLinear(torch.nn.Conv1d):
-    def __init__(self, in_features, out_features):
-        super(ToeplitzLinear, self).__init__(in_channels=1, out_channels=1, kernel_size=in_features+out_features-1, padding=out_features-1, bias=False)
+    def __init__(
+        self, 
+        in_features, 
+        out_features
+    ):
+        super(ToeplitzLinear, self).__init__(
+            in_channels=1, 
+            out_channels=1, 
+            kernel_size=in_features+out_features - 1, 
+            padding=out_features - 1, 
+            bias=False
+        )
 
     def forward(self, input):
         return super(ToeplitzLinear, self).forward(input.unsqueeze(-2)).squeeze(-2)

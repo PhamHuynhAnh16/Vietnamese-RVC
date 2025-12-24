@@ -50,7 +50,14 @@ class RMVPE:
 
                 if self.onnx:
                     mel_chunk = mel_chunk.cpu().numpy().astype(np.float32)
-                    out_chunk = torch.as_tensor(self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: mel_chunk})[0], device=self.device)
+
+                    out_chunk = torch.as_tensor(
+                        self.model.run(
+                            [self.model.get_outputs()[0].name], 
+                            {self.model.get_inputs()[0].name: mel_chunk}
+                        )[0], 
+                        device=self.device
+                    )
                 else: 
                     if self.is_half: mel_chunk = mel_chunk.half()
                     out_chunk = self.model(mel_chunk)
@@ -67,9 +74,16 @@ class RMVPE:
         return f0
 
     def infer_from_audio(self, audio, thred=0.03):
-        hidden = self.mel2hidden(self.mel_extractor(torch.from_numpy(audio).float().to(self.device).unsqueeze(0), center=True))
+        hidden = self.mel2hidden(
+            self.mel_extractor(
+                torch.from_numpy(audio).float().to(self.device).unsqueeze(0), center=True
+            )
+        )
 
-        return self.decode(hidden.squeeze(0).cpu().numpy().astype(np.float32), thred=thred)
+        return self.decode(
+            hidden.squeeze(0).cpu().numpy().astype(np.float32), 
+            thred=thred
+        )
     
     def infer_from_audio_with_pitch(self, audio, thred=0.03, f0_min=50, f0_max=1100):
         f0 = self.infer_from_audio(audio, thred)

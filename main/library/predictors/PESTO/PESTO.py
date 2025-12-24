@@ -5,7 +5,17 @@ import torch
 sys.path.append(os.getcwd())
 
 class PESTO:
-    def __init__(self, model_path, step_size=10, reduction="alwa", num_chunks=1, sample_rate=16000, device=None, providers=None, onnx=False):
+    def __init__(
+        self, 
+        model_path, 
+        step_size=10, 
+        reduction="alwa", 
+        num_chunks=1, 
+        sample_rate=16000, 
+        device=None, 
+        providers=None, 
+        onnx=False
+    ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.step_size = step_size
         self.reduction = reduction
@@ -24,9 +34,19 @@ class PESTO:
             from main.library.predictors.PESTO.preprocessor import Preprocessor
 
             ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
-            model = PPESTO(Resnet1d(**ckpt["hparams"]["encoder"]), preprocessor=Preprocessor(hop_size=step_size, sampling_rate=sample_rate, **ckpt["hcqt_params"]), crop_kwargs=ckpt["hparams"]["pitch_shift"], reduction=ckpt["hparams"]["reduction"])
+            model = PPESTO(
+                Resnet1d(
+                    **ckpt["hparams"]["encoder"]
+                ), 
+                preprocessor=Preprocessor(
+                    hop_size=step_size, 
+                    sampling_rate=sample_rate, 
+                    **ckpt["hcqt_params"]
+                ), 
+                crop_kwargs=ckpt["hparams"]["pitch_shift"], 
+                reduction=ckpt["hparams"]["reduction"]
+            )
             model.load_state_dict(ckpt["state_dict"], strict=False)
-
             self.model = model.to(self.device).eval()
             self.model.reduction = self.reduction
 
@@ -41,9 +61,7 @@ class PESTO:
                     if self.onnx:
                         model = self.model.run(
                             [self.model.get_outputs()[0].name, self.model.get_outputs()[1].name], 
-                            {
-                                self.model.get_inputs()[0].name: chunk.cpu().numpy()
-                            }
+                            {self.model.get_inputs()[0].name: chunk.cpu().numpy()}
                         )
                         pred, conf = torch.tensor(model[0], device=self.device), torch.tensor(model[1], device=self.device)
                     else:

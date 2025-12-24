@@ -33,7 +33,7 @@ def realtime_start(
     model_pth,
     model_index,
     index_strength,
-    onnx_f0_mode,
+    predictor_onnx,
     f0_method,
     hop_length,
     embed_mode,
@@ -54,6 +54,7 @@ def realtime_start(
     clean_audio, 
     clean_strength,
     post_process,
+    sid,
     chorus,
     distortion,
     reverb,
@@ -100,24 +101,49 @@ def realtime_start(
     running = True
 
     gr_info(translations["start_realtime"])
-    yield translations["start_realtime"], interactive_false, interactive_true
+
+    yield (
+        translations["start_realtime"], 
+        interactive_false, 
+        interactive_true
+    )
 
     if not input_audio_device or not output_audio_device:
         gr_warning(translations["provide_audio_device"])
-        yield translations["provide_audio_device"], interactive_true, interactive_false
+
+        yield (
+            translations["provide_audio_device"], 
+            interactive_true, 
+            interactive_false
+        )
         return
 
     if monitor and not monitor_output_device:
         gr_warning(translations["provide_monitor_device"])
-        yield translations["provide_monitor_device"], interactive_true, interactive_false
+
+        yield (
+            translations["provide_monitor_device"], 
+            interactive_true, 
+            interactive_false
+        )
         return
 
     model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
     embedder_model = (embedders if embedders != "custom" else custom_embedders)
 
-    if not model_pth or not os.path.exists(model_pth) or os.path.isdir(model_pth) or not model_pth.endswith((".pth", ".onnx")):
+    if (
+        not model_pth or 
+        not os.path.exists(model_pth) or 
+        os.path.isdir(model_pth) or 
+        not model_pth.endswith((".pth", ".onnx"))
+    ):
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
-        yield translations["provide_file"].format(filename=translations["model"]), interactive_true, interactive_false
+
+        yield (
+            translations["provide_file"].format(filename=translations["model"]), 
+            interactive_true, 
+            interactive_false
+        )
         return
 
     input_devices, output_devices = audio_device()
@@ -143,7 +169,7 @@ def realtime_start(
         model_path=model_pth, 
         index_path=model_index, 
         f0_method=f0_method, 
-        f0_onnx=onnx_f0_mode, 
+        predictor_onnx=predictor_onnx, 
         embedder_model=embedder_model, 
         embedders_mode=embed_mode, 
         sample_rate=PIPELINE_SAMPLE_RATE, 
@@ -168,6 +194,7 @@ def realtime_start(
         clean_audio=clean_audio,
         clean_strength=clean_strength,
         post_process=post_process,
+        sid=sid,
         **{
             "chorus": chorus,
             "distortion": distortion,
@@ -231,9 +258,18 @@ def realtime_start(
 
     while running and callbacks is not None and audio_manager is not None:
         time.sleep(0.1)
-        if hasattr(callbacks, "latency"): yield f"{translations['latency']}: {callbacks.latency:.2f} ms", interactive_false, interactive_true
+        if hasattr(callbacks, "latency"): 
+            yield (
+                f"{translations['latency']}: {callbacks.latency:.2f} ms", 
+                interactive_false, 
+                interactive_true
+            )
 
-    return translations["realtime_has_stop"], interactive_true, interactive_false
+    return (
+        translations["realtime_has_stop"], 
+        interactive_true, 
+        interactive_false
+    )
 
 def realtime_stop():
     global running, callbacks, audio_manager
@@ -253,8 +289,16 @@ def realtime_stop():
         from main.library.utils import clear_gpu_cache
         clear_gpu_cache()
 
-        return translations["realtime_has_stop"], interactive_true, interactive_false
+        return (
+            translations["realtime_has_stop"], 
+            interactive_true, 
+            interactive_false
+        )
     else:
         gr_warning(translations["realtime_not_found"])
 
-        return translations["realtime_not_found"], interactive_true, interactive_false
+        return (
+            translations["realtime_not_found"], 
+            interactive_true, 
+            interactive_false
+        )

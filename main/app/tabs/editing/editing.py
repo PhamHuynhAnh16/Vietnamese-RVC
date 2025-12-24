@@ -5,7 +5,11 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import configs, translations
+from main.app.variables import (
+    configs, 
+    translations 
+)
+
 from main.app.tabs.editing.child.quirk import quirk_tab
 from main.app.tabs.editing.child.audio_effects import audio_effects_tab
 

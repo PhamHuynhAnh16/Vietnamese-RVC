@@ -18,21 +18,45 @@ from main.library.uvr5_lib.demucs.states import capture_init
 from main.library.uvr5_lib.demucs.demucs import rescale_module
 from main.library.uvr5_lib.demucs.hdemucs import pad1d, spectro, ispectro, wiener, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
 
-def create_sin_embedding(length, dim, shift = 0, device="cpu", max_period=10000):
+def create_sin_embedding(
+    length, 
+    dim, 
+    shift = 0, 
+    device="cpu", 
+    max_period=10000
+):
     assert dim % 2 == 0
+
     pos = shift + torch.arange(length, device=device).view(-1, 1, 1)
     half_dim = dim // 2
     adim = torch.arange(dim // 2, device=device).view(1, 1, -1)
-    phase = pos / (max_period ** ((adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)) if str(device).startswith("ocl") else (adim / (half_dim - 1))))
+
+    phase = pos / (
+        max_period ** ((
+            adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)
+        ) if str(device).startswith("ocl") else (
+            adim / (half_dim - 1)
+        ))
+    )
+
     return torch.cat([phase.cos(), phase.sin()], dim=-1)
 
-def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=10000):
+def create_2d_sin_embedding(
+    d_model, 
+    height, 
+    width, 
+    device="cpu", 
+    max_period=10000
+):
     if d_model % 4 != 0: raise ValueError(translations["dims"].format(dims=d_model))
+
     pe = torch.zeros(d_model, height, width)
     d_model = int(d_model / 2)
+
     div_term = (torch.arange(0.0, d_model, 2) * -(math.log(max_period) / d_model)).exp()
     pos_w = torch.arange(0.0, width).unsqueeze(1)
     pos_h = torch.arange(0.0, height).unsqueeze(1)
+
     pe[0:d_model:2, :, :] = (pos_w * div_term).sin().transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
     pe[1:d_model:2, :, :] = (pos_w * div_term).cos().transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
     pe[d_model::2, :, :] = (pos_h * div_term).sin().transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
@@ -40,34 +64,82 @@ def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=100
 
     return pe[None, :].to(device)
 
-def create_sin_embedding_cape(length, dim, batch_size, mean_normalize, augment, max_global_shift = 0.0, max_local_shift = 0.0, max_scale = 1.0, device = "cpu", max_period = 10000.0):
+def create_sin_embedding_cape(
+    length, 
+    dim, 
+    batch_size, 
+    mean_normalize, 
+    augment, 
+    max_global_shift = 0.0, 
+    max_local_shift = 0.0, 
+    max_scale = 1.0, 
+    device = "cpu", 
+    max_period = 10000.0
+):
     assert dim % 2 == 0
+
     pos = 1.0 * torch.arange(length).view(-1, 1, 1) 
     pos = pos.repeat(1, batch_size, 1)  
+
     if mean_normalize: pos -= torch.nanmean(pos, dim=0, keepdim=True)
 
     if augment:
-        delta = np.random.uniform(-max_global_shift, +max_global_shift, size=[1, batch_size, 1])
-        delta_local = np.random.uniform(-max_local_shift, +max_local_shift, size=[length, batch_size, 1])
-        log_lambdas = np.random.uniform(-np.log(max_scale), +np.log(max_scale), size=[1, batch_size, 1])
+        delta = np.random.uniform(
+            -max_global_shift, 
+            +max_global_shift, 
+            size=[1, batch_size, 1]
+        )
+
+        delta_local = np.random.uniform(
+            -max_local_shift, 
+            +max_local_shift, 
+            size=[length, batch_size, 1]
+        )
+
+        log_lambdas = np.random.uniform(
+            -np.log(max_scale), 
+            +np.log(max_scale), 
+            size=[1, batch_size, 1]
+        )
+
         pos = (pos + delta + delta_local) * np.exp(log_lambdas)
 
     pos = pos.to(device)
     half_dim = dim // 2
+
     adim = torch.arange(dim // 2, device=device).view(1, 1, -1)
-    phase = pos / (max_period ** ((adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)) if str(device).startswith("ocl") else (adim / (half_dim - 1))))
+    phase = pos / (
+        max_period ** ((
+            adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)
+        ) if str(device).startswith("ocl") else (
+            adim / (half_dim - 1)
+        ))
+    )
+
     return torch.cat([phase.cos(), phase.sin()], dim=-1).float()
 
 class MyGroupNorm(nn.GroupNorm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self, 
+        *args, 
+        **kwargs
+    ):
+        super().__init__(
+            *args, 
+            **kwargs
+        )
 
     def forward(self, x):
         x = x.transpose(1, 2)
         return super().forward(x).transpose(1, 2)
     
 class LayerScale(nn.Module):
-    def __init__(self, channels, init = 0, channel_last=False):
+    def __init__(
+        self, 
+        channels, 
+        init = 0, 
+        channel_last=False
+    ):
         super().__init__()
         self.channel_last = channel_last
         self.scale = nn.Parameter(torch.zeros(channels, requires_grad=True))
@@ -102,16 +174,47 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
         sparsity=0.95, 
         batch_first=False
     ):
-        factory_kwargs = {"device": device, "dtype": dtype}
-        super().__init__(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, activation=activation, layer_norm_eps=layer_norm_eps, batch_first=batch_first, norm_first=norm_first, device=device, dtype=dtype)
+        factory_kwargs = {
+            "device": device, 
+            "dtype": dtype
+        }
+
+        super().__init__(
+            d_model=d_model, 
+            nhead=nhead, 
+            dim_feedforward=dim_feedforward, 
+            dropout=dropout, 
+            activation=activation, 
+            layer_norm_eps=layer_norm_eps, 
+            batch_first=batch_first, 
+            norm_first=norm_first, 
+            device=device, 
+            dtype=dtype
+        )
+
         self.auto_sparsity = auto_sparsity
 
         if group_norm:
-            self.norm1 = MyGroupNorm(int(group_norm), d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.norm2 = MyGroupNorm(int(group_norm), d_model, eps=layer_norm_eps, **factory_kwargs)
+            self.norm1 = MyGroupNorm(
+                int(group_norm), 
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
+
+            self.norm2 = MyGroupNorm(
+                int(group_norm), 
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
 
         self.norm_out = None
-        if self.norm_first & norm_out: self.norm_out = MyGroupNorm(num_groups=int(norm_out), num_channels=d_model)
+        if self.norm_first & norm_out: 
+            self.norm_out = MyGroupNorm(
+                num_groups=int(norm_out), 
+                num_channels=d_model
+            )
 
         self.gamma_1 = LayerScale(d_model, init_values, True) if layer_scale else nn.Identity()
         self.gamma_2 = LayerScale(d_model, init_values, True) if layer_scale else nn.Identity()
@@ -121,12 +224,27 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
         T, B, C = x.shape
 
         if self.norm_first:
-            x = x + self.gamma_1(self._sa_block(self.norm1(x), src_mask, src_key_padding_mask))
-            x = x + self.gamma_2(self._ff_block(self.norm2(x)))
+            x = x + self.gamma_1(
+                self._sa_block(self.norm1(x), src_mask, src_key_padding_mask)
+            )
+
+            x = x + self.gamma_2(
+                self._ff_block(self.norm2(x))
+            )
+
             if self.norm_out: x = self.norm_out(x)
         else:
-            x = self.norm1(x + self.gamma_1(self._sa_block(x, src_mask, src_key_padding_mask)))
-            x = self.norm2(x + self.gamma_2(self._ff_block(x)))
+            x = self.norm1(
+                x + self.gamma_1(
+                    self._sa_block(x, src_mask, src_key_padding_mask)
+                )
+            )
+
+            x = self.norm2(
+                x + self.gamma_2(
+                    self._ff_block(x)
+                )
+            )
 
         return x
 
@@ -181,7 +299,12 @@ class CrossTransformerEncoder(nn.Module):
             self.cape_augment = cape_augment
             self.cape_glob_loc_scale = cape_glob_loc_scale
 
-        if emb == "scaled": self.position_embeddings = ScaledEmbedding(max_positions, dim, scale=0.2)
+        if emb == "scaled": 
+            self.position_embeddings = ScaledEmbedding(
+                max_positions, 
+                dim, 
+                scale=0.2
+            )
 
         self.lr = lr
         activation = F.gelu if gelu else F.relu
@@ -225,11 +348,29 @@ class CrossTransformerEncoder(nn.Module):
 
         for idx in range(num_layers):
             if idx % 2 == self.classic_parity:
-                self.layers.append(MyTransformerEncoderLayer(**kwargs_classic_encoder))
-                self.layers_t.append(MyTransformerEncoderLayer(**kwargs_classic_encoder))
+                self.layers.append(
+                    MyTransformerEncoderLayer(
+                        **kwargs_classic_encoder
+                    )
+                )
+
+                self.layers_t.append(
+                    MyTransformerEncoderLayer(
+                        **kwargs_classic_encoder
+                    )
+                )
             else:
-                self.layers.append(CrossTransformerEncoderLayer(**kwargs_cross_encoder))
-                self.layers_t.append(CrossTransformerEncoderLayer(**kwargs_cross_encoder))
+                self.layers.append(
+                    CrossTransformerEncoderLayer(
+                        **kwargs_cross_encoder
+                    )
+                )
+
+                self.layers_t.append(
+                    CrossTransformerEncoderLayer(
+                        **kwargs_cross_encoder
+                    )
+                )
 
     def forward(self, x, xt):
         B, C, Fr, T1 = x.shape
@@ -334,27 +475,80 @@ class CrossTransformerEncoderLayer(nn.Module):
         dtype=None, 
         batch_first=False
     ):
-        factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.auto_sparsity = auto_sparsity
-        self.cross_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=batch_first)
-        self.linear1 = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
+        factory_kwargs = {
+            "device": device, 
+            "dtype": dtype
+        }
+
+        self.cross_attn = nn.MultiheadAttention(
+            d_model, 
+            nhead, 
+            dropout=dropout, 
+            batch_first=batch_first
+        )
+
+        self.linear1 = nn.Linear(
+            d_model, 
+            dim_feedforward, 
+            **factory_kwargs
+        )
+    
         self.norm_first = norm_first
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(
+            dim_feedforward, 
+            d_model, 
+            **factory_kwargs
+        )
 
         if group_norm:
-            self.norm1 = MyGroupNorm(int(group_norm), d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.norm2 = MyGroupNorm(int(group_norm), d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.norm3 = MyGroupNorm(int(group_norm), d_model, eps=layer_norm_eps, **factory_kwargs)
+            self.norm1 = MyGroupNorm(
+                int(group_norm), 
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
+
+            self.norm2 = MyGroupNorm(
+                int(group_norm), 
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
+
+            self.norm3 = MyGroupNorm(
+                int(group_norm), 
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
         else:
-            self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.norm3 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
+            self.norm1 = nn.LayerNorm(
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
+
+            self.norm2 = nn.LayerNorm(
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
+
+            self.norm3 = nn.LayerNorm(
+                d_model, 
+                eps=layer_norm_eps, 
+                **factory_kwargs
+            )
 
         self.norm_out = None
         if self.norm_first & norm_out:
-            self.norm_out = MyGroupNorm(num_groups=int(norm_out), num_channels=d_model)
+            self.norm_out = MyGroupNorm(
+                num_groups=int(norm_out), 
+                num_channels=d_model
+            )
 
         self.gamma_1 = LayerScale(d_model, init_values, True) if layer_scale else nn.Identity()
         self.gamma_2 = LayerScale(d_model, init_values, True) if layer_scale else nn.Identity()
@@ -515,7 +709,12 @@ class HTDemucs(nn.Module):
                 "norm": norm,
                 "rewrite": rewrite,
                 "norm_groups": norm_groups,
-                "dconv_kw": {"depth": dconv_depth, "compress": dconv_comp, "init": dconv_init, "gelu": True},
+                "dconv_kw": {
+                    "depth": dconv_depth, 
+                    "compress": dconv_comp, 
+                    "init": dconv_init, 
+                    "gelu": True
+                },
             }
 
             kwt = dict(kw)
@@ -534,12 +733,31 @@ class HTDemucs(nn.Module):
                 chout_z = max(chout, chout_z)
                 chout = chout_z
 
-            enc = HEncLayer(chin_z, chout_z, dconv=dconv_mode & 1, context=context_enc, **kw)
+            enc = HEncLayer(
+                chin_z, 
+                chout_z, 
+                dconv=dconv_mode & 1, 
+                context=context_enc, 
+                **kw
+            )
+
             if freq:
-                tenc = HEncLayer(chin, chout, dconv=dconv_mode & 1, context=context_enc, empty=last_freq, **kwt)
+                tenc = HEncLayer(
+                    chin, 
+                    chout, 
+                    dconv=dconv_mode & 1, 
+                    context=context_enc, 
+                    empty=last_freq, 
+                    **kwt
+                )
+
                 self.tencoder.append(tenc)
 
-            if multi: enc = MultiWrap(enc, multi_freqs)
+            if multi: 
+                enc = MultiWrap(
+                    enc, 
+                    multi_freqs
+                )
 
             self.encoder.append(enc)
             if index == 0:
@@ -547,11 +765,32 @@ class HTDemucs(nn.Module):
                 chin_z = chin
                 if self.cac: chin_z *= 2
 
-            dec = HDecLayer(chout_z, chin_z, dconv=dconv_mode & 2, last=index == 0, context=context, **kw_dec)
-            if multi: dec = MultiWrap(dec, multi_freqs)
+            dec = HDecLayer(
+                chout_z, 
+                chin_z, 
+                dconv=dconv_mode & 2, 
+                last=index == 0, 
+                context=context, 
+                **kw_dec
+            )
+
+            if multi: 
+                dec = MultiWrap(
+                    dec, 
+                    multi_freqs
+                )
 
             if freq:
-                tdec = HDecLayer(chout, chin, dconv=dconv_mode & 2, empty=last_freq, last=index == 0, context=context, **kwt)
+                tdec = HDecLayer(
+                    chout, 
+                    chin, 
+                    dconv=dconv_mode & 2, 
+                    empty=last_freq, 
+                    last=index == 0, 
+                    context=context, 
+                    **kwt
+                )
+
                 self.tdecoder.insert(0, tdec)
 
             self.decoder.insert(0, dec)
@@ -565,17 +804,43 @@ class HTDemucs(nn.Module):
                 else: freqs //= stride
 
             if index == 0 and freq_emb:
-                self.freq_emb = ScaledEmbedding(freqs, chin_z, smooth=emb_smooth, scale=emb_scale)
+                self.freq_emb = ScaledEmbedding(
+                    freqs, 
+                    chin_z, 
+                    smooth=emb_smooth, 
+                    scale=emb_scale
+                )
+
                 self.freq_emb_scale = freq_emb
 
         if rescale: rescale_module(self, reference=rescale)
         transformer_channels = channels * growth ** (depth - 1)
 
         if bottom_channels:
-            self.channel_upsampler = nn.Conv1d(transformer_channels, bottom_channels, 1)
-            self.channel_downsampler = nn.Conv1d(bottom_channels, transformer_channels, 1)
-            self.channel_upsampler_t = nn.Conv1d(transformer_channels, bottom_channels, 1)
-            self.channel_downsampler_t = nn.Conv1d(bottom_channels, transformer_channels, 1)
+            self.channel_upsampler = nn.Conv1d(
+                transformer_channels, 
+                bottom_channels, 
+                1
+            )
+
+            self.channel_downsampler = nn.Conv1d(
+                bottom_channels, 
+                transformer_channels, 
+                1
+            )
+
+            self.channel_upsampler_t = nn.Conv1d(
+                transformer_channels, 
+                bottom_channels, 
+                1
+            )
+
+            self.channel_downsampler_t = nn.Conv1d(
+                bottom_channels, 
+                transformer_channels, 
+                1
+            )
+
             transformer_channels = bottom_channels
 
         if t_layers > 0: 

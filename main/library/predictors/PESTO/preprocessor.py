@@ -5,7 +5,12 @@ import numpy as np
 from scipy.signal import get_window
 
 class Preprocessor(torch.nn.Module):
-    def __init__(self, hop_size, sampling_rate = None, **hcqt_kwargs):
+    def __init__(
+        self, 
+        hop_size, 
+        sampling_rate = None, 
+        **hcqt_kwargs
+    ):
         super(Preprocessor, self).__init__()
         self.hcqt_sr = None
         self.hcqt_kernels = None
@@ -28,7 +33,11 @@ class Preprocessor(torch.nn.Module):
         return self.hcqt_kernels(audio)
 
     def _reset_hcqt_kernels(self):
-        self.hcqt_kernels = HarmonicCQT(sr=self.hcqt_sr, hop_length=int(self.hop_size * self.hcqt_sr / 1000 + 0.5), **self.hcqt_kwargs).to(self._device.device)
+        self.hcqt_kernels = HarmonicCQT(
+            sr=self.hcqt_sr, 
+            hop_length=int(self.hop_size * self.hcqt_sr / 1000 + 0.5), 
+            **self.hcqt_kwargs
+        ).to(self._device.device)
 
 class ToLogMagnitude(torch.nn.Module):
     def __init__(self):
@@ -42,7 +51,22 @@ class ToLogMagnitude(torch.nn.Module):
         return x
     
 class HarmonicCQT(torch.nn.Module):
-    def __init__(self, harmonics, sr = 22050, hop_length = 512, fmin = 32.7, fmax = None, bins_per_semitone = 1, n_bins = 84, center_bins = True, gamma = 0, center = True, streaming = False, mirror = 0, max_batch_size = 1):
+    def __init__(
+        self, 
+        harmonics, 
+        sr = 22050, 
+        hop_length = 512, 
+        fmin = 32.7, 
+        fmax = None, 
+        bins_per_semitone = 1, 
+        n_bins = 84, 
+        center_bins = True, 
+        gamma = 0, 
+        center = True, 
+        streaming = False, 
+        mirror = 0, 
+        max_batch_size = 1
+    ):
         super(HarmonicCQT, self).__init__()
         if center_bins: fmin = fmin / 2 ** ((bins_per_semitone - 1) / (24 * bins_per_semitone))
         self.cqt_kernels = torch.nn.ModuleList([
@@ -67,14 +91,38 @@ class HarmonicCQT(torch.nn.Module):
         return torch.stack([cqt(audio_waveforms) for cqt in self.cqt_kernels], dim=1)
     
 class BaseCQT(torch.nn.Module):
-    def __init__(self, sr=22050, hop_length=512, fmin=32.70, fmax=None, n_bins=84, bins_per_octave=12, gamma=0, filter_scale=1, norm=1, window="hann", center = True, trainable=False, output_format="Magnitude"):
+    def __init__(
+        self, 
+        sr=22050, 
+        hop_length=512, 
+        fmin=32.70, 
+        fmax=None, 
+        n_bins=84, 
+        bins_per_octave=12, 
+        gamma=0, 
+        filter_scale=1, 
+        norm=1, 
+        window="hann", 
+        center = True, 
+        trainable=False, 
+        output_format="Magnitude"
+    ):
         super(BaseCQT, self).__init__()
         self.trainable = trainable
         self.n_bins = n_bins
         self.hop_length = hop_length
         self.center = center
         self.output_format = output_format
-        cqt_kernels, self.kernel_width, lengths, freqs = self.create_cqt_kernels(float(filter_scale) / (2 ** (1 / bins_per_octave) - 1), sr, fmin, n_bins, bins_per_octave, norm, window, fmax, gamma=gamma)
+        cqt_kernels, self.kernel_width, lengths, freqs = self.create_cqt_kernels(
+            float(filter_scale) / (2 ** (1 / bins_per_octave) - 1), 
+            sr, 
+            fmin, 
+            n_bins, 
+            bins_per_octave, 
+            norm, window, 
+            fmax, 
+            gamma=gamma
+        )
         self.sqrt_lengths = lengths.sqrt_().unsqueeze_(-1)
         self.frequencies = freqs
         self.cqt_kernels = torch.from_numpy(cqt_kernels).unsqueeze(1)
@@ -153,11 +201,25 @@ class RegularCQT(BaseCQT):
     def __init__(self, *args, pad_mode="reflect", **kwargs):
         super().__init__(*args, **kwargs)
         padding = self.kernel_width // 2 if self.center else 0
-        self.conv = torch.nn.Conv1d(1, 2 * self.n_bins, kernel_size=self.kernel_width, stride=self.hop_length, padding=padding, padding_mode=pad_mode, bias=False)
+        self.conv = torch.nn.Conv1d(
+            1, 
+            2 * self.n_bins, 
+            kernel_size=self.kernel_width, 
+            stride=self.hop_length, 
+            padding=padding, 
+            padding_mode=pad_mode, 
+            bias=False
+        )
         self.init_weights()
 
 class StreamingCQT(BaseCQT):
-    def __init__(self, *args, mirror = 0, max_batch_size = 1, **kwargs):
+    def __init__(
+        self, 
+        *args, 
+        mirror = 0, 
+        max_batch_size = 1, 
+        **kwargs
+    ):
         super(StreamingCQT, self).__init__(*args, **kwargs)
         if self.center:
             mirrored_samples = int(mirror * (self.kernel_width - self.hop_length) / 2)
@@ -166,7 +228,17 @@ class StreamingCQT(BaseCQT):
             mirrored_samples = 0
             padding = 0
 
-        self.conv = CachedConv1d(1, 2 * self.n_bins, kernel_size=self.kernel_width, stride=self.hop_length, padding=padding, mirror=mirrored_samples, max_batch_size=max_batch_size, bias=False)
+        self.conv = CachedConv1d(
+            1, 
+            2 * self.n_bins, 
+            kernel_size=self.kernel_width, 
+            stride=self.hop_length, 
+            padding=padding, 
+            mirror=mirrored_samples, 
+            max_batch_size=max_batch_size, 
+            bias=False
+        )
+
         self.init_weights()
 
 class CQT:
@@ -188,7 +260,11 @@ class CQT:
         return RegularCQT(*args, **kwargs)
     
 class CachedConv1d(torch.nn.Conv1d):
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, 
+        *args, 
+        **kwargs
+    ):
         kwargs["padding"] = 0
         super(CachedConv1d, self).__init__(*args, **kwargs)
         padding = kwargs.get("padding", 0)
@@ -226,7 +302,10 @@ class CachedConv1d(torch.nn.Conv1d):
         return super(CachedConv1d, self).forward(self.mirror(self.cache(x)))
     
 class RefillPad1d(torch.nn.Module):
-    def __init__(self, padding):
+    def __init__(
+        self, 
+        padding
+    ):
         super(RefillPad1d, self).__init__()
         self.right_padding = padding[1]
 
@@ -234,7 +313,12 @@ class RefillPad1d(torch.nn.Module):
         return torch.cat((x, x[..., -self.right_padding:]), dim=-1)
     
 class CachedPadding1d(torch.nn.Module):
-    def __init__(self, padding, max_batch_size = 1, crop=False):
+    def __init__(
+        self, 
+        padding, 
+        max_batch_size = 1, 
+        crop=False
+    ):
         super().__init__()
         self.padding = padding
         self.max_batch_size = max_batch_size

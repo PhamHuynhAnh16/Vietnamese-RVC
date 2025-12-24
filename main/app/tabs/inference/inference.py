@@ -5,7 +5,11 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations, configs
+from main.app.variables import (
+    configs, 
+    translations 
+)
+
 from main.app.tabs.inference.child.convert import convert_tab
 from main.app.tabs.inference.child.separate import separate_tab
 from main.app.tabs.inference.child.convert_tts import convert_tts_tab

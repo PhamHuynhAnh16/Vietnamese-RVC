@@ -48,7 +48,14 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
     text_enc_hidden_dim = 768 if version == "v2" else 256
     tgt_sr = cpt["config"][-1]
 
-    net_g = SynthesizerONNX(*cpt["config"], use_f0=f0, text_enc_hidden_dim=text_enc_hidden_dim, vocoder=vocoder, checkpointing=False, energy=energy_use)
+    net_g = SynthesizerONNX(
+        *cpt["config"], 
+        use_f0=f0, 
+        text_enc_hidden_dim=text_enc_hidden_dim, 
+        vocoder=vocoder, 
+        checkpointing=False, 
+        energy=energy_use
+    )
     net_g.load_state_dict(cpt["weight"], strict=False)
     net_g.eval().to(device).to(torch.float16 if is_half else torch.float32)
     net_g.remove_weight_norm()

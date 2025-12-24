@@ -12,7 +12,25 @@ sys.path.append(os.getcwd())
 
 from main.library.backends import directml, opencl
 from main.inference.realtime.audio import list_audio_device
-from main.app.variables import config, configs, configs_json, logger, translations, edgetts, google_tts_voice, method_f0, method_f0_full, vr_models, mdx_models, demucs_models, embedders_model, spin_model, whisper_model, file_types
+
+from main.app.variables import (
+    config, 
+    configs, 
+    configs_json, 
+    logger, 
+    translations, 
+    edgetts, 
+    google_tts_voice, 
+    method_f0, 
+    method_f0_full, 
+    vr_models, 
+    mdx_models, 
+    demucs_models, 
+    embedders_model, 
+    spin_model, 
+    whisper_model, 
+    file_types
+)
 
 def gr_info(message):
     gr.Info(message, duration=2)
@@ -29,7 +47,10 @@ def gr_error(message):
 def get_gpu_info():
     ngpu = torch.cuda.device_count()
     gpu_infos = [
-        f"{i}: {torch.cuda.get_device_name(i)} ({int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)" 
+        (
+            f"{i}: {torch.cuda.get_device_name(i)} " + 
+            f"({int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)"
+        ) 
         for i in range(ngpu) 
         if torch.cuda.is_available() or ngpu != 0
     ]
@@ -37,94 +58,230 @@ def get_gpu_info():
     if len(gpu_infos) == 0:
         if directml.torch_available:
             ngpu = directml.device_count()
-            gpu_infos = [f"{i}: {directml.device_name(i)}" for i in range(ngpu) if directml.is_available() or ngpu != 0]
+
+            gpu_infos = [
+                f"{i}: {directml.device_name(i)}" 
+                for i in range(ngpu) 
+                if directml.is_available() or ngpu != 0
+            ]
         elif opencl.torch_available:
             ngpu = opencl.device_count()
-            gpu_infos = [f"{i}: {opencl.device_name(i)}" for i in range(ngpu) if opencl.is_available() or ngpu != 0]
+
+            gpu_infos = [
+                f"{i}: {opencl.device_name(i)}" 
+                for i in range(ngpu) 
+                if opencl.is_available() or ngpu != 0
+            ]
         else:
             ngpu = 0
             gpu_infos = []
 
-    return "\n".join(gpu_infos) if len(gpu_infos) > 0 and not config.cpu_mode else translations["no_support_gpu"]
+    return (
+        "\n".join(gpu_infos) 
+        if len(gpu_infos) > 0 and not config.cpu_mode else 
+        translations["no_support_gpu"]
+    )
 
 def gpu_number_str():
     if config.cpu_mode: return "-"
-
     ngpu = torch.cuda.device_count()
-    if ngpu == 0: ngpu = directml.device_count() if directml.torch_available else opencl.device_count()
 
-    return str("-".join(map(str, range(ngpu))) if torch.cuda.is_available() or directml.is_available() or opencl.is_available() else "-")
+    if ngpu == 0: 
+        ngpu = (
+            directml.device_count() 
+            if directml.torch_available else 
+            opencl.device_count()
+        )
+
+    return str(
+        "-".join(map(str, range(ngpu))) 
+        if (
+            torch.cuda.is_available() or 
+            directml.is_available() or 
+            opencl.is_available()
+        ) else "-"
+    )
 
 def change_f0_choices(): 
-    f0_file = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["f0_path"]) for f in files if f.endswith(".txt")])
-    return {"value": f0_file[0] if len(f0_file) >= 1 else "", "choices": f0_file, "__type__": "update"}
+    f0_file = sorted([
+        os.path.abspath(os.path.join(root, f)) 
+        for root, _, files in os.walk(configs["f0_path"]) 
+        for f in files 
+        if f.endswith(".txt")
+    ])
+
+    return {
+        "value": f0_file[0] if len(f0_file) >= 1 else "", 
+        "choices": f0_file, 
+        "__type__": "update"
+    }
 
 def change_audios_choices(input_audio): 
-    audios = sorted([os.path.abspath(os.path.join(root, f)) for root, _, files in os.walk(configs["audios_path"]) for f in files if os.path.splitext(f)[1].lower() in file_types])
-    return {"value": input_audio if input_audio != "" else (audios[0] if len(audios) >= 1 else ""), "choices": audios, "__type__": "update"}
+    audios = sorted([
+        os.path.abspath(os.path.join(root, f)) 
+        for root, _, files in os.walk(configs["audios_path"]) 
+        for f in files if os.path.splitext(f)[1].lower() in file_types
+    ])
+
+    return {
+        "value": input_audio if input_audio != "" else (audios[0] if len(audios) >= 1 else ""), 
+        "choices": audios, 
+        "__type__": "update"
+    }
 
 def change_reference_choices(): 
     reference = sorted([
         re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) 
         for name in os.listdir(configs["reference_path"]) 
-        if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))
+        if (
+            os.path.exists(os.path.join(configs["reference_path"], name)) and 
+            os.path.isdir(os.path.join(configs["reference_path"], name))
+        )
     ])
 
-    return {"value": reference[0] if len(reference) >= 1 else "", "choices": reference, "__type__": "update"}
+    return {
+        "value": reference[0] if len(reference) >= 1 else "", 
+        "choices": reference, 
+        "__type__": "update"
+    }
 
 def change_models_choices():
-    model, index = sorted(list(
-        model 
-        for model in os.listdir(configs["weights_path"]) 
-        if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_")
-    )), sorted([
-        os.path.join(root, name) 
-        for root, _, files in os.walk(configs["logs_path"], topdown=False) 
-        for name in files if name.endswith(".index") and "trained" not in name
-    ])
+    model, index = (
+        sorted(list(
+            model 
+            for model in os.listdir(configs["weights_path"]) 
+            if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_")
+        )), 
+        sorted([
+            os.path.join(root, name) 
+            for root, _, files in os.walk(configs["logs_path"], topdown=False) 
+            for name in files if name.endswith(".index") and "trained" not in name
+        ])
+    )
 
-    return [{"value": model[0] if len(model) >= 1 else "", "choices": model, "__type__": "update"}, {"value": index[0] if len(index) >= 1 else "", "choices": index, "__type__": "update"}]
+    return [
+        {
+            "value": model[0] if len(model) >= 1 else "", 
+            "choices": model, 
+            "__type__": "update"
+        }, 
+        {
+            "value": index[0] if len(index) >= 1 else "", 
+            "choices": index, 
+            "__type__": "update"
+        }
+    ]
 
 def change_pretrained_choices():
-    pretrainD = sorted([model for model in os.listdir(configs["pretrained_custom_path"]) if model.endswith(".pth") and "D" in model])
-    pretrainG = sorted([model for model in os.listdir(configs["pretrained_custom_path"]) if model.endswith(".pth") and "G" in model])
+    pretrainD = sorted([
+        model for model in os.listdir(configs["pretrained_custom_path"]) 
+        if model.endswith(".pth") and "D" in model
+    ])
 
-    return [{"choices": pretrainD, "value": pretrainD[0] if len(pretrainD) >= 1 else "", "__type__": "update"}, {"choices": pretrainG, "value": pretrainG[0] if len(pretrainG) >= 1 else "", "__type__": "update"}]
+    pretrainG = sorted([
+        model for model in os.listdir(configs["pretrained_custom_path"]) 
+        if model.endswith(".pth") and "G" in model
+    ])
+
+    return [
+        {
+            "choices": pretrainD, 
+            "value": pretrainD[0] if len(pretrainD) >= 1 else "", 
+            "__type__": "update"
+        }, 
+        {
+            "choices": pretrainG, 
+            "value": pretrainG[0] if len(pretrainG) >= 1 else "", 
+            "__type__": "update"
+        }
+    ]
 
 def change_preset_choices():
-    return {"value": "", "choices": sorted(list(f for f in os.listdir(configs["presets_path"]) if f.endswith(".conversion.json"))), "__type__": "update"}
+    return {
+        "value": "", 
+        "choices": sorted(list(
+            f for f in os.listdir(configs["presets_path"]) 
+            if f.endswith(".conversion.json")
+        )), 
+        "__type__": "update"
+    }
 
 def change_effect_preset_choices():
-    return {"value": "", "choices": sorted(list(f for f in os.listdir(configs["presets_path"]) if f.endswith(".effect.json"))), "__type__": "update"}
+    return {
+        "value": "", 
+        "choices": sorted(list(
+            f for f in os.listdir(configs["presets_path"]) 
+            if f.endswith(".effect.json")
+        )), 
+        "__type__": "update"
+    }
 
 def change_tts_voice_choices(google):
-    return {"choices": google_tts_voice if google else edgetts, "value": google_tts_voice[0] if google else edgetts[0], "__type__": "update"}
+    return {
+        "choices": google_tts_voice if google else edgetts, 
+        "value": google_tts_voice[0] if google else edgetts[0], 
+        "__type__": "update"
+    }
 
-def change_backing_choices(backing, merge):
-    if backing or merge: return {"value": False, "interactive": False, "__type__": "update"}
-    elif not backing or not merge: return  {"interactive": True, "__type__": "update"}
-    else: gr_warning(translations["option_not_valid"])
+def change_backing_choices(
+    backing, 
+    merge
+):
+    if backing or merge: 
+        return {
+            "value": False, 
+            "interactive": False, 
+            "__type__": "update"
+        }
+    elif not backing or not merge: 
+        return  {
+            "interactive": True, 
+            "__type__": "update"
+        }
+    else: 
+        gr_warning(translations["option_not_valid"])
 
 def change_download_choices(select):
     selects = [False]*10
 
-    if select == translations["download_url"]: selects[0] = selects[1] = selects[2] = True
-    elif select == translations["download_from_csv"]:  selects[3] = selects[4] = True
-    elif select == translations["search_models"]: selects[5] = selects[6] = True
-    elif select == translations["upload"]: selects[9] = True
-    else: gr_warning(translations["option_not_valid"])
+    if select == translations["download_url"]: 
+        selects[0] = selects[1] = selects[2] = True
+    elif select == translations["download_from_csv"]:  
+        selects[3] = selects[4] = True
+    elif select == translations["search_models"]: 
+        selects[5] = selects[6] = True
+    elif select == translations["upload"]: 
+        selects[9] = True
+    else: 
+        gr_warning(translations["option_not_valid"])
 
-    return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
+    return [
+        {
+            "visible": selects[i], 
+            "__type__": "update"
+        } 
+        for i in range(len(selects))
+    ]
 
 def change_download_pretrained_choices(select):
     selects = [False]*7
 
-    if select == translations["download_url"]: selects[0] = selects[1] = selects[2] = True
-    elif select == translations["list_model"]: selects[3] = selects[4] = selects[5] = True
-    elif select == translations["upload"]: selects[6] = True
-    else: gr_warning(translations["option_not_valid"])
+    if select == translations["download_url"]: 
+        selects[0] = selects[1] = selects[2] = True
+    elif select == translations["list_model"]: 
+        selects[3] = selects[4] = selects[5] = True
+    elif select == translations["upload"]: 
+        selects[6] = True
+    else: 
+        gr_warning(translations["option_not_valid"])
 
-    return [{"visible": selects[i], "__type__": "update"} for i in range(len(selects))]
+    return [
+        {
+            "visible": selects[i], 
+            "__type__": "update"
+        } 
+        for i in range(len(selects))
+    ]
 
 def get_index(model):
     model = os.path.basename(model).split("_")[0]
@@ -142,54 +299,127 @@ def get_index(model):
     } if model else None
 
 def index_strength_show(index):
-    return {"visible": index != "" and index != None and os.path.exists(index) and os.path.isfile(index), "value": 0.5, "__type__": "update"}
+    return {
+        "visible": (
+            index != "" and 
+            index != None and 
+            os.path.exists(index) and 
+            os.path.isfile(index)
+        ), 
+        "value": 0.5, 
+        "__type__": "update"
+    }
 
-def hoplength_show(method, hybrid_method=None):
+def hoplength_show(
+    method, 
+    hybrid_method=None
+):
     visible = False
 
-    for m in ["mangio-crepe", "fcpe", "yin", "piptrack", "mangio-penn"]:
+    for m in [
+        "mangio-crepe", 
+        "fcpe", 
+        "yin", 
+        "piptrack", 
+        "mangio-penn"
+    ]:
         if m in method: visible = True
-        if hybrid_method is not None and m in hybrid_method: visible = True
+
+        if (
+            hybrid_method is not None and 
+            m in hybrid_method
+        ): 
+            visible = True
 
         if visible: break
         else: visible = False
     
-    return {"visible": visible, "__type__": "update"}
+    return {
+        "visible": visible, 
+        "__type__": "update"
+    }
 
 def visible(value):
-    return {"visible": value, "__type__": "update"}
+    return {
+        "visible": value, 
+        "__type__": "update"
+    }
 
 def visibleFalse(value):
-    return {"visible": value, "value": False, "__type__": "update"}
+    return {
+        "visible": value, 
+        "value": False, 
+        "__type__": "update"
+    }
 
 def valueFalse_interactive(value): 
-    return {"value": False, "interactive": value, "__type__": "update"}
+    return {
+        "value": False, 
+        "interactive": value, 
+        "__type__": "update"
+    }
 
 def valueEmpty_visible1(value): 
-    return {"value": "", "visible": value, "__type__": "update"}
+    return {
+        "value": "", 
+        "visible": value, 
+        "__type__": "update"
+    }
 
 def pitch_guidance_lock(vocoders):
-    return {"value": True, "interactive": vocoders == "Default", "__type__": "update"}
+    return {
+        "value": True, 
+        "interactive": vocoders == "Default", 
+        "__type__": "update"
+    }
 
 def vocoders_lock(pitch, vocoders):
-    return {"value": vocoders if pitch else "Default", "interactive": pitch, "__type__": "update"}
+    return {
+        "value": vocoders if pitch else "Default", 
+        "interactive": pitch, 
+        "__type__": "update"
+    }
 
 def unlock_f0(value):
-    return {"choices": method_f0_full if value else method_f0, "value": "rmvpe", "__type__": "update"} 
+    return {
+        "choices": method_f0_full if value else method_f0, 
+        "value": "rmvpe", 
+        "__type__": "update"
+    } 
 
 def unlock_vocoder(value, vocoder):
-    return {"value": vocoder if value == "v2" else "Default", "interactive": value == "v2", "__type__": "update"} 
+    return {
+        "value": vocoder if value == "v2" else "Default", 
+        "interactive": value == "v2", 
+        "__type__": "update"
+    } 
 
-def unlock_ver(value, vocoder):
-    return {"value": "v2" if vocoder == "Default" else value, "interactive": vocoder == "Default", "__type__": "update"}
+def unlock_version(value, vocoder):
+    return {
+        "value": "v2" if vocoder == "Default" else value, 
+        "interactive": vocoder == "Default", 
+        "__type__": "update"
+    }
 
 def change_embedders_mode(value):
     if value == "spin":
-        return {"value": spin_model[0], "choices": spin_model, "__type__": "update"}
+        return {
+            "value": spin_model[0], 
+            "choices": spin_model, 
+            "__type__": "update"
+        }
     elif value == "whisper":
-        return {"value": whisper_model[0], "choices": whisper_model, "__type__": "update"}
+        return {
+            "value": whisper_model[0], 
+            "choices": whisper_model, 
+            "__type__": "update"
+        }
     else:
-        return {"value": embedders_model[0], "choices": embedders_model, "__type__": "update"}
+        return {
+            "value": embedders_model[0], 
+            "choices": embedders_model, 
+            "__type__": "update"
+        }
 
 def change_fp(fp):
     fp16 = fp == "fp16"
@@ -219,17 +449,42 @@ def process_output(file_path):
 
         index = 1
         while 1:
-            file_path = os.path.join(os.path.dirname(file_path), f"{file[0]}_{index}{file[1]}")
+            file_path = os.path.join(
+                os.path.dirname(file_path), 
+                f"{file[0]}_{index}{file[1]}"
+            )
+
             if not os.path.exists(file_path): return file_path
             index += 1
 
 def shutil_move(input_path, output_path):
-    output_path = os.path.join(output_path, os.path.basename(input_path)) if os.path.isdir(output_path) else output_path
+    output_path = (
+        os.path.join(output_path, os.path.basename(input_path)) 
+        if os.path.isdir(output_path) else 
+        output_path
+    )
 
-    return shutil.move(input_path, process_output(output_path)) if os.path.exists(output_path) else shutil.move(input_path, output_path)
+    return (
+        shutil.move(input_path, process_output(output_path)) 
+        if os.path.exists(output_path) else 
+        shutil.move(input_path, output_path)
+    )
 
-def separate_change(model_name, karaoke_model, reverb_model, enable_post_process, separate_backing, separate_reverb, enable_denoise):
-    model_type = "vr" if model_name in list(vr_models.keys()) else "mdx" if model_name in list(mdx_models.keys()) else "demucs" if model_name in list(demucs_models.keys()) else ""
+def separate_change(
+    model_name, 
+    karaoke_model, 
+    reverb_model, 
+    enable_post_process, 
+    separate_backing, 
+    separate_reverb, 
+    enable_denoise
+):
+    model_type = (
+        "vr" if model_name in list(vr_models.keys()) else "mdx" 
+        if model_name in list(mdx_models.keys()) else "demucs" 
+        if model_name in list(demucs_models.keys()) else ""
+    )
+
     karaoke_type = ("vr" if karaoke_model.startswith("VR") else "mdx") if separate_backing else None
     reverb_type = ("vr" if not reverb_model.startswith("MDX") else "mdx") if separate_reverb else None
 
@@ -256,8 +511,19 @@ def separate_change(model_name, karaoke_model, reverb_model, enable_post_process
         valueFalse_interactive(is_vr)
     ]
 
-def create_dataset_change(model_name, reverb_model, enable_post_process, separate_reverb, enable_denoise):
-    model_type = "vr" if model_name in list(vr_models.keys()) else "mdx" if model_name in list(mdx_models.keys()) else "demucs" if model_name in list(demucs_models.keys()) else ""
+def create_dataset_change(
+    model_name, 
+    reverb_model, 
+    enable_post_process, 
+    separate_reverb, 
+    enable_denoise
+):
+    model_type = (
+        "vr" if model_name in list(vr_models.keys()) else "mdx" 
+        if model_name in list(mdx_models.keys()) else "demucs" 
+        if model_name in list(demucs_models.keys()) else ""
+    )
+
     reverb_type = ("vr" if not reverb_model.startswith("MDX") else "mdx") if separate_reverb else None
     all_types = {model_type, reverb_type}
 
@@ -287,13 +553,18 @@ def audio_device():
 
         def priority(name):
             n = name.lower()
+
             if "virtual" in n:
                 return 0
             if "vb" in n:
                 return 1
+
             return 2
 
-        output_sorted = sorted(output_devices, key=lambda d: priority(d.name))
+        output_sorted = sorted(
+            output_devices, 
+            key=lambda d: priority(d.name)
+        )
         input_sorted = sorted(
             input_devices, key=lambda d: priority(d.name), reverse=True
         )
@@ -327,10 +598,21 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
         visible(monitor),
         visible(monitor),
         visible(monitor_is_asio),
-        visible(input_is_asio or output_is_asio or monitor_is_asio),
-        gr.update(visible=input_is_asio, maximum=input_max_ch),
-        gr.update(visible=output_is_asio, maximum=output_max_ch),
-        gr.update(visible=monitor_is_asio, maximum=monitor_max_ch)
+        visible(
+            input_is_asio or output_is_asio or monitor_is_asio
+        ),
+        gr.update(
+            visible=input_is_asio, 
+            maximum=input_max_ch
+        ),
+        gr.update(
+            visible=output_is_asio,
+            maximum=output_max_ch
+        ),
+        gr.update(
+            visible=monitor_is_asio, 
+            maximum=monitor_max_ch
+        )
     ]
 
 def change_audio_device_choices():
@@ -341,9 +623,21 @@ def change_audio_device_choices():
     input_channels_map, output_channels_map = list(input_channels_map.keys()), list(output_channels_map.keys())
 
     return [
-        {"value": input_channels_map[0] if len(input_channels_map) >= 1 else "", "choices": input_channels_map, "__type__": "update"}, 
-        {"value": output_channels_map[0] if len(output_channels_map) >= 1 else "", "choices": output_channels_map, "__type__": "update"},
-        {"value": output_channels_map[0] if len(output_channels_map) >= 1 else "", "choices": output_channels_map, "__type__": "update"}
+        {
+            "value": input_channels_map[0] if len(input_channels_map) >= 1 else "", 
+            "choices": input_channels_map, 
+            "__type__": "update"
+        }, 
+        {
+            "value": output_channels_map[0] if len(output_channels_map) >= 1 else "", 
+            "choices": output_channels_map, 
+            "__type__": "update"
+        },
+        {
+            "value": output_channels_map[0] if len(output_channels_map) >= 1 else "", 
+            "choices": output_channels_map, 
+            "__type__": "update"
+        }
     ]
 
 def replace_punctuation(filename):
@@ -363,12 +657,18 @@ def replace_url(url):
     return url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
 
 def replace_modelname(modelname):
-    return replace_punctuation(modelname.replace(".onnx", "").replace(".pth", "").replace(".index", "").replace(".zip", ""))
+    return replace_punctuation(
+        modelname.replace(".onnx", "").replace(".pth", "").replace(".index", "").replace(".zip", "")
+    )
 
 def replace_export_format(audio_path, export_format = "wav"):
     export_format = f".{export_format}"
 
-    return audio_path if audio_path.endswith(export_format) else audio_path.replace(f".{os.path.basename(audio_path).split('.')[-1]}", export_format)
+    return (
+        audio_path 
+        if audio_path.endswith(export_format) else 
+        audio_path.replace(f".{os.path.basename(audio_path).split('.')[-1]}", export_format)
+    )
 
 def update_dropdowns_from_json(data):
     if not data:
@@ -382,16 +682,57 @@ def update_dropdowns_from_json(data):
     outputs = list(data.get("outputs", {}).keys())
 
     return [
-        gr.update(choices=inputs, value=inputs[0] if len(inputs) > 0 else None),
-        gr.update(choices=outputs, value=outputs[0] if len(outputs) > 0 else None),
-        gr.update(choices=outputs, value=outputs[0] if len(outputs) > 0 else None),
+        gr.update(
+            choices=inputs, 
+            value=inputs[0] if len(inputs) > 0 else None
+        ),
+        gr.update(
+            choices=outputs, 
+            value=outputs[0] if len(outputs) > 0 else None
+        ),
+        gr.update(
+            choices=outputs, 
+            value=outputs[0] if len(outputs) > 0 else None
+        ),
     ]
 
 def update_button_from_json(data):
     if not data:
-        return [gr.update(interactive=True), gr.update(interactive=False)]
+        return [
+            gr.update(interactive=True), 
+            gr.update(interactive=False)
+        ]
     
     return [
         gr.update(interactive=data.get("start_button", True)),
         gr.update(interactive=data.get("stop_button", False))
     ]
+
+def get_speakers_id(model):
+    model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
+
+    if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")): 
+        return {
+            "visible": False, 
+            "value": 0, 
+            "choices": [0], 
+            "__type__": "update"
+        }
+
+    try:
+        model_data = torch.load(model_path, map_location="cpu", weights_only=True)
+        speakers_id = model_data.get("speakers_id", 1)
+
+        return {
+            "visible": speakers_id and speakers_id != 1, 
+            "value": 0, 
+            "choices": list(range(speakers_id)),
+            "__type__": "update"
+        }
+    except Exception as e:
+        return {
+            "visible": False, 
+            "value": 0, 
+            "choices": [0], 
+            "__type__": "update"
+        }

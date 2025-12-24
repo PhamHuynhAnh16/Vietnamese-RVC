@@ -16,7 +16,16 @@ from main.library.predictors.PENN.core import PITCH_BINS, CENTS_PER_BIN, OCTAVE,
 SAMPLE_RATE, WINDOW_SIZE = 8000, 1024
 
 class Viterbi:
-    def __init__(self, pitch_bins=1440, hop_length=80, sample_rate=8000, local_pitch_window_size=19, octaves=1200, max_octaves_per_second=32, cents_per_bin=5):
+    def __init__(
+        self, 
+        pitch_bins=1440, 
+        hop_length=80, 
+        sample_rate=8000, 
+        local_pitch_window_size=19, 
+        octaves=1200, 
+        max_octaves_per_second=32, 
+        cents_per_bin=5
+    ):
         self.pitch_bins = pitch_bins
         self.hop_length = hop_length
         self.sample_rate = sample_rate
@@ -45,22 +54,54 @@ class Viterbi:
         padded = F.pad(logits.squeeze(2), (self.window_size // 2, self.window_size // 2), value=-float('inf'))
 
         if str(bins.device).startswith("ocl"):
-            indices = (bins.cpu().repeat(1, self.window_size) + torch.arange(self.window_size, device="cpu")[None]).to(bins.device)
+            indices = (
+                bins.cpu().repeat(1, self.window_size) + 
+                torch.arange(self.window_size, device="cpu")[None]
+            ).to(bins.device)
         else:
-            indices = bins.repeat(1, self.window_size) + torch.arange(self.window_size, device=bins.device)[None]
+            indices = (
+                bins.repeat(1, self.window_size) + 
+                torch.arange(self.window_size, device=bins.device)[None]
+            )
 
-        return self.expected_value(padded.gather(1, indices), bins_to_cents(torch.clip(indices - self.window_size // 2, 0)))
+        return self.expected_value(
+            padded.gather(1, indices), 
+            bins_to_cents(
+                torch.clip(indices - self.window_size // 2, 0)
+            )
+        )
     
     def triangular_transition_matrix(self):
         xx, yy = torch.meshgrid(torch.arange(self.pitch_bins), torch.arange(self.pitch_bins), indexing='ij')
-        transition = torch.clip(((self.max_octave * self.hop_length / self.sample_rate) * (self.octaves / self.cents_per_bin) + 1) - (xx - yy).abs(), 0)
+        transition = torch.clip(
+            (
+                (self.max_octave * self.hop_length / self.sample_rate) * 
+                (self.octaves / self.cents_per_bin) + 1
+            ) - (xx - yy).abs(), 
+            0
+        )
+
         return transition / transition.sum(dim=1, keepdims=True)
 
     def expected_value(self, logits, cents):
-        return cents_to_frequency((F.softmax(logits, dim=1) * cents).sum(dim=1, keepdims=True))
+        return cents_to_frequency(
+            (F.softmax(logits, dim=1) * cents).sum(dim=1, keepdims=True)
+        )
 
 class PENN:
-    def __init__(self, model_path, hop_length = 80, batch_size = None, f0_min = 31, f0_max = 1984, sample_rate = 8000, interp_unvoiced_at = None, device = None, providers = None, onnx = False):
+    def __init__(
+        self, 
+        model_path, 
+        hop_length = 80, 
+        batch_size = None, 
+        f0_min = 31, 
+        f0_max = 1984, 
+        sample_rate = 8000, 
+        interp_unvoiced_at = None, 
+        device = None, 
+        providers = None, 
+        onnx = False
+    ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.hopsize = hop_length / SAMPLE_RATE
         self.batch_size = batch_size
@@ -70,7 +111,15 @@ class PENN:
         self.interp_unvoiced_at = interp_unvoiced_at
         self.onnx = onnx
         self.resample_audio = None
-        self.decoder = Viterbi(PITCH_BINS, hop_length, SAMPLE_RATE, 19, OCTAVE, 32, CENTS_PER_BIN)
+        self.decoder = Viterbi(
+            PITCH_BINS, 
+            hop_length, 
+            SAMPLE_RATE, 
+            19, 
+            OCTAVE, 
+            32, 
+            CENTS_PER_BIN
+        )
 
         if self.onnx:
             import onnxruntime as ort
@@ -98,7 +147,12 @@ class PENN:
     
     def resample(self, audio, target_sample_rate=SAMPLE_RATE):
         if self.sample_rate == target_sample_rate: return audio
-        if self.resample_audio is None: self.resample_audio = torchaudio.transforms.Resample(self.sample_rate, target_sample_rate).to(audio.device)
+
+        if self.resample_audio is None: 
+            self.resample_audio = torchaudio.transforms.Resample(
+                self.sample_rate, 
+                target_sample_rate
+            ).to(audio.device)
         
         return self.resample_audio(audio)
     
@@ -131,7 +185,11 @@ class PENN:
                     if (end - start) % hopsize: padding += end - start - hopsize
                     batch_audio = torch.nn.functional.pad(batch_audio, (0, padding))
 
-                frames = torch.nn.functional.unfold(batch_audio[:, None, None], kernel_size=(1, WINDOW_SIZE), stride=(1, hopsize)).permute(2, 0, 1)
+                frames = torch.nn.functional.unfold(
+                    batch_audio[:, None, None], 
+                    kernel_size=(1, WINDOW_SIZE), 
+                    stride=(1, hopsize)
+                ).permute(2, 0, 1)
             else:
                 frames = torch.zeros(batch, 1, WINDOW_SIZE)
 
@@ -171,17 +229,15 @@ class PENN:
         return pitch, periodicity
     
     def infer(self, frames):
-        if self.onnx:
-            inferred = torch.tensor(
-                self.model.run(
-                    [self.model.get_outputs()[0].name], 
-                    {
-                        self.model.get_inputs()[0].name: frames.cpu().numpy()
-                    }
-                )[0]
-            )
-        else:
-            with torch.no_grad():
+        with torch.no_grad():
+            if self.onnx:
+                inferred = torch.tensor(
+                    self.model.run(
+                        [self.model.get_outputs()[0].name], 
+                        {self.model.get_inputs()[0].name: frames.cpu().numpy()}
+                    )[0]
+                )
+            else:
                 inferred = self.model(frames)
         
         return inferred

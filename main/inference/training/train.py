@@ -91,6 +91,7 @@ def parse_arguments():
 d_lr_coeff = 1.0
 g_lr_coeff = 1.0
 d_step_per_g_step = 1
+use_clip_grad_value = False
 
 args = parse_arguments()
 
@@ -293,14 +294,26 @@ def main():
             return [], [], [], []
 
         def continue_overtrain_detector(training_file_path):
-            if overtraining_detector and os.path.exists(training_file_path): loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history = load_from_json(training_file_path)
+            if overtraining_detector and os.path.exists(training_file_path): 
+                (
+                    loss_disc_history, 
+                    smoothed_loss_disc_history, 
+                    loss_gen_history, 
+                    smoothed_loss_gen_history 
+                )= load_from_json(training_file_path)
 
         if cleanup:
             for root, dirs, files in os.walk(experiment_dir, topdown=False):
                 for name in files:
                     file_path = os.path.join(root, name)
                     file_name, file_extension = os.path.splitext(name)
-                    if (file_extension == ".0" or (file_name.startswith(("D_", "G_")) and file_extension == ".pth") or (file_name.startswith(("added", "trained")) and file_extension == ".index")): os.remove(file_path)
+
+                    if (
+                        file_extension == ".0" or 
+                        (file_name.startswith(("D_", "G_")) and file_extension == ".pth") or 
+                        (file_name.startswith(("added", "trained")) and file_extension == ".index")
+                    ): 
+                        os.remove(file_path)
 
                 for name in dirs:
                     if name == "eval":
@@ -329,11 +342,33 @@ class EpochRecorder:
         self.last_time = now_time
         return translations["time_or_speed_training"].format(current_time=datetime.datetime.now().strftime("%H:%M:%S"), elapsed_time_str=str(datetime.timedelta(seconds=int(round(elapsed_time, 1)))))
 
-def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, device_id, model_author, vocoder, checkpointing, energy_use):
+def run(
+    rank, 
+    n_gpus, 
+    experiment_dir, 
+    pretrainG, 
+    pretrainD, 
+    pitch_guidance, 
+    custom_total_epoch, 
+    custom_save_every_weights, 
+    config, 
+    device, 
+    device_id, 
+    model_author, 
+    vocoder, 
+    checkpointing, 
+    energy_use
+):
     global global_step, smoothed_value_gen, smoothed_value_disc, optimizer_choice
 
     smoothed_value_gen, smoothed_value_disc = 0, 0
-    dist.init_process_group(backend="gloo" if sys.platform == "win32" or device.type != "cuda" else "nccl", init_method="env://", world_size=n_gpus if device.type == "cuda" else 1, rank=rank if device.type == "cuda" else 0)
+
+    dist.init_process_group(
+        backend="gloo" if sys.platform == "win32" or device.type != "cuda" else "nccl", 
+        init_method="env://", 
+        world_size=n_gpus if device.type == "cuda" else 1, 
+        rank=rank if device.type == "cuda" else 0
+    )
 
     torch.manual_seed(config.train.seed)
     if device.type == "cuda": torch.cuda.manual_seed(config.train.seed)
@@ -341,7 +376,9 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
 
     if torch.cuda.is_available(): torch.cuda.set_device(device_id)
 
-    writer_eval = SummaryWriter(log_dir=os.path.join(experiment_dir, "eval")) if rank == 0 else None
+    writer_eval = SummaryWriter(
+        log_dir=os.path.join(experiment_dir, "eval")
+    ) if rank == 0 else None
 
     from main.inference.training.data_utils import (
         DistributedBucketSampler,
@@ -349,7 +386,12 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         TextAudioLoader
     )
 
-    train_dataset = TextAudioLoader(config.data, pitch_guidance=pitch_guidance, energy=energy_use)
+    train_dataset = TextAudioLoader(
+        config.data, 
+        pitch_guidance=pitch_guidance, 
+        energy=energy_use
+    )
+
     train_loader = DataLoader(
         train_dataset, 
         num_workers=4, 
@@ -380,7 +422,9 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         logger.debug(e)
 
     try:
-        last_g = os.path.join(experiment_dir, "G_latest.pth") if save_only_latest and os.path.exists(os.path.join(experiment_dir, "G_latest.pth"))  else latest_checkpoint_path(experiment_dir, "G_*.pth")
+        g_path = os.path.join(experiment_dir, "G_latest.pth")
+        last_g = g_path if save_only_latest and os.path.exists(g_path) else latest_checkpoint_path(experiment_dir, "G_*.pth")
+
         chk_path = (last_g if last_g else (pretrainG if pretrainG not in ["", "None"] else None))
 
         if chk_path:
@@ -413,10 +457,17 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
         )
     )
 
-    net_g, net_d = (net_g.cuda(device_id), net_d.cuda(device_id)) if torch.cuda.is_available() else (net_g.to(device), net_d.to(device))
+    net_g, net_d = (
+        net_g.cuda(device_id), 
+        net_d.cuda(device_id)
+    ) if torch.cuda.is_available() else (
+        net_g.to(device), 
+        net_d.to(device)
+    )
 
     if optimizer_choice == "AnyPrecisionAdamW" and main_config.brain:
         from main.inference.training.anyprecision_optimizer import AnyPrecisionAdamW
+
         optimizer_optim = AnyPrecisionAdamW
     elif optimizer_choice == "RAdam":
         optimizer_optim = torch.optim.RAdam
@@ -436,15 +487,33 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
     )
 
     fn_mel_loss = MultiScaleMelSpectrogramLoss(sample_rate=config.data.sample_rate) if multiscale_mel_loss else torch.nn.L1Loss()
+
     if not device.type.startswith(("privateuseone", "ocl")): 
-        net_g, net_d = (DDP(net_g, device_ids=[device_id]), DDP(net_d, device_ids=[device_id])) if torch.cuda.is_available() else (DDP(net_g), DDP(net_d))
+        net_g, net_d = (
+            DDP(net_g, device_ids=[device_id]), 
+            DDP(net_d, device_ids=[device_id])
+        ) if torch.cuda.is_available() else (
+            DDP(net_g), 
+            DDP(net_d)
+        )
 
     scaler_dict = {}
     try:
         logger.info(translations["start_training"])
 
-        _, _, _, epoch_str, scaler_dict = load_checkpoint(logger, (os.path.join(experiment_dir, "D_latest.pth") if save_only_latest else latest_checkpoint_path(experiment_dir, "D_*.pth")), net_d, optim_d)
-        _, _, _, epoch_str, _ = load_checkpoint(logger, (os.path.join(experiment_dir, "G_latest.pth") if save_only_latest else latest_checkpoint_path(experiment_dir, "G_*.pth")), net_g, optim_g)
+        _, _, _, epoch_str, scaler_dict = load_checkpoint(
+            logger, 
+            os.path.join(experiment_dir, "D_latest.pth") if save_only_latest else latest_checkpoint_path(experiment_dir, "D_*.pth"), 
+            net_d, 
+            optim_d
+        )
+
+        _, _, _, epoch_str, _ = load_checkpoint(
+            logger, 
+            os.path.join(experiment_dir, "G_latest.pth") if save_only_latest else latest_checkpoint_path(experiment_dir, "G_*.pth"), 
+            net_g, 
+            optim_g
+        )
         
         epoch_str += 1
         global_step = (epoch_str - 1) * len(train_loader)
@@ -471,7 +540,19 @@ def run(rank, n_gpus, experiment_dir, pretrainG, pretrainD, pitch_guidance, cust
             logger.error(e)
             sys.exit(1)
 
-    scheduler_g, scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=config.train.lr_decay, last_epoch=epoch_str - 2), torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=config.train.lr_decay, last_epoch=epoch_str - 2)
+    scheduler_g, scheduler_d = (
+        torch.optim.lr_scheduler.ExponentialLR(
+            optim_g, 
+            gamma=config.train.lr_decay, 
+            last_epoch=epoch_str - 2
+        ), 
+        torch.optim.lr_scheduler.ExponentialLR(
+            optim_d, 
+            gamma=config.train.lr_decay, 
+            last_epoch=epoch_str - 2
+        )
+    )
+
     scaler = GradScaler(device=device, enabled=is_half and device.type == "cuda")
     cache = []
 
@@ -575,13 +656,30 @@ def train_and_evaluate(
 
     autocast_enabled = is_half and device.type == "cuda"
     autocast_dtype = torch.float32 if not autocast_enabled else (torch.bfloat16 if main_config.brain else torch.float16)
-    autocasts = autocast(device.type, enabled=autocast_enabled, dtype=autocast_dtype) if not device.type.startswith("ocl") else nullcontext()
+
+    autocasts = autocast(
+        device.type, 
+        enabled=autocast_enabled, 
+        dtype=autocast_dtype
+    ) if not device.type.startswith("ocl") else nullcontext()
     
     with tqdm(total=len(train_loader), leave=False) as pbar:
         for batch_idx, info in data_iterator:
-            if device.type == "cuda" and not cache_data_in_gpu: info = [tensor.cuda(device_id, non_blocking=True) for tensor in info]  
-            elif device.type in ["privateuseone", "ocl"] and not cache_data_in_gpu: info = [tensor.to(device_id if device.type == "ocl" else device, non_blocking=True) for tensor in info]  
-            else: info = [tensor.to(device) for tensor in info]
+            if device.type == "cuda" and not cache_data_in_gpu: 
+                info = [
+                    tensor.cuda(device_id, non_blocking=True) 
+                    for tensor in info
+                ]  
+            elif device.type in ["privateuseone", "ocl"] and not cache_data_in_gpu: 
+                info = [
+                    tensor.to(device_id if device.type == "ocl" else device, non_blocking=True) 
+                    for tensor in info
+                ]  
+            else: 
+                info = [
+                    tensor.to(device) 
+                    for tensor in info
+                ]
 
             phone, phone_lengths = info[0], info[1]
             if pitch_guidance:
@@ -594,28 +692,53 @@ def train_and_evaluate(
                 energy = info[7] if energy_use else None
 
             with autocasts:
-                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid, energy)
-                wave = commons.slice_segments(wave, ids_slice * config.data.hop_length, config.train.segment_size, dim=3)
+                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(
+                    phone, 
+                    phone_lengths, 
+                    pitch, 
+                    pitchf, 
+                    spec, 
+                    spec_lengths, 
+                    sid, 
+                    energy
+                )
+
+                wave = commons.slice_segments(
+                    wave, 
+                    ids_slice * config.data.hop_length, 
+                    config.train.segment_size, 
+                    dim=3
+                )
 
             for _ in range(d_step_per_g_step):
                 with autocasts:
-                    y_d_hat_r, y_d_hat_g, _, _ = net_d(wave, y_hat.detach())
-                    loss_disc, losses_disc_r, losses_disc_g = losses.discriminator_loss(y_d_hat_r, y_d_hat_g)
+                    y_d_hat_r, y_d_hat_g, _, _ = net_d(
+                        wave, 
+                        y_hat.detach()
+                    )
+
+                    loss_disc, losses_disc_r, losses_disc_g = losses.discriminator_loss(
+                        y_d_hat_r, 
+                        y_d_hat_g
+                    )
 
                 optim_d.zero_grad()
 
                 if autocast_enabled:
                     scaler.scale(loss_disc).backward()
                     scaler.unscale_(optim_d)
-                    grad_norm_d = commons.clip_grad_value(net_d.parameters(), None)
+                    grad_norm_d = commons.clip_grad_value(net_d.parameters(), None) if use_clip_grad_value else commons.grad_norm(net_d.parameters())
                     scaler.step(optim_d)
                 else:
                     loss_disc.backward()
-                    grad_norm_d = commons.clip_grad_value(net_d.parameters(), None)
+                    grad_norm_d = commons.clip_grad_value(net_d.parameters(), None) if use_clip_grad_value else commons.grad_norm(net_d.parameters())
                     optim_d.step()
 
             with autocasts:
-                y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(wave, y_hat)
+                y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(
+                    wave, 
+                    y_hat
+                )
 
             if multiscale_mel_loss: 
                 loss_mel = fn_mel_loss(wave, y_hat) * config.train.c_mel / 3.0
@@ -645,26 +768,45 @@ def train_and_evaluate(
                 ) * config.train.c_mel
 
             if device.type == "privateuseone": 
-                loss_kl = (losses.kl_loss(z_p.detach().cpu(), logs_q.detach().cpu(), m_p.detach().cpu(), logs_p.detach().cpu(), z_mask.detach().cpu()) * config.train.c_kl).to(device)
+                loss_kl = (
+                    losses.kl_loss(
+                        z_p.detach().cpu(), 
+                        logs_q.detach().cpu(), 
+                        m_p.detach().cpu(), 
+                        logs_p.detach().cpu(), 
+                        z_mask.detach().cpu()
+                    ) * config.train.c_kl
+                ).to(device)
             else:
-                loss_kl = losses.kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * config.train.c_kl
+                loss_kl = losses.kl_loss(
+                    z_p, 
+                    logs_q, 
+                    m_p, 
+                    logs_p, 
+                    z_mask
+                ) * config.train.c_kl
 
             loss_fm = losses.feature_loss(fmap_r, fmap_g)
             loss_gen, losses_gen = losses.generator_loss(y_d_hat_g)
-
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
-            if loss_gen_all < lowest_value["value"]: lowest_value = {"step": global_step, "value": loss_gen_all, "epoch": epoch}
+
+            if loss_gen_all < lowest_value["value"]: 
+                lowest_value = {
+                    "step": global_step, 
+                    "value": loss_gen_all, 
+                    "epoch": epoch
+                }
 
             optim_g.zero_grad()
             if autocast_enabled:
                 scaler.scale(loss_gen_all).backward()
                 scaler.unscale_(optim_g)
-                grad_norm_g = commons.clip_grad_value(net_g.parameters(), None)
+                grad_norm_g = commons.clip_grad_value(net_g.parameters(), None) if use_clip_grad_value else commons.grad_norm(net_g.parameters())
                 scaler.step(optim_g)
                 scaler.update()
             else:
                 loss_gen_all.backward()
-                grad_norm_g = commons.clip_grad_value(net_g.parameters(), None)
+                grad_norm_g = commons.clip_grad_value(net_g.parameters(), None) if use_clip_grad_value else commons.grad_norm(net_g.parameters())
                 optim_g.step()
 
             global_step += 1
@@ -789,7 +931,12 @@ def train_and_evaluate(
 
     def save_to_json(file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history):
         with open(file_path, "w") as f:
-            json.dump({"loss_disc_history": loss_disc_history, "smoothed_loss_disc_history": smoothed_loss_disc_history, "loss_gen_history": loss_gen_history, "smoothed_loss_gen_history": smoothed_loss_gen_history}, f)
+            json.dump({
+                "loss_disc_history": loss_disc_history, 
+                "smoothed_loss_disc_history": smoothed_loss_disc_history, 
+                "loss_gen_history": loss_gen_history, 
+                "smoothed_loss_gen_history": smoothed_loss_gen_history
+            }, f)
     
     model_add, model_del = [], []
     done = False

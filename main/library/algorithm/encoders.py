@@ -11,20 +11,67 @@ from main.library.algorithm.normalization import LayerNorm
 from main.library.algorithm.attentions import MultiHeadAttention, FFN
 
 class Encoder(torch.nn.Module):
-    def __init__(self, hidden_channels, filter_channels, n_heads, n_layers, kernel_size=1, p_dropout=0.0, window_size=10, onnx=False, **kwargs):
+    def __init__(
+        self, 
+        hidden_channels, 
+        filter_channels, 
+        n_heads, 
+        n_layers, 
+        kernel_size=1, 
+        p_dropout=0.0, 
+        window_size=10, 
+        onnx=False, 
+        **kwargs
+    ):
         super().__init__()
         self.hidden_channels = hidden_channels
         self.n_layers = n_layers
         self.drop = torch.nn.Dropout(p_dropout)
-        self.attn_layers = torch.nn.ModuleList([MultiHeadAttention(hidden_channels, hidden_channels, n_heads, p_dropout=p_dropout, window_size=window_size, onnx=onnx) for _ in range(n_layers)])
-        self.norm_layers_1 = torch.nn.ModuleList([LayerNorm(hidden_channels, onnx=onnx) for _ in range(n_layers)])
-        self.ffn_layers = torch.nn.ModuleList([FFN(hidden_channels, hidden_channels, filter_channels, kernel_size, p_dropout=p_dropout, onnx=onnx) for _ in range(n_layers)])
-        self.norm_layers_2 = torch.nn.ModuleList([LayerNorm(hidden_channels, onnx=onnx) for _ in range(n_layers)])
+
+        self.attn_layers = torch.nn.ModuleList([
+            MultiHeadAttention(
+                hidden_channels, 
+                hidden_channels, 
+                n_heads, 
+                p_dropout=p_dropout, 
+                window_size=window_size, 
+                onnx=onnx
+            )
+            for _ in range(n_layers)
+        ])
+
+        self.norm_layers_1 = torch.nn.ModuleList([
+            LayerNorm(
+                hidden_channels, 
+                onnx=onnx
+            )
+            for _ in range(n_layers)
+        ])
+
+        self.ffn_layers = torch.nn.ModuleList([
+            FFN(
+                hidden_channels, 
+                hidden_channels, 
+                filter_channels, 
+                kernel_size, 
+                p_dropout=p_dropout, 
+                onnx=onnx
+            ) 
+            for _ in range(n_layers)
+        ])
+
+        self.norm_layers_2 = torch.nn.ModuleList([
+            LayerNorm(
+                hidden_channels, 
+                onnx=onnx
+            ) 
+            for _ in range(n_layers)
+        ])
 
     def forward(self, x, x_mask):
         attn_mask = x_mask.unsqueeze(2) * x_mask.unsqueeze(-1)
         x = x * x_mask
-        
+
         for i in range(self.n_layers):
             x = self.norm_layers_1[i](x + self.drop(self.attn_layers[i](x, x, attn_mask)))
             x = self.norm_layers_2[i](x + self.drop(self.ffn_layers[i](x, x_mask)))
@@ -32,7 +79,20 @@ class Encoder(torch.nn.Module):
         return x * x_mask
     
 class TextEncoder(torch.nn.Module):
-    def __init__(self, out_channels, hidden_channels, filter_channels, n_heads, n_layers, kernel_size, p_dropout, embedding_dim, f0=True, energy=False, onnx=False):
+    def __init__(
+        self, 
+        out_channels, 
+        hidden_channels, 
+        filter_channels, 
+        n_heads, 
+        n_layers, 
+        kernel_size, 
+        p_dropout, 
+        embedding_dim, 
+        f0=True, 
+        energy=False, 
+        onnx=False
+    ):
         super(TextEncoder, self).__init__()
         self.hidden_channels = hidden_channels
         self.out_channels = out_channels
@@ -56,7 +116,16 @@ class TextEncoder(torch.nn.Module):
         return m, logs, x_mask
 
 class PosteriorEncoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels, hidden_channels, kernel_size, dilation_rate, n_layers, gin_channels=0):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        hidden_channels, 
+        kernel_size, 
+        dilation_rate, 
+        n_layers, 
+        gin_channels=0
+    ):
         super(PosteriorEncoder, self).__init__()
         self.out_channels = out_channels
         self.pre = torch.nn.Conv1d(in_channels, hidden_channels, 1)
@@ -65,9 +134,17 @@ class PosteriorEncoder(torch.nn.Module):
 
     def forward(self, x, x_lengths, g = None):
         x_mask = sequence_mask(x_lengths, x.size(2)).unsqueeze(1).to(x.dtype)
-        m, logs = (self.proj(self.enc((self.pre(x) * x_mask), x_mask, g=g)) * x_mask).split(self.out_channels, dim=1)
 
-        return ((m + torch.randn_like(m) * logs.exp()) * x_mask), m, logs, x_mask
+        m, logs = (
+            self.proj(
+                self.enc(
+                    self.pre(x) * x_mask, 
+                    x_mask, g=g
+                )
+            ) * x_mask
+        ).split(self.out_channels, dim=1)
+
+        return (m + torch.randn_like(m) * logs.exp()) * x_mask, m, logs, x_mask
 
     def remove_weight_norm(self):
         self.enc.remove_weight_norm()

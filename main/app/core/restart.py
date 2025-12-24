@@ -14,7 +14,10 @@ def restart_app(app):
     os.system("cls" if platform.system() == "Windows" else "clear")
     
     app.close()
-    subprocess.run([python, os.path.join("main", "app", "app.py")] + [arg for arg in sys.argv[1:] if arg != "--open"])
+    subprocess.run([
+        python, 
+        os.path.join("main", "app", "app.py")
+    ] + [arg for arg in sys.argv[1:] if arg != "--open"])
 
 def change_language(lang, app):
     configs = json.load(open(configs_json, "r"))

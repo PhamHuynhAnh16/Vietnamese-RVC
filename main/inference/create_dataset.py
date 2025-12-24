@@ -217,7 +217,10 @@ def create_dataset(
         ]
         
         if skip_seconds:
-            skip_start_audios, skip_end_audios = skip_start_audios.replace(", ", ",").split(","), skip_end_audios.replace(", ", ",").split(",")
+            skip_start_audios, skip_end_audios = (
+                skip_start_audios.replace(", ", ",").split(","), 
+                skip_end_audios.replace(", ", ",").split(",")
+            )
 
             if len(skip_start_audios) < len(audio_path) or len(skip_end_audios) < len(audio_path): 
                 logger.warning(translations["skip<audio"])
@@ -267,14 +270,29 @@ def create_dataset(
 
         if clean_dataset: 
             from main.tools.noisereduce import TorchGate
-            tg = TorchGate(sr, prop_decrease=clean_strength).to(config.device)
+
+            tg = TorchGate(
+                sr, 
+                prop_decrease=clean_strength
+            ).to(config.device)
         
         for audio in audio_path:
             data, sr = read_file(audio)
+            if len(data.shape) > 1: 
+                data = librosa.to_mono(data.T)
 
-            if len(data.shape) > 1: data = librosa.to_mono(data.T)
-            if sr != sample_rate: data = librosa.resample(data, orig_sr=sr, target_sr=sample_rate, res_type="soxr_vhq")
-            if clean_dataset: data = tg(torch.from_numpy(data).unsqueeze(0).to(config.device).float()).squeeze(0).cpu().detach().numpy()
+            if sr != sample_rate: 
+                data = librosa.resample(
+                    data, 
+                    orig_sr=sr, 
+                    target_sr=sample_rate, 
+                    res_type="soxr_vhq"
+                )
+
+            if clean_dataset: 
+                data = tg(
+                    torch.from_numpy(data).unsqueeze(0).to(config.device).float()
+                ).squeeze(0).cpu().detach().numpy()
 
             sf.write(audio, data, sr)
             output_path = os.path.join(output_dirs, os.path.basename(audio))

@@ -8,7 +8,22 @@ import soundfile as sf
 
 from distutils.util import strtobool
 from scipy.signal import butter, filtfilt
-from pedalboard import Pedalboard, Chorus, Distortion, Reverb, PitchShift, Delay, Limiter, Gain, Bitcrush, Clipping, Compressor, Phaser, HighpassFilter
+
+from pedalboard import (
+    Pedalboard, 
+    Chorus, 
+    Distortion, 
+    Reverb, 
+    PitchShift, 
+    Delay, 
+    Limiter, 
+    Gain, 
+    Bitcrush, 
+    Clipping, 
+    Compressor, 
+    Phaser, 
+    HighpassFilter
+)
 
 sys.path.append(os.getcwd())
 
@@ -204,34 +219,161 @@ def process_audio(
     try:
         board = Pedalboard([HighpassFilter()])
 
-        if chorus: board.append(Chorus(depth=chorus_depth, rate_hz=chorus_rate, mix=chorus_mix, centre_delay_ms=chorus_delay, feedback=chorus_feedback))
-        if distortion: board.append(Distortion(drive_db=distortion_drive))
-        if reverb: board.append(Reverb(room_size=reverb_room_size, damping=reverb_damping, wet_level=reverb_wet_level, dry_level=reverb_dry_level, width=reverb_width, freeze_mode=int(reverb_freeze_mode)))
-        if pitchshift: board.append(PitchShift(semitones=pitch_shift))
-        if delay: board.append(Delay(delay_seconds=delay_seconds, feedback=delay_feedback, mix=delay_mix))
-        if compressor: board.append(Compressor(threshold_db=compressor_threshold, ratio=compressor_ratio, attack_ms=compressor_attack_ms, release_ms=compressor_release_ms))
-        if limiter: board.append(Limiter(threshold_db=limiter_threshold, release_ms=limiter_release))
-        if gain: board.append(Gain(gain_db=gain_db))
-        if bitcrush: board.append(Bitcrush(bit_depth=bitcrush_bit_depth))
-        if clipping: board.append(Clipping(threshold_db=clipping_threshold)) 
-        if phaser: board.append(Phaser(rate_hz=phaser_rate_hz, depth=phaser_depth, centre_frequency_hz=phaser_centre_frequency_hz, feedback=phaser_feedback, mix=phaser_mix))
+        if chorus: 
+            board.append(
+                Chorus(
+                    depth=chorus_depth, 
+                    rate_hz=chorus_rate, 
+                    mix=chorus_mix, 
+                    centre_delay_ms=chorus_delay, 
+                    feedback=chorus_feedback
+                )
+            )
+
+        if distortion: 
+            board.append(
+                Distortion(
+                    drive_db=distortion_drive
+                )
+            )
+
+        if reverb: 
+            board.append(
+                Reverb(
+                    room_size=reverb_room_size, 
+                    damping=reverb_damping, 
+                    wet_level=reverb_wet_level, 
+                    dry_level=reverb_dry_level, 
+                    width=reverb_width, 
+                    freeze_mode=int(reverb_freeze_mode)
+                )
+            )
+
+        if pitchshift: 
+            board.append(
+                PitchShift(
+                    semitones=pitch_shift
+                )
+            )
+
+        if delay: 
+            board.append(
+                Delay(
+                    delay_seconds=delay_seconds, 
+                    feedback=delay_feedback, 
+                    mix=delay_mix
+                )
+            )
+
+        if compressor: 
+            board.append(
+                Compressor(
+                    threshold_db=compressor_threshold, 
+                    ratio=compressor_ratio, 
+                    attack_ms=compressor_attack_ms, 
+                    release_ms=compressor_release_ms
+                )
+            )
+
+        if limiter: 
+            board.append(
+                Limiter(
+                    threshold_db=limiter_threshold, 
+                    release_ms=limiter_release
+                )
+            )
+
+        if gain: 
+            board.append(
+                Gain(
+                    gain_db=gain_db
+                )
+            )
+
+        if bitcrush: 
+            board.append(
+                Bitcrush(
+                    bit_depth=bitcrush_bit_depth
+                )
+            )
+
+        if clipping: 
+            board.append(
+                Clipping(
+                    threshold_db=clipping_threshold
+                )
+            )
+
+        if phaser: board.append(
+            Phaser(
+                rate_hz=phaser_rate_hz, 
+                depth=phaser_depth, 
+                centre_frequency_hz=phaser_centre_frequency_hz, 
+                feedback=phaser_feedback, 
+                mix=phaser_mix
+            )
+        )
 
         processed_audio = board(audio, sample_rate)
 
         if treble_bass_boost:
-            processed_audio = bass_boost(processed_audio, bass_boost_db, bass_boost_frequency, sample_rate)
-            processed_audio = treble_boost(processed_audio, treble_boost_db, treble_boost_frequency, sample_rate)
+            processed_audio = bass_boost(
+                processed_audio, 
+                bass_boost_db, 
+                bass_boost_frequency, 
+                sample_rate
+            )
+
+            processed_audio = treble_boost(
+                processed_audio, 
+                treble_boost_db, 
+                treble_boost_frequency, 
+                sample_rate
+            )
 
         if fade_in_out:
-            processed_audio = fade_in_effect(processed_audio, sample_rate, fade_in_duration)
-            processed_audio = fade_out_effect(processed_audio, sample_rate, fade_out_duration)
+            processed_audio = fade_in_effect(
+                processed_audio, 
+                sample_rate, 
+                fade_in_duration
+            )
+
+            processed_audio = fade_out_effect(
+                processed_audio, 
+                sample_rate, 
+                fade_out_duration
+            )
             
         if resample and resample_sr != sample_rate and resample_sr > 0:
-            processed_audio = librosa.resample(processed_audio, orig_sr=sample_rate, target_sr=resample_sr, res_type="soxr_vhq")
+            processed_audio = librosa.resample(
+                processed_audio, 
+                orig_sr=sample_rate, 
+                target_sr=resample_sr, 
+                res_type="soxr_vhq"
+            )
+
             sample_rate = resample_sr
 
-        sf.write(replace_export_format(output_path, export_format), processed_audio, sample_rate, format=export_format)
-        if audio_combination: pydub_load(audio_combination_input, combination_volume).overlay(pydub_load(replace_export_format(output_path, export_format), main_volume)).export(replace_export_format(output_path, export_format), format=export_format)
+        sf.write(
+            replace_export_format(output_path, export_format), 
+            processed_audio, 
+            sample_rate, 
+            format=export_format
+        )
+
+        if audio_combination: 
+            pydub_load(
+                audio_combination_input, 
+                combination_volume
+            ).overlay(
+                pydub_load(
+                    replace_export_format(output_path, export_format), 
+                    main_volume
+                )
+            ).export(
+                replace_export_format(output_path, export_format), 
+                format=export_format
+            )
     except Exception as e:
         import traceback
         logger.debug(traceback.format_exc())

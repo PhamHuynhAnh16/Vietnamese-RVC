@@ -4,7 +4,7 @@ services:
   rvc:
     build:
       context: .
-      dockerfile: Dockerfile.amd
+      dockerfile: Dockerfile.ocl
     container_name: rvc
     ports:
       - 7860:7860

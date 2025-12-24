@@ -13,7 +13,15 @@ sys.path.append(os.getcwd())
 from main.app.variables import logger, translations
 
 class ServerAudioDevice:
-    def __init__(self, index, name, host_api, max_input_channels, max_output_channels, default_samplerate):
+    def __init__(
+        self, 
+        index, 
+        name, 
+        host_api, 
+        max_input_channels, 
+        max_output_channels, 
+        default_samplerate
+    ):
         self.index = index 
         self.name = name
         self.host_api = host_api
@@ -22,9 +30,16 @@ class ServerAudioDevice:
         self.default_samplerate = default_samplerate
 
 def check_the_device(device, type = "input"):
-    stream_device = sd.InputStream if type == "input" else sd.OutputStream
+    stream_device = (
+        sd.InputStream if type == "input" else sd.OutputStream
+    )
+
     try:
-        with stream_device(device=device["index"], dtype=np.float32, samplerate=device["default_samplerate"]):
+        with stream_device(
+            device=device["index"], 
+            dtype=np.float32, 
+            samplerate=device["default_samplerate"]
+        ):
             return True
     except Exception:
         return False
@@ -40,10 +55,13 @@ def list_audio_device():
         audio_device_list = []
 
     input_audio_device_list = [
-        d for d in audio_device_list if d["max_input_channels"] > 0 and check_the_device(d, "input")
+        d for d in audio_device_list 
+        if d["max_input_channels"] > 0 and check_the_device(d, "input")
     ]
+
     output_audio_device_list = [
-        d for d in audio_device_list if d["max_output_channels"] > 0 and check_the_device(d, "output")
+        d for d in audio_device_list 
+        if d["max_output_channels"] > 0 and check_the_device(d, "output")
     ]
     
     try:
@@ -122,13 +140,21 @@ class Audio:
 
     def get_input_audio_device(self, index):
         audioinput, _ = list_audio_device()
-        serverAudioDevice = [x for x in audioinput if x.index == index]
+
+        serverAudioDevice = [
+            x for x in audioinput 
+            if x.index == index
+        ]
 
         return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
 
     def get_output_audio_device(self, index):
         _, audiooutput = list_audio_device()
-        serverAudioDevice = [x for x in audiooutput if x.index == index]
+
+        serverAudioDevice = [
+            x for x in audiooutput 
+            if x.index == index
+        ]
 
         return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
     
@@ -172,7 +198,10 @@ class Audio:
                 self.mon_queue.get()
 
             output_channels = outdata.shape[1]
-            outdata[:] = (np.repeat(mon_wav, output_channels).reshape(-1, output_channels) * gain)
+
+            outdata[:] = (
+                np.repeat(mon_wav, output_channels).reshape(-1, output_channels) * gain
+            )
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
@@ -212,6 +241,7 @@ class Audio:
             channels=output_max_channel,
             extra_settings=output_extra_setting
         )
+
         self.input_stream.start()
         self.output_stream.start()
 
@@ -258,32 +288,77 @@ class Audio:
     ):
         self.stop()
 
-        input_audio_device, output_audio_device = self.get_input_audio_device(input_device_id), self.get_output_audio_device(output_device_id)
-        input_channels, output_channels = input_audio_device.max_input_channels, output_audio_device.max_output_channels
+        input_audio_device, output_audio_device = (
+            self.get_input_audio_device(input_device_id), 
+            self.get_output_audio_device(output_device_id)
+        )
+
+        input_channels, output_channels = (
+            input_audio_device.max_input_channels, 
+            output_audio_device.max_output_channels
+        )
     
-        input_extra_setting, output_extra_setting, output_monitor_extra_setting, monitor_channels = None, None, None, None
+        input_extra_setting, output_extra_setting = None, None
+        output_monitor_extra_setting, monitor_channels = None, None
+
         wasapi_exclusive_mode = bool(exclusive_mode)
 
-        if input_audio_device and "WASAPI" in input_audio_device.host_api:
-            input_extra_setting = sd.WasapiSettings(exclusive=wasapi_exclusive_mode, auto_convert=not wasapi_exclusive_mode)
-        elif input_audio_device and "ASIO" in input_audio_device.host_api and asio_input_channel != -1:
-            input_extra_setting = sd.AsioSettings(channel_selectors=[asio_input_channel])
+        if (
+            input_audio_device and 
+            "WASAPI" in input_audio_device.host_api
+        ):
+            input_extra_setting = sd.WasapiSettings(
+                exclusive=wasapi_exclusive_mode, 
+                auto_convert=not wasapi_exclusive_mode
+            )
+        elif (
+            input_audio_device and 
+            "ASIO" in input_audio_device.host_api and 
+            asio_input_channel != -1
+        ):
+            input_extra_setting = sd.AsioSettings(
+                channel_selectors=[asio_input_channel]
+            )
             input_channels = 1
 
-        if output_audio_device and "WASAPI" in output_audio_device.host_api:
-            output_extra_setting = sd.WasapiSettings(exclusive=wasapi_exclusive_mode, auto_convert=not wasapi_exclusive_mode)
-        elif input_audio_device and "ASIO" in input_audio_device.host_api and asio_output_channel != -1:
-            output_extra_setting = sd.AsioSettings(channel_selectors=[asio_output_channel])
+        if (
+            output_audio_device and 
+            "WASAPI" in output_audio_device.host_api
+        ):
+            output_extra_setting = sd.WasapiSettings(
+                exclusive=wasapi_exclusive_mode, 
+                auto_convert=not wasapi_exclusive_mode
+            )
+        elif (
+            input_audio_device and 
+            "ASIO" in input_audio_device.host_api and 
+            asio_output_channel != -1
+        ):
+            output_extra_setting = sd.AsioSettings(
+                channel_selectors=[asio_output_channel]
+            )
             output_channels = 1
 
         if self.use_monitor:
             output_monitor_device = self.get_output_audio_device(output_monitor_id)
             monitor_channels = output_monitor_device.max_output_channels
 
-            if output_monitor_device and "WASAPI" in output_monitor_device.host_api:
-                output_monitor_extra_setting = sd.WasapiSettings(exclusive=wasapi_exclusive_mode, auto_convert=not wasapi_exclusive_mode)
-            elif output_monitor_device and "ASIO" in output_monitor_device.host_api and asio_output_monitor_channel != -1:
-                output_monitor_extra_setting = sd.AsioSettings(channel_selectors=[asio_output_monitor_channel])
+            if (
+                output_monitor_device and 
+                "WASAPI" in output_monitor_device.host_api
+            ):
+                output_monitor_extra_setting = sd.WasapiSettings(
+                    exclusive=wasapi_exclusive_mode, 
+                    auto_convert=not wasapi_exclusive_mode
+                )
+            elif (
+                output_monitor_device and 
+                "ASIO" in output_monitor_device.host_api and 
+                asio_output_monitor_channel != -1
+            ):
+                output_monitor_extra_setting = sd.AsioSettings(
+                    channel_selectors=[asio_output_monitor_channel]
+                )
                 monitor_channels = 1
 
         block_frame = int((read_chunk_size * 128 / 48000) * input_audio_sample_rate)

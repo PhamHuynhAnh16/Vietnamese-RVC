@@ -1,0 +1,14 @@
+version: '1'
+
+services:
+  rvc:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: rvc
+    ports:
+      - 7860:7860
+    deploy:
+      resources:
+        reservations:
+          devices: []

@@ -6,7 +6,14 @@ import numpy as np
 SAMPLE_RATE, HOP_LENGTH, FRAME_LENGTH = 16000, 256, 1024
 
 class SWIFT:
-    def __init__(self, model_path, fmin = 50, fmax = 1100, confidence_threshold = 0.9, providers = ["CPUExecutionProvider"]):
+    def __init__(
+        self, 
+        model_path, 
+        fmin = 50, 
+        fmax = 1100, 
+        confidence_threshold = 0.9, 
+        providers = ["CPUExecutionProvider"]
+    ):
         self.fmin = fmin
         self.fmax = fmax
         self.confidence_threshold = confidence_threshold

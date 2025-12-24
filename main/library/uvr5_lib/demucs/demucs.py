@@ -32,11 +32,22 @@ def rescale_module(module, reference):
         if isinstance(sub, (nn.Conv1d, nn.ConvTranspose1d, nn.Conv2d, nn.ConvTranspose2d)): rescale_conv(sub, reference)
 
 class BLSTM(nn.Module):
-    def __init__(self, dim, layers=1, max_steps=None, skip=False):
+    def __init__(
+        self, 
+        dim, 
+        layers=1, 
+        max_steps=None, 
+        skip=False
+    ):
         super().__init__()
         assert max_steps is None or max_steps % 4 == 0
         self.max_steps = max_steps
-        self.lstm = nn.LSTM(bidirectional=True, num_layers=layers, hidden_size=dim, input_size=dim)
+        self.lstm = nn.LSTM(
+            bidirectional=True, 
+            num_layers=layers, 
+            hidden_size=dim, 
+            input_size=dim
+        )
         self.linear = nn.Linear(2 * dim, dim)
         self.skip = skip
 
@@ -76,16 +87,36 @@ class BLSTM(nn.Module):
         return x
 
 class LayerScale(nn.Module):
-    def __init__(self, channels, init = 0):
+    def __init__(
+        self, 
+        channels, 
+        init = 0
+    ):
         super().__init__()
-        self.scale = nn.Parameter(torch.zeros(channels, requires_grad=True))
+        self.scale = nn.Parameter(
+            torch.zeros(channels, requires_grad=True)
+        )
         self.scale.data[:] = init
 
     def forward(self, x):
         return self.scale[:, None] * x
 
 class DConv(nn.Module):
-    def __init__(self, channels, compress = 4, depth = 2, init = 1e-4, norm=True, attn=False, heads=4, ndecay=4, lstm=False, gelu=True, kernel=3, dilate=True):
+    def __init__(
+        self, 
+        channels, 
+        compress = 4, 
+        depth = 2, 
+        init = 1e-4, 
+        norm=True, 
+        attn=False, 
+        heads=4, 
+        ndecay=4, 
+        lstm=False, 
+        gelu=True, 
+        kernel=3, 
+        dilate=True
+    ):
         super().__init__()
         assert kernel % 2 == 1
         self.channels = channels
@@ -102,10 +133,25 @@ class DConv(nn.Module):
             dilation = 2**d if dilate else 1
             padding = dilation * (kernel // 2)
 
-            mods = [nn.Conv1d(channels, hidden, kernel, dilation=dilation, padding=padding), norm_fn(hidden), act(), nn.Conv1d(hidden, 2 * channels, 1), norm_fn(2 * channels), nn.GLU(1), LayerScale(channels, init)]
+            mods = [
+                nn.Conv1d(
+                    channels, 
+                    hidden, 
+                    kernel, 
+                    dilation=dilation, 
+                    padding=padding
+                ), 
+                norm_fn(hidden), 
+                act(), 
+                nn.Conv1d(hidden, 2 * channels, 1), 
+                norm_fn(2 * channels), 
+                nn.GLU(1), 
+                LayerScale(channels, init)
+            ]
 
             if attn: mods.insert(3, LocalState(hidden, heads=heads, ndecay=ndecay))
             if lstm: mods.insert(3, BLSTM(hidden, layers=2, max_steps=200, skip=True))
+
             layer = nn.Sequential(*mods)
             self.layers.append(layer)
 
@@ -116,7 +162,13 @@ class DConv(nn.Module):
         return x
 
 class LocalState(nn.Module):
-    def __init__(self, channels, heads = 4, nfreqs = 0, ndecay = 4):
+    def __init__(
+        self, 
+        channels, 
+        heads = 4, 
+        nfreqs = 0, 
+        ndecay = 4
+    ):
         super().__init__()
         assert channels % heads == 0, (channels, heads)
         self.heads = heads
@@ -238,19 +290,70 @@ class Demucs(nn.Module):
             attn = index >= dconv_attn
             lstm = index >= dconv_lstm
 
-            if dconv_mode & 1: encode += [DConv(channels, depth=dconv_depth, init=dconv_init, compress=dconv_comp, attn=attn, lstm=lstm)]
-            if rewrite: encode += [nn.Conv1d(channels, ch_scale * channels, 1), norm_fn(ch_scale * channels), activation]
+            if dconv_mode & 1: 
+                encode += [
+                    DConv(
+                        channels, 
+                        depth=dconv_depth, 
+                        init=dconv_init, 
+                        compress=dconv_comp, 
+                        attn=attn, lstm=lstm
+                    )
+                ]
+
+            if rewrite: 
+                encode += [
+                    nn.Conv1d(
+                        channels, 
+                        ch_scale * channels, 
+                        1
+                    ), 
+                    norm_fn(ch_scale * channels), 
+                    activation
+                ]
+
             self.encoder.append(nn.Sequential(*encode))
 
             decode = []
             out_channels = in_channels if index > 0 else len(self.sources) * audio_channels
                 
-            if rewrite: decode += [nn.Conv1d(channels, ch_scale * channels, 2 * context + 1, padding=context), norm_fn(ch_scale * channels), activation]
-            if dconv_mode & 2: decode += [DConv(channels, depth=dconv_depth, init=dconv_init, compress=dconv_comp, attn=attn, lstm=lstm)]
-            decode += [nn.ConvTranspose1d(channels, out_channels, kernel_size, stride, padding=padding)]
+            if rewrite: 
+                decode += [
+                    nn.Conv1d(
+                        channels, 
+                        ch_scale * channels, 
+                        2 * context + 1, 
+                        padding=context
+                    ), 
+                    norm_fn(ch_scale * channels), 
+                    activation
+                ]
+
+            if dconv_mode & 2: 
+                decode += [
+                    DConv(
+                        channels, 
+                        depth=dconv_depth, 
+                        init=dconv_init, 
+                        compress=dconv_comp, 
+                        attn=attn, 
+                        lstm=lstm
+                    )
+                ]
+
+            decode += [
+                nn.ConvTranspose1d(
+                    channels, 
+                    out_channels, 
+                    kernel_size, 
+                    stride, 
+                    padding=padding
+                )
+            ]
 
             if index > 0: decode += [norm_fn(out_channels), act2()]
             self.decoder.insert(0, nn.Sequential(*decode))
+
             in_channels = channels
             channels = int(growth * channels)
 
@@ -306,6 +409,7 @@ class Demucs(nn.Module):
         x = x * std + mean
         x = center_trim(x, length)
         x = x.view(x.size(0), len(self.sources), self.audio_channels, x.size(-1))
+
         return x
 
     def load_state_dict(self, state, strict=True):
@@ -319,7 +423,13 @@ class Demucs(nn.Module):
         super().load_state_dict(state, strict=strict)
 
 class ResampleFrac(torch.nn.Module):
-    def __init__(self, old_sr, new_sr, zeros = 24, rolloff = 0.945):
+    def __init__(
+        self, 
+        old_sr, 
+        new_sr, 
+        zeros = 24, 
+        rolloff = 0.945
+    ):
         super().__init__()
         gcd = math.gcd(old_sr, new_sr)
         self.old_sr = old_sr // gcd
@@ -354,14 +464,23 @@ class ResampleFrac(torch.nn.Module):
         length = x.shape[-1]
         
         x = x.reshape(-1, length)
-        y = F.conv1d(F.pad(x[:, None], (self._width, self._width + self.old_sr), mode='replicate'), self.kernel, stride=self.old_sr).transpose(1, 2).reshape(list(shape[:-1]) + [-1])
+        y = F.conv1d(
+            F.pad(
+                x[:, None], 
+                (self._width, self._width + self.old_sr), 
+                mode='replicate'
+            ), 
+            self.kernel, 
+            stride=self.old_sr
+        ).transpose(1, 2).reshape(list(shape[:-1]) + [-1])
 
         float_output_length = torch.as_tensor(self.new_sr * length / self.old_sr)
         max_output_length = float_output_length.ceil().long()
         default_output_length = float_output_length.floor().long()
 
         if output_length is None: applied_output_length = max_output_length if full else default_output_length
-        elif output_length < 0 or output_length > max_output_length: raise ValueError("output_length < 0 or output_length > max_output_length")
+        elif output_length < 0 or output_length > max_output_length: 
+            raise ValueError("output_length < 0 or output_length > max_output_length")
         else:
             applied_output_length = torch.tensor(output_length)
             if full: raise ValueError("full=True")
@@ -394,5 +513,18 @@ def simple_repr(obj, attrs = None, overrides = {}):
         if display: attrs_repr.append(f"{attr}={value}")
     return f"{obj.__class__.__name__}({','.join(attrs_repr)})"
 
-def resample_frac(x, old_sr, new_sr, zeros = 24, rolloff = 0.945, output_length = None, full = False):
-    return ResampleFrac(old_sr, new_sr, zeros, rolloff).to(x)(x, output_length, full)
+def resample_frac(
+    x, 
+    old_sr, 
+    new_sr, 
+    zeros = 24, 
+    rolloff = 0.945, 
+    output_length = None, 
+    full = False
+):
+    return ResampleFrac(
+        old_sr, 
+        new_sr, 
+        zeros, 
+        rolloff
+    ).to(x)(x, output_length, full)

@@ -9,20 +9,37 @@ sys.path.append(os.getcwd())
 
 from main.library.speaker_diarization.speechbrain import MAIN_PROC_ONLY, is_distributed_initialized, main_process_only
 
-KEYS_MAPPING = {".mutihead_attn": ".multihead_attn",  ".convs_intermedite": ".convs_intermediate"}
+WEAKREF_MARKER = "WEAKREF"
+
+KEYS_MAPPING = {
+    ".mutihead_attn": ".multihead_attn",  
+    ".convs_intermedite": ".convs_intermediate"
+}
 
 def map_old_state_dict_weights(state_dict, mapping):
     for replacement_old, replacement_new in mapping.items():
         for old_key in list(state_dict.keys()):
-            if replacement_old in old_key: state_dict[old_key.replace(replacement_old, replacement_new)] = state_dict.pop(old_key)
+            if replacement_old in old_key: 
+                state_dict[
+                    old_key.replace(replacement_old, replacement_new)
+                ] = state_dict.pop(old_key)
 
     return state_dict
 
 def hook_on_loading_state_dict_checkpoint(state_dict):
-    return map_old_state_dict_weights(state_dict, KEYS_MAPPING)
+    return map_old_state_dict_weights(
+        state_dict, 
+        KEYS_MAPPING
+    )
 
 def torch_patched_state_dict_load(path, device="cpu"):
-    return hook_on_loading_state_dict_checkpoint(torch.load(path, map_location=device, weights_only=False))
+    return hook_on_loading_state_dict_checkpoint(
+        torch.load(
+            path, 
+            map_location=device, 
+            weights_only=False
+        )
+    )
 
 @main_process_only
 def torch_save(obj, path):
@@ -33,20 +50,22 @@ def torch_recovery(obj, path, end_of_epoch):
     del end_of_epoch  
 
     state_dict = torch_patched_state_dict_load(path, "cpu")
+
     try:
         obj.load_state_dict(state_dict, strict=True)
     except TypeError:
         obj.load_state_dict(state_dict)
 
 def torch_parameter_transfer(obj, path):
-    incompatible_keys = obj.load_state_dict(torch_patched_state_dict_load(path, "cpu"), strict=False)
+    incompatible_keys = obj.load_state_dict(
+        torch_patched_state_dict_load(path, "cpu"), 
+        strict=False
+    )
 
     for missing_key in incompatible_keys.missing_keys:
         pass
     for unexpected_key in incompatible_keys.unexpected_keys:
         pass
-
-WEAKREF_MARKER = "WEAKREF"
 
 def _cycliclrsaver(obj, path):
     state_dict = obj.state_dict()
@@ -58,9 +77,14 @@ def _cycliclrloader(obj, path, end_of_epoch):
     del end_of_epoch  
 
     try:
-        obj.load_state_dict(torch.load(path, map_location="cpu", weights_only=False), strict=True)
+        obj.load_state_dict(
+            torch.load(path, map_location="cpu", weights_only=False), 
+            strict=True
+        )
     except TypeError:
-        obj.load_state_dict(torch.load(path, map_location="cpu", weights_only=False))
+        obj.load_state_dict(
+            torch.load(path, map_location="cpu", weights_only=False)
+        )
 
 DEFAULT_LOAD_HOOKS = {
     torch.nn.Module: torch_recovery, 
@@ -275,7 +299,11 @@ class Filterbank(torch.nn.Module):
         return x_db.max((x_db.amax(dim=(-2, -1)) - self.top_db).view(x_db.shape[0], 1, 1))
 
 class ContextWindow(torch.nn.Module):
-    def __init__(self, left_frames=0, right_frames=0):
+    def __init__(
+        self, 
+        left_frames=0, 
+        right_frames=0
+    ):
         super().__init__()
         self.left_frames = left_frames
         self.right_frames = right_frames
@@ -295,9 +323,14 @@ class ContextWindow(torch.nn.Module):
         or_shape = x.shape
         if len(or_shape) == 4: x = x.reshape(or_shape[0] * or_shape[2], or_shape[1], or_shape[3])
 
-        cw_x = torch.nn.functional.conv1d(x, self.kernel.to(x.device), groups=x.shape[1], padding=max(self.left_frames, self.right_frames))
-        if len(or_shape) == 4: cw_x = cw_x.reshape(or_shape[0], cw_x.shape[1], or_shape[2], cw_x.shape[-1])
+        cw_x = torch.nn.functional.conv1d(
+            x, 
+            self.kernel.to(x.device), 
+            groups=x.shape[1], 
+            padding=max(self.left_frames, self.right_frames)
+        )
 
+        if len(or_shape) == 4: cw_x = cw_x.reshape(or_shape[0], cw_x.shape[1], or_shape[2], cw_x.shape[-1])
         return cw_x.transpose(1, 2)
 
 class FilterProperties:
@@ -327,7 +360,13 @@ class FilterProperties:
 
     def get_noncausal_equivalent(self):
         if not self.causal: return self
-        return FilterProperties(window_size=(self.window_size - 1) * 2 + 1, stride=self.stride, dilation=self.dilation, causal=False)
+
+        return FilterProperties(
+            window_size=(self.window_size - 1) * 2 + 1, 
+            stride=self.stride, 
+            dilation=self.dilation, 
+            causal=False
+        )
 
     def with_on_top(self, other, allow_approximate=True):
         self_size = self.window_size
@@ -344,7 +383,18 @@ class FilterProperties:
         return FilterProperties(self_size + (self.stride * (other_size - 1)), self.stride * other.stride, self.dilation * other.dilation, self.causal)
 
 class STFT(torch.nn.Module):
-    def __init__(self, sample_rate, win_length=25, hop_length=10, n_fft=400, window_fn=torch.hamming_window, normalized_stft=False, center=True, pad_mode="constant", onesided=True):
+    def __init__(
+        self, 
+        sample_rate, 
+        win_length=25, 
+        hop_length=10, 
+        n_fft=400, 
+        window_fn=torch.hamming_window, 
+        normalized_stft=False, 
+        center=True, 
+        pad_mode="constant", 
+        onesided=True
+    ):
         super().__init__()
         self.sample_rate = sample_rate
         self.win_length = win_length
@@ -365,32 +415,87 @@ class STFT(torch.nn.Module):
         device = x.device
         if str(device) not in ["cuda", "cpu"]: x = x.cpu()
 
-        stft = torch.view_as_real(torch.stft(x, self.n_fft, self.hop_length, self.win_length, self.window.to(x.device), self.center, self.pad_mode, self.normalized_stft, self.onesided, return_complex=True))
-        stft = stft.reshape(or_shape[0], or_shape[2], stft.shape[1], stft.shape[2], stft.shape[3]).permute(0, 3, 2, 4, 1) if len(or_shape) == 3 else stft.transpose(2, 1)
+        stft = torch.view_as_real(
+            torch.stft(
+                x, 
+                self.n_fft, 
+                self.hop_length, 
+                self.win_length, 
+                self.window.to(x.device), 
+                self.center, 
+                self.pad_mode, 
+                self.normalized_stft, 
+                self.onesided, 
+                return_complex=True
+            )
+        )
+
+        stft = (
+            stft.reshape(
+                or_shape[0], 
+                or_shape[2], 
+                stft.shape[1], 
+                stft.shape[2], 
+                stft.shape[3]
+            ).permute(0, 3, 2, 4, 1)
+        ) if len(or_shape) == 3 else (
+            stft.transpose(2, 1)
+        )
 
         return stft.to(device)
 
     def get_filter_properties(self):
         if not self.center: raise ValueError
-        return FilterProperties(window_size=self.win_length, stride=self.hop_length)
+
+        return FilterProperties(
+            window_size=self.win_length, 
+            stride=self.hop_length
+        )
 
 class Deltas(torch.nn.Module):
-    def __init__(self, input_size, window_length=5):
+    def __init__(
+        self, 
+        input_size, 
+        window_length=5
+    ):
         super().__init__()
         self.n = (window_length - 1) // 2
         self.denom = self.n * (self.n + 1) * (2 * self.n + 1) / 3
-        self.register_buffer("kernel", torch.arange(-self.n, self.n + 1, dtype=torch.float32).repeat(input_size, 1, 1),)
+        self.register_buffer("kernel", torch.arange(-self.n, self.n + 1, dtype=torch.float32).repeat(input_size, 1, 1))
 
     def forward(self, x):
         x = x.transpose(1, 2).transpose(2, -1)
         or_shape = x.shape
 
-        if len(or_shape) == 4: x = x.reshape(or_shape[0] * or_shape[2], or_shape[1], or_shape[3])
+        if len(or_shape) == 4: 
+            x = x.reshape(
+                or_shape[0] * or_shape[2], 
+                or_shape[1], 
+                or_shape[3]
+            )
 
-        x = torch.nn.functional.pad(x, (self.n, self.n), mode="replicate")
-        delta_coeff = (torch.nn.functional.conv1d(x, self.kernel.to(x.device), groups=x.shape[1]) / self.denom)
+        x = torch.nn.functional.pad(
+            x, 
+            (self.n, self.n), 
+            mode="replicate"
+        )
 
-        if len(or_shape) == 4: delta_coeff = delta_coeff.reshape(or_shape[0], or_shape[1], or_shape[2], or_shape[3])
+        delta_coeff = (
+            torch.nn.functional.conv1d(
+                x, 
+                self.kernel.to(x.device), 
+                groups=x.shape[1]
+            ) / self.denom
+        )
+
+        if len(or_shape) == 4: 
+            delta_coeff = delta_coeff.reshape(
+                or_shape[0], 
+                or_shape[1], 
+                or_shape[2], 
+                or_shape[3]
+            )
+
         return delta_coeff.transpose(1, -1).transpose(2, -1)
 
 class Fbank(torch.nn.Module):
@@ -417,17 +522,46 @@ class Fbank(torch.nn.Module):
         self.context = context
         self.requires_grad = requires_grad
         if f_max is None: f_max = sample_rate / 2
-        self.compute_STFT = STFT(sample_rate=sample_rate,n_fft=n_fft,win_length=win_length,hop_length=hop_length)
-        self.compute_fbanks = Filterbank(sample_rate=sample_rate,n_fft=n_fft,n_mels=n_mels,f_min=f_min,f_max=f_max,freeze=not requires_grad,filter_shape=filter_shape,param_change_factor=param_change_factor,param_rand_factor=param_rand_factor)
-        self.compute_deltas = Deltas(input_size=n_mels)
-        self.context_window = ContextWindow(left_frames=left_frames, right_frames=right_frames)
+
+        self.compute_STFT = STFT(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            win_length=win_length,
+            hop_length=hop_length
+        )
+        self.compute_fbanks = Filterbank(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            n_mels=n_mels,
+            f_min=f_min,
+            f_max=f_max,
+            freeze=not requires_grad,
+            filter_shape=filter_shape,
+            param_change_factor=param_change_factor,
+            param_rand_factor=param_rand_factor
+        )
+        self.compute_deltas = Deltas(
+            input_size=n_mels
+        )
+        self.context_window = ContextWindow(
+            left_frames=left_frames, 
+            right_frames=right_frames
+        )
 
     @fwd_default_precision(cast_inputs=torch.float32)
     def forward(self, wav):
-        fbanks = self.compute_fbanks(spectral_magnitude(self.compute_STFT(wav)))
+        fbanks = self.compute_fbanks(
+            spectral_magnitude(
+                self.compute_STFT(wav)
+            )
+        )
+
         if self.deltas:
             delta1 = self.compute_deltas(fbanks)
-            fbanks = torch.cat([fbanks, delta1, self.compute_deltas(delta1)], dim=2)
+            fbanks = torch.cat([
+                fbanks, delta1, 
+                self.compute_deltas(delta1)
+            ], dim=2)
 
         if self.context: fbanks = self.context_window(fbanks)
         return fbanks
@@ -437,7 +571,15 @@ class Fbank(torch.nn.Module):
 
 @register_checkpoint_hooks
 class InputNormalization(torch.nn.Module):
-    def __init__(self, mean_norm=True, std_norm=True, norm_type="global", avg_factor=None, requires_grad=False, update_until_epoch=3):
+    def __init__(
+        self, 
+        mean_norm=True, 
+        std_norm=True, 
+        norm_type="global", 
+        avg_factor=None, 
+        requires_grad=False, 
+        update_until_epoch=3
+    ):
         super().__init__()
         self.mean_norm = mean_norm
         self.std_norm = std_norm
@@ -458,7 +600,10 @@ class InputNormalization(torch.nn.Module):
         N_batches = x.shape[0]
         current_means, current_stds = [], []
 
-        if self.norm_type == "sentence" or self.norm_type == "speaker": out = torch.empty_like(x)
+        if (
+            self.norm_type == "sentence" or self.norm_type == "speaker"
+        ): 
+            out = torch.empty_like(x)
 
         for snt_id in range(N_batches):
             actual_size = torch.round(lengths[snt_id] * x.shape[1]).int()
@@ -500,8 +645,15 @@ class InputNormalization(torch.nn.Module):
                 out[snt_id] = (x[snt_id] - speaker_mean) / speaker_std
 
         if self.norm_type == "batch" or self.norm_type == "global":
-            current_mean = ddp_all_reduce(torch.stack(current_means).mean(dim=0), torch.distributed.ReduceOp.AVG)
-            current_std = ddp_all_reduce(torch.stack(current_stds).mean(dim=0), torch.distributed.ReduceOp.AVG)
+            current_mean = ddp_all_reduce(
+                torch.stack(current_means).mean(dim=0), 
+                torch.distributed.ReduceOp.AVG
+            )
+
+            current_std = ddp_all_reduce(
+                torch.stack(current_stds).mean(dim=0), 
+                torch.distributed.ReduceOp.AVG
+            )
 
             if self.norm_type == "batch": out = (x - current_mean.data) / (current_std.data)
 
@@ -525,7 +677,10 @@ class InputNormalization(torch.nn.Module):
 
     def _compute_current_stats(self, x):
         current_std = x.std(dim=0).detach().data if self.std_norm else torch.tensor([1.0], device=x.device)
-        return x.mean(dim=0).detach().data if self.mean_norm else torch.tensor([0.0], device=x.device), torch.max(current_std, self.eps * torch.ones_like(current_std))
+        return (
+            x.mean(dim=0).detach().data if self.mean_norm else torch.tensor([0.0], device=x.device), 
+            current_std.max(self.eps * torch.ones_like(current_std))
+        )
 
     def _statistics_dict(self):
         state = {}

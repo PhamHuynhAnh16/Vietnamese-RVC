@@ -8,7 +8,23 @@ def mean(signals, win_length=9):
     padding = win_length // 2
 
     ones_kernel = torch.ones(signals.size(1), 1, win_length, device=signals.device)
-    avg_pooled = torch.nn.functional.conv1d(torch.where(mask, signals, torch.zeros_like(signals)), ones_kernel, stride=1, padding=padding) / torch.nn.functional.conv1d(mask.float(), ones_kernel, stride=1, padding=padding).clamp(min=1) 
+
+    avg_pooled = torch.nn.functional.conv1d(
+        torch.where(
+            mask, 
+            signals, 
+            torch.zeros_like(signals)
+        ), 
+        ones_kernel, 
+        stride=1, 
+        padding=padding
+    ) / torch.nn.functional.conv1d(
+        mask.float(), 
+        ones_kernel, 
+        stride=1, 
+        padding=padding
+    ).clamp(min=1)
+
     avg_pooled[avg_pooled == 0] = float("nan")
 
     return avg_pooled.squeeze(1)
@@ -20,8 +36,22 @@ def median(signals, win_length):
     mask = ~torch.isnan(signals)
     padding = win_length // 2
 
-    x = torch.nn.functional.pad(torch.where(mask, signals, torch.zeros_like(signals)), (padding, padding), mode="reflect")
-    mask = torch.nn.functional.pad(mask.float(), (padding, padding), mode="constant", value=0)
+    x = torch.nn.functional.pad(
+        torch.where(
+            mask, 
+            signals, 
+            torch.zeros_like(signals)
+        ), 
+        (padding, padding), 
+        mode="reflect"
+    )
+
+    mask = torch.nn.functional.pad(
+        mask.float(), 
+        (padding, padding), 
+        mode="constant", 
+        value=0
+    )
 
     x = x.unfold(2, win_length, 1)
     mask = mask.unfold(2, win_length, 1)

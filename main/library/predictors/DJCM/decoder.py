@@ -59,7 +59,18 @@ class PE_Decoder(nn.Module):
         self.de_blocks = Decoder(n_blocks)
         self.after_conv1 = ResEncoderBlock(32, 32, n_blocks, None)
         self.after_conv2 = nn.Conv2d(32, 1, (1, 1))
-        self.fc = nn.Sequential(BiGRU((1, window_length // 2), 1, seq_layers), nn.Linear(window_length // 2, n_class), nn.Sigmoid())
+        self.fc = nn.Sequential(
+            BiGRU(
+                (1, window_length // 2), 
+                1, 
+                seq_layers
+            ), 
+            nn.Linear(
+                window_length // 2, 
+                n_class
+            ), 
+            nn.Sigmoid()
+        )
         init_layer(self.after_conv2)
 
     def forward(self, x, concat_tensors):

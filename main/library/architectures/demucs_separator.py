@@ -56,7 +56,9 @@ class DemucsSeparator(common_separator.CommonSeparator):
 
         if isinstance(inst_source, np.ndarray):
             inst_source[
-                self.demucs_source_map[common_separator.CommonSeparator.VOCAL_STEM]
+                self.demucs_source_map[
+                    common_separator.CommonSeparator.VOCAL_STEM
+                ]
             ] = spec_utils.reshape_sources(
                 inst_source[
                     self.demucs_source_map[
@@ -95,7 +97,10 @@ class DemucsSeparator(common_separator.CommonSeparator):
                 if stem_name.lower() != self.output_single_stem.lower():
                     continue
 
-            stem_path = os.path.join(f"{self.audio_file_base}_({stem_name})_{self.model_name}.{self.output_format.lower()}")
+            stem_path = os.path.join(
+                f"{self.audio_file_base}_({stem_name})_{self.model_name}.{self.output_format.lower()}"
+            )
+
             self.final_process(stem_path, source[stem_value].T, stem_name)
             output_files.append(stem_path)
 
@@ -123,9 +128,12 @@ class DemucsSeparator(common_separator.CommonSeparator):
 
         sources = (sources * ref.std() + ref.mean()).cpu().numpy()
         sources[[0, 1]] = sources[[1, 0]]
-
         processed[mix] = sources[:, :, 0:None].copy()
-        return np.concatenate([s[:, :, 0:None] for s in list(processed.values())], axis=-1)
+
+        return np.concatenate([
+            s[:, :, 0:None] 
+            for s in list(processed.values())
+        ], axis=-1)
 
 class LocalRepo:
     def __init__(self, root):
@@ -185,7 +193,10 @@ class BagOnlyRepo:
         with open(yaml_file, 'r') as f:
             bag = yaml.safe_load(f)
 
-        return apply.BagOfModels([self.model_repo.get_model(sig) for sig in bag["models"]], bag.get("weights"), bag.get("segment"))
+        return apply.BagOfModels([
+            self.model_repo.get_model(sig) 
+            for sig in bag["models"]
+        ], bag.get("weights"), bag.get("segment"))
 
 def check_checksum(path, checksum):
     sha = sha256()
@@ -201,4 +212,9 @@ def check_checksum(path, checksum):
 
 def get_demucs_model(name, repo = None):
     model_repo = LocalRepo(repo)
-    return (model_repo.get_model(name) if model_repo.has_model(name) else BagOnlyRepo(repo, model_repo).get_model(name)).eval()
+
+    return (
+        model_repo.get_model(name) 
+        if model_repo.has_model(name) else 
+        BagOnlyRepo(repo, model_repo).get_model(name)
+    ).eval()

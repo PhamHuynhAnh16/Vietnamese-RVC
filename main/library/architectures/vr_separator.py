@@ -38,7 +38,11 @@ class VRSeparator(CommonSeparator):
         self.input_high_end_h = None
         self.input_high_end = None
         self.aggression = float(int(arch_config.get("aggression", 5)) / 100)
-        self.aggressiveness = {"value": self.aggression, "split_bin": self.model_params.param["band"]["1"]["crop_stop"], "aggr_correction": self.model_params.param.get("aggr_correction")}
+        self.aggressiveness = {
+            "value": self.aggression, 
+            "split_bin": self.model_params.param["band"]["1"]["crop_stop"], 
+            "aggr_correction": self.model_params.param.get("aggr_correction")
+        }
         self.model_samplerate = self.model_params.param["sr"]
         self.wav_subtype = "PCM_16"
 
@@ -53,10 +57,18 @@ class VRSeparator(CommonSeparator):
         nn_arch_size = min(nn_arch_sizes, key=lambda x: abs(x - model_size))
 
         if nn_arch_size in vr_5_1_models or self.is_vr_51_model:
-            self.model_run = nets_new.CascadedNet(self.model_params.param["bins"] * 2, nn_arch_size, nout=self.model_capacity[0], nout_lstm=self.model_capacity[1])
+            self.model_run = nets_new.CascadedNet(
+                self.model_params.param["bins"] * 2, 
+                nn_arch_size, 
+                nout=self.model_capacity[0], 
+                nout_lstm=self.model_capacity[1]
+            )
             self.is_vr_51_model = True
         else:
-            self.model_run = nets.determine_model_capacity(self.model_params.param["bins"] * 2, nn_arch_size)
+            self.model_run = nets.determine_model_capacity(
+                self.model_params.param["bins"] * 2, 
+                nn_arch_size
+            )
 
         self.model_run.load_state_dict(torch.load(self.model_path, map_location="cpu", weights_only=True))
         self.model_run.to(self.torch_device)
@@ -198,9 +210,20 @@ class VRSeparator(CommonSeparator):
     def spec_to_wav(self, spec):
         if self.high_end_process and isinstance(self.input_high_end, np.ndarray) and self.input_high_end_h:
             input_high_end_ = spec_utils.mirroring("mirroring", spec, self.input_high_end, self.model_params)
-            wav = spec_utils.cmb_spectrogram_to_wave(spec, self.model_params, self.input_high_end_h, input_high_end_, is_v51_model=self.is_vr_51_model)
+
+            wav = spec_utils.cmb_spectrogram_to_wave(
+                spec, 
+                self.model_params, 
+                self.input_high_end_h, 
+                input_high_end_, 
+                is_v51_model=self.is_vr_51_model
+            )
         else:
-            wav = spec_utils.cmb_spectrogram_to_wave(spec, self.model_params, is_v51_model=self.is_vr_51_model)
+            wav = spec_utils.cmb_spectrogram_to_wave(
+                spec, 
+                self.model_params, 
+                is_v51_model=self.is_vr_51_model
+            )
 
         return wav
 

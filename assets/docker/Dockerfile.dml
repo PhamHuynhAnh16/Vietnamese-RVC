@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 EXPOSE 7860
 
-RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
+RUN apt-get update && apt-get install -y ffmpeg && apt-get install -y libportaudio2 && apt-get clean
 
 WORKDIR /app
 
@@ -12,9 +12,12 @@ RUN python3 -m venv /app/.venv && \
     . /app/.venv/bin/activate && \
     pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir six packaging python-dateutil platformdirs pywin32 && \
+    pip install --no-cache-dir torch==2.4.1 torchaudio==2.4.1 torchvision && \
+    pip install --no-cache-dir torch-directml==0.2.5.dev240914 && \
+    pip install --no-cache-dir onnxruntime-directml && \
     pip install --no-cache-dir -r requirements.txt
 
 VOLUME [ "/app/assets" ]
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["python3", "main/app/app.py"]
+CMD ["python3", "main/app/app.py", "--client"]

@@ -6,7 +6,12 @@ import onnxruntime
 import numpy as np
 
 class ONNXRVC:
-    def __init__(self, model_path, providers, log_severity_level = 3):
+    def __init__(
+        self, 
+        model_path, 
+        providers, 
+        log_severity_level = 3
+    ):
         sess_options = onnxruntime.SessionOptions()
         sess_options.log_severity_level = log_severity_level
 
@@ -27,7 +32,15 @@ class ONNXRVC:
             providers=providers
         )
 
-    def get_onnx_argument(self, feats, p_len, sid, pitch, pitchf, energy):
+    def get_onnx_argument(
+        self, 
+        feats, 
+        p_len, 
+        sid, 
+        pitch, 
+        pitchf, 
+        energy
+    ):
         inputs = {
             self.net_g.get_inputs()[0].name: feats.cpu().numpy().astype(np.float32),
             self.net_g.get_inputs()[1].name: p_len.cpu().numpy(),
@@ -59,7 +72,15 @@ class ONNXRVC:
         self.device = device
         return self
 
-    def infer(self, feats = None, p_len = None, pitch = None, pitchf = None, sid = None, energy = None):
+    def infer(
+        self, 
+        feats = None, 
+        p_len = None, 
+        pitch = None, 
+        pitchf = None, 
+        sid = None, 
+        energy = None
+    ):
         output = self.net_g.run(
             [self.net_g.get_outputs()[0].name], (
                 self.get_onnx_argument(

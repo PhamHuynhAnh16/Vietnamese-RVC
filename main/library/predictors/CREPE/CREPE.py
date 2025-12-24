@@ -8,12 +8,23 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
-from main.library.predictors.CREPE.model import MODEL
-
 CENTS_PER_BIN, PITCH_BINS, SAMPLE_RATE, WINDOW_SIZE = 20, 360, 16000, 1024
 
 class CREPE:
-    def __init__(self, model_path, model_size="full", hop_length=512, batch_size=None, f0_min=50, f0_max=1100, device=None, sample_rate=16000, providers=None, onnx=False, return_periodicity=False):
+    def __init__(
+        self, 
+        model_path, 
+        model_size="full", 
+        hop_length=512, 
+        batch_size=None, 
+        f0_min=50, 
+        f0_max=1100, 
+        device=None, 
+        sample_rate=16000, 
+        providers=None, 
+        onnx=False, 
+        return_periodicity=False
+    ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.hop_length = hop_length
         self.batch_size = batch_size
@@ -30,9 +41,10 @@ class CREPE:
             sess_options.log_severity_level = 3
             self.model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
-            model = MODEL(model_size)
-            ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
-            model.load_state_dict(ckpt)
+            from main.library.predictors.CREPE.model import CREPEE
+
+            model = CREPEE(model_size)
+            model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
             model.eval()
             self.model = model.to(device)
 
@@ -40,7 +52,18 @@ class CREPE:
         if str(bins.device).startswith(("ocl", "privateuseone")): bins = bins.to(torch.float32)
 
         cents = CENTS_PER_BIN * bins + 1997.3794084376191
-        return 10 * 2 ** ((cents + cents.new_tensor(scipy.stats.triang.rvs(c=0.5, loc=-CENTS_PER_BIN, scale=2 * CENTS_PER_BIN, size=cents.size()))) / 1200)
+        cents = (
+            cents + cents.new_tensor(
+                scipy.stats.triang.rvs(
+                    c=0.5, 
+                    loc=-CENTS_PER_BIN, 
+                    scale=2 * CENTS_PER_BIN, 
+                    size=cents.size()
+                )
+            )
+        ) / 1200
+
+        return 10 * 2 ** cents
 
     def frequency_to_bins(self, frequency, quantize_fn=torch.floor):
         return quantize_fn(((1200 * (frequency / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).int()
@@ -54,14 +77,30 @@ class CREPE:
         with torch.no_grad():
             probs = torch.nn.functional.softmax(logits, dim=1)
 
-        bins = torch.tensor(np.array([librosa.sequence.viterbi(sequence, self.transition).astype(np.int64) for sequence in probs.cpu().numpy()]), device=probs.device)
+        bins = torch.tensor(
+            np.array([
+                librosa.sequence.viterbi(sequence, self.transition).astype(np.int64) 
+                for sequence in probs.cpu().numpy()
+            ]), 
+            device=probs.device
+        )
+
         return bins, self.bins_to_frequency(bins)
     
     def preprocess(self, audio, pad=True):
         hop_length = (self.sample_rate // 100) if self.hop_length is None else self.hop_length
 
         if self.sample_rate != SAMPLE_RATE:
-            audio = torch.tensor(librosa.resample(audio.detach().cpu().numpy().squeeze(0), orig_sr=self.sample_rate, target_sr=SAMPLE_RATE, res_type="soxr_vhq"), device=audio.device).unsqueeze(0)
+            audio = torch.tensor(
+                librosa.resample(
+                    audio.detach().cpu().numpy().squeeze(0), 
+                    orig_sr=self.sample_rate, 
+                    target_sr=SAMPLE_RATE, 
+                    res_type="soxr_vhq"
+                ), 
+                device=audio.device
+            ).unsqueeze(0)
+
             hop_length = int(hop_length * SAMPLE_RATE / self.sample_rate)
 
         if pad:
@@ -72,7 +111,11 @@ class CREPE:
         batch_size = total_frames if self.batch_size is None else self.batch_size
 
         for i in range(0, total_frames, batch_size):
-            frames = torch.nn.functional.unfold(audio[:, None, None, max(0, i * hop_length):min(audio.size(1), (i + batch_size - 1) * hop_length + WINDOW_SIZE)], kernel_size=(1, WINDOW_SIZE), stride=(1, hop_length))
+            frames = torch.nn.functional.unfold(
+                audio[:, None, None, max(0, i * hop_length):min(audio.size(1), (i + batch_size - 1) * hop_length + WINDOW_SIZE)], 
+                kernel_size=(1, WINDOW_SIZE), 
+                stride=(1, hop_length)
+            )
             
             if self.device.startswith(("ocl", "privateuseone")):
                 frames = frames.transpose(1, 2).contiguous().reshape(-1, WINDOW_SIZE).to(self.device)
@@ -122,7 +165,9 @@ class CREPE:
                     ).reshape(audio.size(0), -1, PITCH_BINS).transpose(1, 2)
 
             result = self.postprocess(model)
-            results.append((result[0].to(audio.device), result[1].to(audio.device)) if isinstance(result, tuple) else result.to(audio.device))
+            results.append(
+                (result[0].to(audio.device), result[1].to(audio.device)) if isinstance(result, tuple) else result.to(audio.device)
+            )
         
         if self.return_periodicity:
             pitch, periodicity = zip(*results)

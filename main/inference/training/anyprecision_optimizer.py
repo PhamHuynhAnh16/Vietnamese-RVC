@@ -3,9 +3,33 @@ import torch
 from torch.optim.optimizer import Optimizer
 
 class AnyPrecisionAdamW(Optimizer):
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, use_kahan_summation=True, momentum_dtype=torch.bfloat16, variance_dtype=torch.bfloat16, compensation_buffer_dtype=torch.bfloat16):
-        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, use_kahan_summation=use_kahan_summation, momentum_dtype=momentum_dtype, variance_dtype=variance_dtype, compensation_buffer_dtype=compensation_buffer_dtype)
-        super().__init__(params, defaults)
+    def __init__(
+        self, 
+        params, 
+        lr=1e-3, 
+        betas=(0.9, 0.999), 
+        eps=1e-8, 
+        weight_decay=0.0, 
+        use_kahan_summation=True, 
+        momentum_dtype=torch.bfloat16, 
+        variance_dtype=torch.bfloat16, 
+        compensation_buffer_dtype=torch.bfloat16
+    ):
+        defaults = dict(
+            lr=lr, 
+            betas=betas, 
+            eps=eps, 
+            weight_decay=weight_decay, 
+            use_kahan_summation=use_kahan_summation, 
+            momentum_dtype=momentum_dtype, 
+            variance_dtype=variance_dtype, 
+            compensation_buffer_dtype=compensation_buffer_dtype
+        )
+
+        super().__init__(
+            params, 
+            defaults
+        )
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -32,7 +56,9 @@ class AnyPrecisionAdamW(Optimizer):
                     state["step"] = torch.tensor(0.0)
                     state["exp_avg"] = torch.zeros_like(p, dtype=momentum_dtype)
                     state["exp_avg_sq"] = torch.zeros_like(p, dtype=variance_dtype)
-                    if use_kahan_summation: state["compensation"] = torch.zeros_like(p, dtype=compensation_buffer_dtype)
+
+                    if use_kahan_summation: 
+                        state["compensation"] = torch.zeros_like(p, dtype=compensation_buffer_dtype)
 
                 state["step"] += 1
                 step = state["step"]

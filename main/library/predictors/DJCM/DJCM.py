@@ -13,7 +13,18 @@ from main.library.predictors.DJCM.spec import Spectrogram
 SAMPLE_RATE, WINDOW_LENGTH, N_CLASS = 16000, 1024, 360
 
 class DJCM:
-    def __init__(self, model_path, device = "cpu", is_half = False, onnx = False, svs = False, providers = ["CPUExecutionProvider"], batch_size = 1, segment_len = 5.12, kernel_size = 3):
+    def __init__(
+        self, 
+        model_path, 
+        device = "cpu", 
+        is_half = False, 
+        onnx = False, 
+        svs = False, 
+        providers = ["CPUExecutionProvider"], 
+        batch_size = 1, 
+        segment_len = 5.12, 
+        kernel_size = 3
+    ):
         super(DJCM, self).__init__()
         if svs: WINDOW_LENGTH = 2048
         self.onnx = onnx
@@ -48,7 +59,14 @@ class DJCM:
     def spec2hidden(self, spec):
         if self.onnx:
             spec = spec.cpu().numpy().astype(np.float32)
-            hidden = torch.as_tensor(self.model.run([self.model.get_outputs()[0].name], {self.model.get_inputs()[0].name: spec})[0], device=self.device)
+
+            hidden = torch.as_tensor(
+                self.model.run(
+                    [self.model.get_outputs()[0].name], 
+                    {self.model.get_inputs()[0].name: spec}
+                )[0], 
+                device=self.device
+            )
         else:
             if self.is_half: spec = spec.half()
             hidden = self.model(spec)
@@ -107,7 +125,15 @@ class DJCM:
         right_pad = np.zeros(int(pad_len - self.seg_len // 4), dtype=np.float32)
         padded_audio = np.concatenate([left_pad, audio, right_pad], axis=-1)
 
-        segments = [padded_audio[start: start + int(self.seg_len)] for start in range(0, len(padded_audio) - int(self.seg_len) + 1, int(self.seg_len // 2))]
+        segments = [
+            padded_audio[start: start + int(self.seg_len)] 
+            for start in range(
+                0, 
+                len(padded_audio) - int(self.seg_len) + 1, 
+                int(self.seg_len // 2)
+            )
+        ]
+
         segments = np.stack(segments, axis=0)
         segments = torch.from_numpy(segments).unsqueeze(1).to(self.device)
 

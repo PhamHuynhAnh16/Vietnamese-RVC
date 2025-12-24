@@ -34,7 +34,7 @@ def convert(
     split_audio, 
     f0_autotune_strength, 
     checkpointing, 
-    f0_onnx, 
+    predictor_onnx, 
     embedders_mode, 
     formant_shifting, 
     formant_qfrency, 
@@ -43,7 +43,8 @@ def convert(
     proposal_pitch, 
     proposal_pitch_threshold, 
     audio_processing=False, 
-    alpha=0.5
+    alpha=0.5,
+    sid=0
 ):    
     subprocess.run([
         python, 
@@ -68,7 +69,7 @@ def convert(
         "--split_audio", str(split_audio), 
         "--f0_autotune_strength", str(f0_autotune_strength), 
         "--checkpointing", str(checkpointing), 
-        "--f0_onnx", str(f0_onnx), 
+        "--predictor_onnx", str(predictor_onnx), 
         "--embedders_mode", embedders_mode, 
         "--formant_shifting", str(formant_shifting), 
         "--formant_qfrency", str(formant_qfrency), 
@@ -77,11 +78,12 @@ def convert(
         "--proposal_pitch", str(proposal_pitch), 
         "--proposal_pitch_threshold", str(proposal_pitch_threshold),
         "--audio_processing", str(audio_processing),
-        "--alpha", str(alpha)
+        "--alpha", str(alpha),
+        "--sid", str(sid)
     ])
 
 def convert_audio(
-    clean, autotune, 
+    clean_audio, autotune, 
     use_audio, 
     use_original, 
     convert_backing, 
@@ -92,8 +94,8 @@ def convert_audio(
     model, 
     index, 
     index_rate, 
-    input, 
-    output, 
+    input_path, 
+    output_path, 
     format, 
     method, 
     hybrid_method, 
@@ -108,7 +110,7 @@ def convert_audio(
     f0_autotune_strength, 
     input_audio_name, 
     checkpointing, 
-    onnx_f0_mode, 
+    predictor_onnx, 
     formant_shifting, 
     formant_qfrency, 
     formant_timbre, 
@@ -117,17 +119,24 @@ def convert_audio(
     proposal_pitch, 
     proposal_pitch_threshold, 
     audio_processing=False, 
-    alpha=0.5
+    alpha=0.5,
+    sid=0
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
     return_none = [None]*6
     return_none[5] = {"visible": True, "__type__": "update"}
 
-    if not use_audio:
-        if merge_instrument or not_merge_backing or convert_backing or use_original:
-            gr_warning(translations["turn_on_use_audio"])
-            return return_none
+    if (
+        not use_audio and (
+            merge_instrument or 
+            not_merge_backing or 
+            convert_backing or 
+            use_original
+        )
+    ):
+        gr_warning(translations["turn_on_use_audio"])
+        return return_none
 
     if use_original:
         if convert_backing:
@@ -137,11 +146,19 @@ def convert_audio(
             gr_warning(translations["turn_off_merge_backup"])
             return return_none
 
-    if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")):
+    if (
+        not model or 
+        not os.path.exists(model_path) or 
+        os.path.isdir(model_path) or 
+        not model.endswith((".pth", ".onnx"))
+    ):
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
         return return_none
 
-    f0method, embedder_model = (method if method != "hybrid" else hybrid_method), (embedders if embedders != "custom" else custom_embedders)
+    f0method, embedder_model = (
+        method if method != "hybrid" else hybrid_method, 
+        embedders if embedders != "custom" else custom_embedders
+    )
 
     if use_audio:
         output_audio = os.path.join(configs["audios_path"], input_audio_name)
@@ -164,8 +181,8 @@ def convert_audio(
 
         if use_original:
             original_vocal = get_audio_file('Original_Vocals_No_Reverb.')
-
-            if original_vocal == translations["notfound"]: original_vocal = get_audio_file('Original_Vocals.')
+            if original_vocal == translations["notfound"]: 
+                original_vocal = get_audio_file('Original_Vocals.')
 
             if original_vocal == translations["notfound"]: 
                 gr_warning(translations["not_found_original_vocal"])
@@ -176,12 +193,17 @@ def convert_audio(
             main_vocal = get_audio_file('Main_Vocals_No_Reverb.')
             backing_vocal = get_audio_file('Backing_Vocals.')
 
-            if main_vocal == translations["notfound"]: main_vocal = get_audio_file('Main_Vocals.')
+            if main_vocal == translations["notfound"]: 
+                main_vocal = get_audio_file('Main_Vocals.')
+
             if main_vocal == translations["notfound"]: 
                 gr_warning(translations["not_found_main_vocal"])
                 return return_none
             
-            if not not_merge_backing and backing_vocal == translations["notfound"]: 
+            if (
+                not not_merge_backing and 
+                backing_vocal == translations["notfound"]
+            ): 
                 gr_warning(translations["not_found_backing_vocal"])
                 return return_none
             
@@ -203,7 +225,7 @@ def convert_audio(
             model_path, 
             index, 
             autotune, 
-            clean, 
+            clean_audio, 
             clean_strength, 
             format, 
             embedder_model, 
@@ -211,7 +233,7 @@ def convert_audio(
             split_audio, 
             f0_autotune_strength, 
             checkpointing, 
-            onnx_f0_mode, 
+            predictor_onnx, 
             embedders_mode, 
             formant_shifting, 
             formant_qfrency, 
@@ -220,13 +242,14 @@ def convert_audio(
             proposal_pitch, 
             proposal_pitch_threshold, 
             audio_processing, 
-            alpha)
+            alpha,
+            sid
+        )
 
         gr_info(translations["convert_success"])
 
         if convert_backing:
             output_backing = process_output(output_backing)
-
             gr_info(translations["convert_backup"])
 
             convert(
@@ -242,7 +265,7 @@ def convert_audio(
                 model_path, 
                 index, 
                 autotune, 
-                clean, 
+                clean_audio, 
                 clean_strength, 
                 format, 
                 embedder_model, 
@@ -250,7 +273,7 @@ def convert_audio(
                 split_audio, 
                 f0_autotune_strength, 
                 checkpointing, 
-                onnx_f0_mode, 
+                predictor_onnx, 
                 embedders_mode, 
                 formant_shifting, 
                 formant_qfrency, 
@@ -259,36 +282,67 @@ def convert_audio(
                 proposal_pitch, 
                 proposal_pitch_threshold, 
                 audio_processing, 
-                alpha
+                alpha,
+                sid
             )
 
             gr_info(translations["convert_backup_success"])
 
         try:
             if not not_merge_backing and not use_original:
-                backing_source = output_backing if convert_backing else backing_vocal
+                backing_source = (
+                    output_backing 
+                    if convert_backing else 
+                    backing_vocal
+                )
 
                 output_merge_backup = process_output(output_merge_backup)
 
                 gr_info(translations["merge_backup"])
 
-                pydub_load(output_path, volume=-4).overlay(pydub_load(backing_source, volume=-6)).export(output_merge_backup, format=format)
+                pydub_load(
+                    output_path, 
+                    volume=-4
+                ).overlay(
+                    pydub_load(
+                        backing_source, 
+                        volume=-6
+                    )
+                ).export(
+                    output_merge_backup, 
+                    format=format
+                )
 
                 gr_info(translations["merge_success"])
 
             if merge_instrument:    
-                vocals = output_merge_backup if not not_merge_backing and not use_original else output_path
+                vocals = (
+                    output_merge_backup 
+                    if not not_merge_backing and not use_original else 
+                    output_path
+                )
 
                 output_merge_instrument = process_output(output_merge_instrument)
-
                 gr_info(translations["merge_instruments_process"])
 
                 instruments = get_audio_file('Instruments.')
-                
                 if instruments == translations["notfound"]: 
                     gr_warning(translations["not_found_instruments"])
+
                     output_merge_instrument = None
-                else: pydub_load(instruments, volume=-7).overlay(pydub_load(vocals, volume=-4 if use_original else None)).export(output_merge_instrument, format=format)
+                else: 
+                    pydub_load(
+                        instruments, 
+                        volume=-7
+                    ).overlay(
+                        pydub_load(
+                            vocals, 
+                            volume=-4 if use_original else None
+                        )
+                    ).export(
+                        output_merge_instrument, 
+                        format=format
+                    )
                 
                 gr_info(translations["merge_success"])
         except:
@@ -303,25 +357,28 @@ def convert_audio(
             {"visible": True, "__type__": "update"}
         ]
     else:
-        if not input or not os.path.exists(input): 
+        if not input_path or not os.path.exists(input_path): 
             gr_warning(translations["input_not_valid"])
             return return_none
         
-        if not output:
+        if not output_path:
             gr_warning(translations["output_not_valid"])
             return return_none
         
-        output = replace_export_format(output, format)
+        output_path = replace_export_format(output_path, format)
 
-        if os.path.isdir(input):
+        if os.path.isdir(input_path):
             gr_info(translations["is_folder"])
 
-            if not [f for f in os.listdir(input) if f.lower().endswith(tuple(file_types))]:
+            if not [
+                f for f in os.listdir(input_path) 
+                if f.lower().endswith(tuple(file_types))
+            ]:
                 gr_warning(translations["not_found_in_folder"])
                 return return_none
             
             gr_info(translations["batch_convert"])
-            output_dir = os.path.dirname(output) or output
+            output_dir = os.path.dirname(output_path) or output_path
 
             convert(
                 pitch, 
@@ -331,12 +388,12 @@ def convert_audio(
                 protect, 
                 hop_length, 
                 f0method, 
-                input, 
+                input_path, 
                 output_dir, 
                 model_path, 
                 index, 
                 autotune, 
-                clean, 
+                clean_audio, 
                 clean_strength, 
                 format, 
                 embedder_model, 
@@ -344,7 +401,7 @@ def convert_audio(
                 split_audio, 
                 f0_autotune_strength, 
                 checkpointing, 
-                onnx_f0_mode, 
+                predictor_onnx, 
                 embedders_mode, 
                 formant_shifting, 
                 formant_qfrency, 
@@ -353,17 +410,18 @@ def convert_audio(
                 proposal_pitch, 
                 proposal_pitch_threshold, 
                 audio_processing, 
-                alpha
+                alpha,
+                sid
             )
 
             gr_info(translations["batch_convert_success"])
 
             return return_none
         else:
-            output_dir = os.path.dirname(output) or output
+            output_dir = os.path.dirname(output_path) or output_path
 
             if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
-            output = process_output(output)
+            output_path = process_output(output_path)
 
             gr_info(translations["convert_vocal"])
 
@@ -375,12 +433,12 @@ def convert_audio(
                 protect, 
                 hop_length, 
                 f0method, 
-                input, 
-                output, 
+                input_path, 
+                output_path, 
                 model_path, 
                 index, 
                 autotune, 
-                clean, 
+                clean_audio, 
                 clean_strength, 
                 format, 
                 embedder_model, 
@@ -388,7 +446,7 @@ def convert_audio(
                 split_audio, 
                 f0_autotune_strength, 
                 checkpointing, 
-                onnx_f0_mode, 
+                predictor_onnx, 
                 embedders_mode, 
                 formant_shifting, 
                 formant_qfrency, 
@@ -397,16 +455,17 @@ def convert_audio(
                 proposal_pitch, 
                 proposal_pitch_threshold, 
                 audio_processing, 
-                alpha
+                alpha,
+                sid
             )
 
             gr_info(translations["convert_success"])
 
-            return_none[0] = output
+            return_none[0] = output_path
             return return_none
 
 def convert_selection(
-    clean,
+    clean_audio,
     autotune,
     use_audio,
     use_original,
@@ -418,8 +477,8 @@ def convert_selection(
     model,
     index,
     index_rate,
-    input,
-    output,
+    input_path,
+    output_path,
     format,
     method,
     hybrid_method,
@@ -433,7 +492,7 @@ def convert_selection(
     split_audio,
     f0_autotune_strength,
     checkpointing,
-    onnx_f0_mode,
+    predictor_onnx,
     formant_shifting,
     formant_qfrency,
     formant_timbre,
@@ -442,7 +501,8 @@ def convert_selection(
     proposal_pitch,
     proposal_pitch_threshold,
     audio_processing=False,
-    alpha=0.5
+    alpha=0.5,
+    sid=0
 ):
     if use_audio:
         gr_info(translations["search_separate"])
@@ -451,7 +511,12 @@ def convert_selection(
             if os.path.isdir(os.path.join(configs["audios_path"], f))
         ] if config.debug_mode else [
             f for f in os.listdir(configs["audios_path"]) 
-            if os.path.isdir(os.path.join(configs["audios_path"], f)) and any(file.lower().endswith(tuple(file_types)) for file in os.listdir(os.path.join(configs["audios_path"], f)))
+            if (
+                os.path.isdir(os.path.join(configs["audios_path"], f)) and any(
+                    file.lower().endswith(tuple(file_types)) 
+                    for file in os.listdir(os.path.join(configs["audios_path"], f))
+                )
+            )
         ]
 
         gr_info(translations["found_choice"].format(choice=len(choice)))
@@ -460,18 +525,30 @@ def convert_selection(
             gr_warning(translations["separator==0"])
 
             return [
-                {"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, 
+                {
+                    "choices": [], 
+                    "value": "", 
+                    "interactive": False, 
+                    "visible": False, 
+                    "__type__": "update"
+                }, 
                 None, 
                 None, 
                 None, 
                 None, 
                 None, 
-                {"visible": True, "__type__": "update"}, 
-                {"visible": False, "__type__": "update"}
+                {
+                    "visible": True, 
+                    "__type__": "update"
+                }, 
+                {
+                    "visible": False, 
+                    "__type__": "update"
+                }
             ]
         elif len(choice) == 1:
             convert_output = convert_audio(
-                clean, 
+                clean_audio, 
                 autotune, 
                 use_audio, 
                 use_original, 
@@ -499,7 +576,7 @@ def convert_selection(
                 f0_autotune_strength, 
                 choice[0], 
                 checkpointing, 
-                onnx_f0_mode, 
+                predictor_onnx, 
                 formant_shifting, 
                 formant_qfrency, 
                 formant_timbre, 
@@ -508,33 +585,58 @@ def convert_selection(
                 proposal_pitch, 
                 proposal_pitch_threshold, 
                 audio_processing, 
-                alpha
+                alpha,
+                sid
             )
 
             return [
-                {"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, 
+                {
+                    "choices": [], 
+                    "value": "", 
+                    "interactive": False, 
+                    "visible": False, 
+                    "__type__": "update"
+                }, 
                 convert_output[0], 
                 convert_output[1], 
                 convert_output[2], 
                 convert_output[3], 
                 convert_output[4], 
-                {"visible": True, "__type__": "update"}, 
-                {"visible": False, "__type__": "update"}
+                {
+                    "visible": True, 
+                    "__type__": "update"
+                }, 
+                {
+                    "visible": False, 
+                    "__type__": "update"
+                }
             ]
         else: 
             return [
-                {"choices": choice, "value": choice[0], "interactive": True, "visible": True, "__type__": "update"}, 
+                {
+                    "choices": choice, 
+                    "value": choice[0], 
+                    "interactive": True, 
+                    "visible": True, 
+                    "__type__": "update"
+                }, 
                 None, 
                 None, 
                 None, 
                 None, 
                 None, 
-                {"visible": False, "__type__": "update"}, 
-                {"visible": True, "__type__": "update"}
+                {
+                    "visible": False, 
+                    "__type__": "update"
+                }, 
+                {
+                    "visible": True, 
+                    "__type__": "update"
+                }
             ]
     else:
         main_convert = convert_audio(
-            clean, 
+            clean_audio, 
             autotune, 
             use_audio, 
             use_original, 
@@ -546,8 +648,8 @@ def convert_selection(
             model, 
             index, 
             index_rate, 
-            input, 
-            output, 
+            input_path, 
+            output_path, 
             format, 
             method, 
             hybrid_method, 
@@ -562,7 +664,7 @@ def convert_selection(
             f0_autotune_strength, 
             None, 
             checkpointing, 
-            onnx_f0_mode, 
+            predictor_onnx, 
             formant_shifting, 
             formant_qfrency, 
             formant_timbre, 
@@ -571,25 +673,53 @@ def convert_selection(
             proposal_pitch, 
             proposal_pitch_threshold, 
             audio_processing, 
-            alpha
+            alpha,
+            sid
         )
 
         return [
-            {"choices": [], "value": "", "interactive": False, "visible": False, "__type__": "update"}, 
+            {
+                "choices": [], 
+                "value": "", 
+                "interactive": False, 
+                "visible": False, 
+                "__type__": "update"
+            }, 
             main_convert[0], 
             None, 
             None, 
             None, 
             None, 
-            {"visible": True, "__type__": "update"}, 
-            {"visible": False, "__type__": "update"}
+            {
+                "visible": True, 
+                "__type__": "update"
+            }, 
+            {
+                "visible": False, 
+                "__type__": "update"
+            }
         ]
 
-def whisper_process(model_size, input_audio, configs, device, out_queue, word_timestamps=True):
+def whisper_process(
+    model_size, 
+    input_audio, 
+    configs, 
+    device, 
+    out_queue, 
+    word_timestamps=True
+):
     from main.library.speaker_diarization.whisper import load_model
 
     try:
-        segments = load_model(model_size, device=device).transcribe(input_audio, fp16=configs.get("fp16", False), word_timestamps=word_timestamps)
+        segments = load_model(
+            model_size, 
+            device=device
+        ).transcribe(
+            input_audio, 
+            fp16=configs.get("fp16", False), 
+            word_timestamps=word_timestamps
+        )
+
         out_queue.put(segments["segments"])
     except Exception as e:
         out_queue.put(e)
@@ -616,7 +746,7 @@ def convert_with_whisper(
     export_format, 
     input_audio, 
     output_audio, 
-    onnx_f0_mode, 
+    predictor_onnx, 
     method, 
     hybrid_method, 
     hop_length, 
@@ -635,7 +765,9 @@ def convert_with_whisper(
     proposal_pitch, 
     proposal_pitch_threshold, 
     audio_processing=False, 
-    alpha=0.5
+    alpha=0.5,
+    sid_1=0,
+    sid_2=0,
 ):
     import librosa
     import multiprocessing as mp
@@ -650,12 +782,21 @@ def convert_with_whisper(
     from main.library.speaker_diarization.embedding import SpeechBrainPretrainedSpeakerEmbedding
     
     check_spk_diarization(model_size)
-    model_pth_1, model_pth_2 = os.path.join(configs["weights_path"], model_1) if not os.path.exists(model_1) else model_1, os.path.join(configs["weights_path"], model_2) if not os.path.exists(model_2) else model_2
+    model_pth_1, model_pth_2 = (
+        os.path.join(configs["weights_path"], model_1) if not os.path.exists(model_1) else model_1, 
+        os.path.join(configs["weights_path"], model_2) if not os.path.exists(model_2) else model_2
+    )
 
     if (
-        not model_1 or not os.path.exists(model_pth_1) or os.path.isdir(model_pth_1) or not model_pth_1.endswith((".pth", ".onnx"))
+        not model_1 or 
+        not os.path.exists(model_pth_1) or 
+        os.path.isdir(model_pth_1) or 
+        not model_pth_1.endswith((".pth", ".onnx"))
     ) and (
-        not model_2 or not os.path.exists(model_pth_2) or os.path.isdir(model_pth_2) or not model_pth_2.endswith((".pth", ".onnx"))
+        not model_2 or 
+        not os.path.exists(model_pth_2) or 
+        os.path.isdir(model_pth_2) or 
+        not model_pth_2.endswith((".pth", ".onnx"))
     ):
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
         return None
@@ -681,24 +822,53 @@ def convert_with_whisper(
             pass
 
         whisper_queue = mp.Queue()
-        whisperprocess = mp.Process(target=whisper_process, args=(model_size, input_audio, configs, config.device, whisper_queue, True))
-        whisperprocess.start()
+        whisperprocess = mp.Process(
+            target=whisper_process, 
+            args=(
+                model_size, 
+                input_audio, 
+                configs, 
+                config.device, 
+                whisper_queue, 
+                True
+            )
+        )
 
+        whisperprocess.start()
         segments = whisper_queue.get()
         audio = Audio()
 
-        embedding_model = SpeechBrainPretrainedSpeakerEmbedding(embedding=os.path.join(configs["speaker_diarization_path"], "models", "speechbrain"), device=config.device)
+        embedding_model = SpeechBrainPretrainedSpeakerEmbedding(
+            embedding=os.path.join(configs["speaker_diarization_path"], "models", "speechbrain"), 
+            device=config.device
+        )
+
         y, sr = librosa.load(input_audio, sr=None)  
         duration = len(y) / sr
             
         def segment_embedding(segment):
-            waveform, _ = audio.crop(input_audio, Segment(segment["start"], min(duration, segment["end"])))
-            return embedding_model(waveform.mean(dim=0, keepdim=True)[None] if waveform.shape[0] == 2 else waveform[None])  
+            waveform, _ = audio.crop(
+                input_audio, 
+                Segment(
+                    segment["start"], 
+                    min(duration, segment["end"])
+                )
+            )
+
+            return embedding_model(
+                waveform.mean(dim=0, keepdim=True)[None] if waveform.shape[0] == 2 else waveform[None]
+            )  
         
         def time(secs):
             return datetime.timedelta(seconds=round(secs))
         
-        def merge_audio(files_list, time_stamps, original_file_path, output_path, format):
+        def merge_audio(
+            files_list, 
+            time_stamps, 
+            original_file_path, 
+            output_path, 
+            format
+        ):
             def extract_number(filename):
                 match = re.search(r'_(\d+)', filename)
                 return int(match.group(1)) if match else 0
@@ -708,14 +878,20 @@ def convert_with_whisper(
             current_position = 0 
 
             for file, (start_i, end_i) in zip(sorted(files_list, key=extract_number), time_stamps):
-                if start_i > current_position: combined += AudioSegment.silent(duration=start_i - current_position)  
+                if start_i > current_position: 
+                    combined += AudioSegment.silent(
+                        duration=start_i - current_position
+                    )  
                 
                 combined += pydub_load(file)  
                 current_position = end_i
 
-            if current_position < total_duration: combined += AudioSegment.silent(duration=total_duration - current_position)
-            combined.export(output_path, format=format)
+            if current_position < total_duration: 
+                combined += AudioSegment.silent(
+                    duration=total_duration - current_position
+                )
 
+            combined.export(output_path, format=format)
             return output_path
 
         embeddings = np.zeros(shape=(len(segments), 192))
@@ -738,14 +914,26 @@ def convert_with_whisper(
                 current_text.append(text)
                 end_time = segment["end"]
             else:
-                if current_speaker is not None: merged_segments.append({"speaker": current_speaker, "start": current_start, "end": end_time, "text": " ".join(current_text)})
+                if current_speaker is not None: 
+                    merged_segments.append({
+                        "speaker": current_speaker, 
+                        "start": current_start, 
+                        "end": end_time, 
+                        "text": " ".join(current_text)
+                    })
                 
                 current_speaker = speaker
                 current_start = start_time
                 current_text = [text]
                 end_time = segment["end"]
 
-        if current_speaker is not None: merged_segments.append({"speaker": current_speaker, "start": current_start, "end": end_time, "text": " ".join(current_text)})
+        if current_speaker is not None: 
+            merged_segments.append({
+                "speaker": current_speaker, 
+                "start": current_start, 
+                "end": end_time, 
+                "text": " ".join(current_text)
+            })
 
         gr_info(translations["whisper_done"])
 
@@ -766,7 +954,12 @@ def convert_with_whisper(
         output_folder = "audios_temp"
 
         if os.path.exists(output_folder): shutil.rmtree(output_folder, ignore_errors=True)
-        for f in [output_folder, os.path.join(output_folder, "1"), os.path.join(output_folder, "2")]:
+
+        for f in [
+            output_folder, 
+            os.path.join(output_folder, "1"), 
+            os.path.join(output_folder, "2")
+        ]:
             os.makedirs(f, exist_ok=True)
 
         time_stamps, processed_segments = [], []
@@ -776,13 +969,30 @@ def convert_with_whisper(
 
             index = i + 1
 
-            segment_filename = os.path.join(output_folder, "1" if i % 2 == 1 else "2", f"segment_{index}.wav")
+            segment_filename = os.path.join(
+                output_folder, 
+                "1" if i % 2 == 1 else "2", 
+                f"segment_{index}.wav"
+            )
+
             audio[start_ms:end_ms].export(segment_filename, format="wav")
 
-            processed_segments.append(os.path.join(output_folder, "1" if i % 2 == 1 else "2", f"segment_{index}_output.wav"))
-            time_stamps.append((start_ms, end_ms))
+            processed_segments.append(
+                os.path.join(
+                    output_folder, 
+                    "1" if i % 2 == 1 else "2", 
+                    f"segment_{index}_output.wav"
+                )
+            )
 
-        f0method, embedder_model = (method if method != "hybrid" else hybrid_method), (embedders if embedders != "custom" else custom_embedders)
+            time_stamps.append(
+                (start_ms, end_ms)
+            )
+
+        f0method, embedder_model = (
+            method if method != "hybrid" else hybrid_method, 
+            embedders if embedders != "custom" else custom_embedders
+        )
 
         gr_info(translations["process_done_start_convert"])
 
@@ -794,8 +1004,7 @@ def convert_with_whisper(
             protect, 
             hop_length, 
             f0method, 
-            os.path.join(output_folder, 
-            "1"), 
+            os.path.join(output_folder, "1"), 
             output_folder, 
             model_pth_1, 
             model_index_1, 
@@ -808,7 +1017,7 @@ def convert_with_whisper(
             False, 
             f0_autotune_strength, 
             checkpointing, 
-            onnx_f0_mode, 
+            predictor_onnx, 
             embed_mode, 
             formant_shifting, 
             formant_qfrency_1, 
@@ -817,7 +1026,8 @@ def convert_with_whisper(
             proposal_pitch, 
             proposal_pitch_threshold, 
             audio_processing, 
-            alpha
+            alpha,
+            sid_1
         )
 
         convert(
@@ -828,8 +1038,7 @@ def convert_with_whisper(
             protect, 
             hop_length, 
             f0method, 
-            os.path.join(output_folder, 
-            "2"), 
+            os.path.join(output_folder, "2"), 
             output_folder, 
             model_pth_2, 
             model_index_2, 
@@ -842,7 +1051,7 @@ def convert_with_whisper(
             False, 
             f0_autotune_strength, 
             checkpointing, 
-            onnx_f0_mode, 
+            predictor_onnx, 
             embed_mode, 
             formant_shifting, 
             formant_qfrency_2, 
@@ -851,29 +1060,40 @@ def convert_with_whisper(
             proposal_pitch, 
             proposal_pitch_threshold, 
             audio_processing, 
-            alpha
+            alpha,
+            sid_2
         )
 
         gr_info(translations["convert_success"])
-        return merge_audio(processed_segments, time_stamps, input_audio, replace_export_format(output_audio, export_format), export_format)
+
+        return merge_audio(
+            processed_segments, 
+            time_stamps, 
+            input_audio, 
+            replace_export_format(output_audio, export_format), 
+            export_format
+        )
     except Exception as e:
-        gr_error(translations["error_occurred"].format(e=e))
         import traceback
+
+        gr_error(translations["error_occurred"].format(e=e))
         logger.debug(traceback.format_exc())
+
         return None
     finally:
-        if os.path.exists("audios_temp"): shutil.rmtree("audios_temp", ignore_errors=True)
+        if os.path.exists("audios_temp"): 
+            shutil.rmtree("audios_temp", ignore_errors=True)
 
 def convert_tts(
-    clean, 
+    clean_audio, 
     autotune, 
     pitch, 
     clean_strength, 
     model, 
     index, 
     index_rate, 
-    input, 
-    output, 
+    input_path, 
+    output_path, 
     format, 
     method, 
     hybrid_method, 
@@ -887,7 +1107,7 @@ def convert_tts(
     split_audio, 
     f0_autotune_strength, 
     checkpointing, 
-    onnx_f0_mode, 
+    predictor_onnx, 
     formant_shifting, 
     formant_qfrency, 
     formant_timbre, 
@@ -896,41 +1116,52 @@ def convert_tts(
     proposal_pitch, 
     proposal_pitch_threshold, 
     audio_processing=False, 
-    alpha=0.5
+    alpha=0.5,
+    sid=0
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
-    if not model_path or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")):
+    if (
+        not model_path or 
+        not os.path.exists(model_path) or 
+        os.path.isdir(model_path) or 
+        not model.endswith((".pth", ".onnx"))
+    ):
         gr_warning(translations["provide_file"].format(filename=translations["model"]))
         return None
 
-    if not input or not os.path.exists(input): 
+    if not input_path or not os.path.exists(input_path): 
         gr_warning(translations["input_not_valid"])
         return None
     
-    if os.path.isdir(input): 
-        input_audio = [f for f in os.listdir(input) if "tts" in f and f.lower().endswith(tuple(file_types))]
+    if os.path.isdir(input_path): 
+        input_audio = [
+            f for f in os.listdir(input_path) 
+            if "tts" in f and f.lower().endswith(tuple(file_types))
+        ]
         
         if not input_audio:
             gr_warning(translations["not_found_in_folder"])
             return None
         
-        input = os.path.join(input, input_audio[0])
+        input_path = os.path.join(input_path, input_audio[0])
     
-    if not output:
+    if not output_path:
         gr_warning(translations["output_not_valid"])
         return None
     
-    output = replace_export_format(output, format)
-    if os.path.isdir(output): output = os.path.join(output, f"tts.{format}")
+    output_path = replace_export_format(output_path, format)
+    if os.path.isdir(output_path): output_path = os.path.join(output_path, f"tts.{format}")
 
-    output_dir = os.path.dirname(output)
+    output_dir = os.path.dirname(output_path)
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     
-    output = process_output(output)
+    output_path = process_output(output_path)
 
-    f0method = method if method != "hybrid" else hybrid_method
-    embedder_model = embedders if embedders != "custom" else custom_embedders
+    f0method, embedder_model = (
+        method if method != "hybrid" else hybrid_method, 
+        embedders if embedders != "custom" else custom_embedders
+    )
 
     gr_info(translations["convert_vocal"])
 
@@ -942,12 +1173,12 @@ def convert_tts(
         protect, 
         hop_length, 
         f0method, 
-        input, 
-        output, 
+        input_path, 
+        output_path, 
         model_path, 
         index, 
         autotune, 
-        clean, 
+        clean_audio, 
         clean_strength, 
         format, 
         embedder_model, 
@@ -955,7 +1186,7 @@ def convert_tts(
         split_audio, 
         f0_autotune_strength, 
         checkpointing, 
-        onnx_f0_mode, 
+        predictor_onnx, 
         embedders_mode, 
         formant_shifting, 
         formant_qfrency, 
@@ -964,8 +1195,9 @@ def convert_tts(
         proposal_pitch, 
         proposal_pitch_threshold, 
         audio_processing, 
-        alpha
+        alpha,
+        sid
     )
 
     gr_info(translations["convert_success"])
-    return output
+    return output_path

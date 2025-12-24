@@ -13,10 +13,31 @@ from torch.nn.utils.parametrizations import weight_norm
 LRELU_SLOPE = 0.1
 
 class MRFLayer(nn.Module):
-    def __init__(self, channels, kernel_size, dilation):
+    def __init__(
+        self, 
+        channels, 
+        kernel_size, 
+        dilation
+    ):
         super().__init__()
-        self.conv1 = weight_norm(nn.Conv1d(channels, channels, kernel_size, padding=(kernel_size * dilation - dilation) // 2, dilation=dilation))
-        self.conv2 = weight_norm(nn.Conv1d(channels, channels, kernel_size, padding=kernel_size // 2, dilation=1))
+        self.conv1 = weight_norm(
+            nn.Conv1d(
+                channels, 
+                channels, 
+                kernel_size, 
+                padding=(kernel_size * dilation - dilation) // 2, 
+                dilation=dilation
+            )
+        )
+        self.conv2 = weight_norm(
+            nn.Conv1d(
+                channels, 
+                channels, 
+                kernel_size, 
+                padding=kernel_size // 2, 
+                dilation=1
+            )
+        )
 
     def forward(self, x):
         return x + self.conv2(F.leaky_relu(self.conv1(F.leaky_relu(x, LRELU_SLOPE)), LRELU_SLOPE))
@@ -46,14 +67,21 @@ class MRFBlock(nn.Module):
         for layer in self.layers:
             layer.remove_weight_norm()
 
-class SineGenerator(nn.Module):
-    def __init__(self, samp_rate, harmonic_num = 0, sine_amp = 0.1, noise_std = 0.003, voiced_threshold = 0):
-        super(SineGenerator, self).__init__()
+class SineGen(nn.Module):
+    def __init__(
+        self, 
+        sampling_rate, 
+        harmonic_num = 0, 
+        sine_amp = 0.1, 
+        noise_std = 0.003, 
+        voiced_threshold = 0
+    ):
+        super(SineGen, self).__init__()
         self.sine_amp = sine_amp
         self.noise_std = noise_std
         self.harmonic_num = harmonic_num
         self.dim = self.harmonic_num + 1
-        self.sampling_rate = samp_rate
+        self.sampling_rate = sampling_rate
         self.voiced_threshold = voiced_threshold
 
     def _f02uv(self, f0):
@@ -89,19 +117,42 @@ class SineGenerator(nn.Module):
         return sine_waves
 
 class SourceModuleHnNSF(nn.Module):
-    def __init__(self, sampling_rate, harmonic_num = 0, sine_amp = 0.1, add_noise_std = 0.003, voiced_threshold = 0):
+    def __init__(
+        self, 
+        sampling_rate, 
+        harmonic_num = 0, 
+        sine_amp = 0.1, 
+        add_noise_std = 0.003, 
+        voiced_threshold = 0
+    ):
         super(SourceModuleHnNSF, self).__init__()
         self.sine_amp = sine_amp
         self.noise_std = add_noise_std
-        self.l_sin_gen = SineGenerator(sampling_rate, harmonic_num, sine_amp, add_noise_std, voiced_threshold)
+        self.l_sin_gen = SineGen(sampling_rate, harmonic_num, sine_amp, add_noise_std, voiced_threshold)
         self.l_linear = nn.Linear(harmonic_num + 1, 1)
         self.l_tanh = nn.Tanh()
 
     def forward(self, x):
-        return self.l_tanh(self.l_linear(self.l_sin_gen(x).to(dtype=self.l_linear.weight.dtype)))
+        return self.l_tanh(
+            self.l_linear(
+                self.l_sin_gen(x).to(dtype=self.l_linear.weight.dtype)
+            )
+        )
 
 class HiFiGANMRFGenerator(nn.Module):
-    def __init__(self, in_channel, upsample_initial_channel, upsample_rates, upsample_kernel_sizes, resblock_kernel_sizes, resblock_dilations, gin_channels, sample_rate, harmonic_num, checkpointing = False):
+    def __init__(
+        self, 
+        in_channel, 
+        upsample_initial_channel, 
+        upsample_rates, 
+        upsample_kernel_sizes, 
+        resblock_kernel_sizes, 
+        resblock_dilations, 
+        gin_channels, 
+        sample_rate, 
+        harmonic_num, 
+        checkpointing = False
+    ):
         super().__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.checkpointing = checkpointing
@@ -110,18 +161,51 @@ class HiFiGANMRFGenerator(nn.Module):
         self.conv_pre = weight_norm(nn.Conv1d(in_channel, upsample_initial_channel, kernel_size=7, stride=1, padding=3))
         self.upsamples = nn.ModuleList()
         self.noise_convs = nn.ModuleList()
-        stride_f0s = [math.prod(upsample_rates[i + 1 :]) if i + 1 < len(upsample_rates) else 1 for i in range(len(upsample_rates))]
+        stride_f0s = [
+            math.prod(upsample_rates[i + 1 :]) if i + 1 < len(upsample_rates) else 1 
+            for i in range(len(upsample_rates))
+        ]
 
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
-            self.upsamples.append(weight_norm(nn.ConvTranspose1d(upsample_initial_channel // (2**i), upsample_initial_channel // (2 ** (i + 1)), kernel_size=k, stride=u, padding=((k - u) // 2) if u % 2 == 0 else (u // 2 + u % 2), output_padding=u % 2)))
+            self.upsamples.append(
+                weight_norm(
+                    nn.ConvTranspose1d(
+                        upsample_initial_channel // (2**i), 
+                        upsample_initial_channel // (2 ** (i + 1)), 
+                        kernel_size=k, 
+                        stride=u, 
+                        padding=((k - u) // 2) if u % 2 == 0 else (u // 2 + u % 2), 
+                        output_padding=u % 2
+                    )
+                )
+            )
+
             stride = stride_f0s[i]
             kernel = 1 if stride == 1 else stride * 2 - stride % 2
-            self.noise_convs.append(nn.Conv1d(1, upsample_initial_channel // (2 ** (i + 1)), kernel_size=kernel, stride=stride, padding=0 if stride == 1 else (kernel - stride) // 2))
+
+            self.noise_convs.append(
+                nn.Conv1d(
+                    1, 
+                    upsample_initial_channel // (2 ** (i + 1)), 
+                    kernel_size=kernel, 
+                    stride=stride, 
+                    padding=0 if stride == 1 else (kernel - stride) // 2
+                )
+            )
 
         self.mrfs = nn.ModuleList()
         for i in range(len(self.upsamples)):
             channel = upsample_initial_channel // (2 ** (i + 1))
-            self.mrfs.append(nn.ModuleList([MRFBlock(channel, kernel_size=k, dilations=d) for k, d in zip(resblock_kernel_sizes, resblock_dilations)]))
+            self.mrfs.append(
+                nn.ModuleList([
+                    MRFBlock(
+                        channel, 
+                        kernel_size=k, 
+                        dilations=d
+                    ) 
+                    for k, d in zip(resblock_kernel_sizes, resblock_dilations)
+                ])
+            )
 
         self.conv_post = weight_norm(nn.Conv1d(channel, 1, kernel_size=7, stride=1, padding=3))
         if gin_channels != 0: self.cond = nn.Conv1d(gin_channels, upsample_initial_channel, 1)

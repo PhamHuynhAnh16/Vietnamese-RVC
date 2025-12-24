@@ -36,7 +36,12 @@ async def websocket_audio(ws: WebSocket):
         model_pth = params["model_pth"]
         model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
 
-        if not model_pth or not os.path.exists(model_pth) or os.path.isdir(model_pth) or not model_pth.endswith((".pth", ".onnx")):
+        if (
+            not model_pth or 
+            not os.path.exists(model_pth) or 
+            os.path.isdir(model_pth) or 
+            not model_pth.endswith((".pth", ".onnx"))
+        ):
             logger.warning(translations["provide_file"].format(filename=translations["model"]))
             await ws.send_text(json.dumps({"type": "warnings", "value": translations["provide_file"].format(filename=translations["model"])}))
             return
@@ -50,11 +55,12 @@ async def websocket_audio(ws: WebSocket):
                 input_sample_rate=DEVICE_SAMPLE_RATE, 
                 extra_convert_size=params["extra_convert_size"]
             )
+
             vc_instance.initialize(vc_model=RVC_Realtime(
                 model_path=model_pth, 
                 index_path=params["model_index"], 
                 f0_method=params["f0_method"], 
-                f0_onnx=params["f0_onnx"], 
+                predictor_onnx=params["predictor_onnx"], 
                 embedder_model=(embedders if embedders != "custom" else params["custom_embedders"]), 
                 embedders_mode=params["embedders_mode"], 
                 sample_rate=PIPELINE_SAMPLE_RATE, 
@@ -68,6 +74,7 @@ async def websocket_audio(ws: WebSocket):
                 clean_audio=params["clean_audio"], 
                 clean_strength=params["clean_strength"],
                 post_process=params["post_process"],
+                sid=params["sid"],
                 **params["kwargs"]
             ))
         
@@ -78,7 +85,11 @@ async def websocket_audio(ws: WebSocket):
             arr = np.frombuffer(audio, dtype=np.float32)
 
             if arr.size != block_frame:
-                arr = np.pad(arr, (0, block_frame - arr.size)).astype(np.float32) if arr.size < block_frame else arr[:block_frame].astype(np.float32)
+                arr = (
+                    np.pad(arr, (0, block_frame - arr.size)).astype(np.float32) 
+                    if arr.size < block_frame else 
+                    arr[:block_frame].astype(np.float32)
+                )
 
             audio_output, _, perf = vc_instance.on_request(
                 arr * (params["input_audio_gain"] / 100.0), 
@@ -99,6 +110,7 @@ async def websocket_audio(ws: WebSocket):
         logger.info(translations["ws_disconnected"])
     except Exception as e:
         import traceback
+
         logger.debug(traceback.format_exc())
         logger.info(translations["error_occurred"].format(e=e))
     finally:

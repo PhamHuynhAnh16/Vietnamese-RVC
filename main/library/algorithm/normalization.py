@@ -13,4 +13,11 @@ class LayerNorm(torch.nn.Module):
 
     def forward(self, x):
         x = x.transpose(1, -1)
-        return (F.layer_norm(x, (self.channels,), self.gamma, self.beta, self.eps) if self.onnx else F.layer_norm(x, (x.size(-1),), self.gamma, self.beta, self.eps)).transpose(1, -1) 
+
+        return F.layer_norm(
+            x, 
+            (self.channels,) if self.onnx else (x.size(-1),), 
+            self.gamma, 
+            self.beta, 
+            self.eps
+        ).transpose(1, -1) 

@@ -179,7 +179,11 @@ def separate(
             logger.debug(f"{key}: {value}")
 
         output_files = []
-        files = [os.path.join(input_path, f) for f in os.listdir(input_path)] if os.path.isdir(input_path) else [input_path]
+
+        files = [
+            os.path.join(input_path, f) 
+            for f in os.listdir(input_path)
+        ] if os.path.isdir(input_path) else [input_path]
 
         for file in files:
             if os.path.isfile(file):
@@ -438,7 +442,13 @@ def vr_main(
                     denoise_list.append(filename)
 
     logger.info(translations["separator_success_2"])
-    return process_file(denoise_list if enable_denoise else output_list, output_dirs, export_format, mode)
+
+    return process_file(
+        denoise_list if enable_denoise else output_list, 
+        output_dirs, 
+        export_format, 
+        mode
+    )
 
 def demucs_main(
     input_path,
@@ -451,7 +461,6 @@ def demucs_main(
     sample_rate=44100
 ):
     exists_file(input_path, output_dirs)
-    
     logger.info(f"{translations['separator_process_2']}...")
 
     output_list = separate_main(
@@ -466,7 +475,13 @@ def demucs_main(
     )
 
     logger.info(translations["separator_success_2"])
-    return process_file(output_list, output_dirs, export_format, mode="4stem")
+
+    return process_file(
+        output_list, 
+        output_dirs, 
+        export_format, 
+        mode="4stem"
+    )
 
 def mdx_main(
     input_path,
@@ -482,7 +497,6 @@ def mdx_main(
     mode="original"
 ):
     exists_file(input_path, output_dirs)
-
     logger.info(f"{translations['separator_process_2']}...")
 
     output_list = separate_main(
@@ -499,36 +513,70 @@ def mdx_main(
     )
 
     logger.info(translations["separator_success_2"])
-    return process_file(output_list, output_dirs, export_format, mode)
 
-def process_file(input_list, output_dirs, export_format="wav", mode="original"):
+    return process_file(
+        output_list, 
+        output_dirs, 
+        export_format, 
+        mode
+    )
+
+def process_file(
+    input_list, 
+    output_dirs, 
+    export_format="wav", 
+    mode="original"
+):
     demucs_inst = []
-
     reverb_audio, no_reverb_audio = None, None
-    main_audio, backing_audio = os.path.join(output_dirs, f"Main_Vocals.{export_format}"), os.path.join(output_dirs, f"Backing_Vocals.{export_format}")
-    original_audio, instruments_audio = os.path.join(output_dirs, f"Original_Vocals.{export_format}"), os.path.join(output_dirs, f"Instruments.{export_format}")
+
+    main_audio, backing_audio = (
+        os.path.join(output_dirs, f"Main_Vocals.{export_format}"), 
+        os.path.join(output_dirs, f"Backing_Vocals.{export_format}")
+    )
+
+    original_audio, instruments_audio = (
+        os.path.join(output_dirs, f"Original_Vocals.{export_format}"), 
+        os.path.join(output_dirs, f"Instruments.{export_format}")
+    )
 
     for file in input_list:
         file_path = os.path.join(output_dirs, file)
-        if not os.path.exists(file_path): logger.warning(translations["not_found"].format(name=file_path))
+        if not os.path.exists(file_path): 
+            logger.warning(translations["not_found"].format(name=file_path))
 
         if mode == "original":
-            if "_(Instrumental)_" in file: os.rename(file_path, instruments_audio)
-            elif "_(Vocals)_" in file: os.rename(file_path, original_audio)
+            if "_(Instrumental)_" in file: 
+                os.rename(file_path, instruments_audio)
+            elif "_(Vocals)_" in file: 
+                os.rename(file_path, original_audio)
         elif mode == "4stem":
-            if "_(Vocals)_" in file: os.rename(file_path, original_audio)
-            elif "_(Drums)_" in file or "_(Bass)_" in file or "_(Other)_" in file: demucs_inst.append(file_path)
+            if "_(Vocals)_" in file: 
+                os.rename(file_path, original_audio)
+            elif "_(Drums)_" in file or "_(Bass)_" in file or "_(Other)_" in file: 
+                demucs_inst.append(file_path)
         elif mode == "reverb":
             filename = file.split("_(")[0]
 
-            reverb_audio = os.path.join(output_dirs, "".join([filename, "_Reverb.", export_format]))
-            no_reverb_audio = os.path.join(output_dirs, "".join([filename, "_No_Reverb.", export_format]))
+            reverb_audio = os.path.join(
+                output_dirs, 
+                "".join([filename, "_Reverb.", export_format])
+            )
 
-            if "_(Reverb)_" in file or "_(Echo)_" in file: os.rename(file_path, reverb_audio)
-            elif "_(No Reverb)_" in file or "_(No Echo)_" in file: os.rename(file_path, no_reverb_audio)
+            no_reverb_audio = os.path.join(
+                output_dirs, 
+                "".join([filename, "_No_Reverb.", export_format])
+            )
+
+            if "_(Reverb)_" in file or "_(Echo)_" in file: 
+                os.rename(file_path, reverb_audio)
+            elif "_(No Reverb)_" in file or "_(No Echo)_" in file: 
+                os.rename(file_path, no_reverb_audio)
         elif mode == "karaoke":
-            if "_(Instrumental)_" in file: os.rename(file_path, backing_audio)
-            elif "_(Vocals)_" in file: os.rename(file_path, main_audio)
+            if "_(Instrumental)_" in file: 
+                os.rename(file_path, backing_audio)
+            elif "_(Vocals)_" in file: 
+                os.rename(file_path, main_audio)
 
     if mode == "reverb": return reverb_audio, no_reverb_audio
     if mode == "karaoke": return main_audio, backing_audio 
@@ -623,6 +671,7 @@ def separate_main(
         return separator.separate(audio_file)
     except:
         logger.debug(translations["default_setting"])
+
         separator = Separator(
             logger=logger, 
             output_dir=output_dir, 

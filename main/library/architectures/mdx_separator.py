@@ -210,7 +210,15 @@ class STFT:
         batch_dimensions = input_tensor.shape[:-2]
         channel_dim, time_dim = input_tensor.shape[-2:]
 
-        permuted_stft_output = torch.stft(input_tensor.reshape([-1, time_dim]), n_fft=self.n_fft, hop_length=self.hop_length, window=self.hann_window.to(input_tensor.device), center=True, return_complex=False).permute([0, 3, 1, 2])
+        permuted_stft_output = torch.stft(
+            input_tensor.reshape([-1, time_dim]), 
+            n_fft=self.n_fft, 
+            hop_length=self.hop_length, 
+            window=self.hann_window.to(input_tensor.device), 
+            center=True, 
+            return_complex=False
+        ).permute([0, 3, 1, 2])
+
         final_output = permuted_stft_output.reshape([*batch_dimensions, channel_dim, 2, -1, permuted_stft_output.shape[-1]]).reshape([*batch_dimensions, channel_dim * 2, -1, permuted_stft_output.shape[-1]])
 
         if is_non_standard_device: final_output = final_output.to(self.device)

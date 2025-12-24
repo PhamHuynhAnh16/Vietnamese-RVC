@@ -22,7 +22,11 @@ def int_keys(pairs):
     return result_dict
 
 class ModelParameters(object):
-    def __init__(self, config_path="", key_in_bin=None):
+    def __init__(
+        self, 
+        config_path="", 
+        key_in_bin=None
+    ):
         if config_path.endswith(".bin"):
             with open(config_path, "rb") as f:
                 data = pickle.load(f)

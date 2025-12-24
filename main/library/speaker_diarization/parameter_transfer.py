@@ -14,7 +14,13 @@ def get_default_hook(obj, default_hooks):
     return None
 
 class Pretrainer:
-    def __init__(self, loadables=None, paths=None, custom_hooks=None, conditions=None):
+    def __init__(
+        self, 
+        loadables=None, 
+        paths=None, 
+        custom_hooks=None, 
+        conditions=None
+    ):
         self.loadables = {}
 
         if loadables is not None: self.add_loadables(loadables)
@@ -55,13 +61,19 @@ class Pretrainer:
             if not self.is_loadable(name): continue
             save_filename = name + ".ckpt"
 
-            if name in self.paths: source, filename = self.split_path(self.paths[name])
+            if name in self.paths: 
+                source, filename = self.split_path(
+                    self.paths[name]
+                )
             elif default_source is not None:
                 filename = save_filename
                 source = default_source
             else: raise ValueError
 
-            fetch_kwargs = {"filename": filename, "source": source}
+            fetch_kwargs = {
+                "filename": filename, 
+                "source": source
+            }
             path = None
 
             def run_fetch(**kwargs):
@@ -69,7 +81,12 @@ class Pretrainer:
 
                 path = fetch(**kwargs)
 
-            run_on_main(run_fetch, kwargs=fetch_kwargs, post_func=run_fetch, post_kwargs=fetch_kwargs)
+            run_on_main(
+                run_fetch, 
+                kwargs=fetch_kwargs, 
+                post_func=run_fetch, 
+                post_kwargs=fetch_kwargs
+            )
 
             loadable_paths[name] = path
             self.paths[name] = str(path)

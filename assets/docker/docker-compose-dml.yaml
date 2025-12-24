@@ -4,11 +4,14 @@ services:
   rvc:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dml
     container_name: rvc
     ports:
       - 7860:7860
     deploy:
       resources:
         reservations:
-          devices: []
+          devices:
+            - driver: amd
+              count: 1
+              capabilities: [gpu]

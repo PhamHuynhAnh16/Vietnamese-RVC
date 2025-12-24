@@ -44,10 +44,27 @@ def parse_arguments():
     return parser.parse_args()
 
 class PreProcess:
-    def __init__(self, sr, exp_dir, per):
-        self.slicer = Slicer(sr=sr, threshold=-42, min_length=1500, min_interval=400, hop_size=15, max_sil_kept=500)
+    def __init__(
+        self, 
+        sr, 
+        exp_dir, 
+        per
+    ):
+        self.slicer = Slicer(
+            sr=sr, 
+            threshold=-42, 
+            min_length=1500, 
+            min_interval=400, 
+            hop_size=15, 
+            max_sil_kept=500
+        )
+        self.b_high, self.a_high = signal.butter(
+            N=5, 
+            Wn=HIGH_PASS_CUTOFF, 
+            btype="high", 
+            fs=sr
+        )
         self.sr = sr
-        self.b_high, self.a_high = signal.butter(N=5, Wn=HIGH_PASS_CUTOFF, btype="high", fs=self.sr)
         self.per = per
         self.exp_dir = exp_dir
         self.device = "cpu"
@@ -66,12 +83,34 @@ class PreProcess:
             logger.debug(f"{sid}-{idx0}-{idx1}-filtered")
             return
         
-        if normalization_mode == "post": normalized_audio = self._normalize_audio(normalized_audio)
+        if normalization_mode == "post": 
+            normalized_audio = self._normalize_audio(normalized_audio)
         
-        wavfile.write(os.path.join(self.gt_wavs_dir, f"{sid}_{idx0}_{idx1}.wav"), self.sr, normalized_audio.astype(np.float32))
-        wavfile.write(os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{idx1}.wav"), SAMPLE_RATE_16K, librosa.resample(normalized_audio, orig_sr=self.sr, target_sr=SAMPLE_RATE_16K, res_type="soxr_vhq").astype(np.float32))
+        wavfile.write(
+            os.path.join(self.gt_wavs_dir, f"{sid}_{idx0}_{idx1}.wav"), 
+            self.sr, 
+            normalized_audio.astype(np.float32)
+        )
+        wavfile.write(
+            os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{idx1}.wav"), 
+            SAMPLE_RATE_16K, 
+            librosa.resample(
+                normalized_audio, 
+                orig_sr=self.sr, 
+                target_sr=SAMPLE_RATE_16K, 
+                res_type="soxr_vhq"
+            ).astype(np.float32)
+        )
 
-    def simple_cut(self, audio, sid, idx0, chunk_len, overlap_len, normalization_mode):
+    def simple_cut(
+        self, 
+        audio, 
+        sid, 
+        idx0, 
+        chunk_len, 
+        overlap_len, 
+        normalization_mode
+    ):
         chunk_length = int(self.sr * chunk_len)
         overlap_length = int(self.sr * overlap_len)
         i = 0
@@ -81,12 +120,38 @@ class PreProcess:
             if normalization_mode == "post": chunk = self._normalize_audio(chunk)
 
             if len(chunk) == chunk_length:
-                wavfile.write(os.path.join(self.gt_wavs_dir, f"{sid}_{idx0}_{i // (chunk_length - overlap_length)}.wav"), self.sr, chunk.astype(np.float32))
-                wavfile.write(os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{i // (chunk_length - overlap_length)}.wav"), SAMPLE_RATE_16K, librosa.resample(chunk, orig_sr=self.sr, target_sr=SAMPLE_RATE_16K, res_type="soxr_vhq").astype(np.float32))
+                wavfile.write(
+                    os.path.join(self.gt_wavs_dir, f"{sid}_{idx0}_{i // (chunk_length - overlap_length)}.wav"), 
+                    self.sr, 
+                    chunk.astype(np.float32)
+                )
+
+                wavfile.write(
+                    os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{i // (chunk_length - overlap_length)}.wav"), 
+                    SAMPLE_RATE_16K, 
+                    librosa.resample(
+                        chunk, 
+                        orig_sr=self.sr, 
+                        target_sr=SAMPLE_RATE_16K, 
+                        res_type="soxr_vhq"
+                    ).astype(np.float32)
+                )
 
             i += chunk_length - overlap_length
 
-    def process_audio(self, path, idx0, sid, cut_preprocess, process_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode):
+    def process_audio(
+        self, 
+        path, 
+        idx0, 
+        sid, 
+        cut_preprocess, 
+        process_effects, 
+        clean_dataset, 
+        clean_strength, 
+        chunk_len, 
+        overlap_len, 
+        normalization_mode
+    ):
         try:
             audio = load_audio(path, self.sr)
 
@@ -96,8 +161,15 @@ class PreProcess:
             if clean_dataset: 
                 if not hasattr(self, "tg"): 
                     from main.tools.noisereduce import TorchGate
-                    self.tg = TorchGate(self.sr, prop_decrease=clean_strength).to(self.device)
-                audio = self.tg(torch.from_numpy(audio).unsqueeze(0).to(self.device).float()).squeeze(0).cpu().detach().numpy()
+
+                    self.tg = TorchGate(
+                        self.sr, 
+                        prop_decrease=clean_strength
+                    ).to(self.device)
+
+                audio = self.tg(
+                    torch.from_numpy(audio).unsqueeze(0).to(self.device).float()
+                ).squeeze(0).cpu().detach().numpy()
 
             if cut_preprocess == "Skip":
                 self.process_audio_segment(
@@ -126,21 +198,71 @@ class PreProcess:
                         i += 1
 
                         if len(audio_segment[start:]) > (self.per + OVERLAP) * self.sr:
-                            self.process_audio_segment(audio_segment[start : start + int(self.per * self.sr)], sid, idx0, idx1, normalization_mode)
+                            self.process_audio_segment(
+                                audio_segment[start : start + int(self.per * self.sr)], 
+                                sid, 
+                                idx0, 
+                                idx1, 
+                                normalization_mode
+                            )
+
                             idx1 += 1
                         else:
-                            self.process_audio_segment(audio_segment[start:], sid, idx0, idx1, normalization_mode)
+                            self.process_audio_segment(
+                                audio_segment[start:], 
+                                sid, 
+                                idx0, 
+                                idx1, 
+                                normalization_mode
+                            )
+
                             idx1 += 1
                             break
         except Exception as e:
             raise RuntimeError(f"{translations['process_audio_error']}: {e}")
 
 def process_file(args):
-    pp, file, cut_preprocess, process_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode = args
-    file_path, idx0, sid = file
-    pp.process_audio(file_path, idx0, sid, cut_preprocess, process_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode)
+    (
+        pp, 
+        file, 
+        cut_preprocess, 
+        process_effects, 
+        clean_dataset, 
+        clean_strength, 
+        chunk_len, 
+        overlap_len, 
+        normalization_mode
+    ) = args
 
-def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_preprocess, process_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode):
+    file_path, idx0, sid = file
+
+    pp.process_audio(
+        file_path, 
+        idx0, 
+        sid, 
+        cut_preprocess, 
+        process_effects, 
+        clean_dataset, 
+        clean_strength, 
+        chunk_len, 
+        overlap_len, 
+        normalization_mode
+    )
+
+def preprocess_training_set(
+    input_root, 
+    sr, 
+    num_processes, 
+    exp_dir, 
+    per, 
+    cut_preprocess, 
+    process_effects, 
+    clean_dataset, 
+    clean_strength, 
+    chunk_len, 
+    overlap_len, 
+    normalization_mode
+):
     start_time = time.time()
     pp = PreProcess(sr, exp_dir, per)
     logger.info(translations["start_preprocess"].format(num_processes=num_processes))
@@ -159,7 +281,24 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per, cut_pre
 
     with tqdm(total=len(files), ncols=100, unit="f") as pbar:
         with ProcessPoolExecutor(max_workers=num_processes) as executor:
-            futures = [executor.submit(process_file, (pp, file, cut_preprocess, process_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode)) for file in files]
+            futures = [
+                executor.submit(
+                    process_file, 
+                    (
+                        pp, 
+                        file, 
+                        cut_preprocess, 
+                        process_effects, 
+                        clean_dataset, 
+                        clean_strength, 
+                        chunk_len, 
+                        overlap_len, 
+                        normalization_mode
+                    )
+                ) 
+                for file in files
+            ]
+
             for future in as_completed(futures):
                 try:
                     future.result() 
@@ -221,7 +360,20 @@ def main():
         pid_file.write(str(os.getpid()))
     
     try:
-        preprocess_training_set(dataset, sample_rate, num_processes, experiment_directory, config.per_preprocess, cut_preprocess, preprocess_effects, clean_dataset, clean_strength, chunk_len, overlap_len, normalization_mode)
+        preprocess_training_set(
+            dataset, 
+            sample_rate, 
+            num_processes, 
+            experiment_directory, 
+            config.per_preprocess, 
+            cut_preprocess, 
+            preprocess_effects, 
+            clean_dataset, 
+            clean_strength, 
+            chunk_len, 
+            overlap_len, 
+            normalization_mode
+        )
     except Exception as e:
         logger.error(f"{translations['process_audio_error']} {e}")
         import traceback

@@ -148,7 +148,12 @@ def audio_effects(
     gr_info(translations["success"])
     return replace_export_format(output_path, export_format)
 
-def apply_voice_quirk(audio_path, mode, output_path, export_format):
+def apply_voice_quirk(
+    audio_path, 
+    mode, 
+    output_path, 
+    export_format
+):
     if not audio_path or not os.path.exists(audio_path) or os.path.isdir(audio_path): 
         gr_warning(translations["input_not_valid"])
         return None
@@ -157,7 +162,9 @@ def apply_voice_quirk(audio_path, mode, output_path, export_format):
         gr_warning(translations["output_not_valid"])
         return None
     
-    if os.path.isdir(output_path): output_path = os.path.join(output_path, f"audio_quirk.{export_format}")
+    if os.path.isdir(output_path): 
+        output_path = os.path.join(output_path, f"audio_quirk.{export_format}")
+
     output_dir = os.path.dirname(output_path) or output_path
 
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
@@ -170,7 +177,19 @@ def apply_voice_quirk(audio_path, mode, output_path, export_format):
     import soundfile as sf
 
     def vibrato(y, sr, freq=5, depth=0.003):
-        return y[np.clip((np.arange(len(y)) + (depth * np.sin(2 * np.pi * freq * (np.arange(len(y)) / sr))) * sr).astype(int), 0, len(y) - 1)]
+        return y[
+            np.clip(
+                (np.arange(
+                    len(y)) + (
+                        depth * np.sin(
+                            2 * np.pi * freq * (np.arange(len(y)) / sr)
+                        )
+                    ) * sr
+                ).astype(int), 
+                0, 
+                len(y) - 1
+            )
+        ]
 
     y, sr = librosa.load(audio_path, sr=None)
     output_path = replace_export_format(output_path, export_format)
@@ -178,20 +197,101 @@ def apply_voice_quirk(audio_path, mode, output_path, export_format):
     mode = translations["quirk_choice"][mode]
     if mode == 0: mode = random.randint(1, 16)
 
-    if mode == 1: y *= np.random.uniform(0.5, 0.8, size=len(y))
-    elif mode == 2: y = librosa.effects.pitch_shift(y=y + np.random.normal(0, 0.01, y.shape), sr=sr, n_steps=np.random.uniform(-1.5, -3.5))
-    elif mode == 3: y = librosa.effects.time_stretch(librosa.effects.pitch_shift(y=y, sr=sr, n_steps=3), rate=1.2)
-    elif mode == 4: y = librosa.effects.time_stretch(librosa.effects.pitch_shift(y=y, sr=sr, n_steps=8), rate=1.3)
-    elif mode == 5: y = librosa.effects.time_stretch(librosa.effects.pitch_shift(y=y, sr=sr, n_steps=-3), rate=0.75)
-    elif mode == 6: y *= np.sin(np.linspace(0, np.pi * 20, len(y))) * 0.5 + 0.5
-    elif mode == 7: y = librosa.effects.time_stretch(vibrato(librosa.effects.pitch_shift(y=y, sr=sr, n_steps=-4), sr, freq=3, depth=0.004), rate=0.85)
-    elif mode == 8: y *= 0.6 + np.pad(y, (sr // 2, 0), mode='constant')[:len(y)] * 0.4
-    elif mode == 9: y = librosa.effects.pitch_shift(y=y, sr=sr, n_steps=2) + np.sin(np.linspace(0, np.pi * 20, len(y))) * 0.02
-    elif mode == 10: y = vibrato(y, sr, freq=8, depth=0.005)
-    elif mode == 11: y = librosa.effects.time_stretch(librosa.effects.pitch_shift(y=y, sr=sr, n_steps=4), rate=1.25)
-    elif mode == 12: y = np.hstack([np.pad(f, (0, int(len(f)*0.3)), mode='edge') for f in librosa.util.frame(y, frame_length=2048, hop_length=512).T])
-    elif mode == 13: y = np.concatenate([y, np.sin(2 * np.pi * np.linspace(0, 1, int(0.05 * sr))) * 0.02])
-    elif mode == 14: y += np.random.normal(0, 0.005, len(y))
+    if mode == 1: 
+        y *= np.random.uniform(
+            0.5, 
+            0.8, 
+            size=len(y)
+        )
+    elif mode == 2: 
+        y = librosa.effects.pitch_shift(
+            y=y + np.random.normal(0, 0.01, y.shape), 
+            sr=sr, 
+            n_steps=np.random.uniform(-1.5, -3.5)
+        )
+    elif mode == 3: 
+        y = librosa.effects.time_stretch(
+            librosa.effects.pitch_shift(
+                y=y, 
+                sr=sr, 
+                n_steps=3
+            ), 
+            rate=1.2
+        )
+    elif mode == 4: 
+        y = librosa.effects.time_stretch(
+            librosa.effects.pitch_shift(
+                y=y, 
+                sr=sr, 
+                n_steps=8
+            ), 
+            rate=1.3
+        )
+    elif mode == 5: 
+        y = librosa.effects.time_stretch(
+            librosa.effects.pitch_shift(
+                y=y, 
+                sr=sr, 
+                n_steps=-3
+            ), 
+            rate=0.75
+        )
+    elif mode == 6: 
+        y *= np.sin(np.linspace(0, np.pi * 20, len(y))) * 0.5 + 0.5
+    elif mode == 7: 
+        y = librosa.effects.time_stretch(
+            vibrato(
+                librosa.effects.pitch_shift(
+                    y=y, 
+                    sr=sr, 
+                    n_steps=-4
+                ), 
+                sr, 
+                freq=3, 
+                depth=0.004
+            ), 
+            rate=0.85
+        )
+    elif mode == 8: 
+        y *= 0.6 + np.pad(y, (sr // 2, 0), mode='constant')[:len(y)] * 0.4
+    elif mode == 9: 
+        y = librosa.effects.pitch_shift(
+            y=y, 
+            sr=sr, 
+            n_steps=2
+        ) + np.sin(
+            np.linspace(0, np.pi * 20, len(y))
+        ) * 0.02
+    elif mode == 10: 
+        y = vibrato(
+            y, 
+            sr, 
+            freq=8, 
+            depth=0.005
+        )
+    elif mode == 11: 
+        y = librosa.effects.time_stretch(
+            librosa.effects.pitch_shift(y=y, sr=sr, n_steps=4), 
+            rate=1.25
+        )
+    elif mode == 12: 
+        y = np.hstack([
+            np.pad(f, (0, int(len(f)*0.3)), mode='edge') 
+            for f in librosa.util.frame(y, frame_length=2048, hop_length=512).T
+        ])
+    elif mode == 13: 
+        y = np.concatenate([
+            y, 
+            np.sin(
+                2 * np.pi * np.linspace(0, 1, int(0.05 * sr))
+            ) * 0.02
+        ])
+    elif mode == 14: 
+        y += np.random.normal(
+            0, 
+            0.005, 
+            len(y)
+        )
     elif mode == 15:
         frame = int(sr * 0.2)
         chunks = [y[i:i + frame] for i in range(0, len(y), frame)]

@@ -11,7 +11,21 @@ sys.path.append(os.getcwd())
 from main.app.variables import logger, translations, config
 from main.inference.training.utils import replace_keys_in_dict
 
-def extract_model(ckpt, sr, pitch_guidance, name, model_path, epoch, step, version, hps, model_author, vocoder, energy_use, speakers_id):
+def extract_model(
+    ckpt, 
+    sr, 
+    pitch_guidance, 
+    name, 
+    model_path, 
+    epoch, 
+    step, 
+    version, 
+    hps, 
+    model_author, 
+    vocoder, 
+    energy_use, 
+    speakers_id
+):
     try:
         logger.info(translations["savemodel"].format(model_dir=model_path, epoch=epoch, step=step))
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
@@ -25,6 +39,7 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_path, epoch, step, versi
                 if "enc_q" not in key
             }
         )
+
         opt["config"] = [
             hps.data.filter_length // 2 + 1, 32, 
             hps.model.inter_channels, 
@@ -57,6 +72,16 @@ def extract_model(ckpt, sr, pitch_guidance, name, model_path, epoch, step, versi
         opt["energy"] = energy_use
         opt["speakers_id"] = speakers_id
 
-        torch.save(replace_keys_in_dict(replace_keys_in_dict(opt, ".parametrizations.weight.original1", ".weight_v"), ".parametrizations.weight.original0", ".weight_g"), model_path)
+        torch.save(
+            replace_keys_in_dict(
+                replace_keys_in_dict(
+                    opt, 
+                    ".parametrizations.weight.original1", 
+                    ".weight_v"
+                ), 
+                ".parametrizations.weight.original0", ".weight_g"
+            ), 
+            model_path
+        )
     except Exception as e:
         logger.error(f"{translations['extract_model_error']}: {e}")

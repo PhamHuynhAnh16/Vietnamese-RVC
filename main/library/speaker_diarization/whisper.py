@@ -224,7 +224,14 @@ def merge_punctuations(alignment, prepended, appended):
         j += 1
 
 class WordTiming:
-    def __init__(self, word, tokens, start, end, probability):
+    def __init__(
+        self, 
+        word, 
+        tokens, 
+        start, 
+        end, 
+        probability
+    ):
         self.word = word
         self.tokens = tokens
         self.start = start
@@ -238,9 +245,13 @@ def median_filter(x, filter_width):
     if (ndim := x.ndim) <= 2: x = x[None, None, :]
 
     assert (filter_width > 0 and filter_width % 2 == 1)
-
     result = None
-    x = F.pad(x, (filter_width // 2, filter_width // 2, 0, 0), mode="reflect")
+
+    x = F.pad(
+        x, 
+        (filter_width // 2, filter_width // 2, 0, 0), 
+        mode="reflect"
+    )
 
     if result is None: result = x.unfold(-1, filter_width, 1).sort()[0][..., filter_width // 2]
     if ndim <= 2: result = result[0, 0]
@@ -298,13 +309,27 @@ def dtw(x):
 def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_width = 7, qk_scale = 1.0):
     if len(text_tokens) == 0: return []
 
-    tokens = torch.tensor([*tokenizer.sot_sequence, tokenizer.no_timestamps, *text_tokens, tokenizer.eot]).to(model.device)
+    tokens = torch.tensor([
+        *tokenizer.sot_sequence, 
+        tokenizer.no_timestamps, 
+        *text_tokens, 
+        tokenizer.eot
+    ]).to(model.device)
 
     QKs = [None] * model.dims.n_text_layer
-    hooks = [block.cross_attn.register_forward_hook(lambda _, ins, outs, index=i: QKs.__setitem__(index, outs[-1][0])) for i, block in enumerate(model.decoder.blocks)]
+    hooks = [
+        block.cross_attn.register_forward_hook(
+            lambda _, ins, outs, index=i: QKs.__setitem__(index, outs[-1][0])
+        ) 
+        for i, block in enumerate(model.decoder.blocks)
+    ]
 
     with torch.no_grad():
-        token_probs = model(mel.unsqueeze(0), tokens.unsqueeze(0))[0][len(tokenizer.sot_sequence) :, : tokenizer.eot].softmax(dim=-1)
+        token_probs = model(
+            mel.unsqueeze(0), 
+            tokens.unsqueeze(0)
+        )[0][len(tokenizer.sot_sequence) :, : tokenizer.eot].softmax(dim=-1)
+
         text_token_probs = token_probs[np.arange(len(text_tokens)), text_tokens].tolist()
 
     for hook in hooks:
@@ -313,18 +338,34 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
     if not (opencl.is_available() or directml.is_available()):
         alignment_indices = model.alignment_heads.indices().T
     else:
-        alignment_indices = [(l, h) for l in range(model.alignment_heads.size(0)) for h in range(model.alignment_heads.size(1)) if model.alignment_heads[l, h]]
+        alignment_indices = [
+            (l, h) 
+            for l in range(model.alignment_heads.size(0)) 
+            for h in range(model.alignment_heads.size(1)) 
+            if model.alignment_heads[l, h]
+        ]
         
-    weights = (torch.stack([QKs[_l][_h] for _l, _h in alignment_indices])[:, :, : num_frames // 2] * qk_scale).softmax(dim=-1)
+    weights = (
+        torch.stack([
+            QKs[_l][_h] 
+            for _l, _h in alignment_indices
+        ])[:, :, : num_frames // 2] * qk_scale
+    ).softmax(dim=-1)
+
     std, mean = torch.std_mean(weights, dim=-2, keepdim=True, unbiased=False)
 
     if directml.is_available():
-        weights = median_filter(((weights - mean) / std).cpu(), medfilt_width).to(weights.device)
+        weights = median_filter(
+            ((weights - mean) / std).cpu(), 
+            medfilt_width
+        ).to(weights.device)
     else:
-        weights = median_filter((weights - mean) / std, medfilt_width)
+        weights = median_filter(
+            (weights - mean) / std, 
+            medfilt_width
+        )
 
     text_indices, time_indices = dtw(-weights.mean(axis=0)[len(tokenizer.sot_sequence) : -1])
-
     words, word_tokens = tokenizer.split_to_word_tokens(text_tokens + [tokenizer.eot])
     if len(word_tokens) <= 1: return []
 
@@ -355,10 +396,24 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
         )
     ]
 
-def add_word_timestamps(*, segments, model, tokenizer, mel, num_frames, prepend_punctuations = "\"'“¿([{-", append_punctuations = "\"'.。,，!！?？:：”)]}、", last_speech_timestamp, **kwargs):
+def add_word_timestamps(
+    *, 
+    segments, 
+    model, 
+    tokenizer, 
+    mel, 
+    num_frames, 
+    prepend_punctuations = "\"'“¿([{-", 
+    append_punctuations = "\"'.。,，!！?？:：”)]}、", 
+    last_speech_timestamp, 
+    **kwargs
+):
     if len(segments) == 0: return
 
-    text_tokens_per_segment = [[token for token in segment["tokens"] if token < tokenizer.eot] for segment in segments]
+    text_tokens_per_segment = [
+        [token for token in segment["tokens"] if token < tokenizer.eot] 
+        for segment in segments
+    ]
 
     text_tokens = list(itertools.chain.from_iterable(text_tokens_per_segment))
     alignment = find_alignment(model, tokenizer, text_tokens, mel, num_frames, **kwargs)
@@ -377,7 +432,6 @@ def add_word_timestamps(*, segments, model, tokenizer, mel, num_frames, prepend_
                 elif alignment[i - 1].word in sentence_end_marks: alignment[i].start = alignment[i].end - max_duration
 
     merge_punctuations(alignment, prepend_punctuations, append_punctuations)
-
     time_offset = segments[0]["seek"] * HOP_LENGTH / SAMPLE_RATE
     word_index = 0
 
@@ -388,21 +442,49 @@ def add_word_timestamps(*, segments, model, tokenizer, mel, num_frames, prepend_
         while word_index < len(alignment) and saved_tokens < len(text_tokens):
             timing = alignment[word_index]
 
-            if timing.word: words.append(dict(word=timing.word, start=round(time_offset + timing.start, 2), end=round(time_offset + timing.end, 2), probability=timing.probability))
+            if timing.word: 
+                words.append(
+                    dict(
+                        word=timing.word, 
+                        start=round(time_offset + timing.start, 2), 
+                        end=round(time_offset + timing.end, 2), 
+                        probability=timing.probability
+                    )
+                )
 
             saved_tokens += len(timing.tokens)
             word_index += 1
 
         if len(words) > 0:
-            if words[0]["end"] - last_speech_timestamp > median_duration * 4 and (words[0]["end"] - words[0]["start"] > max_duration or (len(words) > 1 and words[1]["end"] - words[0]["start"] > max_duration * 2)):
-                if (len(words) > 1 and words[1]["end"] - words[1]["start"] > max_duration): words[0]["end"] = words[1]["start"] = max(words[1]["end"] / 2, words[1]["end"] - max_duration)
+            if (
+                words[0]["end"] - last_speech_timestamp > median_duration * 4 and (
+                    words[0]["end"] - words[0]["start"] > max_duration or 
+                    (len(words) > 1 and words[1]["end"] - words[0]["start"] > max_duration * 2)
+                )
+            ):
+                if (
+                    len(words) > 1 and 
+                    words[1]["end"] - words[1]["start"] > max_duration
+                ): 
+                    words[0]["end"] = words[1]["start"] = max(words[1]["end"] / 2, words[1]["end"] - max_duration)
+
                 words[0]["start"] = max(0, words[0]["end"] - max_duration)
 
-            if (segment["start"] < words[0]["end"] and segment["start"] - 0.5 > words[0]["start"]): words[0]["start"] = max(0, min(words[0]["end"] - median_duration, segment["start"]))
-            else: segment["start"] = words[0]["start"]
+            if (
+                segment["start"] < words[0]["end"] and 
+                segment["start"] - 0.5 > words[0]["start"]
+            ): 
+                words[0]["start"] = max(0, min(words[0]["end"] - median_duration, segment["start"]))
+            else: 
+                segment["start"] = words[0]["start"]
 
-            if (segment["end"] > words[-1]["start"] and segment["end"] + 0.5 < words[-1]["end"]): words[-1]["end"] = max(words[-1]["start"] + median_duration, segment["end"])
-            else: segment["end"] = words[-1]["end"]
+            if (
+                segment["end"] > words[-1]["start"] and 
+                segment["end"] + 0.5 < words[-1]["end"]
+            ): 
+                words[-1]["end"] = max(words[-1]["start"] + median_duration, segment["end"])
+            else: 
+                segment["end"] = words[-1]["end"]
 
             last_speech_timestamp = segment["end"]
 
@@ -412,7 +494,10 @@ def add_word_timestamps(*, segments, model, tokenizer, mel, num_frames, prepend_
 def mel_filters(device, n_mels):
     assert n_mels in {80, 128}
 
-    with np.load(os.path.join(configs["speaker_diarization_path"], "assets", "mel_filters.npz"), allow_pickle=False) as f:
+    with np.load(
+        os.path.join(configs["speaker_diarization_path"], "assets", "mel_filters.npz"), 
+        allow_pickle=False
+    ) as f:
         return torch.from_numpy(f[f"mel_{n_mels}"]).to(device)
 
 def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
@@ -421,7 +506,9 @@ def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
     if not torch.is_tensor(audio):
         if isinstance(audio, str): 
             from main.library.utils import load_audio
+
             audio = load_audio(audio, sample_rate=SAMPLE_RATE).astype(np.float32)
+
         audio = torch.from_numpy(audio)
 
     if device is not None: audio = audio.to(device)
@@ -430,17 +517,39 @@ def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
     if str(audio.device).startswith(("ocl", "privateuseone")):
         if stft is None: 
             from main.library.backends.utils import STFT
-            stft = STFT(N_FFT, HOP_LENGTH, N_FFT).to(audio.device)
-        fft = stft.transform(audio.unsqueeze(0), eps=1e-9).squeeze(0)
-    else:
-        fft = torch.stft(audio, N_FFT, HOP_LENGTH, window=torch.hann_window(N_FFT).to(audio.device), return_complex=True)
 
-    log_spec = (mel_filters(audio.device, n_mels) @ fft[..., :-1].abs() ** 2).clamp(min=1e-10).log10()
+            stft = STFT(
+                N_FFT, 
+                HOP_LENGTH, 
+                N_FFT
+            ).to(audio.device)
+
+        fft = stft.transform(
+            audio.unsqueeze(0), 
+            eps=1e-9
+        ).squeeze(0)
+    else:
+        fft = torch.stft(
+            audio, 
+            N_FFT, 
+            HOP_LENGTH, 
+            window=torch.hann_window(N_FFT).to(audio.device), 
+            return_complex=True
+        )
+
+    log_spec = (
+        mel_filters(audio.device, n_mels) @ fft[..., :-1].abs() ** 2
+    ).clamp(min=1e-10).log10()
+
     return (log_spec.maximum(log_spec.max() - 8.0) + 4.0) / 4.0
 
 def pad_or_trim(array, length = N_SAMPLES, *, axis = -1):
     if torch.is_tensor(array):
-        if array.shape[axis] > length: array = array.index_select(dim=axis, index=torch.arange(length, device=array.device))
+        if array.shape[axis] > length: 
+            array = array.index_select(
+                dim=axis, 
+                index=torch.arange(length, device=array.device)
+            )
 
         if array.shape[axis] < length:
             pad_widths = [(0, 0)] * array.ndim
@@ -457,7 +566,11 @@ def pad_or_trim(array, length = N_SAMPLES, *, axis = -1):
     return array
 
 def get_end(segments):
-    return next((w["end"] for s in reversed(segments) for w in reversed(s["words"])), segments[-1]["end"] if segments else None)
+    return next((
+        w["end"] 
+        for s in reversed(segments) 
+        for w in reversed(s["words"])
+    ), segments[-1]["end"] if segments else None)
 
 def transcribe_function(
     model, 
@@ -497,9 +610,22 @@ def transcribe_function(
 
     language = decode_options["language"]
     task = decode_options.get("task", "transcribe")
-    tokenizer = get_tokenizer(model.is_multilingual, num_languages=model.num_languages, language=language, task=task)
 
-    if isinstance(clip_timestamps, str): clip_timestamps = [float(ts) for ts in (clip_timestamps.split(",") if clip_timestamps else [])]
+    tokenizer = get_tokenizer(
+        model.is_multilingual, 
+        num_languages=model.num_languages, 
+        language=language, 
+        task=task
+    )
+
+    if isinstance(clip_timestamps, str): 
+        clip_timestamps = [
+            float(ts) 
+            for ts in (
+                clip_timestamps.split(",") if clip_timestamps else []
+            )
+        ]
+
     seek_points = [round(ts * FRAMES_PER_SECOND) for ts in clip_timestamps]
 
     if len(seek_points) == 0: seek_points.append(0)
@@ -509,8 +635,10 @@ def transcribe_function(
     punctuation = "\"'“¿([{-\"'.。,，!！?？:：”)]}、"
 
     def decode_with_fallback(segment):
-        temperatures = ([temperature] if isinstance(temperature, (int, float)) else temperature)
         decode_result = None
+        temperatures = (
+            [temperature] if isinstance(temperature, (int, float)) else temperature
+        )
 
         for t in temperatures:
             kwargs = {**decode_options}
@@ -520,12 +648,36 @@ def transcribe_function(
                 kwargs.pop("patience", None)
             else: kwargs.pop("best_of", None)
 
-            decode_result = model.decode(segment, DecodingOptions(**kwargs, temperature=t))
+            decode_result = model.decode(
+                segment, 
+                DecodingOptions(
+                    **kwargs, 
+                    temperature=t
+                )
+            )
+
             needs_fallback = False
 
-            if (compression_ratio_threshold is not None and decode_result.compression_ratio > compression_ratio_threshold): needs_fallback = True  
-            if (logprob_threshold is not None and decode_result.avg_logprob < logprob_threshold): needs_fallback = True  
-            if (no_speech_threshold is not None and decode_result.no_speech_prob > no_speech_threshold and logprob_threshold is not None and decode_result.avg_logprob < logprob_threshold): needs_fallback = False 
+            if (
+                compression_ratio_threshold is not None and 
+                decode_result.compression_ratio > compression_ratio_threshold
+            ): 
+                needs_fallback = True  
+
+            if (
+                logprob_threshold is not None and 
+                decode_result.avg_logprob < logprob_threshold
+            ): 
+                needs_fallback = True  
+
+            if (
+                no_speech_threshold is not None and 
+                decode_result.no_speech_prob > no_speech_threshold and 
+                logprob_threshold is not None and 
+                decode_result.avg_logprob < logprob_threshold
+            ): 
+                needs_fallback = False 
+
             if not needs_fallback: break
 
         return decode_result
@@ -582,8 +734,10 @@ def transcribe_function(
             segment_duration = segment_size * HOP_LENGTH / SAMPLE_RATE
             mel_segment = pad_or_trim(mel_segment, N_FRAMES).to(model.device).to(dtype)
 
-            if carry_initial_prompt: decode_options["prompt"] = initial_prompt_tokens + all_tokens[max(len(initial_prompt_tokens), prompt_reset_since):][-remaining_prompt_length:]
-            else: decode_options["prompt"] = all_tokens[prompt_reset_since:]
+            if carry_initial_prompt: 
+                decode_options["prompt"] = initial_prompt_tokens + all_tokens[max(len(initial_prompt_tokens), prompt_reset_since):][-remaining_prompt_length:]
+            else: 
+                decode_options["prompt"] = all_tokens[prompt_reset_since:]
 
             result = decode_with_fallback(mel_segment)
             tokens = torch.tensor(result.tokens)
@@ -654,9 +808,18 @@ def transcribe_function(
                 duration = segment_duration
 
                 timestamps = tokens[timestamp_tokens.nonzero().flatten()]
-                if (len(timestamps) > 0 and timestamps[-1].item() != tokenizer.timestamp_begin): duration = (timestamps[-1].item() - tokenizer.timestamp_begin) * time_precision
+                if (len(timestamps) > 0 and timestamps[-1].item() != tokenizer.timestamp_begin): 
+                    duration = (timestamps[-1].item() - tokenizer.timestamp_begin) * time_precision
 
-                current_segments.append(new_segment(start=time_offset, end=time_offset + duration, tokens=tokens, result=result))
+                current_segments.append(
+                    new_segment(
+                        start=time_offset, 
+                        end=time_offset + duration, 
+                        tokens=tokens, 
+                        result=result
+                    )
+                )
+
                 seek += segment_size
 
             if word_timestamps:
@@ -673,17 +836,18 @@ def transcribe_function(
 
                 if not single_timestamp_ending:
                     last_word_end = get_end(current_segments)
-                    if last_word_end is not None and last_word_end > time_offset: seek = round(last_word_end * FRAMES_PER_SECOND)
+                    if last_word_end is not None and last_word_end > time_offset: 
+                        seek = round(last_word_end * FRAMES_PER_SECOND)
 
                 if hallucination_silence_threshold is not None:
                     threshold = hallucination_silence_threshold
 
                     if not single_timestamp_ending:
                         last_word_end = get_end(current_segments)
-                        if last_word_end is not None and last_word_end > time_offset: seek = round(last_word_end * FRAMES_PER_SECOND) if (window_end_time - last_word_end) > threshold else (previous_seek + segment_size)
+                        if last_word_end is not None and last_word_end > time_offset: 
+                            seek = round(last_word_end * FRAMES_PER_SECOND) if (window_end_time - last_word_end) > threshold else (previous_seek + segment_size)
 
                     first_segment = next_words_segment(current_segments)
-
                     if first_segment is not None and is_segment_anomaly(first_segment):
                         gap = first_segment["start"] - time_offset
 
@@ -760,7 +924,16 @@ def detect_language_function(model, mel, tokenizer = None):
     logits[:, mask] = -np.inf
 
     language_tokens = logits.argmax(dim=-1)
-    language_probs = [{c: logits.softmax(dim=-1).cpu()[i, j].item() for j, c in zip(tokenizer.all_language_tokens, tokenizer.all_language_codes)} for i in range(n_audio)]
+    language_probs = [
+        {
+            c: logits.softmax(dim=-1).cpu()[i, j].item() 
+            for j, c in zip(
+                tokenizer.all_language_tokens, 
+                tokenizer.all_language_codes
+            )
+        } 
+        for i in range(n_audio)
+    ]
 
     if single:
         language_tokens = language_tokens[0]
@@ -785,12 +958,25 @@ def get_tokenizer(multilingual, *, num_languages = 99, language = None, task = N
         language = None
         task = None
 
-    return Tokenizer(encoding_name=encoding_name, num_languages=num_languages, language=language, task=task)
+    return Tokenizer(
+        encoding_name=encoding_name, 
+        num_languages=num_languages, 
+        language=language, 
+        task=task
+    )
 
 @lru_cache(maxsize=None)
 def get_encoding(name = "gpt2", num_languages = 99):
     vocab_path = os.path.join(configs["speaker_diarization_path"], "assets", f"{name}.tiktoken")
-    ranks = {base64.b64decode(token): int(rank) for token, rank in (line.split() for line in open(vocab_path) if line)}
+
+    ranks = {
+        base64.b64decode(token): int(rank) 
+        for token, rank in (
+            line.split() 
+            for line in open(vocab_path) 
+            if line
+        )
+    }
 
     n_vocab = len(ranks)
     special_tokens = {}
@@ -811,7 +997,13 @@ def get_encoding(name = "gpt2", num_languages = 99):
         special_tokens[token] = n_vocab
         n_vocab += 1
 
-    return tiktoken.Encoding(name=os.path.basename(vocab_path), explicit_n_vocab=n_vocab, pat_str=r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""", mergeable_ranks=ranks, special_tokens=special_tokens)
+    return tiktoken.Encoding(
+        name=os.path.basename(vocab_path), 
+        explicit_n_vocab=n_vocab, 
+        pat_str=r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""", 
+        mergeable_ranks=ranks, 
+        special_tokens=special_tokens
+    )
 
 class DecodingOptions:
     def __init__(
@@ -857,7 +1049,19 @@ def decode_function(model, mel, options = DecodingOptions(), **kwargs):
     return result[0] if single else result
 
 class ModelDimensions:
-    def __init__(self, n_mels, n_audio_ctx, n_audio_state, n_audio_head, n_audio_layer, n_vocab, n_text_ctx, n_text_state, n_text_head, n_text_layer):
+    def __init__(
+        self, 
+        n_mels, 
+        n_audio_ctx, 
+        n_audio_state, 
+        n_audio_head, 
+        n_audio_layer, 
+        n_vocab, 
+        n_text_ctx, 
+        n_text_state, 
+        n_text_head, 
+        n_text_layer
+    ):
         self.n_mels = n_mels
         self.n_audio_ctx = n_audio_ctx
         self.n_audio_state = n_audio_state
@@ -870,25 +1074,58 @@ class ModelDimensions:
         self.n_text_layer = n_text_layer
 
 class LayerNorm(nn.LayerNorm):
-    def forward(self, x):
-        return super().forward(x.float()).type(x.dtype)
+    def forward(
+        self, 
+        x
+    ):
+        return super().forward(
+            x.float()
+        ).type(x.dtype)
     
 class Linear(nn.Linear):
-    def forward(self, x):
-        return F.linear(x, self.weight.to(x.dtype), None if self.bias is None else self.bias.to(x.dtype))
+    def forward(
+        self, 
+        x
+    ):
+        return F.linear(
+            x, 
+            self.weight.to(x.dtype), 
+            self.bias.to(x.dtype) if self.bias is not None else None
+        )
 
 class Conv1d(nn.Conv1d):
-    def _conv_forward(self, x, weight, bias):
-        return super()._conv_forward(x, weight.to(x.dtype), None if bias is None else bias.to(x.dtype))
+    def _conv_forward(
+        self, 
+        x, 
+        weight, 
+        bias
+    ):
+        return super()._conv_forward(
+            x, 
+            weight.to(x.dtype), 
+            bias.to(x.dtype) if bias is not None else None
+        )
 
 class TextDecoder(nn.Module):
-    def __init__(self, n_vocab, n_ctx, n_state, n_head, n_layer):
+    def __init__(
+        self, 
+        n_vocab, 
+        n_ctx, 
+        n_state, 
+        n_head, 
+        n_layer
+    ):
         super().__init__()
-
         self.token_embedding = nn.Embedding(n_vocab, n_state)
         self.positional_embedding = nn.Parameter(torch.empty(n_ctx, n_state))
-
-        self.blocks = nn.ModuleList([ResidualAttentionBlock(n_state, n_head, cross_attention=True) for _ in range(n_layer)])
+        self.blocks = nn.ModuleList([
+            ResidualAttentionBlock(
+                n_state, 
+                n_head, 
+                cross_attention=True
+            ) 
+            for _ in range(n_layer)
+        ])
         self.ln = LayerNorm(n_state)
         self.register_buffer("mask", torch.empty(n_ctx, n_ctx).fill_(-np.inf).triu_(1), persistent=False)
 
@@ -908,8 +1145,13 @@ class AudioEncoder(nn.Module):
         self.conv1 = Conv1d(n_mels, n_state, kernel_size=3, padding=1)
         self.conv2 = Conv1d(n_state, n_state, kernel_size=3, stride=2, padding=1)
         self.register_buffer("positional_embedding", sinusoids(n_ctx, n_state))
-
-        self.blocks = nn.ModuleList([ResidualAttentionBlock(n_state, n_head) for _ in range(n_layer)])
+        self.blocks = nn.ModuleList([
+            ResidualAttentionBlock(
+                n_state, 
+                n_head
+            ) 
+            for _ in range(n_layer)
+        ])
         self.ln_post = LayerNorm(n_state)
 
     def forward(self, x):
@@ -927,17 +1169,33 @@ class Whisper(nn.Module):
     def __init__(self, dims):
         super().__init__()
         self.dims = dims
-        self.encoder = AudioEncoder(self.dims.n_mels, self.dims.n_audio_ctx, self.dims.n_audio_state, self.dims.n_audio_head, self.dims.n_audio_layer)
-        self.decoder = TextDecoder(self.dims.n_vocab, self.dims.n_text_ctx, self.dims.n_text_state, self.dims.n_text_head, self.dims.n_text_layer)
+        self.encoder = AudioEncoder(
+            self.dims.n_mels, 
+            self.dims.n_audio_ctx, 
+            self.dims.n_audio_state, 
+            self.dims.n_audio_head, 
+            self.dims.n_audio_layer
+        )
+        self.decoder = TextDecoder(
+            self.dims.n_vocab, 
+            self.dims.n_text_ctx, 
+            self.dims.n_text_state, 
+            self.dims.n_text_head, 
+            self.dims.n_text_layer
+        )
 
         all_heads = torch.zeros(self.dims.n_text_layer, self.dims.n_text_head, dtype=torch.bool)
         all_heads[self.dims.n_text_layer // 2 :] = True
         self.register_buffer("alignment_heads", all_heads if opencl.is_available() or directml.is_available() else all_heads.to_sparse(), persistent=False)
 
     def set_alignment_heads(self, dump):
-        alignment = torch.from_numpy(np.frombuffer(gzip.decompress(base64.b85decode(dump)), dtype=bool).copy()).reshape(self.dims.n_text_layer, self.dims.n_text_head)
-        if not (opencl.is_available() or directml.is_available()): alignment = alignment.to_sparse()
+        alignment = torch.from_numpy(
+            np.frombuffer(
+                gzip.decompress(base64.b85decode(dump)), dtype=bool
+            ).copy()
+        ).reshape(self.dims.n_text_layer, self.dims.n_text_head)
 
+        if not (opencl.is_available() or directml.is_available()): alignment = alignment.to_sparse()
         self.register_buffer("alignment_heads", alignment, persistent=False)
 
     def embed_audio(self, mel):
@@ -982,7 +1240,12 @@ class Whisper(nn.Module):
     decode = decode_function
 
 class ResidualAttentionBlock(nn.Module):
-    def __init__(self, n_state, n_head, cross_attention = False):
+    def __init__(
+        self, 
+        n_state, 
+        n_head, 
+        cross_attention = False
+    ):
         super().__init__()
         self.attn = MultiHeadAttention(n_state, n_head)
         self.attn_ln = LayerNorm(n_state)
@@ -1000,7 +1263,11 @@ class ResidualAttentionBlock(nn.Module):
         return x + self.mlp(self.mlp_ln(x))
     
 class MultiHeadAttention(nn.Module):
-    def __init__(self, n_state, n_head):
+    def __init__(
+        self, 
+        n_state, 
+        n_head
+    ):
         super().__init__()
         self.n_head = n_head
         self.query = Linear(n_state, n_state)
@@ -1008,16 +1275,33 @@ class MultiHeadAttention(nn.Module):
         self.value = Linear(n_state, n_state)
         self.out = Linear(n_state, n_state)
 
-    def forward(self, x, xa = None, mask = None, kv_cache = None):
-        k, v = (self.key(x if xa is None else xa), self.value(x if xa is None else xa)) if kv_cache is None or xa is None or self.key not in kv_cache else (kv_cache[self.key], kv_cache[self.value])
-        wv, qk = self.qkv_attention(self.query(x), k, v, mask)
+    def forward(
+        self, 
+        x, 
+        xa = None, 
+        mask = None, 
+        kv_cache = None
+    ):
+        k, v = (
+            self.key(x if xa is None else xa), 
+            self.value(x if xa is None else xa)
+        ) if kv_cache is None or xa is None or self.key not in kv_cache else (
+            kv_cache[self.key], 
+            kv_cache[self.value]
+        )
 
+        wv, qk = self.qkv_attention(self.query(x), k, v, mask)
         return self.out(wv), qk
 
     def qkv_attention(self, q, k, v, mask = None):
         _, n_ctx, n_state = q.shape
         scale = (n_state // self.n_head) ** -0.25
-        q, k, v = q.view(*q.shape[:2], self.n_head, -1).permute(0, 2, 1, 3), k.view(*k.shape[:2], self.n_head, -1).permute(0, 2, 1, 3), v.view(*v.shape[:2], self.n_head, -1).permute(0, 2, 1, 3)
+
+        q, k, v = (
+            q.view(*q.shape[:2], self.n_head, -1).permute(0, 2, 1, 3), 
+            k.view(*k.shape[:2], self.n_head, -1).permute(0, 2, 1, 3), 
+            v.view(*v.shape[:2], self.n_head, -1).permute(0, 2, 1, 3)
+        )
 
         qk = (q * scale) @ (k * scale).transpose(-1, -2)
         if mask is not None: qk = qk + mask[:n_ctx, :n_ctx]
@@ -1035,7 +1319,8 @@ class SuppressBlank(LogitFilter):
         self.sample_begin = sample_begin
 
     def apply(self, logits, tokens):
-        if tokens.shape[1] == self.sample_begin: logits[:, self.tokenizer.encode(" ") + [self.tokenizer.eot]] = -np.inf
+        if tokens.shape[1] == self.sample_begin: 
+            logits[:, self.tokenizer.encode(" ") + [self.tokenizer.eot]] = -np.inf
 
 class SuppressTokens(LogitFilter):
     def __init__(self, suppress_tokens):
@@ -1061,7 +1346,13 @@ class PyTorchInference(Inference):
         self.kv_cache = {}
         self.hooks = []
 
-        self.kv_modules = [block.attn.key for block in self.model.decoder.blocks] + [block.attn.value for block in self.model.decoder.blocks]
+        self.kv_modules = [
+            block.attn.key 
+            for block in self.model.decoder.blocks
+        ] + [
+            block.attn.value 
+            for block in self.model.decoder.blocks
+        ]
 
     def logits(self, tokens, audio_features):
         if not self.kv_cache: self.kv_cache, self.hooks = self.model.install_kv_cache_hooks()
@@ -1086,17 +1377,27 @@ class SequenceRanker:
         pass
 
 class MaximumLikelihoodRanker(SequenceRanker):
-    def __init__(self, length_penalty):
+    def __init__(
+        self, 
+        length_penalty
+    ):
         self.length_penalty = length_penalty
 
     def rank(self, tokens, sum_logprobs):
         def scores(logprobs, lengths):
             result = []
+
             for logprob, length in zip(logprobs, lengths):
-                result.append(logprob / (length if self.length_penalty is None else ((5 + length) / 6) ** self.length_penalty))
+                result.append(
+                    logprob / (length if self.length_penalty is None else ((5 + length) / 6) ** self.length_penalty)
+                )
+
             return result
 
-        return [np.argmax(scores(p, l)) for p, l in zip(sum_logprobs, [[len(t) for t in s] for s in tokens])]
+        return [
+            np.argmax(scores(p, l)) 
+            for p, l in zip(sum_logprobs, [[len(t) for t in s] for s in tokens])
+        ]
     
 class TokenDecoder:
     def reset(self):
@@ -1109,13 +1410,19 @@ class TokenDecoder:
         pass
 
 class GreedyDecoder(TokenDecoder):
-    def __init__(self, temperature, eot):
+    def __init__(
+        self, 
+        temperature, 
+        eot
+    ):
         self.temperature = temperature
         self.eot = eot
 
     def update(self, tokens, logits, sum_logprobs):
         next_tokens = logits.argmax(dim=-1) if self.temperature == 0 else (
-            Categorical(logits=(logits / self.temperature).cpu() if opencl.is_available() else (logits / self.temperature))
+            Categorical(
+                logits=(logits / self.temperature).cpu() if opencl.is_available() else (logits / self.temperature)
+            )
         ).sample().to(logits.device)
 
         logprobs = F.log_softmax(logits.float(), dim=-1)
@@ -1130,7 +1437,13 @@ class GreedyDecoder(TokenDecoder):
         return F.pad(tokens, (0, 1), value=self.eot), sum_logprobs.tolist()
 
 class BeamSearchDecoder(TokenDecoder):
-    def __init__(self, beam_size, eot, inference, patience = None):
+    def __init__(
+        self, 
+        beam_size, 
+        eot, 
+        inference, 
+        patience = None
+    ):
         self.beam_size = beam_size
         self.eot = eot
         self.inference = inference
@@ -1185,7 +1498,10 @@ class BeamSearchDecoder(TokenDecoder):
                 if len(previously_finished) >= self.max_candidates: break  
                 previously_finished[seq] = newly_finished[seq]
 
-        return torch.tensor(next_tokens, device=tokens.device), all(len(sequences) >= self.max_candidates for sequences in self.finished_sequences)
+        return (
+            torch.tensor(next_tokens, device=tokens.device), 
+            all(len(sequences) >= self.max_candidates for sequences in self.finished_sequences)
+        )
 
     def finalize(self, preceding_tokens, sum_logprobs):
         sum_logprobs = sum_logprobs.cpu()
@@ -1197,10 +1513,18 @@ class BeamSearchDecoder(TokenDecoder):
                     sequences[tuple(sequence)] = sum_logprobs[i][j].item()
                     if len(sequences) >= self.beam_size: break
 
-        return [[torch.tensor(seq) for seq in sequences.keys()] for sequences in self.finished_sequences], [list(sequences.values()) for sequences in self.finished_sequences]
+        return (
+            [[torch.tensor(seq) for seq in sequences.keys()] for sequences in self.finished_sequences], 
+            [list(sequences.values()) for sequences in self.finished_sequences]
+        )
 
 class ApplyTimestampRules(LogitFilter):
-    def __init__(self, tokenizer, sample_begin, max_initial_timestamp_index):
+    def __init__(
+        self, 
+        tokenizer, 
+        sample_begin, 
+        max_initial_timestamp_index
+    ):
         self.tokenizer = tokenizer
         self.sample_begin = sample_begin
         self.max_initial_timestamp_index = max_initial_timestamp_index
@@ -1221,7 +1545,12 @@ class ApplyTimestampRules(LogitFilter):
 
             timestamps = sampled_tokens[sampled_tokens.ge(self.tokenizer.timestamp_begin)]
 
-            if timestamps.numel() > 0: logits[k, self.tokenizer.timestamp_begin : timestamps[-1] if last_was_timestamp and not penultimate_was_timestamp else (timestamps[-1] + 1)] = -np.inf
+            if timestamps.numel() > 0: 
+                logits[
+                    k, 
+                    self.tokenizer.timestamp_begin : 
+                    timestamps[-1] if last_was_timestamp and not penultimate_was_timestamp else (timestamps[-1] + 1)
+                ] = -np.inf
 
         if tokens.shape[1] == self.sample_begin:
             logits[:, : self.tokenizer.timestamp_begin] = -np.inf
@@ -1232,41 +1561,84 @@ class ApplyTimestampRules(LogitFilter):
 
         logprobs = F.log_softmax(logits.float(), dim=-1)
         for k in range(tokens.shape[0]):
-            if logprobs[k, self.tokenizer.timestamp_begin :].logsumexp(dim=-1) > logprobs[k, : self.tokenizer.timestamp_begin].max(): logits[k, : self.tokenizer.timestamp_begin] = -np.inf
+            if logprobs[k, self.tokenizer.timestamp_begin :].logsumexp(dim=-1) > logprobs[k, : self.tokenizer.timestamp_begin].max(): 
+                logits[k, : self.tokenizer.timestamp_begin] = -np.inf
 
 class DecodingTask:
-    def __init__(self, model, options):
+    def __init__(
+        self, 
+        model, 
+        options
+    ):
         self.model = model
-
         language = options.language or "en"
-        tokenizer = get_tokenizer(model.is_multilingual, num_languages=model.num_languages, language=language, task=options.task)
+
+        tokenizer = get_tokenizer(
+            model.is_multilingual, 
+            num_languages=model.num_languages, 
+            language=language, 
+            task=options.task
+        )
 
         self.tokenizer = tokenizer
         self.options = self._verify_options(options)
-
         self.n_group = options.beam_size or options.best_of or 1
         self.n_ctx = model.dims.n_text_ctx
         self.sample_len = options.sample_len or model.dims.n_text_ctx // 2
-
         self.sot_sequence = tokenizer.sot_sequence
-        if self.options.without_timestamps: self.sot_sequence = tokenizer.sot_sequence_including_notimestamps
+
+        if self.options.without_timestamps: 
+            self.sot_sequence = tokenizer.sot_sequence_including_notimestamps
 
         self.initial_tokens = self._get_initial_tokens()
         self.sample_begin = len(self.initial_tokens)
         self.sot_index = self.initial_tokens.index(tokenizer.sot)
+
         self.inference = PyTorchInference(model, len(self.initial_tokens))
         self.sequence_ranker = MaximumLikelihoodRanker(options.length_penalty)
-        self.decoder = BeamSearchDecoder(options.beam_size, tokenizer.eot, self.inference, options.patience) if options.beam_size is not None else GreedyDecoder(options.temperature, tokenizer.eot)
+
+        self.decoder = BeamSearchDecoder(
+            options.beam_size, 
+            tokenizer.eot, 
+            self.inference, 
+            options.patience
+        ) if options.beam_size is not None else GreedyDecoder(
+            options.temperature, 
+            tokenizer.eot
+        )
 
         self.logit_filters = []
 
-        if self.options.suppress_blank: self.logit_filters.append(SuppressBlank(self.tokenizer, self.sample_begin))
-        if self.options.suppress_tokens: self.logit_filters.append(SuppressTokens(self._get_suppress_tokens()))
+        if self.options.suppress_blank: 
+            self.logit_filters.append(
+                SuppressBlank(
+                    self.tokenizer, 
+                    self.sample_begin
+                )
+            )
+
+        if self.options.suppress_tokens: 
+            self.logit_filters.append(
+                SuppressTokens(
+                    self._get_suppress_tokens()
+                )
+            )
 
         if not options.without_timestamps:
             max_initial_timestamp_index = None
-            if options.max_initial_timestamp: max_initial_timestamp_index = round(self.options.max_initial_timestamp / (CHUNK_LENGTH / model.dims.n_audio_ctx))
-            self.logit_filters.append(ApplyTimestampRules(tokenizer, self.sample_begin, max_initial_timestamp_index))
+
+            if options.max_initial_timestamp: 
+                max_initial_timestamp_index = round(
+                    self.options.max_initial_timestamp / (CHUNK_LENGTH / model.dims.n_audio_ctx)
+                )
+
+            self.logit_filters.append(
+                ApplyTimestampRules(
+                    tokenizer, 
+                    self.sample_begin, 
+                    max_initial_timestamp_index
+                )
+            )
 
     def _verify_options(self, options):
         if options.beam_size is not None and options.best_of is not None: raise ValueError
@@ -1284,7 +1656,11 @@ class DecodingTask:
             if self.sample_len is not None: prefix_tokens = prefix_tokens[-(self.n_ctx // 2 - self.sample_len):]
             tokens = tokens + prefix_tokens
 
-        if prompt := self.options.prompt: tokens = ([self.tokenizer.sot_prev] + (self.tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt)[-(self.n_ctx // 2 - 1) :] + tokens)
+        if prompt := self.options.prompt: 
+            tokens = (
+                [self.tokenizer.sot_prev] + 
+                (self.tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt)[-(self.n_ctx // 2 - 1) :] + tokens
+            )
 
         return tuple(tokens)
 
@@ -1298,7 +1674,13 @@ class DecodingTask:
         elif suppress_tokens is None or len(suppress_tokens) == 0: suppress_tokens = [] 
         else: assert isinstance(suppress_tokens, list)
 
-        suppress_tokens.extend([self.tokenizer.transcribe, self.tokenizer.translate, self.tokenizer.sot, self.tokenizer.sot_prev, self.tokenizer.sot_lm])
+        suppress_tokens.extend([
+            self.tokenizer.transcribe, 
+            self.tokenizer.translate, 
+            self.tokenizer.sot, 
+            self.tokenizer.sot_prev, 
+            self.tokenizer.sot_lm
+        ])
 
         if self.tokenizer.no_speech is not None: suppress_tokens.append(self.tokenizer.no_speech)
         return tuple(sorted(set(suppress_tokens)))
@@ -1357,7 +1739,19 @@ class DecodingTask:
         tokens = torch.tensor([self.initial_tokens]).repeat(n_audio, 1)
 
         languages, language_probs = self._detect_language(audio_features, tokens)
-        if self.options.task == "lang_id": return [DecodingResult(audio_features=features, language=language, language_probs=probs) for features, language, probs in zip(audio_features, languages, language_probs)]
+        if self.options.task == "lang_id": 
+            return [
+                DecodingResult(
+                    audio_features=features, 
+                    language=language, 
+                    language_probs=probs
+                ) 
+                for features, language, probs in zip(
+                    audio_features, 
+                    languages, 
+                    language_probs
+                )
+            ]
 
         tokens = tokens.repeat_interleave(self.n_group, dim=0).to(audio_features.device)
         tokens, sum_logprobs, no_speech_probs = self._main_loop(audio_features, tokens)
@@ -1376,7 +1770,14 @@ class DecodingTask:
         selected = self.sequence_ranker.rank(tokens, sum_logprobs)
         tokens = [t[i].tolist() for i, t in zip(selected, tokens)]
 
-        fields = ([tokenizer.decode(t).strip() for t in tokens], languages, tokens, audio_features, [lp / (len(t) + 1) for t, lp in zip(tokens, [lp[i] for i, lp in zip(selected, sum_logprobs)])], no_speech_probs)
+        fields = (
+            [tokenizer.decode(t).strip() for t in tokens], 
+            languages, 
+            tokens, 
+            audio_features, 
+            [lp / (len(t) + 1) for t, lp in zip(tokens, [lp[i] for i, lp in zip(selected, sum_logprobs)])], 
+            no_speech_probs
+        )
         if len(set(map(len, fields))) != 1: raise RuntimeError
 
         return [
@@ -1394,7 +1795,18 @@ class DecodingTask:
         ]
     
 class DecodingResult:
-    def __init__(self, audio_features, language, language_probs = None, tokens = None, text = "", avg_logprob = np.nan, no_speech_prob = np.nan, temperature = np.nan, compression_ratio = np.nan):
+    def __init__(
+        self, 
+        audio_features, 
+        language, 
+        language_probs = None, 
+        tokens = None, 
+        text = "", 
+        avg_logprob = np.nan, 
+        no_speech_prob = np.nan, 
+        temperature = np.nan, 
+        compression_ratio = np.nan
+    ):
         self.audio_features = audio_features
         self.language = language
         self.language_probs = language_probs if language_probs is not None else {}
@@ -1406,8 +1818,19 @@ class DecodingResult:
         self.compression_ratio = compression_ratio
 
 class Tokenizer:
-    def __init__(self, encoding_name, num_languages = 2, language = None, task = None, sot_sequence = ()):
-        self.encoding = get_encoding(name=encoding_name, num_languages=num_languages)
+    def __init__(
+        self, 
+        encoding_name, 
+        num_languages = 2, 
+        language = None, 
+        task = None, 
+        sot_sequence = ()
+    ):
+        self.encoding = get_encoding(
+            name=encoding_name, 
+            num_languages=num_languages
+        )
+
         self.num_languages = num_languages
         self.language = language
         self.task = task
@@ -1422,8 +1845,19 @@ class Tokenizer:
         langs = tuple(LANGUAGES.keys())[: self.num_languages]
         sot_sequence = [sot]
 
-        if self.language is not None: sot_sequence.append(sot + 1 + langs.index(self.language))
-        if self.task is not None: sot_sequence.append(self.special_tokens["<|transcribe|>"] if self.task == "transcribe" else self.special_tokens["<|translate|>"])
+        if self.language is not None: 
+            sot_sequence.append(
+                sot + 1 + langs.index(self.language)
+            )
+
+        if self.task is not None: 
+            sot_sequence.append(
+                self.special_tokens[
+                    "<|transcribe|>"
+                ] if self.task == "transcribe" else self.special_tokens[
+                    "<|translate|>"
+                ]
+            )
 
         self.sot_sequence = tuple(sot_sequence)
 
@@ -1431,7 +1865,11 @@ class Tokenizer:
         return self.encoding.encode(text, **kwargs)
 
     def decode(self, token_ids, **kwargs):
-        return self.encoding.decode([t for t in token_ids if t < self.timestamp_begin], **kwargs)
+        return self.encoding.decode([
+            t 
+            for t in token_ids 
+            if t < self.timestamp_begin
+        ], **kwargs)
 
     def decode_with_timestamps(self, token_ids, **kwargs):
         return self.encoding.decode(token_ids, **kwargs)
@@ -1526,7 +1964,10 @@ class Tokenizer:
             current_tokens.append(token)
             decoded = self.decode_with_timestamps(current_tokens)
 
-            if (replacement_char not in decoded or self.decode_with_timestamps(tokens)[unicode_offset + decoded.index(replacement_char)] == replacement_char):
+            if (
+                replacement_char not in decoded or 
+                self.decode_with_timestamps(tokens)[unicode_offset + decoded.index(replacement_char)] == replacement_char
+            ):
                 words.append(decoded)
                 word_tokens.append(current_tokens)
                 current_tokens = []
@@ -1539,7 +1980,13 @@ class Tokenizer:
         words, word_tokens = [], []
 
         for subword, subword_tokens in zip(subwords, subword_tokens_list):
-            if (subword_tokens[0] >= self.eot) or (subword.startswith(" ")) or (subword.strip() in string.punctuation) or len(words) == 0:
+            if (
+                subword_tokens[0] >= self.eot
+            ) or (
+                subword.startswith(" ")
+            ) or (
+                subword.strip() in string.punctuation
+            ) or len(words) == 0:
                 words.append(subword)
                 word_tokens.append(subword_tokens)
             else:

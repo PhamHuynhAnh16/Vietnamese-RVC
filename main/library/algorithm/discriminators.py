@@ -144,5 +144,19 @@ class DiscriminatorR(torch.nn.Module):
         n_fft, hop_length, win_length = self.resolution
         pad = int((n_fft - hop_length) / 2)
 
-        stft = torch.stft(F.pad(x.cpu() if x.device.type in ["privateuseone", "ocl"] else x, (pad, pad), mode="reflect").squeeze(1), n_fft=n_fft, hop_length=hop_length, win_length=win_length, window=torch.ones(win_length, device=x.device), center=False, return_complex=True)
+        is_not_cuda = x.device.type in ["privateuseone", "ocl"]
+        stft = torch.stft(
+            F.pad(
+                x.cpu() if is_not_cuda else x, 
+                (pad, pad), 
+                mode="reflect"
+            ).squeeze(1), 
+            n_fft=n_fft, 
+            hop_length=hop_length, 
+            win_length=win_length, 
+            window=torch.ones(win_length, device="cpu" if is_not_cuda else x.device), 
+            center=False, 
+            return_complex=True
+        )
+
         return torch.view_as_real(stft).norm(p=2, dim=-1).to(x.device)

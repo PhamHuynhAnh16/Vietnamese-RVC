@@ -53,19 +53,15 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 - Tạo tham chiếu huấn luyện
 
-**Phương thức trích xuất cao độ: `pm-ac, pm-cc, pm-shs, dio, mangio-crepe-tiny, mangio-crepe-small, mangio-crepe-medium, mangio-crepe-large, mangio-crepe-full, crepe-tiny, crepe-small, crepe-medium, crepe-large, crepe-full, fcpe, fcpe-legacy, fcpe-previous, rmvpe, rmvpe-clipping, rmvpe-medfilt, rmvpe-clipping-medfilt, harvest, yin, pyin, swipe, piptrack, penn, mangio-penn, djcm, djcm-clipping, djcm-medfilt, djcm-clipping-medfilt, swift, pesto`**
+**Phương thức trích xuất cao độ (38+): `pm, dio, crepe, fcpe, rmvpe, hpa-rmvpe, harvest, yin, pyin, swipe, piptrack, penn, djcm, swift, pesto`**
 
-**Các mô hình trích xuất nhúng: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin-v1, spin-v2, whisper-tiny, whisper-tiny.en, whisper-base, whisper-base.en, whisper-small, whisper-small.en, whisper-medium, whisper-medium.en, whisper-large-v1, whisper-large-v2, whisper-large-v3, whisper-large-v3-turbo`**
+**Các mô hình trích xuất nhúng (21+): `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin, whisper`**
 
 - **Các mô hình trích xuất nhúng có sẳn các chế độ nhúng như: fairseq, onnx, transformers, spin, whisper.**
 - **Các mô hình trích xuất cao độ đều có phiên bản tăng tốc ONNX trừ các phương thức hoạt động bằng trình bao bọc.** 
 - **Các mô hình trích xuất cao độ đều có thể kết hợp với nhau theo tỉ lệ để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
 
-## Hướng dẫn sử dụng
-
-**Sẽ có nếu tôi thực sự rảnh...**
-
-## Cài đặt nâng cao
+## Cài đặt
 
 Bước 1: Cài đặt các phần phụ trợ cần thiết
 
@@ -119,7 +115,7 @@ uv pip install -r requirements.txt
 </details>
 
 <details>
-<summary>Đối với OPENCL (AMD)</summary>
+<summary>Đối với OPENCL</summary>
 
 ```
 uv pip install numpy==1.26.4 numba==0.61.0
@@ -139,7 +135,7 @@ Lưu ý:
 </details>
 
 <details>
-<summary>Đối với DIRECTML (AMD)</summary>
+<summary>Đối với DIRECTML</summary>
 
 ```
 uv pip install numpy==1.26.4 numba==0.61.0
@@ -185,22 +181,9 @@ env\\Scripts\\python.exe main/app/run_tensorboard.py
 python main\\app\\parser.py --help
 ```
 
-## Cài đặt, sử dụng đơn giản
-
-**Cài đặt phiên bản releases từ [Vietnamese_RVC](https://github.com/PhamHuynhAnh16/Vietnamese-RVC/releases)**
-- Chọn bản đúng với bạn và tải về máy.
-- Giải nén dự án.
-- Chạy tệp run_app.bat để mở giao diện hoạt động.
-
-**Sử dụng tệp run_install.bat**
-- Tải mã nguồn về máy.
-- Giải nén dự án.
-- Chạy tệp run_install.bat để bắt đầu cài đặt.
-- Chạy tệp run_app.bat để mở giao diện hoạt động.
-
 ## LƯU Ý
 
-- **Hiện tại các bộ mã hóa mới như MRF HIFIGAN vẫn chưa đầy đủ các bộ huấn luyện trước**
+- **Hiện tại các bộ mã hóa mới như MRF HIFIGAN và REFINEGAN vẫn chưa đầy đủ các bộ huấn luyện trước**
 - **Bộ mã hóa MRF HIFIGAN và REFINEGAN không hỗ trợ huấn luyện khi không không huấn luyện cao độ**
 - **Huấn luyện năng lương có thể cải thiện chất lượng mô hình nhưng chưa có mô hình huấn luyện trước dành cho tính năng này**
 - **Các mô hình trong kho lưu trữ Vietnamese-RVC được thu thập rải rác trên AI Hub, HuggingFace và các các kho lưu trữ khác. Có thể mang các giấy phép bản quyền khác nhau**

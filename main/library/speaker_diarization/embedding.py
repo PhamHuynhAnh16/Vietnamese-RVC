@@ -13,16 +13,26 @@ sys.path.append(os.getcwd())
 from main.library.speaker_diarization.speechbrain import EncoderClassifier
 
 class SpeechBrainPretrainedSpeakerEmbedding:
-    def __init__(self, embedding, device = None):
+    def __init__(
+        self, 
+        embedding, 
+        device = None
+    ):
         super().__init__()
 
         self.embedding = embedding
         self.device = device or torch.device("cpu")
-        self.classifier_ = EncoderClassifier.from_hparams(source=self.embedding, run_opts={"device": self.device})
+        self.classifier_ = EncoderClassifier.from_hparams(
+            source=self.embedding, 
+            run_opts={"device": self.device}
+        )
 
     @cached_property
     def dimension(self):
-        *_, dimension = self.classifier_.encode_batch(torch.rand(1, 16000).to(self.device)).shape
+        *_, dimension = self.classifier_.encode_batch(
+            torch.rand(1, 16000).to(self.device)
+        ).shape
+
         return dimension
 
     @cached_property
@@ -55,8 +65,17 @@ class SpeechBrainPretrainedSpeakerEmbedding:
             batch_size_masks, _ = masks.shape
             assert batch_size == batch_size_masks
 
-            imasks = F.interpolate(masks.unsqueeze(dim=1), size=num_samples, mode="nearest").squeeze(dim=1) > 0.5
-            signals = pad_sequence([waveform[imask].contiguous() for waveform, imask in zip(waveforms, imasks)], batch_first=True)
+            imasks = F.interpolate(
+                masks.unsqueeze(dim=1), 
+                size=num_samples, 
+                mode="nearest"
+            ).squeeze(dim=1) > 0.5
+
+            signals = pad_sequence([
+                waveform[imask].contiguous() 
+                for waveform, imask in zip(waveforms, imasks)
+            ], batch_first=True)
+    
             wav_lens = imasks.sum(dim=1)
 
         max_len = wav_lens.max()
@@ -66,7 +85,12 @@ class SpeechBrainPretrainedSpeakerEmbedding:
         wav_lens = wav_lens / max_len
         wav_lens[too_short] = 1.0
 
-        embeddings = (self.classifier_.encode_batch(signals, wav_lens=wav_lens).squeeze(dim=1).cpu().numpy())
-        embeddings[too_short.cpu().numpy()] = np.nan
+        embeddings = (
+            self.classifier_.encode_batch(
+                signals, 
+                wav_lens=wav_lens
+            ).squeeze(dim=1).cpu().numpy()
+        )
 
+        embeddings[too_short.cpu().numpy()] = np.nan
         return embeddings

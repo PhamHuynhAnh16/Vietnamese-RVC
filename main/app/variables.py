@@ -105,13 +105,11 @@ method_f0_full = [
     "fcpe-legacy", 
     "fcpe-previous", 
     "rmvpe", 
-    "rmvpe-clipping", 
     "rmvpe-medfilt", 
-    "rmvpe-clipping-medfilt", 
     "hpa-rmvpe", 
-    "hpa-rmvpe-clipping", 
     "hpa-rmvpe-medfilt", 
-    "hpa-rmvpe-clipping-medfilt", 
+    "hpa-rmvpe-previous", 
+    "hpa-rmvpe-previous-medfilt", 
     "harvest", 
     "harvest-stonemask", 
     "yin", 
@@ -121,13 +119,9 @@ method_f0_full = [
     "penn", 
     "mangio-penn", 
     "djcm", 
-    "djcm-clipping", 
     "djcm-medfilt", 
-    "djcm-clipping-medfilt", 
     "djcm-svs", 
-    "djcm-svs-clipping", 
     "djcm-svs-medfilt", 
-    "djcm-svs-clipping-medfilt", 
     "swift", 
     "pesto", 
     "hybrid"
@@ -172,8 +166,8 @@ embedders_mode = [
 ]
 
 embedders_model = [
-    "contentvec_base", 
     "hubert_base", 
+    "contentvec_base", 
     "vietnamese_hubert_base", 
     "japanese_hubert_base", 
     "korean_hubert_base", 
@@ -266,7 +260,7 @@ reverb_models = configs.get("reverb_models", "")
 denoise_models = configs.get("denoise_models", "")
 uvr_model = list(demucs_models.keys()) + list(vr_models.keys()) + list(mdx_models.keys())
 
-font = configs.get("font", "https://fonts.googleapis.com/css2?family=Courgette&display=swap")
+font = configs.get("font", "https://fonts.googleapis.com/css2?family=Saira&display=swap")
 sample_rate_choice = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 csv_path = configs["csv_path"]
 
@@ -283,7 +277,18 @@ else: allow_disk = []
 try:
     if os.path.exists(csv_path): reader = list(csv.DictReader(open(csv_path, newline='', encoding='utf-8')))
     else:
-        reader = list(csv.DictReader([line.decode('utf-8') for line in urllib.request.urlopen(codecs.decode("uggcf://qbpf.tbbtyr.pbz/fcernqfurrgf/q/1gNHnDeRULtEfz1Yieaw14USUQjWJy0Oq9k0DrCrjApb/rkcbeg?sbezng=pfi&tvq=1977693859", "rot13")).readlines()]))
+        reader = list(
+            csv.DictReader([
+                line.decode('utf-8') 
+                for line in urllib.request.urlopen(
+                    codecs.decode(
+                        "uggcf://qbpf.tbbtyr.pbz/fcernqfurrgf/q/1gNHnDeRULtEfz1Yieaw14USUQjWJy0Oq9k0DrCrjApb/rkcbeg?sbezng=pfi&tvq=1977693859", 
+                        "rot13"
+                    )
+                ).readlines()
+            ])
+        )
+
         writer = csv.DictWriter(open(csv_path, mode='w', newline='', encoding='utf-8'), fieldnames=reader[0].keys())
         writer.writeheader()
         writer.writerows(reader)

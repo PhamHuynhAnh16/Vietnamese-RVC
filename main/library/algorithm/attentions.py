@@ -11,7 +11,19 @@ sys.path.append(os.getcwd())
 from main.library.algorithm.commons import convert_pad_shape
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, channels, out_channels, n_heads, p_dropout=0.0, window_size=None, heads_share=True, block_length=None, proximal_bias=False, proximal_init=False, onnx=False):
+    def __init__(
+        self, 
+        channels, 
+        out_channels, 
+        n_heads, 
+        p_dropout=0.0, 
+        window_size=None, 
+        heads_share=True, 
+        block_length=None, 
+        proximal_bias=False, 
+        proximal_init=False, 
+        onnx=False
+    ):
         super().__init__()
         assert channels % n_heads == 0
         self.channels = channels
@@ -55,11 +67,20 @@ class MultiHeadAttention(nn.Module):
         b, d, t_s, t_t = (*key.size(), query.size(2))
         query = query.view(b, self.n_heads, self.k_channels, t_t).transpose(2, 3)
         key = key.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
+        value = value.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
         scores = (query / math.sqrt(self.k_channels)) @ key.transpose(-2, -1)
     
-        if self.window_size is not None:
+        if self.window_size:
             assert (t_s == t_t)
-            scores += self._relative_position_to_absolute_position(self._matmul_with_relative_keys(query / math.sqrt(self.k_channels), self._get_relative_embeddings(self.emb_rel_k, t_s, onnx=self.onnx)), onnx=self.onnx)
+            scores += self._relative_position_to_absolute_position(
+                self._matmul_with_relative_keys(
+                    query / math.sqrt(self.k_channels), 
+                    self._get_relative_embeddings(
+                        self.emb_rel_k, 
+                        t_s
+                    )
+                )
+            )
 
         if self.proximal_bias:
             assert t_s == t_t
@@ -67,15 +88,31 @@ class MultiHeadAttention(nn.Module):
 
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -1e4)
-            if self.block_length is not None:
+
+            if self.block_length:
                 assert (t_s == t_t)
-                scores = scores.masked_fill((torch.ones_like(scores).triu(-self.block_length).tril(self.block_length)) == 0, -1e4)
+                block_mask = (
+                    torch.ones_like(scores)
+                    .triu(-self.block_length)
+                    .tril(self.block_length)
+                )
+                scores = scores.masked_fill(block_mask == 0, -1e4)
 
         p_attn = self.drop(F.softmax(scores, dim=-1))
-        output = p_attn @ value.view(b, self.n_heads, self.k_channels, t_s).transpose(2, 3)
+        output = p_attn @ value
 
-        if self.window_size is not None: output += self._matmul_with_relative_values(self._absolute_position_to_relative_position(p_attn, onnx=self.onnx), self._get_relative_embeddings(self.emb_rel_v, t_s, onnx=self.onnx))
-        return (output.transpose(2, 3).contiguous().view(b, d, t_t)), p_attn
+        if self.window_size: 
+            output += self._matmul_with_relative_values(
+                self._absolute_position_to_relative_position(
+                    p_attn
+                ), 
+                self._get_relative_embeddings(
+                    self.emb_rel_v, 
+                    t_s
+                )
+            )
+
+        return output.transpose(2, 3).contiguous().view(b, d, t_t), p_attn
 
     def _matmul_with_relative_values(self, x, y):
         return x @ y.unsqueeze(0)
@@ -83,8 +120,8 @@ class MultiHeadAttention(nn.Module):
     def _matmul_with_relative_keys(self, x, y):
         return x @ y.unsqueeze(0).transpose(-2, -1)
 
-    def _get_relative_embeddings(self, relative_embeddings, length, onnx=False):
-        if onnx:
+    def _get_relative_embeddings(self, relative_embeddings, length):
+        if self.onnx:
             pad_length = (length - (self.window_size + 1)).clamp(min=0)
             slice_start_position = ((self.window_size + 1) - length).clamp(min=0)
             pad_shape = [0, 0, pad_length, pad_length, 0, 0]
@@ -93,74 +130,88 @@ class MultiHeadAttention(nn.Module):
             slice_start_position = max((self.window_size + 1) - length, 0)
             pad_shape = convert_pad_shape([[0, 0], [pad_length, pad_length], [0, 0]])
 
-        return (F.pad(relative_embeddings, pad_shape) if pad_length > 0 else relative_embeddings)[:, slice_start_position:(slice_start_position + 2 * length - 1)]  
+        if pad_length > 0:
+            relative_embeddings = F.pad(
+                relative_embeddings, 
+                pad_shape
+            )
 
-    def _relative_position_to_absolute_position(self, x, onnx=False):
+        return relative_embeddings[:, slice_start_position:(slice_start_position + 2 * length - 1)]  
+
+    def _relative_position_to_absolute_position(self, x):
         batch, heads, length, _ = x.size()
 
-        return ((
-            F.pad(
-                F.pad(x, [0, 1, 0, 0, 0, 0, 0, 0]).view([batch, heads, length * 2 * length]), 
-                [0, length - 1, 0, 0, 0, 0]
-            )
-        ) if onnx else (
-            F.pad(
-                F.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])).view([batch, heads, length * 2 * length]), 
-                convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
-            )
-        )).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
+        if self.onnx:
+            pad = [0, 1, 0, 0, 0, 0, 0, 0]
+            pad_shape = [0, length - 1, 0, 0, 0, 0]
+        else:
+            pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])
+            pad_shape = convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
 
-    def _absolute_position_to_relative_position(self, x, onnx=False):
+        pad = F.pad(x, pad).view([batch, heads, length * 2 * length])
+        return F.pad(pad, pad_shape).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
+
+    def _absolute_position_to_relative_position(self, x):
         batch, heads, length, _ = x.size()
 
-        return ((
-            F.pad(
-                F.pad(x, [0, length - 1, 0, 0, 0, 0, 0, 0]).view([batch, heads, length*length + length * (length - 1)]), 
-                [length, 0, 0, 0, 0, 0]
-            ) 
-        ) if onnx else (
-            F.pad(
-                F.pad(x, convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])).view([batch, heads, length**2 + length * (length - 1)]), 
-                convert_pad_shape([[0, 0], [0, 0], [length, 0]])
-            )
-        )).view([batch, heads, length, 2 * length])[:, :, :, 1:]
+        if self.onnx:
+            pad = [0, length - 1, 0, 0, 0, 0, 0, 0]
+            pad_shape = [length, 0, 0, 0, 0, 0]
+        else:
+            pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
+            pad_shape = convert_pad_shape([[0, 0], [0, 0], [length, 0]])
+
+        pad = F.pad(x, pad).view([batch, heads, length**2 + length * (length - 1)])
+        return F.pad(pad,  pad_shape).view([batch, heads, length, 2 * length])[:, :, :, 1:]
 
     def _attention_bias_proximal(self, length):
         r = torch.arange(length, dtype=torch.float32)
-
-        return -(r.unsqueeze(0) - r.unsqueeze(1)).abs().log1p().unsqueeze(0).unsqueeze(0)
+        diff = r.unsqueeze(0) - r.unsqueeze(1)
+        return -diff.abs().log1p().unsqueeze(0).unsqueeze(0)
 
 class FFN(nn.Module):
-    def __init__(self, in_channels, out_channels, filter_channels, kernel_size, p_dropout=0.0, activation=None, causal=False, onnx=False):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        filter_channels, 
+        kernel_size, 
+        p_dropout=0.0, 
+        activation=None, 
+        causal=False, 
+        onnx=False
+    ):
         super().__init__()
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.filter_channels = filter_channels
-        self.kernel_size = kernel_size
-        self.p_dropout = p_dropout
-        self.activation = activation
-        self.causal = causal
         self.onnx = onnx
-        self.padding = self._causal_padding if causal else self._same_padding
+        self.padding_fn = self._causal_padding if causal else self._same_padding
         self.conv_1 = nn.Conv1d(in_channels, filter_channels, kernel_size)
         self.conv_2 = nn.Conv1d(filter_channels, out_channels, kernel_size)
         self.drop = nn.Dropout(p_dropout)
+        self.activation = activation
 
     def forward(self, x, x_mask):
-        x = self.conv_1(self.padding(x * x_mask))
+        x = self.conv_1(self.padding_fn(x * x_mask))
+        x = self.drop(self._apply_activation(x))
+        x = self.conv_2(self.padding_fn(x * x_mask))
 
-        return self.conv_2(self.padding(self.drop(((x * (1.702 * x).sigmoid()) if self.activation == "gelu" else x.relu())) * x_mask)) * x_mask
+        return x * x_mask
+
+    def _apply_activation(self, x):
+        if self.activation == "gelu": return x * (1.702 * x).sigmoid()
+        return x.relu()
 
     def _causal_padding(self, x):
-        if self.kernel_size == 1: return x
+        pad_l, pad_r = self.conv_1.kernel_size[0] - 1, 0
 
         return F.pad(
-            x, [self.kernel_size - 1, 0, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [(self.kernel_size - 1), 0]])
+            x, 
+            [pad_l, pad_r, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [pad_l, pad_r]])
         )
 
     def _same_padding(self, x):
-        if self.kernel_size == 1: return x
-        
+        pad = (self.conv_1.kernel_size[0] - 1) // 2
+
         return F.pad(
-            x, [(self.kernel_size - 1) // 2, self.kernel_size // 2, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [((self.kernel_size - 1) // 2), (self.kernel_size // 2)]])
+            x, 
+            [pad, pad, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [pad, pad]])
         )

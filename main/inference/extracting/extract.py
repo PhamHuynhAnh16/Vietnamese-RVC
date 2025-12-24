@@ -33,12 +33,13 @@ def parse_arguments():
     parser.add_argument("--gpu", type=str, default="-")
     parser.add_argument("--sample_rate", type=int, required=True)
     parser.add_argument("--embedder_model", type=str, default="hubert_base")
-    parser.add_argument("--f0_onnx", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--predictor_onnx", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--embedders_mode", type=str, default="fairseq")
     parser.add_argument("--f0_autotune", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--f0_autotune_strength", type=float, default=1)
     parser.add_argument("--rms_extract", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--alpha", type=float, default=0.5)
+    parser.add_argument("--include_mutes", type=int, default=2)
 
     return parser.parse_args()
 
@@ -53,12 +54,13 @@ def main():
         pitch_guidance, 
         sample_rate, 
         embedder_model, 
-        f0_onnx, 
+        predictor_onnx, 
         embedders_mode, 
         f0_autotune, 
         f0_autotune_strength, 
         rms_extract, 
-        alpha
+        alpha,
+        include_mutes
     ) = (
         args.f0_method, 
         args.hop_length, 
@@ -68,19 +70,28 @@ def main():
         args.pitch_guidance, 
         args.sample_rate, 
         args.embedder_model, 
-        args.f0_onnx, 
+        args.predictor_onnx, 
         args.embedders_mode, 
         args.f0_autotune, 
         args.f0_autotune_strength, 
         args.rms_extract, 
-        args.alpha
+        args.alpha,
+        args.include_mutes
     )
 
-    check_assets(f0_method, embedder_model, f0_onnx=f0_onnx, embedders_mode=embedders_mode)
+    check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
 
     num_processes = max(1, num_processes)
-    devices = ["cpu"] if gpus == "-" else [(f"cuda:{idx}" if config.device.startswith("cuda") else f"{'ocl' if config.device.startswith('ocl') else 'privateuseone'}:{idx}") for idx in gpus.split("-")]
+
+    devices = ["cpu"] if gpus == "-" else [
+        (
+            f"cuda:{idx}"
+        ) if config.device.startswith("cuda") else (
+            f"{'ocl' if config.device.startswith('ocl') else 'privateuseone'}:{idx}"
+        ) 
+        for idx in gpus.split("-")
+    ]
 
     log_data = {
         translations['modelname']: args.model_name, 
@@ -93,10 +104,11 @@ def main():
         translations['training_version']: version, 
         translations['extract_f0']: pitch_guidance, 
         translations['hubert_model']: embedder_model, 
-        translations["f0_onnx_mode"]: f0_onnx, 
+        translations["predictor_onnx"]: predictor_onnx, 
         translations["embed_mode"]: embedders_mode, 
         translations["train&energy"]: rms_extract,
-        translations["alpha_label"]: alpha
+        translations["alpha_label"]: alpha,
+        translations["include_mutes"]: include_mutes
     }
 
     for key, value in log_data.items():
@@ -107,11 +119,48 @@ def main():
         pid_file.write(str(os.getpid()))
     
     try:
-        run_pitch_extraction(exp_dir, f0_method, hop_length, num_processes, devices, f0_onnx, config.is_half, f0_autotune, f0_autotune_strength, alpha)
-        run_embedding_extraction(exp_dir, version, num_processes, devices, embedder_model, embedders_mode, config.is_half)
-        run_rms_extraction(exp_dir, num_processes, devices, rms_extract)
-        generate_config(version, sample_rate, exp_dir)
-        generate_filelist(pitch_guidance, exp_dir, version, sample_rate, embedders_mode, embedder_model, rms_extract)
+        run_pitch_extraction(
+            exp_dir, 
+            f0_method, 
+            hop_length, 
+            num_processes, 
+            devices, 
+            predictor_onnx, 
+            config.is_half, 
+            f0_autotune, 
+            f0_autotune_strength, 
+            alpha
+        )
+        run_embedding_extraction(
+            exp_dir, 
+            version, 
+            num_processes, 
+            devices, 
+            embedder_model, 
+            embedders_mode, 
+            config.is_half
+        )
+        run_rms_extraction(
+            exp_dir, 
+            num_processes, 
+            devices, 
+            rms_extract
+        )
+        generate_config(
+            version, 
+            sample_rate, 
+            exp_dir
+        )
+        generate_filelist(
+            pitch_guidance, 
+            exp_dir, 
+            version, 
+            sample_rate, 
+            embedders_mode, 
+            embedder_model, 
+            rms_extract,
+            include_mutes
+        )
     except Exception as e:
         logger.error(f"{translations['extract_error']}: {e}")
 
