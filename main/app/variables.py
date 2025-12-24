@@ -115,6 +115,7 @@ method_f0_full = [
     "yin", 
     "pyin", 
     "swipe", 
+    "swipe-stonemask", 
     "piptrack", 
     "penn", 
     "mangio-penn", 

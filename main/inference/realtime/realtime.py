@@ -471,7 +471,7 @@ class VoiceChanger:
             proposal_pitch_threshold
         )
 
-        conv_input = audio[None, None, : self.crossfade_frame + self.sola_search_frame]
+        conv_input = audio[None, None, : self.crossfade_frame + self.sola_search_frame].float()
         cor_nom = F.conv1d(conv_input, self.sola_buffer[None, None, :])
 
         cor_den = (
