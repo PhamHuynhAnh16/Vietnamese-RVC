@@ -742,5 +742,9 @@
     "mic_inaccessible": "Unable to access input devices!",
     "ws_connected": "Connected to [WS]",
     "ws_closed": "Stopped connecting to [WS]",
-    "ws_disconnected": "Disconnected from [WS]"
+    "ws_disconnected": "Disconnected from [WS]",
+    "sids_label": "Speaker ID",
+    "sids_info": "Speaker ID for the multi-voice model",
+    "include_mutes": "Number of silent files",
+    "include_mutes_info": "Number of silent files used when training the model to learn silent segments"
 }
