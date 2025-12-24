@@ -26,7 +26,7 @@ class HubertModelONNX:
     def extract_features(self, source, padding_mask = None, output_layer = None):
         logits = self.model.run(
             [self.model.get_outputs()[0].name, self.model.get_outputs()[1].name], 
-            {"feats": source.detach().cpu().numpy()}
+            {"feats": source.float().detach().cpu().numpy()}
         )
 
         return [
