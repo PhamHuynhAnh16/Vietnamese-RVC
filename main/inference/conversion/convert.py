@@ -480,7 +480,7 @@ class VoiceConverter:
                             proposal_pitch=proposal_pitch,
                             proposal_pitch_threshold=proposal_pitch_threshold,
                             energy_use=self.energy,
-                            del_onnx=not split_audio,
+                            delete_predictor_onnx=not split_audio,
                             alpha=alpha
                         )
                     ) 

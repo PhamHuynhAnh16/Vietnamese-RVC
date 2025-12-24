@@ -272,7 +272,7 @@ def spectral_subtract_denoise(
         hop_length=hop_length, 
         win_length=n_fft, 
         window=window, 
-        length=x.shape[0]
+        length=x.shape[-1]
     ) if stft is None else stft.inverse(
         clean_mag, 
         phase
