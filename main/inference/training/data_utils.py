@@ -54,7 +54,7 @@ class TextAudioLoader(tdata.Dataset):
 
     def get_audio_text_pair(self, audiopath_and_text):
         extra = audiopath_and_text[2:]
-        pitch = pitchf = energy = sid = None
+        pitch, pitchf, energy, sid = None, None, None, None
 
         if self.pitch_guidance and self.energy: pitch, pitchf, energy, sid = extra
         elif self.pitch_guidance: pitch, pitchf, sid = extra

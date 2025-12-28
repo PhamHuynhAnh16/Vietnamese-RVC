@@ -492,8 +492,8 @@ def training(
         "--overtraining_threshold", str(threshold),
         "--cleanup", str(clean_up),
         "--cache_data_in_gpu", str(cache),
-        "--g_pretrained_path", pretrained_G,
-        "--d_pretrained_path", pretrained_D,
+        "--g_pretrained_path", str(pretrained_G),
+        "--d_pretrained_path", str(pretrained_D),
         "--model_author", model_author,
         "--vocoder", vocoder,
         "--checkpointing", str(checkpointing),
@@ -502,7 +502,7 @@ def training(
         "--optimizer", optimizer,
         "--energy_use", str(energy_use),
         "--use_custom_reference", str(custom_reference),
-        "--reference_path", reference_path,
+        "--reference_path", str(reference_path),
         "--multiscale_mel_loss", str(multiscale_mel_loss),
     ])
 

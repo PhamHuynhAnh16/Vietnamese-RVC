@@ -110,7 +110,8 @@ args = parse_arguments()
     cache_data_in_gpu, 
     overtraining_detector, 
     overtraining_threshold, 
-    cleanup, model_author, 
+    cleanup, 
+    model_author, 
     vocoder, 
     checkpointing, 
     optimizer_choice, 
@@ -145,6 +146,7 @@ args = parse_arguments()
 )
 
 disc_version = version if vocoder != "RefineGAN" else "v3"
+
 is_half = main_config.is_half
 if main_config.brain: is_half = True
 
@@ -152,8 +154,8 @@ experiment_dir = os.path.join(main_configs["logs_path"], model_name)
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
 
-torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith("ocl") else False
-torch.backends.cudnn.benchmark = args.benchmark if not main_config.device.startswith("ocl") else False
+torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith(("ocl", "privateuseone")) else False
+torch.backends.cudnn.benchmark = args.benchmark if not main_config.device.startswith(("ocl", "privateuseone")) else False
 
 lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
 global_step, last_loss_gen_all, overtrain_save_epoch = 0, 0, 0

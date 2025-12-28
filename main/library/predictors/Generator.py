@@ -290,12 +290,12 @@ class Generator:
                 filter_radius=filter_radius, 
                 mode=f0_method.split("-")[1]
             )
-        elif f0_method in ["harvest", "dio"]:
+        elif f0_method.split("-")[0] in ["harvest", "dio"]:
             f0 = self.get_f0_pyworld(
                 x, 
                 p_len, 
                 filter_radius, 
-                f0_method, 
+                f0_method.split("-")[0], 
                 use_stonemask="stonemask" in f0_method
             )
         elif "crepe" in f0_method:
