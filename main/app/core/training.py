@@ -474,8 +474,6 @@ def training(
             reference_path = None
     else: reference_path = None
 
-    gr_info(translations["start"].format(start=translations["training"]))
-
     p = subprocess.Popen([
         python,
         configs["train_path"],

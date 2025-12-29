@@ -5,8 +5,6 @@ import librosa
 
 sys.path.append(os.getcwd())
 
-from main.library.backends.utils import STFT
-
 def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
     return (x.clamp(min=clip_val) * C).log()
 
@@ -22,11 +20,18 @@ def spectral_de_normalize_torch(magnitudes):
 stft = None
 mel_basis, hann_window = {}, {}
 
-def spectrogram_torch(y, n_fft, hop_size, win_size, center=False):
+def spectrogram_torch(
+    y, 
+    n_fft, 
+    hop_size, 
+    win_size, 
+    center=False
+):
     global hann_window, stft
 
     wnsize_dtype_device = str(win_size) + "_" + str(y.dtype) + "_" + str(y.device)
-    if wnsize_dtype_device not in hann_window: hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
+    if wnsize_dtype_device not in hann_window: 
+        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
 
     pad = torch.nn.functional.pad(
         y.unsqueeze(1), 
@@ -36,6 +41,8 @@ def spectrogram_torch(y, n_fft, hop_size, win_size, center=False):
 
     if str(y.device).startswith(("ocl", "privateuseone")):
         if stft is None: 
+            from main.library.backends.utils import STFT
+
             stft = STFT(
                 filter_length=n_fft, 
                 hop_length=hop_size, 
@@ -65,7 +72,14 @@ def spectrogram_torch(y, n_fft, hop_size, win_size, center=False):
 
     return spec.to(y.device)
 
-def spec_to_mel_torch(spec, n_fft, num_mels, sample_rate, fmin, fmax):
+def spec_to_mel_torch(
+    spec, 
+    n_fft, 
+    num_mels, 
+    sample_rate, 
+    fmin, 
+    fmax
+):
     global mel_basis
 
     fmax_dtype_device = str(fmax) + "_" + str(spec.dtype) + "_" + str(spec.device)
@@ -130,7 +144,9 @@ class MultiScaleMelSpectrogramLoss(torch.nn.Module):
         win_dtype_device = str(window_length) + "_" + dtype_device
         mel_dtype_device = str(n_mels) + "_" + dtype_device
 
-        if win_dtype_device not in self.hann_window: self.hann_window[win_dtype_device] = torch.hann_window(window_length, device=wav.device, dtype=torch.float32)
+        if win_dtype_device not in self.hann_window: 
+            self.hann_window[win_dtype_device] = torch.hann_window(window_length, device=wav.device, dtype=torch.float32)
+
         wav = wav.float().squeeze(1)
 
         if str(wav.device).startswith(("ocl", "privateuseone")):

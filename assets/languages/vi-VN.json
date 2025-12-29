@@ -73,7 +73,6 @@
     "download_pretrained": "Tải xuống huấn luyện trước {dg}{rvc_version} gốc",
     "not_found_pretrain": "Không tìm thấy huấn luyện trước {dg}",
     "not_use_pretrain": "Sẽ không có huấn luyện trước được sử dụng",
-    "training": "huấn luyện",
     "rick_roll": "Bấm vào đây nếu bạn muốn bị Rick Roll:) ---> [RickRoll]({rickroll})",
     "terms_of_use": "**Vui lòng không sử dụng Dự án với bất kỳ mục đích nào vi phạm đạo đức, pháp luật, hoặc gây tổn hại đến cá nhân, tổ chức...**",
     "exemption": "**Trong trường hợp người sử dụng không tuân thủ các điều khoản hoặc vi phạm, tôi sẽ không chịu trách nhiệm về bất kỳ khiếu nại, thiệt hại, hay trách nhiệm pháp lý nào, dù là trong hợp đồng, do sơ suất, hay các lý do khác, phát sinh từ, ngoài, hoặc liên quan đến phần mềm, việc sử dụng phần mềm hoặc các giao dịch khác liên quan đến phần mềm.**",

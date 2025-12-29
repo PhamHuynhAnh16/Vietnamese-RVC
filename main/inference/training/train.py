@@ -342,7 +342,11 @@ class EpochRecorder:
         now_time = ttime()
         elapsed_time = now_time - self.last_time
         self.last_time = now_time
-        return translations["time_or_speed_training"].format(current_time=datetime.datetime.now().strftime("%H:%M:%S"), elapsed_time_str=str(datetime.timedelta(seconds=int(round(elapsed_time, 1)))))
+
+        return translations["time_or_speed_training"].format(
+            current_time=datetime.datetime.now().strftime("%H:%M:%S"), 
+            elapsed_time_str=str(datetime.timedelta(seconds=int(round(elapsed_time, 1))))
+        )
 
 def run(
     rank, 
@@ -501,7 +505,7 @@ def run(
 
     scaler_dict = {}
     try:
-        logger.info(translations["start_training"])
+        if rank == 0: logger.info(translations["start_training"])
 
         _, _, _, epoch_str, scaler_dict = load_checkpoint(
             logger, 
@@ -563,7 +567,7 @@ def run(
     if use_custom_reference and os.path.isfile(os.path.join(reference_path, "feats.npy")):
         import numpy as np
 
-        logger.info(translations["using_reference"].format(reference_name=reference_path))
+        if rank == 0: logger.info(translations["using_reference"].format(reference_name=reference_path))
         phone = np.repeat(np.load(os.path.join(reference_path, "feats.npy")), 2, axis=0)
 
         reference = (
@@ -637,27 +641,47 @@ def train_and_evaluate(
 
     net_g, net_d = nets
     optim_g, optim_d = optims
+
     train_loader.batch_sampler.set_epoch(epoch)
     net_g.train(); net_d.train()
 
     if device.type == "cuda" and cache_data_in_gpu:
         data_iterator = cache
+
         if cache == []:
             for batch_idx, info in enumerate(train_loader):
-                cache.append((batch_idx, [tensor.cuda(device_id, non_blocking=True) for tensor in info]))
-        else: shuffle(cache)
+                cache.append(
+                    (batch_idx, [
+                        tensor.cuda(device_id, non_blocking=True) 
+                        for tensor in info
+                    ])
+                )
+        else: 
+            shuffle(cache)
     elif device.type in ["privateuseone", "ocl"] and cache_data_in_gpu:
         data_iterator = cache
+
         if cache == []:
             for batch_idx, info in enumerate(train_loader):
-                cache.append((batch_idx, [tensor.to(device_id if device.type == "ocl" else device, non_blocking=True) for tensor in info]))
-        else: shuffle(cache)
-    else: data_iterator = enumerate(train_loader)
+                cache.append(
+                    (batch_idx, [
+                        tensor.to(device_id if device.type == "ocl" else device, non_blocking=True) 
+                        for tensor in info
+                    ])
+                )
+        else: 
+            shuffle(cache)
+    else: 
+        data_iterator = enumerate(train_loader)
 
     epoch_recorder = EpochRecorder()
 
     autocast_enabled = is_half and device.type == "cuda"
-    autocast_dtype = torch.float32 if not autocast_enabled else (torch.bfloat16 if main_config.brain else torch.float16)
+    autocast_dtype = (
+        torch.float32 
+        if not autocast_enabled else 
+        (torch.bfloat16 if main_config.brain else torch.float16)
+    )
 
     autocasts = autocast(
         device.type, 
@@ -743,7 +767,10 @@ def train_and_evaluate(
                 )
 
             if multiscale_mel_loss: 
-                loss_mel = fn_mel_loss(wave, y_hat) * config.train.c_mel / 3.0
+                loss_mel = fn_mel_loss(
+                    wave, 
+                    y_hat
+                ) * config.train.c_mel / 3.0
             else:
                 y_hat_mel = mel_spectrogram_torch(
                     y_hat.float().squeeze(1), 
@@ -755,6 +782,7 @@ def train_and_evaluate(
                     config.data.mel_fmin, 
                     config.data.mel_fmax
                 )
+
                 loss_mel = fn_mel_loss(
                     mel_spectrogram_torch(
                         wave.float().squeeze(1), 
@@ -854,12 +882,14 @@ def train_and_evaluate(
             config.data.mel_fmin, 
             config.data.mel_fmax
         )
+
         y_mel = commons.slice_segments(
             mel, 
             ids_slice, 
             config.train.segment_size // config.data.hop_length, 
             dim=3
         )
+
         y_hat_mel = mel_spectrogram_torch(
             y_hat.float().squeeze(1), 
             config.data.filter_length, 
@@ -916,22 +946,43 @@ def train_and_evaluate(
                 scalars=scalar_dict
             )
 
-    def check_overtraining(smoothed_loss_history, threshold, epsilon=0.004):
+    def check_overtraining(
+        smoothed_loss_history, 
+        threshold, 
+        epsilon=0.004
+    ):
         if len(smoothed_loss_history) < threshold + 1: return False
 
         for i in range(-threshold, -1):
-            if smoothed_loss_history[i + 1] > smoothed_loss_history[i]: return True
-            if abs(smoothed_loss_history[i + 1] - smoothed_loss_history[i]) >= epsilon: return False
+            if smoothed_loss_history[i + 1] > smoothed_loss_history[i]: 
+                return True
+
+            if abs(smoothed_loss_history[i + 1] - smoothed_loss_history[i]) >= epsilon: 
+                return False
 
         return True
 
-    def update_exponential_moving_average(smoothed_loss_history, new_value, smoothing=0.987):
-        smoothed_value = new_value if not smoothed_loss_history else (smoothing * smoothed_loss_history[-1] + (1 - smoothing) * new_value)      
-        smoothed_loss_history.append(smoothed_value)
+    def update_exponential_moving_average(
+        smoothed_loss_history, 
+        new_value, 
+        smoothing=0.987
+    ):
+        smoothed_value = (
+            new_value 
+            if not smoothed_loss_history else 
+            (smoothing * smoothed_loss_history[-1] + (1 - smoothing) * new_value)
+        )      
 
+        smoothed_loss_history.append(smoothed_value)
         return smoothed_value
 
-    def save_to_json(file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history):
+    def save_to_json(
+        file_path, 
+        loss_disc_history, 
+        smoothed_loss_disc_history, 
+        loss_gen_history, 
+        smoothed_loss_gen_history
+    ):
         with open(file_path, "w") as f:
             json.dump({
                 "loss_disc_history": loss_disc_history, 
@@ -966,7 +1017,10 @@ def train_and_evaluate(
                 scaler
             )
 
-            if custom_save_every_weights: model_add.append(os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s.pth"))
+            if custom_save_every_weights: 
+                model_add.append(
+                    os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s.pth")
+                )
 
         if overtraining_detector and epoch > 1:
             current_loss_disc, current_loss_gen = float(loss_disc), float(lowest_value["value"])
@@ -974,31 +1028,91 @@ def train_and_evaluate(
             loss_disc_history.append(current_loss_disc)
             loss_gen_history.append(current_loss_gen)
             
-            smoothed_value_disc = update_exponential_moving_average(smoothed_loss_disc_history, current_loss_disc)
-            smoothed_value_gen = update_exponential_moving_average(smoothed_loss_gen_history, current_loss_gen)
+            smoothed_value_disc = update_exponential_moving_average(
+                smoothed_loss_disc_history, 
+                current_loss_disc
+            )
+
+            smoothed_value_gen = update_exponential_moving_average(
+                smoothed_loss_gen_history, 
+                current_loss_gen
+            )
             
-            is_overtraining_disc = check_overtraining(smoothed_loss_disc_history, overtraining_threshold * 2)
-            is_overtraining_gen = check_overtraining(smoothed_loss_gen_history, overtraining_threshold, 0.01)
+            is_overtraining_disc = check_overtraining(
+                smoothed_loss_disc_history, 
+                overtraining_threshold * 2
+            )
+
+            is_overtraining_gen = check_overtraining(
+                smoothed_loss_gen_history, 
+                overtraining_threshold, 
+                0.01
+            )
             
             consecutive_increases_disc = (consecutive_increases_disc + 1) if is_overtraining_disc else 0
             consecutive_increases_gen = (consecutive_increases_gen + 1) if is_overtraining_gen else 0
 
-            if epoch % save_every_epoch == 0: save_to_json(training_file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history)
+            if epoch % save_every_epoch == 0: 
+                save_to_json(
+                    training_file_path, 
+                    loss_disc_history, 
+                    smoothed_loss_disc_history, 
+                    loss_gen_history, 
+                    smoothed_loss_gen_history
+                )
 
-            if (is_overtraining_gen and consecutive_increases_gen == overtraining_threshold or is_overtraining_disc and consecutive_increases_disc == (overtraining_threshold * 2)):
-                logger.info(translations["overtraining_find"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
+            if (
+                is_overtraining_gen and 
+                consecutive_increases_gen == overtraining_threshold or 
+                is_overtraining_disc and 
+                consecutive_increases_disc == (overtraining_threshold * 2)
+            ):
+                logger.info(
+                    translations["overtraining_find"].format(
+                        epoch=epoch, 
+                        smoothed_value_gen=f"{smoothed_value_gen:.3f}", 
+                        smoothed_value_disc=f"{smoothed_value_disc:.3f}"
+                    )
+                )
+
                 done = True
             else:
-                logger.info(translations["best_epoch"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
+                logger.info(
+                    translations["best_epoch"].format(
+                        epoch=epoch, 
+                        smoothed_value_gen=f"{smoothed_value_gen:.3f}", 
+                        smoothed_value_disc=f"{smoothed_value_disc:.3f}"
+                    )
+                )
+
                 for file in glob.glob(os.path.join(main_configs["weights_path"], f"{model_name}_*e_*s_best_epoch.pth")):
                     model_del.append(file)
 
-                model_add.append(os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth"))
+                model_add.append(
+                    os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth")
+                )
         
         if epoch >= custom_total_epoch:
-            logger.info(translations["success_training"].format(epoch=epoch, global_step=global_step, loss_gen_all=round(loss_gen_all.item(), 3)))
-            logger.info(translations["training_info"].format(lowest_value_rounded=round(float(lowest_value["value"]), 3), lowest_value_epoch=lowest_value['epoch'], lowest_value_step=lowest_value['step']))
-            model_add.append(os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s.pth"))
+            logger.info(
+                translations["success_training"].format(
+                    epoch=epoch, 
+                    global_step=global_step, 
+                    loss_gen_all=round(loss_gen_all.item(), 3)
+                )
+            )
+
+            logger.info(
+                translations["training_info"].format(
+                    lowest_value_rounded=round(float(lowest_value["value"]), 3), 
+                    lowest_value_epoch=lowest_value['epoch'], 
+                    lowest_value_step=lowest_value['step']
+                )
+            )
+
+            model_add.append(
+                os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s.pth")
+            )
+
             done = True
             
         for m in model_del:
@@ -1037,7 +1151,8 @@ def train_and_evaluate(
                     lowest_value_step=lowest_value['step'], 
                     remaining_epochs_gen=(overtraining_threshold - consecutive_increases_gen), 
                     remaining_epochs_disc=((overtraining_threshold * 2) - consecutive_increases_disc), 
-                    smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"
+                    smoothed_value_gen=f"{smoothed_value_gen:.3f}", 
+                    smoothed_value_disc=f"{smoothed_value_disc:.3f}"
                 )
             )
         elif epoch > 1 and overtraining_detector == False: 
@@ -1062,11 +1177,15 @@ def train_and_evaluate(
                 )
             )
 
-        logger.debug(f"loss_gen_all: {loss_gen_all} loss_gen: {loss_gen} loss_fm: {loss_fm} loss_mel: {loss_mel} loss_kl: {loss_kl}")
+        logger.debug(
+            f"loss_gen_all: {loss_gen_all} loss_gen: {loss_gen} loss_fm: {loss_fm} loss_mel: {loss_mel} loss_kl: {loss_kl}"
+        )
+
         last_loss_gen_all = loss_gen_all
 
         if done: 
             pid_file_path = os.path.join(experiment_dir, "config.json")
+
             with open(pid_file_path, "r") as pid_file:
                 pid_data = json.load(pid_file)
 
@@ -1074,7 +1193,9 @@ def train_and_evaluate(
                 pid_data.pop("process_pids", None)
                 json.dump(pid_data, pid_file, indent=4)
 
-            if os.path.exists(os.path.join(experiment_dir, "train_pid.txt")): os.remove(os.path.join(experiment_dir, "train_pid.txt"))
+            if os.path.exists(os.path.join(experiment_dir, "train_pid.txt")): 
+                os.remove(os.path.join(experiment_dir, "train_pid.txt"))
+
             sys.exit(0)
 
         with torch.no_grad():

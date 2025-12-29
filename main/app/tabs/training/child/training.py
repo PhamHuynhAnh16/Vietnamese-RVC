@@ -450,18 +450,20 @@ def training_model_tab():
                                     info=translations["gpu_number_info"], 
                                     interactive=True
                                 )
-                                gpu_info = gr.Textbox(
+                                gpu_str, gpu_len = get_gpu_info()
+                                gr.Textbox(
                                     label=translations["gpu_info"], 
-                                    value=get_gpu_info(), 
+                                    value=gpu_str, 
                                     info=translations["gpu_info_2"], 
-                                    interactive=False
+                                    interactive=False,
+                                    lines=gpu_len
                                 )
                                 cpu_core = gr.Slider(
                                     label=translations["cpu_core"], 
                                     info=translations["cpu_core_info"], 
                                     minimum=1, 
                                     maximum=os.cpu_count(), 
-                                    value=os.cpu_count(), 
+                                    value=min(os.cpu_count(), 4), 
                                     step=1, 
                                     interactive=True
                                 )          

@@ -77,9 +77,12 @@ def get_gpu_info():
             gpu_infos = []
 
     return (
-        "\n".join(gpu_infos) 
-        if len(gpu_infos) > 0 and not config.cpu_mode else 
-        translations["no_support_gpu"]
+        (
+            "\n".join(gpu_infos) 
+            if len(gpu_infos) > 0 and not config.cpu_mode else 
+            translations["no_support_gpu"]
+        ),
+        ngpu
     )
 
 def gpu_number_str():
@@ -99,7 +102,8 @@ def gpu_number_str():
             torch.cuda.is_available() or 
             directml.is_available() or 
             opencl.is_available()
-        ) else "-"
+        ) else 
+        "-"
     )
 
 def change_f0_choices(): 
