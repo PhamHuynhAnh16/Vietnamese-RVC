@@ -15,7 +15,7 @@ os.environ["LRU_CACHE_CAPACITY"] = "3"
 
 from main.library.predictors.FCPE.wav2mel import Wav2Mel
 from main.library.predictors.FCPE.encoder import EncoderLayer, ConformerNaiveEncoder
-from main.library.predictors.FCPE.utils import l2_regularization, batch_interp_with_replacement_detach, decrypt_model, DotDict
+from main.library.predictors.FCPE.utils import batch_interp_with_replacement_detach, decrypt_model, DotDict
 
 @torch.no_grad()
 def cent_to_f0(cent):
@@ -153,8 +153,7 @@ class CFNaiveMelPE(nn.Module):
         self.f0_max = f0_max
         self.f0_min = f0_min
         self.use_fa_norm = use_fa_norm
-        self.residual_dropout = 0.1  
-        self.attention_dropout = 0.1  
+
         self.harmonic_emb = nn.Embedding(9, hidden_dims) if use_harmonic_emb else None
         self.input_stack = nn.Sequential(
             nn.Conv1d(
@@ -187,10 +186,23 @@ class CFNaiveMelPE(nn.Module):
             atten_dropout=atten_dropout
         )
         self.norm = nn.LayerNorm(hidden_dims)
-        self.output_proj = weight_norm(nn.Linear(hidden_dims, out_dims))
-        self.cent_table_b = torch.linspace(f0_to_cent(torch.Tensor([f0_min]))[0], f0_to_cent(torch.Tensor([f0_max]))[0], out_dims).detach()
+        self.output_proj = weight_norm(
+            nn.Linear(
+                hidden_dims, 
+                out_dims
+            )
+        )
+
+        self.cent_table_b = torch.linspace(
+            f0_to_cent(torch.Tensor([f0_min]))[0], 
+            f0_to_cent(torch.Tensor([f0_max]))[0], 
+            out_dims
+        ).detach()
+        self.gaussian_blurred_cent_mask_b = (
+            1200 * torch.Tensor([self.f0_max / 10.]).log2()
+        )[0].detach()
+
         self.register_buffer("cent_table", self.cent_table_b)
-        self.gaussian_blurred_cent_mask_b = (1200 * torch.Tensor([self.f0_max / 10.]).log2())[0].detach()
         self.register_buffer("gaussian_blurred_cent_mask", self.gaussian_blurred_cent_mask_b)
 
     def forward(self, x, _h_emb=None):
@@ -232,11 +244,6 @@ class FCPE_LEGACY(nn.Module):
         out_dims=360, 
         n_layers=12, 
         n_chans=512, 
-        loss_mse_scale=10, 
-        loss_l2_regularization=False, 
-        loss_l2_regularization_scale=1, 
-        loss_grad1_mse=False, 
-        loss_grad1_mse_scale=1, 
         f0_max=1975.5, 
         f0_min=32.70, 
         confidence=False, 
@@ -244,60 +251,86 @@ class FCPE_LEGACY(nn.Module):
         use_input_conv=True
     ):
         super().__init__()
-        self.loss_mse_scale = loss_mse_scale
-        self.loss_l2_regularization = loss_l2_regularization
-        self.loss_l2_regularization_scale = loss_l2_regularization_scale
-        self.loss_grad1_mse = loss_grad1_mse
-        self.loss_grad1_mse_scale = loss_grad1_mse_scale
+        self.n_out = out_dims
         self.f0_max = f0_max
         self.f0_min = f0_min
         self.confidence = confidence
         self.threshold = threshold
         self.use_input_conv = use_input_conv
-        self.cent_table_b = torch.Tensor(np.linspace(f0_to_cent(torch.Tensor([f0_min]))[0], f0_to_cent(torch.Tensor([f0_max]))[0], out_dims))
+
+        self.cent_table_b = torch.Tensor(
+            np.linspace(
+                f0_to_cent(torch.Tensor([f0_min]))[0], 
+                f0_to_cent(torch.Tensor([f0_max]))[0], 
+                out_dims
+            )
+        )
         self.register_buffer("cent_table", self.cent_table_b)
-        self.stack = nn.Sequential(nn.Conv1d(input_channel, n_chans, 3, 1, 1), nn.GroupNorm(4, n_chans), nn.LeakyReLU(), nn.Conv1d(n_chans, n_chans, 3, 1, 1))
-        self.decoder = PCmer(num_layers=n_layers, num_heads=8, dim_model=n_chans, dim_keys=n_chans, dim_values=n_chans, residual_dropout=0.1, attention_dropout=0.1)
+
+        self.stack = nn.Sequential(
+            nn.Conv1d(
+                input_channel, 
+                n_chans, 
+                3, 
+                1, 
+                1
+            ), 
+            nn.GroupNorm(
+                4, 
+                n_chans
+            ), 
+            nn.LeakyReLU(), 
+            nn.Conv1d(
+                n_chans, 
+                n_chans, 
+                3, 
+                1, 
+                1
+            )
+        )
+        self.decoder = PCmer(
+            num_layers=n_layers, 
+            num_heads=8, 
+            dim_model=n_chans, 
+            dim_keys=n_chans, 
+            dim_values=n_chans, 
+            residual_dropout=0.1, 
+            attention_dropout=0.1
+        )
         self.norm = nn.LayerNorm(n_chans)
-        self.n_out = out_dims
-        self.dense_out = weight_norm(nn.Linear(n_chans, self.n_out))
+        self.dense_out = weight_norm(
+            nn.Linear(
+                n_chans, 
+                self.n_out
+            )
+        )
 
-    def forward(self, mel, infer=True, gt_f0=None, return_hz_f0=False, cdecoder="local_argmax", output_interp_target_length=None):
-        x = self.dense_out(self.norm(self.decoder((self.stack(mel.transpose(1, 2)).transpose(1, 2) if self.use_input_conv else mel)))).sigmoid()
+    def forward(self, mel, return_hz_f0=False, cdecoder="local_argmax", output_interp_target_length=None):
+        x = self.decoder(self.stack(mel.transpose(1, 2)).transpose(1, 2) if self.use_input_conv else mel)
+        x = self.dense_out(self.norm(x)).sigmoid()
 
-        if not infer:
-            loss_all = self.loss_mse_scale * F.binary_cross_entropy(x, self.gaussian_blurred_cent(f0_to_cent(gt_f0)))
-
-            if self.loss_l2_regularization: 
-                loss_all += l2_regularization(
-                    model=self, 
-                    l2_alpha=self.loss_l2_regularization_scale
+        x = cent_to_f0(
+            (
+                cents_decoder(
+                    self.cent_table, 
+                    x, 
+                    self.confidence, 
+                    threshold=self.threshold, 
+                    mask=True
                 )
-
-            x = loss_all
-        else:
-            x = cent_to_f0(
-                (
-                    cents_decoder(
-                        self.cent_table, 
-                        x, 
-                        self.confidence, 
-                        threshold=self.threshold, 
-                        mask=True
-                    )
-                ) if cdecoder == "argmax" else (
-                    cents_local_decoder(
-                        self.cent_table, 
-                        x, 
-                        self.n_out, 
-                        self.confidence, 
-                        threshold=self.threshold, 
-                        mask=True
-                    )
+            ) if cdecoder == "argmax" else (
+                cents_local_decoder(
+                    self.cent_table, 
+                    x, 
+                    self.n_out, 
+                    self.confidence, 
+                    threshold=self.threshold, 
+                    mask=True
                 )
             )
+        )
 
-            x = (1 + x / 700).log() if not return_hz_f0 else x
+        x = (1 + x / 700).log() if not return_hz_f0 else x
 
         if output_interp_target_length is not None: 
             x = F.interpolate(
@@ -419,12 +452,7 @@ class FCPEInfer_LEGACY:
                 input_channel=self.args.model.input_channel, 
                 out_dims=self.args.model.out_dims, 
                 n_layers=self.args.model.n_layers, 
-                n_chans=self.args.model.n_chans, 
-                loss_mse_scale=self.args.loss.loss_mse_scale, 
-                loss_l2_regularization=self.args.loss.loss_l2_regularization, 
-                loss_l2_regularization_scale=self.args.loss.loss_l2_regularization_scale, 
-                loss_grad1_mse=self.args.loss.loss_grad1_mse, 
-                loss_grad1_mse_scale=self.args.loss.loss_grad1_mse_scale, 
+                n_chans=self.args.model.n_chans,  
                 f0_max=self.f0_max, 
                 f0_min=self.f0_min, 
                 confidence=self.args.model.confidence
@@ -456,7 +484,6 @@ class FCPEInfer_LEGACY:
         else: 
             return self.model(
                 mel=mel, 
-                infer=True, 
                 return_hz_f0=True, 
                 output_interp_target_length=p_len
             )

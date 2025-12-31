@@ -31,15 +31,6 @@ def calc_same_padding(kernel_size):
     pad = kernel_size // 2
     return (pad, pad - (kernel_size + 1) % 2)
 
-def l2_regularization(model, l2_alpha):
-    l2_loss = []
-
-    for module in model.modules():
-        if type(module) is nn.Conv2d: 
-            l2_loss.append((module.weight**2).sum() / 2.0)
-
-    return l2_alpha * sum(l2_loss)
-
 def torch_interp(x, xp, fp):
     sort_idx = xp.argsort()
     xp = xp[sort_idx]

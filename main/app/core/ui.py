@@ -295,7 +295,8 @@ def get_index(model):
             f for f in [
                 os.path.join(root, name) 
                 for root, _, files in os.walk(configs["logs_path"], topdown=False) 
-                for name in files if name.endswith(".index") and "trained" not in name
+                for name in files 
+                if name.endswith(".index") and "trained" not in name
             ] 
             if model.split(".")[0] in f
         ), ""), 
@@ -733,7 +734,7 @@ def get_speakers_id(model):
             "choices": list(range(speakers_id)),
             "__type__": "update"
         }
-    except Exception as e:
+    except Exception:
         return {
             "visible": False, 
             "value": 0, 

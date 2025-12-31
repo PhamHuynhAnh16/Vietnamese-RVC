@@ -112,10 +112,10 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
             ) if "hpa" in f0_method else "rmvpe"
         elif "fcpe" in f0_method:
             modelname = (
-                "fcpe" + (
-                    "_legacy" if "legacy" in f0_method and "previous" not in f0_method else ""
-                )
-            ) if "previous" in f0_method else "ddsp_200k"
+                "fcpe_legacy" 
+                if "legacy" in f0_method else 
+                "fcpe"
+            ) if "previous" in f0_method or "legacy" in f0_method else "ddsp_200k"
         elif "crepe" in f0_method:
             modelname = "crepe_" + f0_method.replace("mangio-", "").split("-")[1]
         elif "penn" in f0_method:

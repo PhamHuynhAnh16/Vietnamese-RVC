@@ -83,7 +83,8 @@ def convert(
     ])
 
 def convert_audio(
-    clean_audio, autotune, 
+    clean_audio, 
+    autotune, 
     use_audio, 
     use_original, 
     convert_backing, 
