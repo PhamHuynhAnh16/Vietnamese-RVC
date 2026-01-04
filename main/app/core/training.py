@@ -347,7 +347,9 @@ def training(
     energy_use, 
     custom_reference=False, 
     reference_name="", 
-    multiscale_mel_loss=False
+    multiscale_mel_loss=False,
+    embedders="hubert_base",
+    custom_embedders=None
 ):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
@@ -465,7 +467,22 @@ def training(
         gr_warning(translations["not_use_pretrain"])
 
     if custom_reference:
-        reference_path = os.path.join(configs["reference_path"], reference_name)
+        embedder_model = embedders if embedders != "custom" else custom_embedders
+
+        reference_path = os.path.join(
+            configs["reference_path"], 
+            "".join([
+                reference_name, 
+                "_", 
+                rvc_version, 
+                "_", 
+                embedder_model, 
+                "_", 
+                pitch_guidance, 
+                "_", 
+                energy_use
+            ])
+        )
 
         if not os.path.exists(reference_path):
             gr_warning(translations["not_found_reference"])

@@ -930,7 +930,9 @@ def training_model_tab():
                 energy,
                 custom_reference,
                 reference_name,
-                multiscale_mel_loss
+                multiscale_mel_loss,
+                embedders, 
+                embedders_custom
             ],
             outputs=[
                 training_info

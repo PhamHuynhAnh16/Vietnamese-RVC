@@ -197,7 +197,7 @@ def convert_tts_tab():
                     value="wav", 
                     interactive=True
                 )
-                output_audio = gr.Textbox(
+                output_audio_tts = gr.Textbox(
                     label=translations["output_tts"], 
                     value="audios/tts.wav", 
                     placeholder="audios/tts.wav", 
@@ -828,7 +828,7 @@ def convert_tts_tab():
                 prompt, 
                 tts_voice, 
                 speed, 
-                output_audio,
+                output_audio_tts,
                 tts_pitch,
                 google_tts_check_box,
                 txt_input
@@ -848,7 +848,7 @@ def convert_tts_tab():
                 model_pth, 
                 model_index, 
                 index_strength, 
-                output_audio, 
+                output_audio_tts, 
                 output_audio,
                 export_format,
                 f0_method, 

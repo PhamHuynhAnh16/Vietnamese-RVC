@@ -745,5 +745,6 @@
     "sids_label": "Speaker ID",
     "sids_info": "Speaker ID for the multi-voice model",
     "include_mutes": "Number of silent files",
-    "include_mutes_info": "Number of silent files used when training the model to learn silent segments"
+    "include_mutes_info": "Number of silent files used when training the model to learn silent segments",
+    "use_precision": "Use precision {fp} for the training"
 }

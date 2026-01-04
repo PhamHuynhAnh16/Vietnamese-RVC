@@ -239,6 +239,12 @@ def main():
             n_gpus = 1
             logger.warning(translations["not_gpu"])
 
+        logger.info(
+            translations["use_precision"].format(
+                fp=("BF16" if main_config.brain else "FP16") if is_half else "FP32"
+            )
+        )
+
         def start():
             children = []
             pid_data = {"process_pids": []}
