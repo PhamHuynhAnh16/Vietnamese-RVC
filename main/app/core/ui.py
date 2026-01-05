@@ -429,7 +429,7 @@ def change_embedders_mode(value):
 def change_fp(fp):
     fp16 = fp == "fp16"
 
-    if fp16 and config.allow_is_half: 
+    if fp16 and not config.allow_is_half: 
         gr_warning(translations["fp16_not_support"])
         return "fp32"
     else:
