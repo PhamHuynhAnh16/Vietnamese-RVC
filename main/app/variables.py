@@ -33,7 +33,7 @@ if not logger.hasHandlers():
     logger.addHandler(file_handler)
     logger.setLevel(logging.DEBUG)
 
-if config.device in ["cpu", "mps", "ocl:0"] and configs.get("fp16", False):
+if config.device in ["cpu", "mps", "ocl:0", "privateuseone:0"] and configs.get("fp16", False):
     logger.warning(translations["fp16_not_support"])
     configs["fp16"] = config.is_half = False
 

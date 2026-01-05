@@ -139,7 +139,8 @@ class PosteriorEncoder(torch.nn.Module):
             self.proj(
                 self.enc(
                     self.pre(x) * x_mask, 
-                    x_mask, g=g
+                    x_mask, 
+                    g=g
                 )
             ) * x_mask
         ).split(self.out_channels, dim=1)

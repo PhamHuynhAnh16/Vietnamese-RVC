@@ -746,5 +746,5 @@
     "sids_info": "Mã nhận dạng giọng nói đối với mô hình đa giọng nói",
     "include_mutes": "Số tệp im lặng",
     "include_mutes_info": "Số lượng tệp im lặng được sử dụng khi huấn luyện mô hình có thể học các đoạn im lặng",
-    "use_precision": "Sử dụng độ chính xác {fp} cho quá trình huấn luyện"
+    "use_precision": "Sử dụng độ chính xác {fp} cho quá trình huấn luyện."
 }

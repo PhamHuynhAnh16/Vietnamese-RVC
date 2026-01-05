@@ -426,6 +426,7 @@ class VoiceConverter:
                     if audio_max > 1: audio /= audio_max
                 except:
                     import shutil
+
                     shutil.copy(audio_input_path, audio_output_path)
                     return
 

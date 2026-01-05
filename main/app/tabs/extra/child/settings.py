@@ -67,7 +67,7 @@ def settings_tab(app):
                 value="fp16" if configs.get("fp16", False) else "fp32", 
                 label=translations["precision"], 
                 info=translations["precision_info"], 
-                interactive=config.device not in ["cpu", "mps", "ocl:0"]
+                interactive=config.allow_is_half
             )
             fp_button = gr.Button(
                 translations["update_precision"], 

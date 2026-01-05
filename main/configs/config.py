@@ -38,21 +38,30 @@ class Config:
 
         self.gpu_mem = None
         self.per_preprocess = 3.7
+
         self.device = self.get_default_device()
         self.providers = self.get_providers()
+
         self.is_half = self.is_fp16()
+        self.allow_is_half = not self.device.startswith(("cpu", "mps", "ocl", "privateuseone"))
+
         self.x_pad, self.x_query, self.x_center, self.x_max = self.device_config()
     
     def multi_language(self):
         try:
             lang = self.configs.get("language", "vi-VN")
-            if len([l for l in os.listdir(self.configs["language_path"]) if l.endswith(".json")]) < 1: raise FileNotFoundError("Không tìm thấy bất cứ gói ngôn ngữ nào(No package languages found)")
+
+            if len([l for l in os.listdir(self.configs["language_path"]) if l.endswith(".json")]) < 1: 
+                raise FileNotFoundError("Không tìm thấy bất cứ gói ngôn ngữ nào(No package languages found)")
 
             if not lang: lang = "vi-VN"
-            if lang not in self.configs["support_language"]: raise ValueError("Ngôn ngữ không được hỗ trợ(Language not supported)")
+
+            if lang not in self.configs["support_language"]: 
+                raise ValueError("Ngôn ngữ không được hỗ trợ (Language not supported)")
 
             lang_path = os.path.join(self.configs["language_path"], f"{lang}.json")
-            if not os.path.exists(lang_path): lang_path = os.path.join(self.configs["language_path"], "vi-VN.json")
+            if not os.path.exists(lang_path): 
+                lang_path = os.path.join(self.configs["language_path"], "vi-VN.json")
 
             with open(lang_path, encoding="utf-8") as f:
                 translations = json.load(f)
