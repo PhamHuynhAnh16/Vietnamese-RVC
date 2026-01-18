@@ -736,7 +736,6 @@
     "alpha_info": "The blending ratio of pitch values extracted by different methods.",
     "multiscale_mel_loss": "Use Multi-Scale Mel Loss",
     "multiscale_mel_loss_info": "Compares the Mel spectrograms of real and generated audio at multiple scales. Helps the model learn timbral details, brightness, and frequency structure more effectively, thereby improving output speech quality and naturalness.",
-    "realtime_client": "Realtime (Client)",
     "media_devices": "Browser does not support accessing audio devices via API",
     "mic_inaccessible": "Unable to access input devices!",
     "ws_connected": "Connected to [WS]",
@@ -746,5 +745,13 @@
     "sids_info": "Speaker ID for the multi-voice model",
     "include_mutes": "Number of silent files",
     "include_mutes_info": "Number of silent files used when training the model to learn silent segments",
-    "use_precision": "Use precision {fp} for the training."
+    "use_precision": "Use precision {fp} for the training.",
+    "index_assertion": "The index file structure is incompatible with the model.",
+    "record": "Record",
+    "start_record": "Start recording",
+    "stop_record": "Stop recording",
+    "starting_record": "Start recording...",
+    "stopping_record": "Stop recording!",
+    "volume": "Volume",
+    "response": "Response"
 }

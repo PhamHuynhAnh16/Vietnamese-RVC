@@ -8,7 +8,7 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import config
+from main.app.variables import config, logger, translations
 from main.library.utils import load_embedders_model, extract_features, change_rms, load_faiss_index, load_model
 
 class Inference:
@@ -95,7 +95,8 @@ class Pipeline:
         self.embedder = embedder
         self.predictor = predictor
         self.rms = rms
-        self.index = index
+        self.index = index[0]
+        self.big_npy = index[1]
         self.use_f0 = inference.use_f0
         self.tgt_sr = inference.tgt_sr
         self.energy = inference.energy
@@ -106,7 +107,8 @@ class Pipeline:
         self.is_half = config.is_half
         self.dtype = torch.float16 if self.is_half else torch.float32
         self.model_window = self.tgt_sr // 100
-        self.sid = torch.tensor([sid], device=self.device, dtype=torch.int64)
+        self.sid = sid
+        self.torch_sid = torch.tensor([sid], device=self.device, dtype=torch.int64)
         self.resamplers = {}
     
     def execute(
@@ -162,24 +164,28 @@ class Pipeline:
             feats0 = feats.detach().clone() if protect < 0.5 and self.use_f0 else None
 
             if (
-                not isinstance(self.index[0], type(None)) and 
-                not isinstance(self.index[1], type(None)) and 
+                not isinstance(self.index, type(None)) and 
+                not isinstance(self.big_npy, type(None)) and 
                 index_rate != 0
             ):
-                skip_offset = skip_head // 2
-                npy = feats[0][skip_offset :].cpu().numpy()
+                try:
+                    skip_offset = skip_head // 2
+                    npy = feats[0][skip_offset :].cpu().numpy()
 
-                if self.is_half: npy = npy.astype(np.float32)
+                    if self.is_half: npy = npy.astype(np.float32)
 
-                score, ix = self.index[0].search(npy, k=8)
-                weight = np.square(1 / score)
+                    score, ix = self.index.search(npy, k=8)
+                    weight = np.square(1 / score)
 
-                npy = np.sum(self.index[1][ix] * np.expand_dims(weight / weight.sum(axis=1, keepdims=True), axis=2), axis=1)
-                if self.is_half: npy = npy.astype(np.float16)
+                    npy = np.sum(self.big_npy[ix] * np.expand_dims(weight / weight.sum(axis=1, keepdims=True), axis=2), axis=1)
+                    if self.is_half: npy = npy.astype(np.float16)
 
-                feats[0][skip_offset :] = (
-                    torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate + (1 - index_rate) * feats[0][skip_offset :]
-                )
+                    feats[0][skip_offset :] = (
+                        torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate + (1 - index_rate) * feats[0][skip_offset :]
+                    )
+                except AssertionError:
+                    logger.warning(translations["index_assertion"])
+                    self.index = self.big_npy = None
 
             feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)[:, :audio_feats_len, :]
 
@@ -214,7 +220,7 @@ class Pipeline:
             out_audio = self.inference.inference(
                 feats, 
                 p_len, 
-                self.sid, 
+                self.torch_sid, 
                 pitch, 
                 pitchf, 
                 energy

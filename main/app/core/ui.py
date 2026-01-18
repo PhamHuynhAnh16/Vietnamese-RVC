@@ -713,6 +713,18 @@ def update_button_from_json(data):
         gr.update(interactive=data.get("stop_button", False))
     ]
 
+def update_value_from_json(data):
+    if not data:
+        return [
+            gr.update(), 
+            gr.update(value=None)
+        ]
+    
+    return [
+        data.get("button", "Start"),
+        data.get("path", None),
+    ]
+
 def get_speakers_id(model):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 

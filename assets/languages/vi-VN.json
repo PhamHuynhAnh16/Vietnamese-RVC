@@ -736,7 +736,6 @@
     "alpha_info": "Mức trộn các cao độ của các phương thức trích xuất với nhau",
     "multiscale_mel_loss": "Sử dụng tổn thất Mel đa tần",
     "multiscale_mel_loss_info": "So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra.",
-    "realtime_client": "Thời gian thực (Client)",
     "media_devices": "Trình duyệt không hỗ trợ truy cập thiết bị âm thanh thông qua API",
     "mic_inaccessible": "Không thể truy cập được thiết bị âm thanh đầu vào!",
     "ws_connected": "Đã kết nối với [WS]",
@@ -746,5 +745,13 @@
     "sids_info": "Mã nhận dạng giọng nói đối với mô hình đa giọng nói",
     "include_mutes": "Số tệp im lặng",
     "include_mutes_info": "Số lượng tệp im lặng được sử dụng khi huấn luyện mô hình có thể học các đoạn im lặng",
-    "use_precision": "Sử dụng độ chính xác {fp} cho quá trình huấn luyện."
+    "use_precision": "Sử dụng độ chính xác {fp} cho quá trình huấn luyện.",
+    "index_assertion": "Cấu trúc tệp chỉ mục không tương thích với mô hình.",
+    "record": "Ghi Âm",
+    "start_record": "Bắt đầu ghi âm",
+    "stop_record": "Dừng ghi âm",
+    "starting_record": "Bắt đầu ghi âm...",
+    "stopping_record": "Dừng ghi âm!",
+    "volume": "Âm lượng",
+    "response": "Phản hồi"
 }

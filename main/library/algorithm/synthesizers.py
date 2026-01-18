@@ -64,6 +64,20 @@ class Synthesizer(torch.nn.Module):
                     num_mels=inter_channels, 
                     checkpointing=checkpointing
                 )
+            elif vocoder == "BigVGAN":
+                from main.library.generators.bigvgan import BigVGANGenerator
+
+                self.dec = BigVGANGenerator(
+                    in_channel=inter_channels,
+                    upsample_initial_channel=upsample_initial_channel,
+                    upsample_rates=upsample_rates,
+                    upsample_kernel_sizes=upsample_kernel_sizes,
+                    resblock_kernel_sizes=resblock_kernel_sizes,
+                    resblock_dilations=resblock_dilation_sizes,
+                    gin_channels=gin_channels,
+                    sample_rate=sr,
+                    harmonic_num=0, 
+                )
             elif vocoder in ["MRF-HiFi-GAN", "MRF HiFi-GAN"]: 
                 from main.library.generators.mrf_hifigan import HiFiGANMRFGenerator
 

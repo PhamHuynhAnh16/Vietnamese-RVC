@@ -68,6 +68,7 @@ class RVC_Realtime:
         self.input_sensitivity = 10 ** (silent_threshold / 20)
         self.window_size = sample_rate // 100
         self.dtype = torch.float16 if config.is_half else torch.float32
+        self.kwargs = None
 
     def initialize(self):
         check_assets(
@@ -326,6 +327,9 @@ class RVC_Realtime:
         vol_t = self.audio_buffer.square().mean().sqrt()
         vol = max(vol_t.item(), 0)
 
+        tg = self.tg
+        board = self.board
+
         if self.vad is not None:
             is_speech = self.vad.is_speech(audio_in_16k.cpu().numpy().copy())
 
@@ -347,8 +351,8 @@ class RVC_Realtime:
                     f0_autotune_strength, 
                     proposal_pitch, 
                     proposal_pitch_threshold,
-                    self.tg,
-                    self.board
+                    tg,
+                    board
                 )
 
                 return torch.zeros(audio_model.shape, dtype=self.dtype, device=config.device), vol
@@ -371,8 +375,8 @@ class RVC_Realtime:
                 f0_autotune_strength, 
                 proposal_pitch, 
                 proposal_pitch_threshold,
-                self.tg,
-                self.board
+                tg,
+                board
             )
 
             return torch.zeros(audio_model.shape, dtype=self.dtype, device=config.device), vol
@@ -396,8 +400,8 @@ class RVC_Realtime:
             f0_autotune_strength, 
             proposal_pitch, 
             proposal_pitch_threshold,
-            self.tg,
-            self.board
+            tg,
+            board
         )
 
         audio_out = self.resample_out(audio_model * vol_t.sqrt())
@@ -411,6 +415,7 @@ class VoiceChanger:
         input_sample_rate, 
         extra_convert_size
     ):
+        self.input_sample_rate = input_sample_rate
         self.block_frame = read_chunk_size * 128
         self.crossfade_frame = int(cross_fade_overlap_size * input_sample_rate)
         self.extra_frame = int(extra_convert_size * input_sample_rate)
@@ -419,8 +424,11 @@ class VoiceChanger:
         self.sola_buffer = None
         self.generate_strength()
 
-    def initialize(self, vc_model):
+    def initialize(self, vc_model, record_audio = False, record_audio_path = None, export_format = "wav",):
         self.vc_model = vc_model
+        self.record_audio = record_audio
+        self.record_audio_path = record_audio_path
+        self.export_format = export_format
 
         self.vc_model.realloc(
             self.block_frame, 
@@ -430,6 +438,17 @@ class VoiceChanger:
         )
 
         self.vc_model.initialize()
+
+    def setup_soundfile_record(self):
+        import soundfile as sf
+
+        self.soundfile = sf.SoundFile(
+            self.record_audio_path,
+            mode="w",
+            samplerate=self.input_sample_rate,
+            channels=1,
+            format=self.export_format.lower(),
+        ) if self.record_audio else None
 
     def generate_strength(self):
         self.fade_in_window = (
@@ -493,7 +512,12 @@ class VoiceChanger:
         audio[: self.crossfade_frame] += (self.sola_buffer * self.fade_out_window)
 
         self.sola_buffer[:] = audio[block_size : block_size + self.crossfade_frame]
-        return audio[: block_size].detach().cpu().numpy(), vol
+        audio_output = audio[:block_size].detach().cpu().numpy()
+
+        if self.record_audio and self.soundfile is not None:
+            self.soundfile.write(audio_output)
+
+        return audio_output, vol
     
     @torch.no_grad()
     def on_request(

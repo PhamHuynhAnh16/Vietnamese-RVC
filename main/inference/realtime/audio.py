@@ -30,6 +30,9 @@ class ServerAudioDevice:
         self.default_samplerate = default_samplerate
 
 def check_the_device(device, type = "input"):
+    if sys.platform == "linux" and "hw:" not in device["name"]:
+        return False
+
     stream_device = (
         sd.InputStream if type == "input" else sd.OutputStream
     )
@@ -120,6 +123,7 @@ class Audio:
         self.callbacks = callbacks
         self.mon_queue = Queue()
         self.performance = [0, 0, 0]
+        self.stream = None
         self.input_stream = None
         self.output_stream = None
         self.monitor = None
@@ -176,16 +180,31 @@ class Audio:
         )
     
     def process_data_with_time(self, indata):
-        out_wav, _, perf, _ = self.process_data(indata)
+        out_wav, vol, perf, _ = self.process_data(indata)
         self.performance = perf
+        self.volume = vol
 
-        self.callbacks.emit_to(self.performance)
+        self.callbacks.emit_to(self.performance, self.volume)
         return out_wav
     
-    def audio_stream_callback(self, indata, frames, times, status):
+    def audio_stream_no_output_callback(self, indata, frames, times, status):
         try:
             out_wav = self.process_data_with_time(indata)
             self.mon_queue.put(out_wav)
+        except Exception as e:
+            logger.error(translations["error_occurred"].format(e=e))
+            logger.debug(traceback.format_exc())
+
+    def audio_stream_callback(self, indata, outdata, frames, times, status):
+        try:
+            out_wav = self.process_data_with_time(indata)
+            output_channels = outdata.shape[1]
+            if self.use_monitor: self.mon_queue.put(out_wav)
+
+            outdata[:] = (
+                np.repeat(out_wav, output_channels).reshape(-1, output_channels)
+                * self.output_audio_gain
+            )
         except Exception as e:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
@@ -221,29 +240,43 @@ class Audio:
         output_extra_setting, 
         output_monitor_extra_setting
     ):
-        self.input_stream = sd.InputStream(
-            callback=self.audio_stream_callback,
-            latency="low",
-            dtype=np.float32,
-            device=input_device_id,
-            blocksize=block_frame,
-            samplerate=input_audio_sample_rate,
-            channels=input_max_channel,
-            extra_settings=input_extra_setting
-        )
-        self.output_stream = sd.OutputStream(
-            callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.output_audio_gain),
-            latency="low",
-            dtype=np.float32,
-            device=output_device_id,
-            blocksize=block_frame,
-            samplerate=input_audio_sample_rate,
-            channels=output_max_channel,
-            extra_settings=output_extra_setting
-        )
+        if input_device_id != output_device_id:
+            self.input_stream = sd.InputStream(
+                callback=self.audio_stream_no_output_callback,
+                latency="low",
+                dtype=np.float32,
+                device=input_device_id,
+                blocksize=block_frame,
+                samplerate=input_audio_sample_rate,
+                channels=input_max_channel,
+                extra_settings=input_extra_setting
+            )
+            self.output_stream = sd.OutputStream(
+                callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.output_audio_gain),
+                latency="low",
+                dtype=np.float32,
+                device=output_device_id,
+                blocksize=block_frame,
+                samplerate=input_audio_sample_rate,
+                channels=output_max_channel,
+                extra_settings=output_extra_setting
+            )
 
-        self.input_stream.start()
-        self.output_stream.start()
+            self.input_stream.start()
+            self.output_stream.start()
+        else:
+            self.stream = sd.Stream(
+                callback=self.audio_stream_callback,
+                latency="low",
+                dtype=np.float32,
+                device=(input_device_id, output_device_id),
+                blocksize=block_frame,
+                samplerate=input_audio_sample_rate,
+                channels=(input_max_channel, output_max_channel),
+                extra_settings=(input_extra_setting, output_extra_setting),
+            )
+
+            self.stream.start()
 
         if self.use_monitor:
             self.monitor = sd.OutputStream(
@@ -260,6 +293,10 @@ class Audio:
 
     def stop(self):
         self.running = False
+
+        if self.stream is not None:
+            self.stream.close()
+            self.stream = None
 
         if self.input_stream is not None:
             self.input_stream.close()
@@ -301,15 +338,13 @@ class Audio:
         input_extra_setting, output_extra_setting = None, None
         output_monitor_extra_setting, monitor_channels = None, None
 
-        wasapi_exclusive_mode = bool(exclusive_mode)
-
         if (
             input_audio_device and 
             "WASAPI" in input_audio_device.host_api
         ):
             input_extra_setting = sd.WasapiSettings(
-                exclusive=wasapi_exclusive_mode, 
-                auto_convert=not wasapi_exclusive_mode
+                exclusive=exclusive_mode, 
+                auto_convert=not exclusive_mode
             )
         elif (
             input_audio_device and 
@@ -326,8 +361,8 @@ class Audio:
             "WASAPI" in output_audio_device.host_api
         ):
             output_extra_setting = sd.WasapiSettings(
-                exclusive=wasapi_exclusive_mode, 
-                auto_convert=not wasapi_exclusive_mode
+                exclusive=exclusive_mode, 
+                auto_convert=not exclusive_mode
             )
         elif (
             input_audio_device and 
@@ -348,8 +383,8 @@ class Audio:
                 "WASAPI" in output_monitor_device.host_api
             ):
                 output_monitor_extra_setting = sd.WasapiSettings(
-                    exclusive=wasapi_exclusive_mode, 
-                    auto_convert=not wasapi_exclusive_mode
+                    exclusive=exclusive_mode, 
+                    auto_convert=not exclusive_mode
                 )
             elif (
                 output_monitor_device and 

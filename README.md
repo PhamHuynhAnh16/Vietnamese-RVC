@@ -19,13 +19,17 @@ Công cụ chuyển đổi giọng nói chất lượng và hiệu suất cao đ
 
 ## Mô tả
 
-Dự án này là một công cụ chuyển đổi giọng nói đơn giản, dễ sử dụng. Với mục tiêu tạo ra các sản phẩm chuyển đổi giọng nói chất lượng cao và hiệu suất tối ưu, dự án cho phép người dùng thay đổi giọng nói một cách mượt mà, tự nhiên.
+Dự án này là một công cụ chuyển đổi giọng nói. Với mục tiêu tạo ra các sản phẩm chuyển đổi giọng nói chất lượng cao và hiệu suất tối ưu, dự án cho phép người dùng thay đổi giọng nói một cách mượt mà, tự nhiên.
+
+Dự án này hướng tới sự thử nghiệm nghiên cứu của cá nhân hơn là về sự trải nghiệm, độ ổn định và có thể xảy ra lỗi, nếu bạn muốn hướng đến một dự án có sự ổn định, mượt mà nhất hãy dùng thử [Applio](https://github.com/IAHispano/Applio), nếu bạn muốn hướng tới thử nghiệm đây sẽ là dự án dành cho bạn.
+
+Dự án này có thể sẽ không cung cấp bản dựng sẳn, chỉ cung cấp mã nguồn để sử dụng được dự án bạn phải tự dựng thủ công trên máy của mình hoặc liên hệ hỗ trợ dựng thông qua discord của tôi.
 
 ## Các tính năng của dự án
 
 - Tách nhạc (MDX-Net / Demucs / VR)
 
-- Chuyển đổi giọng nói (Chuyển đổi tệp / Chuyển đổi hàng loạt / Chuyển đổi với Whisper / Chuyển đổi văn bản)
+- Chuyển đổi giọng nói (Chuyển đổi phi thời gian thực / Chuyển đổi hàng loạt / Chuyển đổi với Whisper / Chuyển đổi văn bản / Chuyển đổi thời gian thực)
 
 - Áp dụng hiệu ứng cho âm thanh
 
@@ -33,33 +37,25 @@ Dự án này là một công cụ chuyển đổi giọng nói đơn giản, d�
 
 - Huấn luyện mô hình (v1 / v2, bộ mã hóa chất lượng cao, huấn luyện năng lượng)
 
-- Dung hợp mô hình
-
-- Đọc thông tin mô hình
-
-- Xuất mô hình sang ONNX
-
-- Tải xuống từ kho mô hình có sẳn
+- Chuyển đổi mô hình RVC sang mô hình ONNX
 
 - Tìm kiếm mô hình từ web
 
-- Trích xuất cao độ
-
-- Hỗ trợ suy luận chuyển đổi âm thanh bằng mô hình ONNX
-
-- Mô hình ONNX RVC cũng sẽ hỗ trợ chỉ mục để suy luận
-
-- Chuyển đổi giọng nói thời gian thực
-
-- Tạo tham chiếu huấn luyện
+- Tạo bộ tham chiếu huấn luyện
 
 **Phương thức trích xuất cao độ (38+): `pm, dio, crepe, fcpe, rmvpe, hpa-rmvpe, harvest, yin, pyin, swipe, piptrack, penn, djcm, swift, pesto`**
 
 **Các mô hình trích xuất nhúng (21+): `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin, whisper`**
 
-- **Các mô hình trích xuất nhúng có sẳn các chế độ nhúng như: fairseq, onnx, transformers, spin, whisper.**
-- **Các mô hình trích xuất cao độ đều có phiên bản tăng tốc ONNX trừ các phương thức hoạt động bằng trình bao bọc.** 
-- **Các mô hình trích xuất cao độ đều có thể kết hợp với nhau theo tỉ lệ để tạo ra cảm giác mới mẻ, ví dụ: `hybrid[rmvpe+harvest]`.**
+- **Trích xuất nhúng hỗ trợ những mô hình từ: `fairseq (.pt)`, `onnx (.onnx)`, `transformers (.bin - .json)`, `spin (.bin - .json)`, `whisper (.pt)`.**
+- **Trích xuất cao độ hỗ trợ việc trộn phương thức với nhau để cải thiện chất lượng, ví dụ: `hybrid[rmvpe+harvest]`.**
+
+Lưu ý:
+- Mô hình trích xuất cao độ có thể khiến chất lượng đầu ra kém đi khi sử dụng trong sai môi trường, khuyên dùng nhất là "RMVPE".
+- Mô hình trích xuất nhúng contentvec_base và hubert_base là một chỉ khác nhau về mặt dung lượng và độ chính xác khi suy luận của nó.
+- Việc thay đổi mô hình nhúng đòi hỏi việc huấn luyện lại từ đầu hoàn toàn mô hình RVC để sử dụng được. Các mô hình RVC thông dụng hiện tại sử dụng bộ nhúng contentvec_base hoặc hubert_base.
+- Khi huấn luyện mô hình RVC, để đạt được chất lượng cao nhất khi huấn luyện cần phải cung cấp dữ liệu âm thanh sạch không tiếng ồn, không bị nhiễu hay dính tạp âm, giọng rõ ràng và càng nhiều âm thanh càng tốt yêu cầu từ 10 phút giọng trở lên.
+- Khi huấn luyện nếu bạn không biết xem các giá trị thất thoát huấn luyện từ tensorboard, bạn có thể huấn luyện tầm 300-500 kỷ nguyên là tốt nhất, nhiều quá có thể khiến mô hình trở nên máy móc hơn.
 
 ## Cài đặt
 
@@ -111,6 +107,21 @@ uv pip install numpy==1.26.4 numba==0.61.0
 uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
 uv pip install -r requirements.txt
 ```
+
+Lưu ý:
+- Nếu gặp lỗi liên quan đến Pytorch hãy thử gỡ cài đặt Pytorch hiện tại và cài đặt phiên bản Pytorch cũ hơn ví dụ như cu121.
+```
+pip uninstall -y torch torchaudio torchvision
+uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu121
+```
+
+- Nếu gặp lỗi liên quan đến Onnxruntime hãy thử gỡ cài đặt Onnxruntime hiện tại và cài đặt phiên bản Pytorch cũ hơn ví dụ 1.20.1. 
+```
+pip uninstall -y onnxruntime-gpu
+uv pip install onnxruntime-gpu==1.20.1
+```
+
+- Nếu bạn không biết cách phân biệt giữa hai lỗi, hãy chạy cả hai lệnh trên:D
 
 </details>
 

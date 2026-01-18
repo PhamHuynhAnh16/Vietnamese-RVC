@@ -179,13 +179,17 @@ def preprocess(
     if not model_name: return gr_warning(translations["provide_name"])
 
     try:
-        if not os.path.exists(dataset) or not any(
-            f.lower().endswith(tuple(file_types)) 
-            for f in os.listdir(dataset) 
-            if os.path.isfile(os.path.join(dataset, f))
-        ): 
-            return gr_warning(translations["not_found_data"])
-    except:
+        found = False
+        if os.path.exists(dataset):
+            for root, _, files in os.walk(dataset):
+                for f in files:
+                    if f.lower().endswith(tuple(file_types)) and os.path.getsize(os.path.join(root, f)) > 0:
+                        found = True
+                        break
+
+                if found: break
+        if not found: return gr_warning(translations["not_found_data"])
+    except Exception:
         return gr_warning(translations["not_found_data"])
     
     model_dir = os.path.join(configs["logs_path"], model_name)

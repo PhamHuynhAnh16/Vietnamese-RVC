@@ -92,6 +92,9 @@ d_lr_coeff = 1.0
 g_lr_coeff = 1.0
 d_step_per_g_step = 1
 use_clip_grad_value = False
+weights_path = main_configs["weights_path"]
+logs_path = main_configs["logs_path"]
+custom_save_checkpoint_path = None
 
 args = parse_arguments()
 
@@ -145,12 +148,12 @@ args = parse_arguments()
     args.multiscale_mel_loss
 )
 
-disc_version = version if vocoder != "RefineGAN" else "v3"
+disc_version = version if vocoder not in ["RefineGAN", "BigVGAN"] else "v3"
 
 is_half = main_config.is_half
 if main_config.brain: is_half = True
 
-experiment_dir = os.path.join(main_configs["logs_path"], model_name)
+experiment_dir = os.path.join(logs_path, model_name) if not os.path.exists(model_name) else model_name
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
 
@@ -434,8 +437,10 @@ def run(
         logger.debug(e)
 
     try:
-        g_path = os.path.join(experiment_dir, "G_latest.pth")
-        last_g = g_path if save_only_latest and os.path.exists(g_path) else latest_checkpoint_path(experiment_dir, "G_*.pth")
+        checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
+
+        g_path = os.path.join(checkpoint_path, "G_latest.pth")
+        last_g = g_path if save_only_latest and os.path.exists(g_path) else latest_checkpoint_path(checkpoint_path, "G_*.pth")
 
         chk_path = (last_g if last_g else (pretrainG if pretrainG not in ["", "None"] else None))
 
@@ -1002,6 +1007,7 @@ def train_and_evaluate(
     
     if rank == 0:
         if epoch % save_every_epoch == False:
+            checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
             checkpoint_suffix = f"{'latest' if save_only_latest else global_step}.pth"
 
             save_checkpoint(
@@ -1010,7 +1016,7 @@ def train_and_evaluate(
                 optim_g, 
                 config.train.learning_rate, 
                 epoch, 
-                os.path.join(experiment_dir, "G_" + checkpoint_suffix), 
+                os.path.join(checkpoint_path, "G_" + checkpoint_suffix), 
                 scaler
             )
             save_checkpoint(
@@ -1019,13 +1025,13 @@ def train_and_evaluate(
                 optim_d, 
                 config.train.learning_rate, 
                 epoch, 
-                os.path.join(experiment_dir, "D_" + checkpoint_suffix), 
+                os.path.join(checkpoint_path, "D_" + checkpoint_suffix), 
                 scaler
             )
 
             if custom_save_every_weights: 
                 model_add.append(
-                    os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s.pth")
+                    os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth")
                 )
 
         if overtraining_detector and epoch > 1:
@@ -1091,11 +1097,11 @@ def train_and_evaluate(
                     )
                 )
 
-                for file in glob.glob(os.path.join(main_configs["weights_path"], f"{model_name}_*e_*s_best_epoch.pth")):
+                for file in glob.glob(os.path.join(weights_path, f"{model_name}_*e_*s_best_epoch.pth")):
                     model_del.append(file)
 
                 model_add.append(
-                    os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth")
+                    os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth")
                 )
         
         if epoch >= custom_total_epoch:
@@ -1116,7 +1122,7 @@ def train_and_evaluate(
             )
 
             model_add.append(
-                os.path.join(main_configs["weights_path"], f"{model_name}_{epoch}e_{global_step}s.pth")
+                os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth")
             )
 
             done = True

@@ -11,8 +11,9 @@ from main.app.variables import logger, translations
 from main.inference.realtime.realtime import VoiceChanger, RVC_Realtime
 
 class AudioCallbacks:
-    def emit_to(self, performance):
+    def emit_to(self, performance, volume):
         self.latency = performance[1]
+        self.volume = volume
     
     def __init__(
         self, 
@@ -51,6 +52,9 @@ class AudioCallbacks:
         clean_strength = 0.7, 
         post_process = False, 
         sid = 0,
+        record_audio = False,
+        record_audio_path = None,
+        export_format = "WAV",
         **kwargs
     ):
         self.pass_through = pass_through
@@ -96,6 +100,9 @@ class AudioCallbacks:
             clean_strength,
             post_process, 
             sid,
+            record_audio,
+            record_audio_path,
+            export_format,
             **kwargs
         )
 
@@ -117,6 +124,9 @@ class AudioCallbacks:
         clean_strength = 0.7, 
         post_process = False, 
         sid = 0,
+        record_audio = False,
+        record_audio_path = None,
+        export_format = "wav",
         **kwargs
     ):
         self.vc.initialize(
@@ -140,7 +150,10 @@ class AudioCallbacks:
                 post_process,
                 sid,
                 **kwargs
-            )
+            ),
+            record_audio,
+            record_audio_path,
+            export_format
         )
 
     def change_voice(

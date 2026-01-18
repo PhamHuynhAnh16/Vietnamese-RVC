@@ -65,6 +65,7 @@ def training_model_tab():
                         label=translations["sample_rate"], 
                         info=translations["sample_rate_info"], 
                         choices=[
+                            "24k",
                             "32k", 
                             "40k", 
                             "48k"
@@ -489,7 +490,8 @@ def training_model_tab():
                             choices=[
                                 "Default", 
                                 "MRF-HiFi-GAN", 
-                                "RefineGAN"
+                                "RefineGAN",
+                                "BigVGAN"
                             ], 
                             value="Default", 
                             interactive=True
@@ -647,7 +649,7 @@ def training_model_tab():
             ]
         )                
         dataset_path.change(
-            fn=lambda folder: os.makedirs(folder, exist_ok=True), 
+            fn=lambda folder: os.makedirs(folder, exist_ok=True) if folder else None, 
             inputs=[
                 dataset_path
             ], 

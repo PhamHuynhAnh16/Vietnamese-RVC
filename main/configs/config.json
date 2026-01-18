@@ -575,7 +575,6 @@
     "settings_tab": true,
     "create_srt_tab": true,
     "realtime_tab": true,
-    "realtime_client_tab": true,
     "create_reference_tab": true,
     "font": "https://fonts.googleapis.com/css2?family=Saira&display=swap",
     "app_port": 7860,

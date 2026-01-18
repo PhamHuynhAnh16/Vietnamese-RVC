@@ -417,8 +417,7 @@ class VoiceConverter:
                 if audio_processing: 
                     audio = preprocess(
                         audio, 
-                        self.sample_rate, 
-                        device=self.device
+                        self.sample_rate
                     )
 
                 try:
@@ -499,10 +498,7 @@ class VoiceConverter:
                 if audio_processing: 
                     audio_output = postprocess(
                         audio_output, 
-                        self.tgt_sr, 
-                        audio, 
-                        self.sample_rate, 
-                        device=self.device
+                        self.tgt_sr
                     )
 
                 if self.tgt_sr != resample_sr and resample_sr > 0: 

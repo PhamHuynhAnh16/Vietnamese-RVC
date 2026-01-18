@@ -15,6 +15,7 @@ start_time = time.time()
 from main.app.tabs.extra.extra import extra_tab
 from main.app.tabs.editing.editing import editing_tab
 from main.app.tabs.training.training import training_tab
+from main.app.tabs.realtime.realtime import realtime_tab
 from main.app.tabs.downloads.downloads import download_tab
 from main.app.tabs.inference.inference import inference_tab
 from main.configs.rpc import connect_discord_ipc, send_discord_rpc
@@ -33,6 +34,10 @@ js_code = """
     window._workletNode = null;
     window._playbackNode = null;
     window._ws = null;
+    window.OutputAudioRoute = null;
+    window.MonitorAudioRoute = null;
+    window.lastSend = 0;
+    window.responseMs = 0;
 
     function setStatus(msg, use_alert = true) {
         const realtimeStatus = document.querySelector("#realtime-status-info h2.output-class");
@@ -325,8 +330,8 @@ js_code = """
             inputNode.port.postMessage({ block_frame: block_frame });
             src.connect(inputNode);
 
-            createOutputRoute(window._audioCtx, playbackNode, output_audio_device, output_audio_gain / 100);
-            if (monitor && monitor_output_device) createOutputRoute(window._audioCtx, playbackNode, monitor_output_device, monitor_audio_gain / 100);
+            window.OutputAudioRoute = createOutputRoute(window._audioCtx, playbackNode, output_audio_device, output_audio_gain / 100);
+            if (monitor && monitor_output_device) window.MonitorAudioRoute = createOutputRoute(window._audioCtx, playbackNode, monitor_output_device, monitor_audio_gain / 100);
             
             const protocol = (location.protocol === "https:") ? "wss:" : "ws:";
             const wsUrl = protocol + '//' + location.hostname + `:${location.port}` + '/api/ws-audio';
@@ -424,14 +429,17 @@ js_code = """
                 const chunk = e.data && e.data.chunk;
 
                 if (!chunk) return;
-                if (ws.readyState === WebSocket.OPEN) ws.send(chunk);
+                if (ws.readyState === WebSocket.OPEN) {
+                    window.lastSend = performance.now();
+                    ws.send(chunk);
+                }
             };
 
             ws.onmessage = (ev) => {
                 if (typeof ev.data === 'string') {
                     const msg = JSON.parse(ev.data);
 
-                    if (msg.type === 'latency') setStatus(`__LATENCY__: ${msg.value.toFixed(1)} ms`, false)
+                    if (msg.type === 'latency') setStatus(`__LATENCY__: ${msg.value.toFixed(2)} ms | __VOLUME__: ${msg.volume.toFixed(2)} dB | __RESPONSE__: ${window.responseMs.toFixed(2)} ms`, use_alert=false)
                     if (msg.type === 'warnings') {
                         setStatus(msg.value);
                         StopAudioStream();
@@ -442,6 +450,7 @@ js_code = """
 
                 const ab = ev.data;
                 playbackNode.port.postMessage({ chunk: ab }, [ab]);
+                window.responseMs = performance.now() - window.lastSend;
             };
 
             ws.onclose = () => console.log("__WS_CLOSED__");
@@ -459,6 +468,32 @@ js_code = """
             return StopAudioStream();
         }
     };
+
+    window.ChangeConfig = async function(value, key, if_kwargs=false) {
+        if (key === "output_audio_gain") {
+            window.OutputAudioRoute.gainNode.gain.value = value / 100
+        } else if (key == "monitor_audio_gain") {
+            if (window.MonitorAudioRoute) window.MonitorAudioRoute.gainNode.gain.value = value / 100
+        } else {
+            const protocol = (location.protocol === "https:") ? "wss:" : "ws:";
+            const wsUrl = protocol + '//' + location.hostname + `:${location.port}` + '/api/change-config';
+            const ws = new WebSocket(wsUrl);
+
+            ws.binaryType = "arraybuffer";
+            ws.onopen = () => {
+                ws.send(
+                    JSON.stringify({
+                        type: 'init',
+                        key: key,
+                        value: value,
+                        if_kwargs: if_kwargs
+                    })
+                );
+    
+                ws.close();
+            };
+        }
+    }
 
     window.StopAudioStream = async function() {
         try {
@@ -487,6 +522,9 @@ js_code = """
                 window._audioCtx = null;
             }
 
+            if (window.OutputAudioRoute) window.OutputAudioRoute = null;
+            if (window.MonitorAudioRoute) window.MonitorAudioRoute = null;
+
             document.querySelectorAll('audio').forEach(a => a.remove());
             setStatus("__REALTIME_HAS_STOP__", false);
 
@@ -495,6 +533,34 @@ js_code = """
             setStatus(`__ERROR__ ${e}`);
 
             return {"start_button": false, "stop_button": true}
+        }
+    };
+
+    window.SoundfileRecordAudio = async function (RecordButton, RecordAudioPath, ExportFormat) {
+        const protocol = (location.protocol === "https:") ? "https:" : "http:";
+        const url = protocol + '//' + location.hostname + `:${location.port}` + '/api/record';
+
+        const res = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                record_button: RecordButton,
+                record_audio_path: RecordAudioPath,
+                export_format: ExportFormat
+            })
+        });
+
+        const msg = await res.json();
+
+        if (msg.type === "info" || msg.type === "warnings") {
+            alert(msg.value);
+
+            return {
+                "button": msg.button,
+                "path": msg.path
+            };
         }
     };
 }
@@ -522,6 +588,10 @@ js_code = """
     "__REALTIME_HAS_STOP__", translations["realtime_has_stop"]
 ).replace(
     "__PROVIDE_MODEL__", translations["provide_file"].format(filename=translations["model"])
+).replace(
+    "__VOLUME__", translations["volume"]
+).replace(
+    "__RESPONSE__", translations["response"]
 )
 
 css = """
@@ -571,14 +641,7 @@ with gr.Blocks(
     with gr.Tabs():      
         inference_tab()
         editing_tab()
-
-        if client_mode:
-            from main.app.tabs.realtime.realtime_client import realtime_client_tab
-            realtime_client_tab()
-        else:
-            from main.app.tabs.realtime.realtime import realtime_tab
-            realtime_tab()
-
+        realtime_tab()
         training_tab()
         download_tab()
         extra_tab(app)
