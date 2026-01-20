@@ -482,9 +482,9 @@ def training(
                 "_", 
                 embedder_model, 
                 "_", 
-                pitch_guidance, 
+                str(pitch_guidance), 
                 "_", 
-                energy_use
+                str(energy_use)
             ])
         )
 
