@@ -612,8 +612,7 @@ def training_model_tab():
         pitch_guidance.change(
             fn=vocoders_lock, 
             inputs=[
-                pitch_guidance, 
-                vocoders
+                pitch_guidance
             ], 
             outputs=[
                 vocoders

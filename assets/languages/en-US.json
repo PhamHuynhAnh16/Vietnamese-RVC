@@ -753,5 +753,6 @@
     "starting_record": "Start recording...",
     "stopping_record": "Stop recording!",
     "volume": "Volume",
-    "response": "Response"
+    "response": "Response",
+    "use_vocoders": "Use Vocoders: {name}"
 }

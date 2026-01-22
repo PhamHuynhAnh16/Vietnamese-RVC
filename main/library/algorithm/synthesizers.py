@@ -4,6 +4,7 @@ import torch
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import logger, translations
 from main.library.algorithm.residuals import ResidualCouplingBlock
 from main.library.algorithm.encoders import TextEncoder, PosteriorEncoder
 from main.library.algorithm.commons import slice_segments, rand_slice_segments
@@ -58,6 +59,8 @@ class Synthesizer(torch.nn.Module):
             if vocoder == "RefineGAN": 
                 from main.library.generators.refinegan import RefineGANGenerator
 
+                logger.info(translations["use_vocoders"].format(name="REFINEGAN"))
+
                 self.dec = RefineGANGenerator(
                     sample_rate=sr, 
                     upsample_rates=upsample_rates, 
@@ -66,6 +69,8 @@ class Synthesizer(torch.nn.Module):
                 )
             elif vocoder == "BigVGAN":
                 from main.library.generators.bigvgan import BigVGANGenerator
+
+                logger.info(translations["use_vocoders"].format(name="BIGVGAN"))
 
                 self.dec = BigVGANGenerator(
                     in_channel=inter_channels,
@@ -81,6 +86,8 @@ class Synthesizer(torch.nn.Module):
             elif vocoder in ["MRF-HiFi-GAN", "MRF HiFi-GAN"]: 
                 from main.library.generators.mrf_hifigan import HiFiGANMRFGenerator
 
+                logger.info(translations["use_vocoders"].format(name="MRF-HIFIGAN"))
+
                 self.dec = HiFiGANMRFGenerator(
                     in_channel=inter_channels, 
                     upsample_initial_channel=upsample_initial_channel, 
@@ -94,9 +101,11 @@ class Synthesizer(torch.nn.Module):
                     checkpointing=checkpointing
                 )
             else: 
-                from main.library.generators.nsf_hifigan import HiFiGANNRFGenerator
+                from main.library.generators.nsf_hifigan import HiFiGANNSFGenerator
 
-                self.dec = HiFiGANNRFGenerator(
+                logger.info(translations["use_vocoders"].format(name="NSF-HIFIGAN"))
+
+                self.dec = HiFiGANNSFGenerator(
                     inter_channels, 
                     resblock_kernel_sizes, 
                     resblock_dilation_sizes, 
@@ -109,6 +118,8 @@ class Synthesizer(torch.nn.Module):
                 )
         else: 
             from main.library.generators.hifigan import HiFiGANGenerator
+
+            logger.info(translations["use_vocoders"].format(name="HIFIGAN"))
 
             self.dec = HiFiGANGenerator(
                 inter_channels, 

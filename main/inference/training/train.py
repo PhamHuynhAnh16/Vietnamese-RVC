@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import glob
 import json
@@ -578,7 +579,7 @@ def run(
     if use_custom_reference and os.path.isfile(os.path.join(reference_path, "feats.npy")):
         import numpy as np
 
-        if rank == 0: logger.info(translations["using_reference"].format(reference_name=reference_path))
+        if rank == 0: logger.info(translations["using_reference"].format(reference_name=re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', os.path.basename(reference_path))))
         phone = np.repeat(np.load(os.path.join(reference_path, "feats.npy")), 2, axis=0)
 
         reference = (

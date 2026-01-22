@@ -378,12 +378,14 @@ def pitch_guidance_lock(vocoders):
         "__type__": "update"
     }
 
-def vocoders_lock(pitch, vocoders):
-    return {
-        "value": vocoders if pitch else "Default", 
-        "interactive": pitch, 
-        "__type__": "update"
-    }
+def vocoders_lock(pitch):
+    if pitch:
+        return gr.update(interactive=True)
+
+    return gr.update(
+        value="Default",
+        interactive=False
+    )
 
 def unlock_f0(value):
     return {

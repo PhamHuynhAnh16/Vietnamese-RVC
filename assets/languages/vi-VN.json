@@ -753,5 +753,6 @@
     "starting_record": "Bắt đầu ghi âm...",
     "stopping_record": "Dừng ghi âm!",
     "volume": "Âm lượng",
-    "response": "Phản hồi"
+    "response": "Phản hồi",
+    "use_vocoders": "Sử dụng bộ mã hóa: {name}"
 }

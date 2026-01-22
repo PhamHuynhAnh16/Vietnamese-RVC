@@ -85,7 +85,7 @@ class SourceModuleHnNSF(torch.nn.Module):
             )
         )
 
-class HiFiGANNRFGenerator(torch.nn.Module):
+class HiFiGANNSFGenerator(torch.nn.Module):
     def __init__(
         self, 
         initial_channel, 
@@ -98,7 +98,7 @@ class HiFiGANNRFGenerator(torch.nn.Module):
         sr, 
         checkpointing = False
     ):
-        super(HiFiGANNRFGenerator, self).__init__()
+        super(HiFiGANNSFGenerator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
         self.upp = math.prod(upsample_rates)

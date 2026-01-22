@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import csv
 import json
@@ -205,8 +206,12 @@ paths_for_files = sorted([
 ])
 
 reference_list = sorted([
-    name for name in os.listdir(configs["reference_path"]) 
-    if os.path.exists(os.path.join(configs["reference_path"], name)) and os.path.isdir(os.path.join(configs["reference_path"], name))
+    re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) 
+    for name in os.listdir(configs["reference_path"]) 
+    if (
+        os.path.exists(os.path.join(configs["reference_path"], name)) and 
+        os.path.isdir(os.path.join(configs["reference_path"], name))
+    )
 ])
 
 model_name = sorted(list(
