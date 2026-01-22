@@ -510,7 +510,7 @@
     "provide_folder": "Vui lòng cung cấp thư mục hợp lệ!",
     "empty_folder": "Thư mục dữ liệu trống!",
     "vocoder": "Bộ mã hóa",
-    "vocoder_info": "Bộ mã hóa giọng nói dùng để phân tích và tổng hợp tín hiệu giọng nói của con người để chuyển đổi giọng nói.\n\nDefault: Tùy chọn này là HiFi-GAN-NSF, tương thích với tất cả các RVC\n\nMRF-HiFi-GAN: Độ trung thực cao hơn.\n\nRefineGAN: Chất lượng âm thanh vượt trội.",
+    "vocoder_info": "Bộ mã hóa giọng nói dùng để phân tích và tổng hợp tín hiệu giọng nói của con người để chuyển đổi giọng nói.\n\nDefault: Tùy chọn này là HiFi-GAN-NSF, tương thích với tất cả các RVC\n\nMRF-HiFi-GAN: Độ trung thực cao hơn.\n\nRefineGAN: Chất lượng âm thanh vượt trội.\n\nBigVGAN: Được cho là có chất lượng siêu cao, nhưng sẽ biến GPU của bạn thành lò nướng.",
     "code_error": "Lỗi: Nhận mã trạng thái",
     "json_error": "Lỗi: Không thể phân tích từ phản hồi.",
     "requests_error": "Yêu cầu thất bại: {e}",

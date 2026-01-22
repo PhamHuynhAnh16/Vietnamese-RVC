@@ -14,7 +14,7 @@ from distutils.util import strtobool
 sys.path.append(os.getcwd())
 
 from main.app.variables import config, logger, translations, configs
-from main.library.utils import load_audio, load_embedders_model, extract_features
+from main.library.utils import load_audio, load_embedders_model, extract_features, check_assets
 
 warnings.filterwarnings("ignore")
 
@@ -78,6 +78,13 @@ def main():
         args.proposal_pitch, 
         args.proposal_pitch_threshold, 
         args.alpha
+    )
+
+    check_assets(
+        f0_method, 
+        embedder_model, 
+        predictor_onnx, 
+        embedders_mode
     )
 
     create_reference(
