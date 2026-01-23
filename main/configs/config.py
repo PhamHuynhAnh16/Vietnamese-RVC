@@ -134,6 +134,8 @@ class Config:
             providers = ["CUDAExecutionProvider"]
         elif "ROCMExecutionProvider" in ort_providers and self.device.startswith("cuda"):
             providers = ["ROCMExecutionProvider"]
+        elif "DmlExecutionProvider" in ort_providers and self.device.startswith("cuda"):
+            providers = ["DmlExecutionProvider"]
         elif "DmlExecutionProvider" in ort_providers and self.device.startswith(("ocl", "privateuseone")): 
             providers = ["DmlExecutionProvider"]
         elif "CoreMLExecutionProvider" in ort_providers and self.device.startswith("mps"): 

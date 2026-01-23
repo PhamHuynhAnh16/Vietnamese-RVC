@@ -585,7 +585,7 @@ def audio_device():
 
         return input_device_list, output_device_list
     except Exception:
-        return [], []
+        return {}, {}
 
 def update_audio_device(input_device, output_device, monitor_device, monitor):
     input_channels_map, output_channels_map = audio_device()
@@ -755,3 +755,6 @@ def get_speakers_id(model):
             "choices": [0], 
             "__type__": "update"
         }
+ 
+def run_commands(cmd):
+    os.system(cmd)

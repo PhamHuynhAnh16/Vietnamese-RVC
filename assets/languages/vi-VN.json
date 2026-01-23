@@ -754,5 +754,12 @@
     "stopping_record": "Dừng ghi âm!",
     "volume": "Âm lượng",
     "response": "Phản hồi",
-    "use_vocoders": "Sử dụng bộ mã hóa: {name}"
+    "use_vocoders": "Sử dụng bộ mã hóa: {name}",
+    "commands": "Lệnh",
+    "commands_info": "Sử dụng các lệnh phụ trợ đễ hỗ trợ phát triển.",
+    "run_commands": "Chạy lệnh",
+    "check_requirements": "Kiểm tra các gói phụ thuộc...",
+    "requirements_change": "Phát hiện các gói phụ thuộc có sự thay đổi, tiến hành cập nhật...",
+    "update_requirements_complete": "Hoàn tất kiểm tra các gói phụ thuộc!",
+    "check_requirements_failed": "Kiểm tra phiên bản các gói phụ thuộc thất bại!"
 }

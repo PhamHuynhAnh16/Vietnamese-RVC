@@ -1,12 +1,13 @@
 import os
+from re import L
 import sys
 
 import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.core.ui import change_fp
 from main.app.core.utils import stop_pid
+from main.app.core.ui import change_fp, run_commands
 
 from main.app.core.restart import (
     change_font, 
@@ -85,6 +86,17 @@ def settings_tab(app):
                 translations["change_font"]
             )
     with gr.Row():
+        commands = gr.Textbox(
+            label=translations["commands"],
+            info=translations["commands_info"],
+            value="",
+            interactive=True
+        )
+    with gr.Row():
+        run_commands_button = gr.Button(
+            translations["run_commands"]
+        )
+    with gr.Row():
         with gr.Column():
             with gr.Accordion(translations["stop"], open=False, visible=True):
                 separate_stop = gr.Button(
@@ -122,6 +134,13 @@ def settings_tab(app):
             fn=change_fp, 
             inputs=[fp_choice], 
             outputs=[fp_choice]
+        )
+        run_commands_button.click(
+            fn=run_commands,
+            inputs=[
+                commands
+            ],
+            outputs=[]
         )
     with gr.Row():
         change_lang.click(

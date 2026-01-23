@@ -1,5 +1,6 @@
 import os
 import sys
+import torch
 
 import gradio as gr
 
@@ -45,7 +46,7 @@ input_channels_map, output_channels_map = audio_device()
 client_mode = "--client" in sys.argv
 
 def realtime_tab():
-    with gr.TabItem(translations["realtime"], visible=configs.get("realtime_tab", True)):
+    with gr.TabItem(translations["realtime"], visible=configs.get("realtime_tab", True) and not torch.cuda.get_device_name().endswith("[ZLUDA]")):
         gr.Markdown(translations["realtime_markdown"])
         with gr.Row():
             gr.Markdown(translations["realtime_markdown_2"])

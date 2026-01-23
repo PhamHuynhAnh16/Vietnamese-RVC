@@ -49,6 +49,7 @@ Dự án này có thể sẽ không cung cấp bản dựng sẳn, chỉ cung c�
 
 - **Trích xuất nhúng hỗ trợ những mô hình từ: `fairseq (.pt)`, `onnx (.onnx)`, `transformers (.bin - .json)`, `spin (.bin - .json)`, `whisper (.pt)`.**
 - **Trích xuất cao độ hỗ trợ việc trộn phương thức với nhau để cải thiện chất lượng, ví dụ: `hybrid[rmvpe+harvest]`.**
+- **Bộ mã hóa giọng nói tùy chỉnh: `HiFiGAN`, `NSF-HiFiGAN`, `MRF-HiFiGAN`, `ReFineGAN`, `BigVGAN`.**
 
 Lưu ý:
 - Mô hình trích xuất cao độ có thể khiến chất lượng đầu ra kém đi khi sử dụng trong sai môi trường, khuyên dùng nhất là "RMVPE".
@@ -78,47 +79,48 @@ Cài đặt bằng github:
 
 Bước 3: Cài đặt thư viện cần thiết:
 
+<details>
+<summary>Đối với Windows</summary>
+
 Nhập lệnh:
 ```
 python -m venv env
-env\\Scripts\\activate
-
-python -m pip install uv
-uv pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common wget
+env\Scripts\python.exe -m pip install uv
+env\Scripts\python.exe -m uv pip install six packaging python-dateutil platformdirs pywin32 onnxconverter_common wget
 ```
 
-Cài đặt đối với các thiết bị khác nhau
+Tiếp tục chạy các lệnh dưới đây theo phiên bản phần cứng của bạn.
 
 <details>
-<summary>Đối với CPU</summary>
+<summary>Đối với CPU (Sử dụng CPU cho việc tính toán)</summary>
 
 ```
-uv pip install -r requirements.txt
+env\Scripts\python.exe -m uv pip install -r requirements.txt
 ```
 
 </details>
 
 <details>
-<summary>Đối với CUDA</summary>
+<summary>Đối với CUDA (Sử dụng đối với GPU của Nvidia)</summary>
 
 Có thể thay cu118 thành bản cu128 mới hơn nếu GPU hỗ trợ:
 ```
-uv pip install numpy==1.26.4 numba==0.61.0
-uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
-uv pip install -r requirements.txt
+env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
+env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
+env\Scripts\python.exe -m uv pip install -r requirements.txt
 ```
 
 Lưu ý:
 - Nếu gặp lỗi liên quan đến Pytorch hãy thử gỡ cài đặt Pytorch hiện tại và cài đặt phiên bản Pytorch cũ hơn ví dụ như cu121.
 ```
-pip uninstall -y torch torchaudio torchvision
-uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu121
+env\Scripts\python.exe -m pip uninstall -y torch torchaudio torchvision
+env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu121
 ```
 
 - Nếu gặp lỗi liên quan đến Onnxruntime hãy thử gỡ cài đặt Onnxruntime hiện tại và cài đặt phiên bản Pytorch cũ hơn ví dụ 1.20.1. 
 ```
-pip uninstall -y onnxruntime-gpu
-uv pip install onnxruntime-gpu==1.20.1
+env\Scripts\python.exe -m pip uninstall -y onnxruntime-gpu
+env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.20.1
 ```
 
 - Nếu bạn không biết cách phân biệt giữa hai lỗi, hãy chạy cả hai lệnh trên:D
@@ -126,14 +128,14 @@ uv pip install onnxruntime-gpu==1.20.1
 </details>
 
 <details>
-<summary>Đối với OPENCL</summary>
+<summary>Đối với OPENCL (Sử dụng đối với GPU của AMD)</summary>
 
 ```
-uv pip install numpy==1.26.4 numba==0.61.0
-uv pip install torch==2.6.0 torchaudio==2.6.0 torchvision
-uv pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
-uv pip install onnxruntime-directml
-uv pip install -r requirements.txt
+env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
+env\Scripts\python.exe -m uv pip install torch==2.6.0 torchaudio==2.6.0 torchvision
+env\Scripts\python.exe -m uv pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
+env\Scripts\python.exe -m uv pip install onnxruntime-directml
+env\Scripts\python.exe -m uv pip install -r requirements.txt
 ```
 
 Lưu ý: 
@@ -146,14 +148,14 @@ Lưu ý:
 </details>
 
 <details>
-<summary>Đối với DIRECTML</summary>
+<summary>Đối với DIRECTML (Sử dụng đối với GPU của AMD / Intel Graphics)</summary>
 
 ```
-uv pip install numpy==1.26.4 numba==0.61.0
-uv pip install torch==2.4.1 torchaudio==2.4.1 torchvision
-uv pip install torch-directml==0.2.5.dev240914
-uv pip install onnxruntime-directml
-uv pip install -r requirements.txt
+env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
+env\Scripts\python.exe -m uv pip install torch==2.4.1 torchaudio==2.4.1 torchvision
+env\Scripts\python.exe -m uv pip install torch-directml==0.2.5.dev240914
+env\Scripts\python.exe -m uv pip install onnxruntime-directml
+env\Scripts\python.exe -m uv pip install -r requirements.txt
 ```
 
 Lưu ý: 
@@ -165,6 +167,101 @@ Lưu ý:
 
 </details>
 
+<details>
+<summary>Đối với ZLUDA (Sử dụng đối với GPU của AMD hỗ trợ ROCm)</summary>
+
+Kiểm tra GPU của bạn có được hỗ trợ hay không: [ROCM-Requirements](https://rocm.docs.amd.com/projects/install-on-windows/en/develop/reference/system-requirements.html).
+Tải và cài đặt: [VC++ Runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe) và [HIP-SDK](https://www.amd.com/en/developer/resources/rocm-hub/hip-sdk.html).
+Thêm thư mục bin từ HIP-SDK vào PATH hệ thống.
+
+```
+env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
+env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
+env\Scripts\python.exe -m uv pip install -r requirements.txt
+```
+
+Sao chép path-zluda-hipxx.bat (Thay xx theo phiên bản HIP SDK của bạn) và run_app.bat ra thư mục chính thay thế các tệp hiện tại.
+Chạy tệp path-zluda-hipxx.bat.
+
+Lưu ý:
+- Nếu GPU của bạn không nằm trong danh sách hỗ trợ (ví dụ như: gf803) bạn có thể thử dùng HIP SDK 5.7.0 và ghi đè thư mục library trong ROCm/5.7.0/bin/rocblas từ [ROCmLibs](https://github.com/likelovewant/ROCmLibs-for-gfx1103-AMD780M-APU/releases) (Không Khuyến Khích).
+- Nếu Onnxruntime không hoạt động, bạn có thể thử đổi sang phiên bản onnxruntime-directml.
+- Zluda không được thiết kế cho các hệ thống thời gian thực nên chức năng thời gian thực của ứng dụng sẽ bị vô hiệu hóa.
+
+</details>
+</details>
+
+<details>
+<summary>Đối với Linux</summary>
+
+Nhập lệnh:
+```
+sudo apt update -y
+sudo apt install -y curl git build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+curl https://pyenv.run | bash
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+source ~/.bashrc
+pyenv local --unset
+pyenv shell --unset
+pyenv install 3.11.9
+pyenv global 3.11.9
+python -m pip install uv
+python -m uv pip install six packaging python-dateutil platformdirs onnxconverter_common wget
+```
+
+Tiếp tục chạy các lệnh dưới đây theo phiên bản phần cứng của bạn.
+
+<details>
+<summary>Đối với CPU (Sử dụng CPU cho việc tính toán)</summary>
+
+```
+python -m uv pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary>Đối với CUDA (Sử dụng đối với GPU của Nvidia)</summary>
+
+Có thể thay cu118 thành bản cu128 mới hơn nếu GPU hỗ trợ:
+```
+python -m uv pip install numpy==1.26.4 numba==0.61.0
+python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
+python -m uv pip install -r requirements.txt
+```
+
+Lưu ý:
+- Nếu gặp lỗi liên quan đến Pytorch hãy thử gỡ cài đặt Pytorch hiện tại và cài đặt phiên bản Pytorch cũ hơn ví dụ như cu121.
+```
+python -m pip uninstall -y torch torchaudio torchvision
+python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu121
+```
+
+- Nếu gặp lỗi liên quan đến Onnxruntime hãy thử gỡ cài đặt Onnxruntime hiện tại và cài đặt phiên bản Pytorch cũ hơn ví dụ 1.20.1. 
+```
+python -m pip uninstall -y onnxruntime-gpu
+python -m uv pip install onnxruntime-gpu==1.20.1
+```
+
+- Nếu bạn không biết cách phân biệt giữa hai lỗi, hãy chạy cả hai lệnh trên:D
+
+</details>
+
+<details>
+<summary>Đối với ROCm (Sử dụng đối với GPU của AMD)</summary>
+
+Có thể thay rocm6.4 thành bản rocm7.1 mới hơn nếu GPU hỗ trợ:
+```
+python -m uv pip install numpy==1.26.4 numba==0.61.0
+python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm6.4
+python -m uv pip install -r requirements.txt
+```
+
+</details>
+</details>
+
 ## Sử dụng
 
 **Sử dụng với Google Colab**
@@ -172,24 +269,44 @@ Lưu ý:
 - Bước 1: Chạy ô Cài đặt và đợi nó hoàn tất.
 - Bước 2: Chạy ô Mở giao diện sử dụng (Khi này giao diện sẽ in ra 2 đường dẫn 1 là 0.0.0.0.7680 và 1 đường dẫn gradio có thể nhấp được, bạn chọn vào đường dẫn nhấp được và nó sẽ đưa bạn đến giao diện).
 
-**Chạy tệp run_app để mở giao diện sử dụng, chạy tệp tensorboard để mở biểu đồ kiểm tra huấn luyện. (Lưu ý: không tắt Command Prompt hoặc Terminal)**
+**(Windows) Chạy tệp run_app.bat để mở giao diện sử dụng, chạy tệp tensorboard.bat để mở biểu đồ kiểm tra huấn luyện. (Lưu ý: không tắt Command Prompt hoặc Terminal)**
 ```
 run_app.bat / tensorboard.bat
 ```
 
 **Khởi động giao diện sử dụng. (Thêm `--allow_all_disk` vào lệnh để cho phép gradio truy cập tệp ngoài)**
 ```
-env\\Scripts\\python.exe main\\app\\app.py --open
+env\Scripts\python.exe main\app\app.py --open
 ```
 
 **Với trường hợp bạn sử dụng Tensorboard để kiểm tra huấn luyện**
 ```
-env\\Scripts\\python.exe main/app/run_tensorboard.py
+env\Scripts\python.exe main\app\run_tensorboard.py
 ```
 
 **Sử dụng bằng cú pháp**
 ```
-python main\\app\\parser.py --help
+env\Scripts\python.exe main\app\parser.py --help
+```
+
+**(Linux) Chạy tệp run_app.sh để mở giao diện sử dụng, chạy tệp tensorboard.sh để mở biểu đồ kiểm tra huấn luyện. (Lưu ý: không tắt Terminal)**
+```
+run_app.sh / tensorboard.sh
+```
+
+**Khởi động giao diện sử dụng. **
+```
+python main/app/app.py --open
+```
+
+**Với trường hợp bạn sử dụng Tensorboard để kiểm tra huấn luyện**
+```
+python main/app/run_tensorboard.py
+```
+
+**Sử dụng bằng cú pháp**
+```
+python main/app/parser.py --help
 ```
 
 ## LƯU Ý

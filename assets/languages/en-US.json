@@ -754,5 +754,12 @@
     "stopping_record": "Stop recording!",
     "volume": "Volume",
     "response": "Response",
-    "use_vocoders": "Use Vocoders: {name}"
+    "use_vocoders": "Use Vocoders: {name}",
+    "commands": "Commands",
+    "commands_info": "Use auxiliary commands to support development.",
+    "run_commands": "Run Commands",
+    "check_requirements": "Check for requirements...",
+    "requirements_change": "Detected changes to requirements, update them...",
+    "update_requirements_complete": "Completed checking requirements!",
+    "check_requirements_failed": "Version check failed!"
 }

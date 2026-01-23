@@ -617,5 +617,6 @@
     "pretrain_strict": true,
     "cpu_mode": false,
     "brain": false,
-    "discord_presence": true
+    "discord_presence": true,
+    "check_new_requirements": true
 }
