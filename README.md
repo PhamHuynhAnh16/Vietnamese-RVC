@@ -294,7 +294,7 @@ env\Scripts\python.exe main\app\parser.py --help
 run_app.sh / tensorboard.sh
 ```
 
-**Khởi động giao diện sử dụng. **
+**Khởi động giao diện sử dụng.**
 ```
 python main/app/app.py --open
 ```
