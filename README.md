@@ -256,8 +256,12 @@ Có thể thay rocm6.4 thành bản rocm7.1 mới hơn nếu GPU hỗ trợ:
 ```
 python -m uv pip install numpy==1.26.4 numba==0.61.0
 python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm6.4
+python -m uv pip install onnxruntime-rocm
 python -m uv pip install -r requirements.txt
 ```
+
+Lưu ý:
+- Onnxruntime-ROCm hiện không có bản build chính thức cho python 3.11 nên bạn cần cài đặt mọi thứ trên python 3.10 hoặc 3.12.
 
 </details>
 </details>
