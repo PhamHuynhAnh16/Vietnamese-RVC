@@ -109,20 +109,23 @@ class Separator:
         self.torch_device = torch.device("cuda")
 
         if "CUDAExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(have='CUDAExecutionProvider'))
+            self.logger.info(translations["onnx_have"].format(backends='CUDAExecutionProvider'))
             self.onnx_execution_provider = ["CUDAExecutionProvider"]
         else: 
-            self.logger.warning(translations["onnx_not_have"].format(have='CUDAExecutionProvider'))
+            self.logger.warning(translations["onnx_not_have"].format(backends='CUDAExecutionProvider'))
 
     def configure_amd(self, ort_providers):
-        self.logger.info(translations["running_in_amd"])
+        self.logger.info(translations["running_in_amd"].format(backends=config.device.upper()))
         self.torch_device = torch.device(config.device)
 
-        if "DmlExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(have='DmlExecutionProvider'))
+        if "ROCMExecutionProvider" in ort_providers:
+            self.logger.info(translations["onnx_have"].format(backends='ROCMExecutionProvider'))
+            self.onnx_execution_provider = ["ROCMExecutionProvider"]
+        elif "DmlExecutionProvider" in ort_providers:
+            self.logger.info(translations["onnx_have"].format(backends='DmlExecutionProvider'))
             self.onnx_execution_provider = ["DmlExecutionProvider"]
         else: 
-            self.logger.warning(translations["onnx_not_have"].format(have='DmlExecutionProvider'))
+            self.logger.warning(translations["onnx_not_have"].format(backends=('DmlExecutionProvider' if not config.device.startswith("ocl") else 'OclExecutionProvider') if not config.device.startswith("cuda") else 'ROCMExecutionProvider'))
 
     def configure_mps(self, ort_providers):
         self.logger.info(translations["set_torch_mps"])
@@ -130,10 +133,10 @@ class Separator:
         self.torch_device = self.torch_device_mps
 
         if "CoreMLExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(have='CoreMLExecutionProvider'))
+            self.logger.info(translations["onnx_have"].format(backends='CoreMLExecutionProvider'))
             self.onnx_execution_provider = ["CoreMLExecutionProvider"]
         else: 
-            self.logger.warning(translations["onnx_not_have"].format(have='CoreMLExecutionProvider'))
+            self.logger.warning(translations["onnx_not_have"].format(backends='CoreMLExecutionProvider'))
 
     def get_model_hash(self, model_path):
         try:

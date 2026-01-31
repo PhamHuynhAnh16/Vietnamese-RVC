@@ -5,12 +5,17 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.core.ui import shutil_move
 from main.app.core.model_utils import model_info
 
+from main.app.core.ui import (
+    shutil_move,
+    change_models_choices
+)
+
 from main.app.variables import (
+    configs,
+    model_name, 
     translations, 
-    configs
 )
 
 def read_model_tab():
@@ -28,13 +33,17 @@ def read_model_tab():
             scale=2
         )
     with gr.Column():
-        model_path = gr.Textbox(
-            label=translations["model_path"], 
-            value="", 
-            placeholder="assets/weights/Model.pth", 
-            info=translations["model_path_info"], 
-            interactive=True
+        model_path = gr.Dropdown(
+            label=translations["model_name"], 
+            choices=model_name, 
+            value=model_name[0] if len(model_name) >= 1 else "", 
+            interactive=True, 
+            allow_custom_value=True
         )
+        with gr.Row():
+            refresh_model = gr.Button(
+                translations["refresh"]
+            )
         output_info = gr.Textbox(
             label=translations["modelinfo"], 
             value="", 
@@ -60,4 +69,11 @@ def read_model_tab():
                 output_info
             ],
             api_name="read_model"
+        )
+        refresh_model.click(
+            fn=lambda: change_models_choices()[0], 
+            inputs=[], 
+            outputs=[
+                model_path
+            ]
         )

@@ -118,7 +118,10 @@ class Audio:
         input_audio_gain = 1.0, 
         output_audio_gain = 1.0, 
         monitor_audio_gain = 1.0, 
-        monitor = False
+        monitor = False,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         self.callbacks = callbacks
         self.mon_queue = Queue()
@@ -141,6 +144,9 @@ class Audio:
         self.f0_autotune_strength = f0_autotune_strength
         self.proposal_pitch = proposal_pitch
         self.proposal_pitch_threshold = proposal_pitch_threshold
+        self.embedders_mix = embedders_mix
+        self.embedders_mix_layers = embedders_mix_layers
+        self.embedders_mix_ratio = embedders_mix_ratio
 
     def get_input_audio_device(self, index):
         audioinput, _ = list_audio_device()
@@ -176,7 +182,10 @@ class Audio:
             self.f0_autotune, 
             self.f0_autotune_strength, 
             self.proposal_pitch, 
-            self.proposal_pitch_threshold
+            self.proposal_pitch_threshold,
+            self.embedders_mix,
+            self.embedders_mix_layers,
+            self.embedders_mix_ratio
         )
     
     def process_data_with_time(self, indata):

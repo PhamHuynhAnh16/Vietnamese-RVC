@@ -303,8 +303,7 @@ def load_embedders_model(embedder_model, embedders_mode="fairseq"):
 
             hubert_model = HubertModelONNX(
                 embedder_model_path, 
-                config.providers, 
-                config.device
+                config.providers
             )
         elif embedders_mode == "transformers":
             from main.library.embedders.transformers import HubertModelWithFinalProj
@@ -316,8 +315,7 @@ def load_embedders_model(embedder_model, embedders_mode="fairseq"):
             from main.library.embedders.ppg import WhisperModel
 
             hubert_model = WhisperModel(
-                embedder_model_path, 
-                config.device
+                embedder_model_path
             )
         else: raise ValueError(translations["option_not_valid"])
     except Exception as e:
@@ -356,7 +354,7 @@ def restore(segments, total_len, dtype=np.float32):
 
     return np.concatenate(out, axis=-1)
 
-def extract_features(model, feats, version, device="cpu"):
+def extract_features(model, feats, version, device="cpu", mix=False, mix_layers=9, mix_ratio=0.5):
     with torch.no_grad():
         logits = model.extract_features(
             **{
@@ -364,8 +362,20 @@ def extract_features(model, feats, version, device="cpu"):
                 "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), 
                 "output_layer": 9 if version == "v1" else 12
             }
-        )
-        feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
+        )[0]
+
+        if mix and isinstance(model, torch.nn.Module):
+            mix_logits = model.extract_features(
+                **{
+                    "source": feats, 
+                    "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), 
+                    "output_layer": mix_layers
+                }
+            )[0]
+
+            logits = mix_ratio * mix_logits + (1 - mix_ratio) * logits
+
+        feats = model.final_proj(logits) if version == "v1" else logits
 
     return feats
 

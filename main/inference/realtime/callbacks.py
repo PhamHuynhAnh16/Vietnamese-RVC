@@ -55,6 +55,9 @@ class AudioCallbacks:
         record_audio = False,
         record_audio_path = None,
         export_format = "WAV",
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5,
         **kwargs
     ):
         self.pass_through = pass_through
@@ -81,7 +84,10 @@ class AudioCallbacks:
             input_audio_gain, 
             output_audio_gain, 
             monitor_audio_gain,
-            monitor
+            monitor,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
         self.initialize(
             model_path, 
@@ -167,7 +173,10 @@ class AudioCallbacks:
         f0_autotune = False, 
         f0_autotune_strength = 1, 
         proposal_pitch = False, 
-        proposal_pitch_threshold = 255.0
+        proposal_pitch_threshold = 255.0,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         if self.pass_through:
             vol = float(np.sqrt(np.square(received_data).mean(dtype=np.float32)))
@@ -185,7 +194,10 @@ class AudioCallbacks:
                     f0_autotune, 
                     f0_autotune_strength, 
                     proposal_pitch, 
-                    proposal_pitch_threshold
+                    proposal_pitch_threshold,
+                    embedders_mix,
+                    embedders_mix_layers,
+                    embedders_mix_ratio
                 )
 
             return audio, vol, perf, None

@@ -44,7 +44,10 @@ def convert(
     proposal_pitch_threshold, 
     audio_processing=False, 
     alpha=0.5,
-    sid=0
+    sid=0,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):    
     subprocess.run([
         python, 
@@ -79,7 +82,10 @@ def convert(
         "--proposal_pitch_threshold", str(proposal_pitch_threshold),
         "--audio_processing", str(audio_processing),
         "--alpha", str(alpha),
-        "--sid", str(sid)
+        "--sid", str(sid),
+        "--embedders_mix", str(embedders_mix),
+        "--embedders_mix_layers", str(embedders_mix_layers),
+        "--embedders_mix_ratio", str(embedders_mix_ratio),
     ])
 
 def convert_audio(
@@ -121,7 +127,10 @@ def convert_audio(
     proposal_pitch_threshold, 
     audio_processing=False, 
     alpha=0.5,
-    sid=0
+    sid=0,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
@@ -244,7 +253,10 @@ def convert_audio(
             proposal_pitch_threshold, 
             audio_processing, 
             alpha,
-            sid
+            sid,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         gr_info(translations["convert_success"])
@@ -284,7 +296,10 @@ def convert_audio(
                 proposal_pitch_threshold, 
                 audio_processing, 
                 alpha,
-                sid
+                sid,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             )
 
             gr_info(translations["convert_backup_success"])
@@ -412,7 +427,10 @@ def convert_audio(
                 proposal_pitch_threshold, 
                 audio_processing, 
                 alpha,
-                sid
+                sid,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             )
 
             gr_info(translations["batch_convert_success"])
@@ -457,7 +475,10 @@ def convert_audio(
                 proposal_pitch_threshold, 
                 audio_processing, 
                 alpha,
-                sid
+                sid,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             )
 
             gr_info(translations["convert_success"])
@@ -503,7 +524,10 @@ def convert_selection(
     proposal_pitch_threshold,
     audio_processing=False,
     alpha=0.5,
-    sid=0
+    sid=0,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     if use_audio:
         gr_info(translations["search_separate"])
@@ -587,7 +611,10 @@ def convert_selection(
                 proposal_pitch_threshold, 
                 audio_processing, 
                 alpha,
-                sid
+                sid,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             )
 
             return [
@@ -675,7 +702,10 @@ def convert_selection(
             proposal_pitch_threshold, 
             audio_processing, 
             alpha,
-            sid
+            sid,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         return [
@@ -769,6 +799,9 @@ def convert_with_whisper(
     alpha=0.5,
     sid_1=0,
     sid_2=0,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     import librosa
     import multiprocessing as mp
@@ -1028,7 +1061,10 @@ def convert_with_whisper(
             proposal_pitch_threshold, 
             audio_processing, 
             alpha,
-            sid_1
+            sid_1,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         convert(
@@ -1062,7 +1098,10 @@ def convert_with_whisper(
             proposal_pitch_threshold, 
             audio_processing, 
             alpha,
-            sid_2
+            sid_2,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         gr_info(translations["convert_success"])
@@ -1118,7 +1157,10 @@ def convert_tts(
     proposal_pitch_threshold, 
     audio_processing=False, 
     alpha=0.5,
-    sid=0
+    sid=0,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
@@ -1197,7 +1239,10 @@ def convert_tts(
         proposal_pitch_threshold, 
         audio_processing, 
         alpha,
-        sid
+        sid,
+        embedders_mix,
+        embedders_mix_layers,
+        embedders_mix_ratio
     )
 
     gr_info(translations["convert_success"])

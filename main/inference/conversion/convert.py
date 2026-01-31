@@ -70,6 +70,9 @@ def parse_arguments():
     parser.add_argument("--audio_processing", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--sid", type=int, default=0, required=False)
+    parser.add_argument("--embedders_mix", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--embedders_mix_layers", type=int, default=9, required=False)
+    parser.add_argument("--embedders_mix_ratio", type=float, default=0.5)
 
     return parser.parse_args()
 
@@ -107,7 +110,10 @@ def main():
         proposal_pitch_threshold, 
         audio_processing, 
         alpha,
-        sid
+        sid,
+        embedders_mix,
+        embedders_mix_layers,
+        embedders_mix_ratio
     ) = (
         args.pitch, 
         args.filter_radius, 
@@ -139,7 +145,10 @@ def main():
         args.proposal_pitch_threshold, 
         args.audio_processing, 
         args.alpha,
-        args.sid
+        args.sid,
+        args.embedders_mix,
+        args.embedders_mix_layers,
+        args.embedders_mix_ratio
     )
     
     run_convert_script(
@@ -173,7 +182,10 @@ def main():
         proposal_pitch_threshold=proposal_pitch_threshold, 
         audio_processing=audio_processing, 
         alpha=alpha,
-        sid=sid
+        sid=sid,
+        embedders_mix=embedders_mix, 
+        embedders_mix_layers=embedders_mix_layers, 
+        embedders_mix_ratio=embedders_mix_ratio
     )
 
 def run_convert_script(
@@ -207,7 +219,10 @@ def run_convert_script(
     proposal_pitch_threshold=255.0, 
     audio_processing=False,
     alpha=0.5,
-    sid=0
+    sid=0,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     check_assets(
         f0_method, 
@@ -217,39 +232,39 @@ def run_convert_script(
     )
 
     log_data = {
-        translations['pitch']: pitch, 
-        translations['filter_radius']: filter_radius, 
-        translations['index_strength']: index_rate, 
-        translations['rms_mix_rate']: rms_mix_rate, 
-        translations['protect']: protect, 
-        translations['hop_length']: hop_length, 
-        translations['f0_method']: f0_method, 
-        translations['audio_path']: input_path, 
-        translations['output_path']: replace_export_format(output_path, export_format), 
-        translations['model_path']: pth_path, 
-        translations['indexpath']: index_path, 
-        translations['autotune']: f0_autotune, 
-        translations['clear_audio']: clean_audio, 
-        translations['export_format']: export_format, 
-        translations['hubert_model']: embedder_model, 
-        translations['split_audio']: split_audio, 
-        translations['memory_efficient_training']: checkpointing, 
+        translations["pitch"]: pitch, 
+        translations["filter_radius"]: filter_radius, 
+        translations["index_strength"]: index_rate, 
+        translations["rms_mix_rate"]: rms_mix_rate, 
+        translations["protect"]: protect, 
+        translations["hop_length"]: hop_length, 
+        translations["f0_method"]: f0_method, 
+        translations["audio_path"]: input_path, 
+        translations["output_path"]: replace_export_format(output_path, export_format), 
+        translations["model_path"]: pth_path, 
+        translations["indexpath"]: index_path, 
+        translations["autotune"]: f0_autotune, 
+        translations["autotune_rate_info"]: f0_autotune_strength,
+        translations["clear_audio"]: clean_audio, 
+        translations["clean_strength"]: clean_strength,
+        translations["sample_rate"]: resample_sr,
+        translations["export_format"]: export_format, 
+        translations["hubert_model"]: embedder_model, 
+        translations["split_audio"]: split_audio, 
+        translations["memory_efficient_training"]: checkpointing, 
         translations["predictor_onnx"]: predictor_onnx, 
+        translations["f0_file"]: f0_file,
         translations["embed_mode"]: embedders_mode, 
         translations["proposal_pitch"]: proposal_pitch, 
+        translations["proposal_pitch_threshold"]: proposal_pitch_threshold,
         translations["audio_processing"]: audio_processing,
-        translations["alpha_label"]: alpha
+        translations["alpha_label"]: alpha,
+        translations["embedders_mix"]: embedders_mix,
+        translations["embedders_mix_layers"]: embedders_mix_layers,
+        translations["embedders_mix_ratio"]: embedders_mix_ratio,
+        translations["formant_qfrency"]: formant_qfrency,
+        translations["formant_timbre"]: formant_timbre
     }
-
-    if clean_audio: log_data[translations['clean_strength']] = clean_strength
-    if resample_sr != 0: log_data[translations['sample_rate']] = resample_sr
-    if f0_autotune: log_data[translations['autotune_rate_info']] = f0_autotune_strength
-    if os.path.isfile(f0_file): log_data[translations['f0_file']] = f0_file
-    if proposal_pitch: log_data[translations["proposal_pitch_threshold"]] = proposal_pitch_threshold
-
-    if formant_shifting:
-        log_data[translations['formant_qfrency']] = formant_qfrency
-        log_data[translations['formant_timbre']] = formant_timbre
 
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}")
@@ -294,7 +309,10 @@ def run_convert_script(
             proposal_pitch=proposal_pitch, 
             proposal_pitch_threshold=proposal_pitch_threshold,
             audio_processing=audio_processing,
-            alpha=alpha
+            alpha=alpha,
+            embedders_mix=embedders_mix, 
+            embedders_mix_layers=embedders_mix_layers, 
+            embedders_mix_ratio=embedders_mix_ratio
         )
 
     if os.path.isdir(input_path):
@@ -400,7 +418,10 @@ class VoiceConverter:
         proposal_pitch = False, 
         proposal_pitch_threshold = 0, 
         audio_processing = False, 
-        alpha = 0.5
+        alpha = 0.5,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         self.checkpointing = checkpointing
 
@@ -481,7 +502,10 @@ class VoiceConverter:
                             proposal_pitch_threshold=proposal_pitch_threshold,
                             energy_use=self.energy,
                             delete_predictor_onnx=not split_audio,
-                            alpha=alpha
+                            alpha=alpha,
+                            embedders_mix=embedders_mix, 
+                            embedders_mix_layers=embedders_mix_layers, 
+                            embedders_mix_ratio=embedders_mix_ratio
                         )
                     ) 
                     for waveform, start, end in chunks

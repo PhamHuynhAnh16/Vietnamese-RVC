@@ -531,8 +531,8 @@ def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
     else:
         fft = torch.stft(
             audio, 
-            N_FFT, 
-            HOP_LENGTH, 
+            n_fft=N_FFT, 
+            hop_length=HOP_LENGTH, 
             window=torch.hann_window(N_FFT).to(audio.device), 
             return_complex=True
         )

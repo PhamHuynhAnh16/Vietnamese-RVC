@@ -129,7 +129,10 @@ def create_reference(
     f0_autotune_strength, 
     proposal_pitch, 
     proposal_pitch_threshold, 
-    alpha=0.5
+    alpha=0.5,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     gr_info(translations["start"].format(start=translations["create_reference"]))
 
@@ -152,6 +155,9 @@ def create_reference(
         "--proposal_pitch", str(proposal_pitch),
         "--proposal_pitch_threshold", str(proposal_pitch_threshold),
         "--alpha", str(alpha),
+        "--embedders_mix", str(embedders_mix),
+        "--embedders_mix_layers", str(embedders_mix_layers),
+        "--embedders_mix_ratio", str(embedders_mix_ratio)
     ])
 
     done = [False]
@@ -237,7 +243,10 @@ def extract(
     hybrid_method, 
     rms_extract, 
     alpha=0.5, 
-    include_mutes=2
+    include_mutes=2,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     f0_method, embedder_model = (
         method if method != "hybrid" else hybrid_method, 
@@ -280,6 +289,9 @@ def extract(
         "--rms_extract", str(rms_extract),
         "--alpha", str(alpha),
         "--include_mutes", str(include_mutes),
+        "--embedders_mix", str(embedders_mix),
+        "--embedders_mix_layers", str(embedders_mix_layers),
+        "--embedders_mix_ratio", str(embedders_mix_ratio)
     ])
     
     done = [False]
@@ -353,7 +365,8 @@ def training(
     reference_name="", 
     multiscale_mel_loss=False,
     embedders="hubert_base",
-    custom_embedders=None
+    custom_embedders=None,
+    cosine_annealing_lr=False
 ):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
@@ -523,6 +536,7 @@ def training(
         "--use_custom_reference", str(custom_reference),
         "--reference_path", str(reference_path),
         "--multiscale_mel_loss", str(multiscale_mel_loss),
+        "--cosine_annealing_lr", str(cosine_annealing_lr)
     ])
 
     done = [False]

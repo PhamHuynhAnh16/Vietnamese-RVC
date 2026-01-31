@@ -81,7 +81,7 @@ class STFT:
         else:
             spec = torch.stft(
                 pad, 
-                n_fft, 
+                n_fft=n_fft, 
                 hop_length=hop_length_new, 
                 win_length=win_size_new, 
                 window=hann_window[keyshift_key], 

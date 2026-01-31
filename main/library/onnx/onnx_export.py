@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore")
 FEATS_LENGTH = 200
 
 def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
-    if not device.startswith("cuda"): device = "cpu"
+    if not device.startswith("cuda") or (torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]")): device = "cpu"
 
     cpt = (torch.load(input_path, map_location="cpu", weights_only=True) if os.path.isfile(input_path) else None)
     cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]

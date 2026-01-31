@@ -123,7 +123,7 @@ with gr.Blocks(
     
     if __name__ == "__main__":
         device = config.device.replace("privateuseone", "dml")
-        if torch.cuda.get_device_name().endswith("[ZLUDA]"): device = device.replace("cuda", "hip")
+        if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"): device = device.replace("cuda", "hip")
 
         logger.info(device)
         logger.info(f'{translations["precision"]}: {("BF16" if config.brain else "FP16") if config.is_half else "FP32"}')

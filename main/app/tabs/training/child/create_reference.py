@@ -181,6 +181,12 @@ def create_reference_tab():
                 label=translations["hubert_model"], 
                 open=False
             ):
+                embedders_mix = gr.Checkbox(
+                    label=translations["embedders_mix"],
+                    info=translations["embedders_mix_info"],
+                    value=False,
+                    interactive=True
+                )
                 with gr.Row():
                     version = gr.Radio(
                         label=translations["training_version"], 
@@ -216,6 +222,25 @@ def create_reference_tab():
                         placeholder="hubert_base", 
                         interactive=True, 
                         visible=False
+                    )
+                with gr.Column(visible=False) as embedders_mix_column:
+                    embedders_mix_layers = gr.Slider(
+                        label=translations["embedders_mix_layers"], 
+                        info=translations["embedders_mix_layers_info"],
+                        minimum=1, 
+                        maximum=12, 
+                        value=9, 
+                        step=1, 
+                        interactive=True
+                    )
+                    embedders_mix_ratio = gr.Slider(
+                        label=translations["embedders_mix_ratio"], 
+                        info=translations["embedders_mix_ratio_info"], 
+                        minimum=0.1, 
+                        maximum=1, 
+                        value=0.5, 
+                        step=0.1, 
+                        interactive=True
                     )
     with gr.Row():
         create_reference_info = gr.Textbox(
@@ -325,6 +350,15 @@ def create_reference_tab():
                 f0_method_column
             ]
         )
+        embedders_mix.change(
+            fn=visible,
+            inputs=[
+                embedders_mix
+            ],
+            outputs=[
+                embedders_mix_column
+            ]
+        )
         create_reference_button.click(
             fn=create_reference,
             inputs=[
@@ -343,7 +377,10 @@ def create_reference_tab():
                 f0_autotune_strength, 
                 proposal_pitch, 
                 proposal_pitch_threshold,
-                alpha
+                alpha,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ],
             outputs=[
                 create_reference_info

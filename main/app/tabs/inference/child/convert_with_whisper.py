@@ -304,6 +304,12 @@ def convert_with_whisper_tab():
                     translations["hubert_model"], 
                     open=False
                 ):
+                    embedders_mix = gr.Checkbox(
+                        label=translations["embedders_mix"],
+                        info=translations["embedders_mix_info"],
+                        value=False,
+                        interactive=True
+                    )
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
@@ -327,6 +333,25 @@ def convert_with_whisper_tab():
                         interactive=True, 
                         visible=False
                     )
+                    with gr.Column(visible=False) as embedders_mix_column:
+                        embedders_mix_layers = gr.Slider(
+                            label=translations["embedders_mix_layers"], 
+                            info=translations["embedders_mix_layers_info"],
+                            minimum=1, 
+                            maximum=12, 
+                            value=9, 
+                            step=1, 
+                            interactive=True
+                        )
+                        embedders_mix_ratio = gr.Slider(
+                            label=translations["embedders_mix_ratio"], 
+                            info=translations["embedders_mix_ratio_info"], 
+                            minimum=0.1, 
+                            maximum=1, 
+                            value=0.5, 
+                            step=0.1, 
+                            interactive=True
+                        )
                 with gr.Column():     
                     resample_sr3 = gr.Radio(
                         choices=[0]+sample_rate_choice, 
@@ -649,6 +674,15 @@ def convert_with_whisper_tab():
                 sids_2
             ]
         )
+        embedders_mix.change(
+            fn=visible,
+            inputs=[
+                embedders_mix
+            ],
+            outputs=[
+                embedders_mix_column
+            ]
+        )
     with gr.Row():
         convert_button.click(
             fn=convert_with_whisper,
@@ -692,7 +726,10 @@ def convert_with_whisper_tab():
                 audio_processing,
                 alpha,
                 sids_1,
-                sids_2
+                sids_2,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ],
             outputs=[
                 play_output_audio

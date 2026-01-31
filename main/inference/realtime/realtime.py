@@ -309,7 +309,10 @@ class RVC_Realtime:
         f0_autotune = False, 
         f0_autotune_strength = 1, 
         proposal_pitch = False, 
-        proposal_pitch_threshold = 255.0
+        proposal_pitch_threshold = 255.0,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         if self.pipeline is None:
             raise RuntimeError(translations["create_pipeline_error"])
@@ -352,7 +355,10 @@ class RVC_Realtime:
                     proposal_pitch, 
                     proposal_pitch_threshold,
                     tg,
-                    board
+                    board,
+                    embedders_mix,
+                    embedders_mix_layers,
+                    embedders_mix_ratio
                 )
 
                 return torch.zeros(audio_model.shape, dtype=self.dtype, device=config.device), vol
@@ -376,7 +382,10 @@ class RVC_Realtime:
                 proposal_pitch, 
                 proposal_pitch_threshold,
                 tg,
-                board
+                board,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             )
 
             return torch.zeros(audio_model.shape, dtype=self.dtype, device=config.device), vol
@@ -401,7 +410,10 @@ class RVC_Realtime:
             proposal_pitch, 
             proposal_pitch_threshold,
             tg,
-            board
+            board,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         audio_out = self.resample_out(audio_model * vol_t.sqrt())
@@ -473,7 +485,10 @@ class VoiceChanger:
         f0_autotune = False, 
         f0_autotune_strength = 1, 
         proposal_pitch = False, 
-        proposal_pitch_threshold = 255.0
+        proposal_pitch_threshold = 255.0,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         block_size = audio_in.shape[0]
 
@@ -487,7 +502,10 @@ class VoiceChanger:
             f0_autotune, 
             f0_autotune_strength, 
             proposal_pitch, 
-            proposal_pitch_threshold
+            proposal_pitch_threshold,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         conv_input = audio[None, None, : self.crossfade_frame + self.sola_search_frame].float()
@@ -531,7 +549,10 @@ class VoiceChanger:
         f0_autotune = False, 
         f0_autotune_strength = 1, 
         proposal_pitch = False, 
-        proposal_pitch_threshold = 255.0
+        proposal_pitch_threshold = 255.0,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         if self.vc_model is None:
             raise RuntimeError(translations["voice_changer_selected_error"])
@@ -548,7 +569,10 @@ class VoiceChanger:
             f0_autotune, 
             f0_autotune_strength, 
             proposal_pitch, 
-            proposal_pitch_threshold
+            proposal_pitch_threshold,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
 
         end = time.perf_counter()

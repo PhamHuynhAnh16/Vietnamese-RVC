@@ -130,7 +130,10 @@ class Pipeline:
         proposal_pitch = False, 
         proposal_pitch_threshold = 255.0,
         torchgate = None,
-        board = None
+        board = None,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         with torch.no_grad():     
             assert audio.dim() == 1, audio.dim()
@@ -157,7 +160,10 @@ class Pipeline:
                 self.embedder, 
                 audio.view(1, -1), 
                 self.inference.version, 
-                device=self.device
+                device=self.device, 
+                mix=embedders_mix, 
+                mix_layers=embedders_mix_layers, 
+                mix_ratio=embedders_mix_ratio
             )
 
             feats = torch.cat((feats, feats[:, -1:, :]), 1)

@@ -86,6 +86,7 @@ def parse_arguments():
     parser.add_argument("--use_custom_reference", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--reference_path", type=str, default="")
     parser.add_argument("--multiscale_mel_loss", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--use_cosine_annealing_lr", type=lambda x: bool(strtobool(x)), default=False)
 
     return parser.parse_args()
 
@@ -93,6 +94,7 @@ d_lr_coeff = 1.0
 g_lr_coeff = 1.0
 d_step_per_g_step = 1
 use_clip_grad_value = False
+
 weights_path = main_configs["weights_path"]
 logs_path = main_configs["logs_path"]
 custom_save_checkpoint_path = None
@@ -122,7 +124,8 @@ args = parse_arguments()
     energy_use, 
     use_custom_reference, 
     reference_path, 
-    multiscale_mel_loss
+    multiscale_mel_loss,
+    use_cosine_annealing_lr
 ) = (
     args.model_name, 
     args.save_every_epoch, 
@@ -146,7 +149,8 @@ args = parse_arguments()
     args.energy_use, 
     args.use_custom_reference, 
     args.reference_path, 
-    args.multiscale_mel_loss
+    args.multiscale_mel_loss,
+    args.use_cosine_annealing_lr
 )
 
 disc_version = version if vocoder not in ["RefineGAN", "BigVGAN"] else "v3"
@@ -186,28 +190,28 @@ def main():
     global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch, model_author, vocoder, checkpointing, gpus, energy_use
 
     log_data = {
-        translations['modelname']: model_name, 
+        translations["modelname"]: model_name, 
         translations["save_every_epoch"]: save_every_epoch, 
         translations["total_e"]: total_epoch, 
         translations["dorg"].format(pretrainG=pretrainG, pretrainD=pretrainD): "", 
-        translations['training_version']: version, 
+        translations["training_version"]: version, 
         "Gpu": gpus, 
-        translations['batch_size']: batch_size, 
-        translations['training_f0']: pitch_guidance, 
-        translations['save_only_latest']: save_only_latest, 
-        translations['save_every_weights']: save_every_weights, 
-        translations['cache_in_gpu']: cache_data_in_gpu, 
-        translations['overtraining_detector']: overtraining_detector, 
-        translations['threshold']: overtraining_threshold, 
-        translations['cleanup_training']: cleanup, 
-        translations['memory_efficient_training']: checkpointing, 
+        translations["batch_size"]: batch_size, 
+        translations["training_f0"]: pitch_guidance, 
+        translations["save_only_latest"]: save_only_latest, 
+        translations["save_every_weights"]: save_every_weights, 
+        translations["cache_in_gpu"]: cache_data_in_gpu, 
+        translations["overtraining_detector"]: overtraining_detector, 
+        translations["threshold"]: overtraining_threshold, 
+        translations["cleanup_training"]: cleanup, 
+        translations["memory_efficient_training"]: checkpointing, 
         translations["optimizer"]: optimizer_choice, 
         translations["train&energy"]: energy_use,
-        translations["multiscale_mel_loss"]: multiscale_mel_loss
+        translations["multiscale_mel_loss"]: multiscale_mel_loss,
+        translations["model_author"].format(model_author=model_author): "",
+        translations["vocoder"]: vocoder,
+        translations["cosine_annealing_lr"]: use_cosine_annealing_lr
     }
-
-    if model_author: log_data[translations["model_author"].format(model_author=model_author)] = ""
-    if vocoder != "Default": log_data[translations['vocoder']] = vocoder
 
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}" if value != "" else f"{key} {value}")
@@ -484,24 +488,39 @@ def run(
     )
 
     if optimizer_choice == "AnyPrecisionAdamW" and main_config.brain:
-        from main.inference.training.anyprecision_optimizer import AnyPrecisionAdamW
+        from main.library.optimizers.anyprecision_optimizer import AnyPrecisionAdamW
 
         optimizer_optim = AnyPrecisionAdamW
     elif optimizer_choice == "RAdam":
-        optimizer_optim = torch.optim.RAdam
-    else:
-        optimizer_optim = torch.optim.AdamW
+        from torch.optim import RAdam
 
-    optim_g, optim_d = optimizer_optim(
-        net_g.parameters(), 
-        config.train.learning_rate * g_lr_coeff, 
-        betas=config.train.betas, 
-        eps=config.train.eps
-    ), optimizer_optim(
-        net_d.parameters(), 
-        config.train.learning_rate * d_lr_coeff, 
-        betas=config.train.betas, 
-        eps=config.train.eps
+        optimizer_optim = RAdam
+    elif optimizer_choice == "AdaBelief":
+        from main.library.optimizers.adabelief import AdaBelief
+
+        optimizer_optim = AdaBelief
+    elif optimizer_choice == "AdaBeliefV2":
+        from main.library.optimizers.adabeliefv2 import AdaBeliefV2, get_inverse_sqrt_scheduler
+
+        optimizer_optim = AdaBeliefV2
+    else:
+        from torch.optim import AdamW
+
+        optimizer_optim = AdamW
+
+    optim_g, optim_d = (
+        optimizer_optim(
+            net_g.parameters(), 
+            config.train.learning_rate * g_lr_coeff, 
+            betas=config.train.betas if not optimizer_choice.startswith("AdaBelief") else 1e-8, 
+            eps=config.train.eps
+        ), 
+        optimizer_optim(
+            net_d.parameters(), 
+            config.train.learning_rate * d_lr_coeff, 
+            betas=config.train.betas if not optimizer_choice.startswith("AdaBelief") else 1e-8, 
+            eps=config.train.eps
+        )
     )
 
     fn_mel_loss = MultiScaleMelSpectrogramLoss(sample_rate=config.data.sample_rate) if multiscale_mel_loss else torch.nn.L1Loss()
@@ -558,18 +577,47 @@ def run(
             logger.error(e)
             sys.exit(1)
 
-    scheduler_g, scheduler_d = (
-        torch.optim.lr_scheduler.ExponentialLR(
-            optim_g, 
-            gamma=config.train.lr_decay, 
-            last_epoch=epoch_str - 2
-        ), 
-        torch.optim.lr_scheduler.ExponentialLR(
-            optim_d, 
-            gamma=config.train.lr_decay, 
-            last_epoch=epoch_str - 2
+    if optimizer_choice == "AdaBelief" or use_cosine_annealing_lr:
+        scheduler_g, scheduler_d = (
+            torch.optim.lr_scheduler.CosineAnnealingLR(
+                optim_g, 
+                T_max=total_epoch, 
+                eta_min=1e-6, 
+                last_epoch=epoch_str - 2
+            ), 
+            torch.optim.lr_scheduler.CosineAnnealingLR(
+                optim_d, 
+                T_max=total_epoch, 
+                eta_min=1e-6, 
+                last_epoch=epoch_str - 2
+            )
         )
-    )
+    elif optimizer_choice == "AdaBeliefV2":
+        scheduler_g, scheduler_d = (
+            get_inverse_sqrt_scheduler(
+                optim_g, 
+                warmup_epochs=10, 
+                last_epoch=epoch_str - 2
+            ), 
+            get_inverse_sqrt_scheduler(
+                optim_d, 
+                warmup_epochs=10, 
+                last_epoch=epoch_str - 2
+            )
+        )
+    else:
+        scheduler_g, scheduler_d = (
+            torch.optim.lr_scheduler.ExponentialLR(
+                optim_g, 
+                gamma=config.train.lr_decay, 
+                last_epoch=epoch_str - 2
+            ), 
+            torch.optim.lr_scheduler.ExponentialLR(
+                optim_d, 
+                gamma=config.train.lr_decay, 
+                last_epoch=epoch_str - 2
+            )
+        )
 
     scaler = GradScaler(device=device, enabled=is_half and device.type == "cuda")
     cache = []

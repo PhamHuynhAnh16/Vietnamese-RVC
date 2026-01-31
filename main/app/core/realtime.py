@@ -218,6 +218,9 @@ js_code = """
         exclusive_mode,
         post_process,
         sid,
+        embedders_mix,
+        embedders_mix_layers,
+        embedders_mix_ratio,
         chorus,
         distortion,
         reverb,
@@ -367,6 +370,9 @@ js_code = """
                         input_audio_gain: input_audio_gain,
                         post_process: post_process,
                         sid: sid,
+                        embedders_mix: embedders_mix,
+                        embedders_mix_layers: embedders_mix_layers,
+                        embedders_mix_ratio: embedders_mix_ratio,
                         kwargs: {
                             chorus: chorus,
                             distortion: distortion,
@@ -623,6 +629,9 @@ def realtime_start(
     clean_strength,
     post_process,
     sid,
+    embedders_mix,
+    embedders_mix_layers,
+    embedders_mix_ratio,
     chorus,
     distortion,
     reverb,
@@ -763,6 +772,9 @@ def realtime_start(
         "clean_strength": clean_strength,
         "post_process": post_process,
         "sid": sid,
+        "embedders_mix": embedders_mix,
+        "embedders_mix_layers": embedders_mix_layers,
+        "embedders_mix_ratio": embedders_mix_ratio,
         "kwargs": {
             "chorus": chorus,
             "distortion": distortion,
@@ -929,6 +941,10 @@ def change_callbacks_config():
         callbacks.audio.input_audio_gain = callbacks_kwargs.get("input_audio_gain", 1.0)
         callbacks.audio.output_audio_gain = callbacks_kwargs.get("output_audio_gain", 1.0)
         callbacks.audio.monitor_audio_gain = callbacks_kwargs.get("monitor_audio_gain", 1.0)
+
+        callbacks.audio.embedders_mix = callbacks_kwargs.get("embedders_mix", False)
+        callbacks.audio.embedders_mix_layers = callbacks_kwargs.get("embedders_mix_layers", 9)
+        callbacks.audio.embedders_mix_ratio = callbacks_kwargs.get("embedders_mix_ratio", 0.5)
 
         model_pth = callbacks_kwargs.get("model_path", callbacks.vc.vc_model.model_path)
         model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth

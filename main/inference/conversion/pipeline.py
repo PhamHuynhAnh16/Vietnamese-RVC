@@ -57,7 +57,10 @@ class Pipeline:
         index_rate, 
         version, 
         protect, 
-        energy
+        energy,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         pitch_guidance = pitch != None and pitchf != None
         energy_use = energy != None
@@ -71,7 +74,10 @@ class Pipeline:
                 model, 
                 feats.view(1, -1), 
                 version, 
-                self.device
+                self.device, 
+                mix=embedders_mix, 
+                mix_layers=embedders_mix_layers, 
+                mix_ratio=embedders_mix_ratio
             )
 
             feats0 = feats.clone() if protect < 0.5 and pitch_guidance else None
@@ -156,7 +162,10 @@ class Pipeline:
         proposal_pitch_threshold=255.0, 
         energy_use=False, 
         delete_predictor_onnx=True, 
-        alpha = 0.5
+        alpha = 0.5,
+        embedders_mix = False,
+        embedders_mix_layers = 9,
+        embedders_mix_ratio = 0.5
     ):
         index, big_npy = load_faiss_index(file_index) if index_rate != 0 else None, None
         if pbar: pbar.update(1)
@@ -271,7 +280,10 @@ class Pipeline:
                     index_rate, 
                     version, 
                     protect, 
-                    energy[:, s // self.window : (t + self.t_pad2) // self.window] if energy_use else None
+                    energy[:, s // self.window : (t + self.t_pad2) // self.window] if energy_use else None,
+                    embedders_mix=embedders_mix, 
+                    embedders_mix_layers=embedders_mix_layers, 
+                    embedders_mix_ratio=embedders_mix_ratio
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )    
             s = t
@@ -289,7 +301,10 @@ class Pipeline:
                 index_rate, 
                 version, 
                 protect, 
-                (energy[:, t // self.window :] if t is not None else energy) if energy_use else None
+                (energy[:, t // self.window :] if t is not None else energy) if energy_use else None,
+                embedders_mix=embedders_mix, 
+                embedders_mix_layers=embedders_mix_layers, 
+                embedders_mix_ratio=embedders_mix_ratio
             )[self.t_pad_tgt : -self.t_pad_tgt]
         )
 

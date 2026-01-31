@@ -22,7 +22,10 @@ def process_file_embedding(
     device, 
     version, 
     is_half, 
-    threads
+    threads,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     dtype = torch.float16 if is_half else torch.float32
 
@@ -53,7 +56,10 @@ def process_file_embedding(
                     model, 
                     feats.view(1, -1), 
                     version, 
-                    device
+                    device,
+                    mix=embedders_mix, 
+                    mix_layers=embedders_mix_layers, 
+                    mix_ratio=embedders_mix_ratio
                 )
 
             feats = feats.squeeze(0).float().cpu().numpy()
@@ -80,7 +86,10 @@ def run_embedding_extraction(
     devices, 
     embedder_model, 
     embedders_mode, 
-    is_half
+    is_half,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     wav_path, out_path = setup_paths(exp_dir, version)
     logger.info(translations["start_extract_hubert"])
@@ -106,7 +115,10 @@ def run_embedding_extraction(
                 devices[i], 
                 version, 
                 is_half, 
-                num_processes // len(devices)
+                num_processes // len(devices),
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ) 
             for i in range(len(devices))
         ])

@@ -184,9 +184,15 @@ Sao chép path-zluda-hipxx.bat (Thay xx theo phiên bản HIP SDK của bạn) v
 Chạy tệp path-zluda-hipxx.bat.
 
 Lưu ý:
+- Zluda hoạt động bằng cách biên dịch mã cuda sang hip sdk và quá trình này diễn ra cực kỳ chậm và trong lúc đó gpu của bạn sẽ không được sử dụng.
 - Nếu GPU của bạn không nằm trong danh sách hỗ trợ (ví dụ như: gf803) bạn có thể thử dùng HIP SDK 5.7.0 và ghi đè thư mục library trong ROCm/5.7.0/bin/rocblas từ [ROCmLibs](https://github.com/likelovewant/ROCmLibs-for-gfx1103-AMD780M-APU/releases) (Không Khuyến Khích).
 - Nếu Onnxruntime không hoạt động, bạn có thể thử đổi sang phiên bản onnxruntime-directml.
 - Zluda không được thiết kế cho các hệ thống thời gian thực nên chức năng thời gian thực của ứng dụng sẽ bị vô hiệu hóa.
+- Bạn có thể thử Onnxruntime ROCm nhưng nó chỉ hoạt động trên python 3.10.x hoặc 3.12.x.
+```
+env\Scripts\python.exe -m pip uninstall onnxruntime-gpu
+env\Scripts\python.exe -m uv pip install onnxruntime-rocm
+```
 
 </details>
 </details>
@@ -364,6 +370,7 @@ python main/app/parser.py --help
 | **[Penn](https://github.com/interactiveaudiolab/penn)**                                                                        | Interactive Audio Lab   | MIT License |
 | **[Voice Changer](https://github.com/deiteris/voice-changer)**                                                                 | Yury deiteris           | MIT License |
 | **[Pesto](https://github.com/SonyCSLParis/pesto)**                                                                             | Sony CSL Paris          | LGPL 3.0    |
+| **[PolTrain](https://github.com/Politrees/PolTrain)**                                                                          | Artyom Bebroy           | MIT License |
 
 ## Kho mô hình của công cụ tìm kiếm mô hình
 

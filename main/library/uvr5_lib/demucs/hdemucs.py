@@ -23,8 +23,8 @@ def spectro(x, n_fft=512, hop_length=None, pad=0):
 
     z = torch.stft(
         x, 
-        n_fft * (1 + pad), 
-        hop_length or n_fft // 4, 
+        n_fft=n_fft * (1 + pad), 
+        hop_length=hop_length or n_fft // 4, 
         window=torch.hann_window(n_fft).to(x), 
         win_length=n_fft, 
         normalized=True, 

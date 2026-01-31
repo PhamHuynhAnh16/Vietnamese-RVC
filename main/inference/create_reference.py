@@ -50,7 +50,8 @@ def main():
         reference_name, 
         pitch_guidance, 
         use_energy, 
-        version, embedder_model, 
+        version, 
+        embedder_model, 
         embedders_mode, 
         f0_method, 
         predictor_onnx, 
@@ -60,7 +61,10 @@ def main():
         f0_autotune_strength, 
         proposal_pitch, 
         proposal_pitch_threshold, 
-        alpha
+        alpha,
+        embedders_mix,
+        embedders_mix_layers,
+        embedders_mix_ratio
     ) = (
         args.audio_path, 
         args.reference_name, 
@@ -77,8 +81,36 @@ def main():
         args.f0_autotune_strength, 
         args.proposal_pitch, 
         args.proposal_pitch_threshold, 
-        args.alpha
+        args.alpha,
+        args.embedders_mix,
+        args.embedders_mix_layers,
+        args.embedders_mix_ratio
     )
+
+    log_data = {
+        translations["audio_path"]: audio_path, 
+        translations["reference_name"]: reference_name,
+        translations['extract_f0']: pitch_guidance, 
+        translations["train&energy"]: use_energy,
+        translations['training_version']: version, 
+        translations['hubert_model']: embedder_model, 
+        translations["embed_mode"]: embedders_mode, 
+        translations['f0_method']: f0_method, 
+        translations["predictor_onnx"]: predictor_onnx, 
+        translations["pitch"]: f0_up_key, 
+        translations["filter_radius"]: filter_radius, 
+        translations["autotune"]: f0_autotune, 
+        translations["autotune_rate_info"]: f0_autotune_strength,
+        translations["proposal_pitch"]: proposal_pitch, 
+        translations["proposal_pitch_threshold"]: proposal_pitch_threshold,
+        translations["alpha_label"]: alpha,
+        translations["embedders_mix"]: embedders_mix,
+        translations["embedders_mix_layers"]: embedders_mix_layers,
+        translations["embedders_mix_ratio"]: embedders_mix_ratio,
+    }
+
+    for key, value in log_data.items():
+        logger.debug(f"{key}: {value}")
 
     check_assets(
         f0_method, 
@@ -103,7 +135,10 @@ def main():
         f0_autotune_strength, 
         proposal_pitch, 
         proposal_pitch_threshold,
-        alpha
+        alpha,
+        embedders_mix,
+        embedders_mix_layers,
+        embedders_mix_ratio
     )
 
 def create_reference(
@@ -122,7 +157,10 @@ def create_reference(
     f0_autotune_strength = 1,
     proposal_pitch = False,
     proposal_pitch_threshold = 255.0,
-    alpha = 0.5
+    alpha = 0.5,
+    embedders_mix = False,
+    embedders_mix_layers = 9,
+    embedders_mix_ratio = 0.5
 ):
     device = config.device
     is_half = config.is_half
@@ -170,7 +208,10 @@ def create_reference(
                 embedder, 
                 audio_pad.view(1, -1), 
                 version, 
-                device=device
+                device=device,
+                mix=embedders_mix, 
+                mix_layers=embedders_mix_layers, 
+                mix_ratio=embedders_mix_ratio
             )
 
         np.save(

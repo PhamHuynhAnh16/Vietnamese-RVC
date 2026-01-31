@@ -418,14 +418,14 @@ class STFT(torch.nn.Module):
         stft = torch.view_as_real(
             torch.stft(
                 x, 
-                self.n_fft, 
-                self.hop_length, 
-                self.win_length, 
-                self.window.to(x.device), 
-                self.center, 
-                self.pad_mode, 
-                self.normalized_stft, 
-                self.onesided, 
+                n_fft=self.n_fft, 
+                hop_length=self.hop_length, 
+                win_length=self.win_length, 
+                window=self.window.to(x.device), 
+                center=self.center, 
+                pad_mode=self.pad_mode, 
+                normalized=self.normalized_stft, 
+                onesided=self.onesided, 
                 return_complex=True
             )
         )

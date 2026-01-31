@@ -165,34 +165,32 @@ def create_dataset(
     clean_strength=0.7
 ):
     log_data = {
-        translations['audio_path']: input_data, 
-        translations['output_path']: output_dirs, 
-        translations['skip']: skip_seconds,
-        translations['separator_tab']: separate,
-        translations['modelname']: model_name, 
-        translations['dereveb_audio']: separate_reverb,
-        translations['sr']: sample_rate, 
-        translations['shift']: shifts, 
-        translations['batch_size']: batch_size, 
-        translations['overlap']: overlap, 
-        translations['aggression']: aggression,
-        translations['hop_length']: hop_length,
-        translations['window_size']: window_size,
-        translations['segments_size']: segments_size, 
-        translations['post_process_threshold']: post_process_threshold,
-        translations['enable_tta']: enable_tta,
-        translations['denoise_mdx']: enable_denoise, 
-        translations['high_end_process']: high_end_process,
-        translations['enable_post_process']: enable_post_process,
-        translations['clear_dataset']: clean_dataset
+        translations["audio_path"]: input_data, 
+        translations["output_path"]: output_dirs, 
+        translations["skip"]: skip_seconds,
+        translations["separator_tab"]: separate,
+        translations["modelname"]: model_name, 
+        translations["dereveb_audio"]: separate_reverb,
+        translations["sr"]: sample_rate, 
+        translations["shift"]: shifts, 
+        translations["batch_size"]: batch_size, 
+        translations["overlap"]: overlap, 
+        translations["aggression"]: aggression,
+        translations["hop_length"]: hop_length,
+        translations["window_size"]: window_size,
+        translations["segments_size"]: segments_size, 
+        translations["post_process_threshold"]: post_process_threshold,
+        translations["enable_tta"]: enable_tta,
+        translations["denoise_mdx"]: enable_denoise, 
+        translations["high_end_process"]: high_end_process,
+        translations["enable_post_process"]: enable_post_process,
+        translations["clear_dataset"]: clean_dataset,
+        translations["clean_strength"]: clean_strength,
+        translations["dereveb_model"]: reverb_model,
+        translations["denoise_model"]: denoise_model,
+        translations["skip_start"]: skip_start_audios,
+        translations["skip_end"]: skip_end_audios
     }
-
-    if clean_dataset: log_data[translations['clean_strength']] = clean_strength
-    if separate_reverb: log_data[translations['dereveb_model']] = reverb_model
-    if enable_denoise and model_name in list(vr_models.keys()): log_data["Denoise Model"] = denoise_model
-    if skip_seconds:
-        log_data[translations['skip_start']] = skip_start_audios
-        log_data[translations['skip_end']] = skip_end_audios
 
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}")

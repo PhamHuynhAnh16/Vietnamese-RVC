@@ -131,16 +131,16 @@ class Config:
         ort_providers = onnxruntime.get_available_providers()
 
         if "CUDAExecutionProvider" in ort_providers and self.device.startswith("cuda"): 
-            providers = ["CUDAExecutionProvider"]
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         elif "ROCMExecutionProvider" in ort_providers and self.device.startswith("cuda"):
-            providers = ["ROCMExecutionProvider"]
+            providers = ["ROCMExecutionProvider", "CPUExecutionProvider"]
         elif "DmlExecutionProvider" in ort_providers and self.device.startswith("cuda"):
-            providers = ["DmlExecutionProvider"]
+            providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
         elif "DmlExecutionProvider" in ort_providers and self.device.startswith(("ocl", "privateuseone")): 
-            providers = ["DmlExecutionProvider"]
+            providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
         elif "CoreMLExecutionProvider" in ort_providers and self.device.startswith("mps"): 
-            providers = ["CoreMLExecutionProvider"]
+            providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
         else: 
-            providers = ["CPUExecutionProvider"]
+            providers = ["CPUExecutionProvider", "CPUExecutionProvider"]
 
         return providers

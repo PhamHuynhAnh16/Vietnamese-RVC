@@ -348,9 +348,9 @@ def main():
         translations['cpu_core']: num_processes, 
         translations['split_audio']: cut_preprocess, 
         translations['preprocess_effect']: preprocess_effects, 
-        translations['clear_audio']: clean_dataset
+        translations['clear_audio']: clean_dataset,
+        translations['clean_strength']: clean_strength
     }
-    if clean_dataset: log_data[translations['clean_strength']] = clean_strength
 
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}")

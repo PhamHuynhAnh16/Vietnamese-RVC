@@ -150,30 +150,29 @@ def separate(
         output_dirs = os.path.dirname(output_dirs) or output_dirs
 
         log_data = {
-            translations['audio_path']: input_path, 
-            translations['output_path']: output_dirs, 
-            translations['export_format']: export_format, 
-            translations['shift']: shifts, 
-            translations['segments_size']: segments_size, 
-            translations['overlap']: overlap, 
-            translations['modelname']: model_name, 
-            translations['denoise_mdx']: enable_denoise, 
-            translations['hop_length']: hop_length, 
-            translations['batch_size']: batch_size, 
-            translations['sr']: sample_rate,
-            translations['separator_backing']: separate_backing,
-            translations['dereveb_audio']: separate_reverb,
-            translations['aggression']: aggression,
-            translations['window_size']: window_size,
-            translations['post_process_threshold']: post_process_threshold,
-            translations['enable_tta']: enable_tta,
-            translations['high_end_process']: high_end_process,
-            translations['enable_post_process']: enable_post_process
+            translations["audio_path"]: input_path, 
+            translations["output_path"]: output_dirs, 
+            translations["export_format"]: export_format, 
+            translations["shift"]: shifts, 
+            translations["segments_size"]: segments_size, 
+            translations["overlap"]: overlap, 
+            translations["modelname"]: model_name, 
+            translations["denoise_mdx"]: enable_denoise, 
+            translations["hop_length"]: hop_length, 
+            translations["batch_size"]: batch_size, 
+            translations["sr"]: sample_rate,
+            translations["separator_backing"]: separate_backing,
+            translations["dereveb_audio"]: separate_reverb,
+            translations["aggression"]: aggression,
+            translations["window_size"]: window_size,
+            translations["post_process_threshold"]: post_process_threshold,
+            translations["enable_tta"]: enable_tta,
+            translations["high_end_process"]: high_end_process,
+            translations["enable_post_process"]: enable_post_process,
+            translations["backing_model_ver"]: karaoke_model,
+            translations["dereveb_model"]: reverb_model,
+            translations["denoise_model"]: denoise_model
         }
-
-        if separate_backing: log_data[translations['backing_model_ver']] = karaoke_model
-        if separate_reverb: log_data[translations['dereveb_model']] = reverb_model
-        if enable_denoise and model_name in list(vr_models.keys()): log_data["Denoise Model"] = denoise_model
 
         for key, value in log_data.items():
             logger.debug(f"{key}: {value}")

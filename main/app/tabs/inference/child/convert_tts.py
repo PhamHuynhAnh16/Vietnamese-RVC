@@ -291,6 +291,12 @@ def convert_tts_tab():
                     translations["hubert_model"], 
                     open=False
                 ):
+                    embedders_mix = gr.Checkbox(
+                        label=translations["embedders_mix"],
+                        info=translations["embedders_mix_info"],
+                        value=False,
+                        interactive=True
+                    )
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
@@ -314,6 +320,25 @@ def convert_tts_tab():
                         interactive=True, 
                         visible=False
                     )
+                    with gr.Column(visible=False) as embedders_mix_column:
+                        embedders_mix_layers = gr.Slider(
+                            label=translations["embedders_mix_layers"], 
+                            info=translations["embedders_mix_layers_info"],
+                            minimum=1, 
+                            maximum=12, 
+                            value=9, 
+                            step=1, 
+                            interactive=True
+                        )
+                        embedders_mix_ratio = gr.Slider(
+                            label=translations["embedders_mix_ratio"], 
+                            info=translations["embedders_mix_ratio_info"], 
+                            minimum=0.1, 
+                            maximum=1, 
+                            value=0.5, 
+                            step=0.1, 
+                            interactive=True
+                        )
                 with gr.Accordion(
                     translations["use_presets"], 
                     open=False
@@ -563,7 +588,10 @@ def convert_tts_tab():
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ], 
             outputs=[
                 cleaner, 
@@ -581,7 +609,10 @@ def convert_tts_tab():
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ]
         )
         save_file_button.click(
@@ -613,7 +644,10 @@ def convert_tts_tab():
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ], 
             outputs=[
                 presets_name
@@ -821,6 +855,15 @@ def convert_tts_tab():
                 sids
             ]
         )
+        embedders_mix.change(
+            fn=visible,
+            inputs=[
+                embedders_mix
+            ],
+            outputs=[
+                embedders_mix_column
+            ]
+        )
     with gr.Row():
         tts_button.click(
             fn=TTS, 
@@ -873,7 +916,10 @@ def convert_tts_tab():
                 proposal_pitch_threshold,
                 audio_processing, 
                 alpha,
-                sids
+                sids,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ],
             outputs=[
                 tts_voice_convert

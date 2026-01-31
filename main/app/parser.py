@@ -131,6 +131,9 @@ elif argv_help_is_allows[1] in argv:
         3. Mô hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Mô hình nhúng sử dụng.
             - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
+            - `--embedders_mix` (mặc định: `False`): Hòa trộn tầng.
+            - `--embedders_mix_layers` (mặc định: `9`): Tầng hòa trộn.
+            - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
 
         4. Đường dẫn tệp:
             - `--input_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
@@ -228,6 +231,9 @@ elif argv_help_is_allows[4] in argv:
         4. Cấu hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.
             - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
+            - `--embedders_mix` (mặc định: `False`): Hòa trộn tầng.
+            - `--embedders_mix_layers` (mặc định: `9`): Tầng hòa trộn.
+            - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
           
         4. RMS:
             - `--rms_extract` (mặc định: False): Trích xuất thêm năng lượng rms.
@@ -326,8 +332,9 @@ elif argv_help_is_allows[7] in argv:
             - `--checkpointing` (mặc định: `False`): Bật/tắt checkpointing để tiết kiệm RAM.
             - `--deterministic` (mặc định: `False`): Khi bật sẽ sử dụng các thuật toán có tính xác định cao, đảm bảo rằng mỗi lần chạy cùng một dữ liệu đầu vào sẽ cho kết quả giống nhau.
             - `--benchmark` (mặc định: `False`): Khi bật sẽ thử nghiệm và chọn thuật toán tối ưu nhất cho phần cứng và kích thước cụ thể.
-            - `--optimizer` (mặc định: `AdamW`): Trình tối ưu hóa được sử dụng (`AdamW`, `RAdam`, `AnyPrecisionAdamW`).
+            - `--optimizer` (mặc định: `AdamW`): Trình tối ưu hóa được sử dụng (`AdamW`, `RAdam`, `AnyPrecisionAdamW`, `AdaBelief`, `AdaBeliefV2`).
             - `--multiscale_mel_loss` (mặc định: `False`): So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra.
+            - `--use_cosine_annealing_lr` (mặc định: `False`): Sử dụng phương pháp giảm LR bằng Cosine Annealing có thể giúp cải thiện chất lượng phát âm.
           
         9. Bộ tham chiếu:
             - `--use_custom_reference` (mặc định: `False`): Có tùy chỉnh bộ tham chiếu hay không.
@@ -348,7 +355,10 @@ elif argv_help_is_allows[8] in argv:
         3. Cấu hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.
             - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
-        
+            - `--embedders_mix` (mặc định: `False`): Hòa trộn tầng.
+            - `--embedders_mix_layers` (mặc định: `9`): Tầng hòa trộn.
+            - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
+          
         4. Cấu hình F0:
             - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
             - `--predictor_onnx` (mặc định: `False`): Có sử dụng chế độ tăng tốc bằng ONNX của trích xuất cao độ hay không.

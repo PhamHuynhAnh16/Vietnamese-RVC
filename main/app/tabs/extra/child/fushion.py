@@ -9,11 +9,13 @@ from main.app.core.model_utils import fushion_model
 
 from main.app.core.ui import (
     visible, 
-    shutil_move
+    shutil_move,
+    change_models_choices
 )
 
 from main.app.variables import (
     configs, 
+    model_name, 
     translations 
 )
 
@@ -21,7 +23,7 @@ def fushion_tab():
     with gr.Row():
         gr.Markdown(translations["fushion_markdown_2"])
     with gr.Row():
-        model_name = gr.Textbox(
+        modelname = gr.Textbox(
             label=translations["modelname"], 
             placeholder="Model.pth", 
             value="", 
@@ -45,15 +47,23 @@ def fushion_tab():
                 file_types=[".pth", ".onnx"]
             )
         with gr.Row():
-            model_path_1 = gr.Textbox(
-                label=f"{translations['model_path']} 1", 
-                value="", 
-                placeholder="assets/weights/Model_1.pth"
+            model_path_1 = gr.Dropdown(
+                label=translations["model_name"] + " 1", 
+                choices=model_name, 
+                value=model_name[0] if len(model_name) >= 1 else "", 
+                interactive=True, 
+                allow_custom_value=True
             )
-            model_path_2 = gr.Textbox(
-                label=f"{translations['model_path']} 2", 
-                value="", 
-                placeholder="assets/weights/Model_2.pth"
+            model_path_2 = gr.Dropdown(
+                label=translations["model_name"] + " 2", 
+                choices=model_name, 
+                value=model_name[0] if len(model_name) >= 1 else "", 
+                interactive=True, 
+                allow_custom_value=True
+            )
+        with gr.Row():
+            refresh_model = gr.Button(
+                translations["refresh"]
             )
     with gr.Row():
         ratio = gr.Slider(
@@ -90,17 +100,25 @@ def fushion_tab():
                 model_path_2
             ]
         )
+        refresh_model.click(
+            fn=lambda: [change_models_choices()[0] for _ in range(2)], 
+            inputs=[], 
+            outputs=[
+                model_path_1,
+                model_path_2
+            ]
+        )
     with gr.Row():
         fushion_button.click(
             fn=fushion_model,
             inputs=[
-                model_name, 
+                modelname, 
                 model_path_1, 
                 model_path_2, 
                 ratio
             ],
             outputs=[
-                model_name, 
+                modelname, 
                 output_model
             ],
             api_name="fushion_model"

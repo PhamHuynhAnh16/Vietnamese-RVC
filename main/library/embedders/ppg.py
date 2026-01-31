@@ -18,8 +18,8 @@ class WhisperModel(torch.nn.Module):
         self.final_proj = torch.nn.Linear(dims.n_text_state, 768)
         self.model = Whisper(dims)
         self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.model = self.model.to(device)
         del self.model.decoder
+        self.rank = 0
 
     def forward(self, audio):
         ppgln = audio.shape[1] // 320
@@ -38,4 +38,8 @@ class WhisperModel(torch.nn.Module):
         return [ppg]
     
     def extract_features(self, source, padding_mask = None, output_layer = None):
+        if self.rank == 0:
+            self.rank += 1
+            self.model.to(padding_mask.device)
+
         return self.forward(source)

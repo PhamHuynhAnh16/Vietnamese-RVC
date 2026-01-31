@@ -255,6 +255,12 @@ def training_model_tab():
                         label=translations["hubert_model"], 
                         open=False
                     ):
+                        embedders_mix = gr.Checkbox(
+                            label=translations["embedders_mix"],
+                            info=translations["embedders_mix_info"],
+                            value=False,
+                            interactive=True
+                        )
                         with gr.Group():
                             embedder_mode = gr.Radio(
                                 label=translations["embed_mode"], 
@@ -279,6 +285,25 @@ def training_model_tab():
                                 placeholder="hubert_base", 
                                 interactive=True, 
                                 visible=False
+                            )
+                        with gr.Column(visible=False) as embedders_mix_column:
+                            embedders_mix_layers = gr.Slider(
+                                label=translations["embedders_mix_layers"], 
+                                info=translations["embedders_mix_layers_info"],
+                                minimum=1, 
+                                maximum=12, 
+                                value=9, 
+                                step=1, 
+                                interactive=True
+                            )
+                            embedders_mix_ratio = gr.Slider(
+                                label=translations["embedders_mix_ratio"], 
+                                info=translations["embedders_mix_ratio_info"], 
+                                minimum=0.1, 
+                                maximum=1, 
+                                value=0.5, 
+                                step=0.1, 
+                                interactive=True
                             )
                 with gr.Column():
                     extract_button = gr.Button(
@@ -484,6 +509,12 @@ def training_model_tab():
                             value=False, 
                             interactive=True
                         )
+                        cosine_annealing_lr = gr.Checkbox(
+                            label=translations["cosine_annealing_lr"], 
+                            info=translations["cosine_annealing_lr_info"], 
+                            value=False, 
+                            interactive=True
+                        )
                         vocoders = gr.Radio(
                             label=translations["vocoder"], 
                             info=translations["vocoder_info"], 
@@ -517,7 +548,9 @@ def training_model_tab():
                             choices=[
                                 "AdamW", 
                                 "RAdam", 
-                                "AnyPrecisionAdamW"
+                                "AnyPrecisionAdamW",
+                                "AdaBelief",
+                                "AdaBeliefV2"
                             ], 
                             interactive=True
                         )
@@ -839,6 +872,16 @@ def training_model_tab():
             ]
         )
     with gr.Row():
+        embedders_mix.change(
+            fn=visible,
+            inputs=[
+                embedders_mix
+            ],
+            outputs=[
+                embedders_mix_column
+            ]
+        )
+    with gr.Row():
         preprocess_button.click(
             fn=preprocess,
             inputs=[
@@ -880,7 +923,10 @@ def training_model_tab():
                 hybrid_f0method,
                 energy,
                 alpha,
-                include_mutes
+                include_mutes,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ],
             outputs=[
                 extract_info
@@ -933,7 +979,8 @@ def training_model_tab():
                 reference_name,
                 multiscale_mel_loss,
                 embedders, 
-                embedders_custom
+                embedders_custom,
+                cosine_annealing_lr
             ],
             outputs=[
                 training_info

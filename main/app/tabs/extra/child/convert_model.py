@@ -9,11 +9,13 @@ from main.app.core.model_utils import onnx_export
 
 from main.app.core.ui import (
     visible, 
-    shutil_move
+    shutil_move,
+    change_models_choices
 )
 
 from main.app.variables import (
     configs, 
+    model_name, 
     translations 
 )
 
@@ -24,20 +26,28 @@ def convert_model_tab():
         model_pth_upload = gr.File(
             label=translations["drop_model"], 
             file_types=[".pth"]
-        ) 
+        )
+    with gr.Accordion(
+        label=translations["model_name"], 
+        open=True
+    ):
+        with gr.Row():
+            model_pth_path = gr.Dropdown(
+                label=translations["model_name"], 
+                choices=model_name, 
+                value=model_name[0] if len(model_name) >= 1 else "", 
+                interactive=True, 
+                allow_custom_value=True
+            )
+        with gr.Row():
+            refresh_model = gr.Button(
+                translations["refresh"]
+            )
     with gr.Row():
         convert_onnx_button = gr.Button(
             translations["convert_model"], 
             variant="primary", 
             scale=2
-        )
-    with gr.Row():
-        model_pth_path = gr.Textbox(
-            label=translations["model_path"], 
-            value="", 
-            placeholder="assets/weights/Model.pth", 
-            info=translations["model_path_info"], 
-            interactive=True
         )
     with gr.Row():
         output_model_file = gr.File(
@@ -56,6 +66,14 @@ def convert_model_tab():
                 model_pth_path
             ]
         )
+        refresh_model.click(
+            fn=lambda: change_models_choices()[0], 
+            inputs=[], 
+            outputs=[
+                model_pth_path
+            ]
+        )
+    with gr.Row():
         convert_onnx_button.click(
             fn=onnx_export,
             inputs=[

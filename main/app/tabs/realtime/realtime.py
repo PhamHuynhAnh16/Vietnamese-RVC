@@ -46,7 +46,7 @@ input_channels_map, output_channels_map = audio_device()
 client_mode = "--client" in sys.argv
 
 def realtime_tab():
-    with gr.TabItem(translations["realtime"], visible=configs.get("realtime_tab", True) and not torch.cuda.get_device_name().endswith("[ZLUDA]")):
+    with gr.TabItem(translations["realtime"], visible=configs.get("realtime_tab", True) and not (torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"))):
         gr.Markdown(translations["realtime_markdown"])
         with gr.Row():
             gr.Markdown(translations["realtime_markdown_2"])
@@ -306,6 +306,12 @@ def realtime_tab():
                     translations["hubert_model"], 
                     open=True
                 ):
+                    embedders_mix = gr.Checkbox(
+                        label=translations["embedders_mix"],
+                        info=translations["embedders_mix_info"],
+                        value=False,
+                        interactive=True
+                    )
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
@@ -328,6 +334,25 @@ def realtime_tab():
                         interactive=True, 
                         visible=False
                     )
+                    with gr.Column(visible=False) as embedders_mix_column:
+                        embedders_mix_layers = gr.Slider(
+                            label=translations["embedders_mix_layers"], 
+                            info=translations["embedders_mix_layers_info"],
+                            minimum=1, 
+                            maximum=12, 
+                            value=9, 
+                            step=1, 
+                            interactive=True
+                        )
+                        embedders_mix_ratio = gr.Slider(
+                            label=translations["embedders_mix_ratio"], 
+                            info=translations["embedders_mix_ratio_info"], 
+                            minimum=0.1, 
+                            maximum=1, 
+                            value=0.5, 
+                            step=0.1, 
+                            interactive=True
+                        )
         with gr.Row():
                 with gr.Accordion(
                     translations["setting"], 
@@ -1109,6 +1134,15 @@ def realtime_tab():
                     ]
                 )
         with gr.Row():
+            embedders_mix.change(
+                fn=visible,
+                inputs=[
+                    embedders_mix
+                ],
+                outputs=[
+                    embedders_mix_column
+                ]
+            )
             if not client_mode:
                 monitor.change(
                     fn=update_audio_device,
@@ -1256,6 +1290,9 @@ def realtime_tab():
                         clean_strength,
                         post_process,
                         sids,
+                        embedders_mix,
+                        embedders_mix_layers,
+                        embedders_mix_ratio,
                         chorus,
                         distortion,
                         reverb,
@@ -1366,6 +1403,9 @@ def realtime_tab():
                         exclusive_mode,
                         post_process,
                         sids,
+                        embedders_mix,
+                        embedders_mix_layers,
+                        embedders_mix_ratio,
                         chorus,
                         distortion,
                         reverb,
@@ -1435,7 +1475,7 @@ def realtime_tab():
         with gr.Row():
             cross_fade_overlap_size.change(
                 js="(value) => window.ChangeConfig(value, 'cross_fade_overlap_size')" if client_mode else None, 
-                fn=lambda value: change_config(value, "cross_fade_overlap_size") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "cross_fade_overlap_size")) if not client_mode else None, 
                 inputs=[
                     cross_fade_overlap_size
                 ], 
@@ -1443,7 +1483,7 @@ def realtime_tab():
             )
             extra_convert_size.change(
                 js="(value) => window.ChangeConfig(value, 'extra_convert_size')" if client_mode else None, 
-                fn=lambda value: change_config(value, "extra_convert_size") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "extra_convert_size")) if not client_mode else None, 
                 inputs=[
                     extra_convert_size
                 ], 
@@ -1451,7 +1491,7 @@ def realtime_tab():
             )
             silent_threshold.change(
                 js="(value) => window.ChangeConfig(value, 'silent_threshold')" if client_mode else None, 
-                fn=lambda value: change_config(value, "silent_threshold") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "silent_threshold")) if not client_mode else None, 
                 inputs=[
                     silent_threshold
                 ], 
@@ -1460,7 +1500,7 @@ def realtime_tab():
         with gr.Row():
             vad_enabled.change(
                 js="(value) => window.ChangeConfig(value, 'vad_enabled')" if client_mode else None, 
-                fn=lambda value: change_config(value, "vad_enabled") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "vad_enabled")) if not client_mode else None, 
                 inputs=[
                     vad_enabled
                 ], 
@@ -1468,7 +1508,7 @@ def realtime_tab():
             )
             vad_sensitivity.change(
                 js="(value) => window.ChangeConfig(value, 'vad_sensitivity')" if client_mode else None, 
-                fn=lambda value: change_config(value, "vad_sensitivity") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "vad_sensitivity")) if not client_mode else None, 
                 inputs=[
                     vad_sensitivity
                 ], 
@@ -1476,7 +1516,7 @@ def realtime_tab():
             )            
             vad_frame_ms.change(
                 js="(value) => window.ChangeConfig(value, 'vad_frame_ms')" if client_mode else None, 
-                fn=lambda value: change_config(value, "vad_frame_ms") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "vad_frame_ms")) if not client_mode else None, 
                 inputs=[
                     vad_frame_ms
                 ], 
@@ -1485,7 +1525,7 @@ def realtime_tab():
         with gr.Row():
             input_audio_gain.change(
                 js="(value) => window.ChangeConfig(value, 'input_audio_gain')" if client_mode else None, 
-                fn=lambda value: change_config(value / 100.0, "input_audio_gain") if not client_mode else None, 
+                fn=(lambda value: change_config(value / 100.0, "input_audio_gain")) if not client_mode else None, 
                 inputs=[
                     input_audio_gain
                 ], 
@@ -1493,7 +1533,7 @@ def realtime_tab():
             )
             output_audio_gain.change(
                 js="(value) => window.ChangeConfig(value, 'output_audio_gain')" if client_mode else None, 
-                fn=lambda value: change_config(value / 100.0, "output_audio_gain") if not client_mode else None, 
+                fn=(lambda value: change_config(value / 100.0, "output_audio_gain")) if not client_mode else None, 
                 inputs=[
                     output_audio_gain
                 ], 
@@ -1501,7 +1541,7 @@ def realtime_tab():
             )
             monitor_audio_gain.change(
                 js="(value) => window.ChangeConfig(value, 'monitor_audio_gain')" if client_mode else None, 
-                fn=lambda value: change_config(value / 100.0, "monitor_audio_gain") if not client_mode else None, 
+                fn=(lambda value: change_config(value / 100.0, "monitor_audio_gain")) if not client_mode else None, 
                 inputs=[
                     monitor_audio_gain
                 ], 
@@ -1510,7 +1550,7 @@ def realtime_tab():
         with gr.Row():
             index_strength.change(
                 js="(value) => window.ChangeConfig(value, 'index_rate')" if client_mode else None, 
-                fn=lambda value: change_config(value, "index_rate") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "index_rate")) if not client_mode else None, 
                 inputs=[
                     index_strength
                 ], 
@@ -1518,7 +1558,7 @@ def realtime_tab():
             )
             rms_mix_rate.change(
                 js="(value) => window.ChangeConfig(value, 'rms_mix_rate')" if client_mode else None, 
-                fn=lambda value: change_config(value, "rms_mix_rate") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "rms_mix_rate")) if not client_mode else None, 
                 inputs=[
                     rms_mix_rate
                 ], 
@@ -1526,7 +1566,7 @@ def realtime_tab():
             )
             protect.change(
                 js="(value) => window.ChangeConfig(value, 'protect')" if client_mode else None, 
-                fn=lambda value: change_config(value, "protect") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "protect")) if not client_mode else None, 
                 inputs=[
                     protect
                 ], 
@@ -1535,7 +1575,7 @@ def realtime_tab():
         with gr.Row():
             pitch.change(
                 js="(value) => window.ChangeConfig(value, 'f0_up_key')" if client_mode else None, 
-                fn=lambda value: change_config(value, "f0_up_key") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "f0_up_key")) if not client_mode else None, 
                 inputs=[
                     pitch
                 ], 
@@ -1543,7 +1583,7 @@ def realtime_tab():
             )
             f0_autotune.change(
                 js="(value) => window.ChangeConfig(value, 'f0_autotune')" if client_mode else None, 
-                fn=lambda value: change_config(value, "f0_autotune") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "f0_autotune")) if not client_mode else None, 
                 inputs=[
                     f0_autotune
                 ], 
@@ -1551,7 +1591,7 @@ def realtime_tab():
             )
             f0_autotune_strength.change(
                 js="(value) => window.ChangeConfig(value, 'f0_autotune_strength')" if client_mode else None, 
-                fn=lambda value: change_config(value, "f0_autotune_strength") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "f0_autotune_strength")) if not client_mode else None, 
                 inputs=[
                     f0_autotune_strength
                 ], 
@@ -1560,7 +1600,7 @@ def realtime_tab():
         with gr.Row():
             proposal_pitch.change(
                 js="(value) => window.ChangeConfig(value, 'proposal_pitch')" if client_mode else None, 
-                fn=lambda value: change_config(value, "proposal_pitch") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "proposal_pitch")) if not client_mode else None, 
                 inputs=[
                     proposal_pitch
                 ], 
@@ -1568,7 +1608,7 @@ def realtime_tab():
             )
             proposal_pitch_threshold.change(
                 js="(value) => window.ChangeConfig(value, 'proposal_pitch_threshold')" if client_mode else None, 
-                fn=lambda value: change_config(value, "proposal_pitch_threshold") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "proposal_pitch_threshold")) if not client_mode else None, 
                 inputs=[
                     proposal_pitch_threshold
                 ], 
@@ -1576,7 +1616,7 @@ def realtime_tab():
             )
             clean_audio.change(
                 js="(value) => window.ChangeConfig(value, 'clean_audio')" if client_mode else None, 
-                fn=lambda value: change_config(value, "clean_audio") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "clean_audio")) if not client_mode else None, 
                 inputs=[
                     clean_audio
                 ], 
@@ -1585,7 +1625,7 @@ def realtime_tab():
         with gr.Row():
             clean_strength.change(
                 js="(value) => window.ChangeConfig(value, 'clean_strength')" if client_mode else None, 
-                fn=lambda value: change_config(value, "clean_strength") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "clean_strength")) if not client_mode else None, 
                 inputs=[
                     clean_strength
                 ], 
@@ -1593,13 +1633,13 @@ def realtime_tab():
             )
             post_process.change(
                 js="(value) => window.ChangeConfig(value, 'post_process')" if client_mode else None, 
-                fn=lambda value: change_config(value, "post_process") if not client_mode else None, 
+                fn=(lambda value: change_config(value, "post_process")) if not client_mode else None, 
                 inputs=[post_process], 
                 outputs=[]
             )
             reverb.change(
                 js="(value) => window.ChangeConfig(value, 'reverb', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb
                 ], 
@@ -1608,7 +1648,7 @@ def realtime_tab():
         with gr.Row():
             chorus.change(
                 js="(value) => window.ChangeConfig(value, 'chorus', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "chorus", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "chorus", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     chorus
                 ], 
@@ -1616,7 +1656,7 @@ def realtime_tab():
             )
             delay.change(
                 js="(value) => window.ChangeConfig(value, 'delay', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "delay", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "delay", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     delay
                 ], 
@@ -1624,7 +1664,7 @@ def realtime_tab():
             )
             phaser.change(
                 js="(value) => window.ChangeConfig(value, 'phaser', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "phaser", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "phaser", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     phaser
                 ], 
@@ -1633,7 +1673,7 @@ def realtime_tab():
         with gr.Row():
             compressor.change(
                 js="(value) => window.ChangeConfig(value, 'compressor', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "compressor", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "compressor", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     compressor
                 ], 
@@ -1641,7 +1681,7 @@ def realtime_tab():
             )
             limiter.change(
                 js="(value) => window.ChangeConfig(value, 'limiter', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "limiter", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "limiter", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     limiter
                 ], 
@@ -1649,7 +1689,7 @@ def realtime_tab():
             )
             distortion.change(
                 js="(value) => window.ChangeConfig(value, 'distortion', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "distortion", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "distortion", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     distortion
                 ], 
@@ -1658,7 +1698,7 @@ def realtime_tab():
         with gr.Row():
             pitch_shift.change(
                 js="(value) => window.ChangeConfig(value, 'pitch_shift', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "pitch_shift", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "pitch_shift", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     pitch_shift
                 ], 
@@ -1666,7 +1706,7 @@ def realtime_tab():
             )
             gain.change(
                 js="(value) => window.ChangeConfig(value, 'gain', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "gain", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "gain", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     gain
                 ], 
@@ -1674,7 +1714,7 @@ def realtime_tab():
             )
             bitcrush.change(
                 js="(value) => window.ChangeConfig(value, 'bitcrush', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "bitcrush", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "bitcrush", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     bitcrush
                 ], 
@@ -1683,7 +1723,7 @@ def realtime_tab():
         with gr.Row():
             clipping.change(
                 js="(value) => window.ChangeConfig(value, 'clipping', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "clipping", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "clipping", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     clipping
                 ], 
@@ -1691,7 +1731,7 @@ def realtime_tab():
             )
             pitch_shift_semitones.change(
                 js="(value) => window.ChangeConfig(value, 'pitch_shift_semitones', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "pitch_shift_semitones", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "pitch_shift_semitones", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     pitch_shift_semitones
                 ], 
@@ -1699,7 +1739,7 @@ def realtime_tab():
             )
             gain_db.change(
                 js="(value) => window.ChangeConfig(value, 'gain_db', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "gain_db", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "gain_db", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     gain_db
                 ], 
@@ -1708,7 +1748,7 @@ def realtime_tab():
         with gr.Row():
             phaser_depth.change(
                 js="(value) => window.ChangeConfig(value, 'phaser_depth', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "phaser_depth", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "phaser_depth", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     phaser_depth
                 ], 
@@ -1716,7 +1756,7 @@ def realtime_tab():
             )
             phaser_rate_hz.change(
                 js="(value) => window.ChangeConfig(value, 'phaser_rate_hz', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "phaser_rate_hz", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "phaser_rate_hz", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     phaser_rate_hz
                 ], 
@@ -1724,7 +1764,7 @@ def realtime_tab():
             )
             phaser_mix.change(
                 js="(value) => window.ChangeConfig(value, 'phaser_mix', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "phaser_mix", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "phaser_mix", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     phaser_mix
                 ], 
@@ -1733,13 +1773,13 @@ def realtime_tab():
         with gr.Row():
             phaser_centre_frequency_hz.change(
                 js="(value) => window.ChangeConfig(value, 'phaser_centre_frequency_hz', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "phaser_centre_frequency_hz", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "phaser_centre_frequency_hz", if_kwargs=True)) if not client_mode else None, 
                 inputs=[phaser_centre_frequency_hz], 
                 outputs=[]
             )
             phaser_feedback.change(
                 js="(value) => window.ChangeConfig(value, 'phaser_feedback', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "phaser_feedback", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "phaser_feedback", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     phaser_feedback
                 ], 
@@ -1747,7 +1787,7 @@ def realtime_tab():
             )
             reverb_room_size.change(
                 js="(value) => window.ChangeConfig(value, 'reverb_room_size', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb_room_size", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb_room_size", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb_room_size
                 ], 
@@ -1756,7 +1796,7 @@ def realtime_tab():
         with gr.Row():
             reverb_damping.change(
                 js="(value) => window.ChangeConfig(value, 'reverb_damping', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb_damping", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb_damping", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb_damping
                 ], 
@@ -1764,7 +1804,7 @@ def realtime_tab():
             )
             reverb_wet_gain.change(
                 js="(value) => window.ChangeConfig(value, 'reverb_wet_level', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb_wet_level", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb_wet_level", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb_wet_gain
                 ], 
@@ -1772,7 +1812,7 @@ def realtime_tab():
             )
             reverb_dry_gain.change(
                 js="(value) => window.ChangeConfig(value, 'reverb_dry_level', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb_dry_level", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb_dry_level", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb_dry_gain
                 ], 
@@ -1781,7 +1821,7 @@ def realtime_tab():
         with gr.Row():    
             reverb_width.change(
                 js="(value) => window.ChangeConfig(value, 'reverb_width', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb_width", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb_width", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb_width
                 ], 
@@ -1789,7 +1829,7 @@ def realtime_tab():
             )
             reverb_freeze_mode.change(
                 js="(value) => window.ChangeConfig(value, 'reverb_freeze_mode', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "reverb_freeze_mode", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "reverb_freeze_mode", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     reverb_freeze_mode
                 ], 
@@ -1797,7 +1837,7 @@ def realtime_tab():
             )
             limiter_threshold.change(
                 js="(value) => window.ChangeConfig(value, 'limiter_threshold', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "limiter_threshold", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "limiter_threshold", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     limiter_threshold
                 ], 
@@ -1806,7 +1846,7 @@ def realtime_tab():
         with gr.Row():    
             limiter_release_time.change(
                 js="(value) => window.ChangeConfig(value, 'limiter_release', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "limiter_release", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "limiter_release", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     limiter_release_time
                 ], 
@@ -1814,7 +1854,7 @@ def realtime_tab():
             )
             chorus_rate.change(
                 js="(value) => window.ChangeConfig(value, 'chorus_rate', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "chorus_rate", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "chorus_rate", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     chorus_rate
                 ], 
@@ -1822,7 +1862,7 @@ def realtime_tab():
             )
             chorus_depth.change(
                 js="(value) => window.ChangeConfig(value, 'chorus_depth', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "chorus_depth", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "chorus_depth", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     chorus_depth
                 ], 
@@ -1831,7 +1871,7 @@ def realtime_tab():
         with gr.Row():    
             chorus_center_delay.change(
                 js="(value) => window.ChangeConfig(value, 'chorus_delay', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "chorus_delay", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "chorus_delay", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     chorus_center_delay
                 ], 
@@ -1839,7 +1879,7 @@ def realtime_tab():
             )
             chorus_feedback.change(
                 js="(value) => window.ChangeConfig(value, 'chorus_feedback', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "chorus_feedback", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "chorus_feedback", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     chorus_feedback
                 ], 
@@ -1847,7 +1887,7 @@ def realtime_tab():
             )
             chorus_mix.change(
                 js="(value) => window.ChangeConfig(value, 'chorus_mix', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "chorus_mix", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "chorus_mix", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     chorus_mix
                 ], 
@@ -1856,7 +1896,7 @@ def realtime_tab():
         with gr.Row():
             bitcrush_bit_depth.change(
                 js="(value) => window.ChangeConfig(value, 'bitcrush_bit_depth', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "bitcrush_bit_depth", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "bitcrush_bit_depth", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     bitcrush_bit_depth
                 ], 
@@ -1864,7 +1904,7 @@ def realtime_tab():
             )
             clipping_threshold.change(
                 js="(value) => window.ChangeConfig(value, 'clipping_threshold', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "clipping_threshold", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "clipping_threshold", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     clipping_threshold
                 ], 
@@ -1872,7 +1912,7 @@ def realtime_tab():
             )
             distortion_gain.change(
                 js="(value) => window.ChangeConfig(value, 'distortion_gain', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "distortion_gain", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "distortion_gain", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     distortion_gain
                 ], 
@@ -1881,7 +1921,7 @@ def realtime_tab():
         with gr.Row():
             compressor_threshold.change(
                 js="(value) => window.ChangeConfig(value, 'compressor_threshold', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "compressor_threshold", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "compressor_threshold", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     compressor_threshold
                 ], 
@@ -1889,7 +1929,7 @@ def realtime_tab():
             )
             compressor_ratio.change(
                 js="(value) => window.ChangeConfig(value, 'compressor_ratio', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "compressor_ratio", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "compressor_ratio", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     compressor_ratio
                 ], 
@@ -1897,7 +1937,7 @@ def realtime_tab():
             )
             compressor_attack.change(
                 js="(value) => window.ChangeConfig(value, 'compressor_attack', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "compressor_attack", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "compressor_attack", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     compressor_attack
                 ], 
@@ -1906,7 +1946,7 @@ def realtime_tab():
         with gr.Row():
             compressor_release.change(
                 js="(value) => window.ChangeConfig(value, 'compressor_release', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "compressor_release", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "compressor_release", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     compressor_release
                 ], 
@@ -1914,7 +1954,7 @@ def realtime_tab():
             )
             delay_seconds.change(
                 js="(value) => window.ChangeConfig(value, 'delay_seconds', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "delay_seconds", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "delay_seconds", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     delay_seconds
                 ], 
@@ -1922,7 +1962,7 @@ def realtime_tab():
             )
             delay_feedback.change(
                 js="(value) => window.ChangeConfig(value, 'delay_feedback', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "delay_feedback", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "delay_feedback", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     delay_feedback
                 ], 
@@ -1931,7 +1971,7 @@ def realtime_tab():
         with gr.Row():
             delay_mix.change(
                 js="(value) => window.ChangeConfig(value, 'delay_mix', if_kwargs=true)" if client_mode else None, 
-                fn=lambda value: change_config(value, "delay_mix", if_kwargs=True) if not client_mode else None, 
+                fn=(lambda value: change_config(value, "delay_mix", if_kwargs=True)) if not client_mode else None, 
                 inputs=[
                     delay_mix
                 ], 
@@ -1939,45 +1979,84 @@ def realtime_tab():
             )
             model_pth.change(
                 js="(value) => window.ChangeConfig(value, 'model_path')" if client_mode else None, 
-                fn=lambda value: change_config(value, "model_path") if not client_mode else None, 
-                inputs=[model_pth], 
+                fn=(lambda value: change_config(value, "model_path")) if not client_mode else None, 
+                inputs=[
+                    model_pth
+                ], 
                 outputs=[]
             )
             model_index.change(
                 js="(value) => window.ChangeConfig(value, 'index_path')" if client_mode else None, 
-                fn=lambda value: change_config(value, "index_path") if not client_mode else None, 
-                inputs=[model_index], 
+                fn=(lambda value: change_config(value, "index_path")) if not client_mode else None, 
+                inputs=[
+                    model_index
+                ], 
                 outputs=[]
             )
         with gr.Row():
             f0_method.change(
                 js="(value) => window.ChangeConfig(value, 'f0_method')" if client_mode else None, 
-                fn=lambda value: change_config(value, "f0_method") if not client_mode else None, 
-                inputs=[f0_method], 
+                fn=(lambda value: change_config(value, "f0_method")) if not client_mode else None, 
+                inputs=[
+                    f0_method
+                ], 
                 outputs=[]
             )
             predictor_onnx.change(
                 js="(value) => window.ChangeConfig(value, 'predictor_onnx')" if client_mode else None, 
-                fn=lambda value: change_config(value, "predictor_onnx") if not client_mode else None, 
-                inputs=[predictor_onnx], 
+                fn=(lambda value: change_config(value, "predictor_onnx")) if not client_mode else None, 
+                inputs=[
+                    predictor_onnx
+                ], 
                 outputs=[]
             )
             embedders.change(
                 js="(value) => window.ChangeConfig(value, 'embedder_model')" if client_mode else None, 
-                fn=lambda value: change_config(value, "embedder_model") if not client_mode else None, 
-                inputs=[embedders], 
+                fn=(lambda value: change_config(value, "embedder_model")) if not client_mode else None, 
+                inputs=[
+                    embedders
+                ], 
                 outputs=[]
             )
         with gr.Row():
             custom_embedders.change(
                 js="(value) => window.ChangeConfig(value, 'embedder_model_custom')" if client_mode else None, 
-                fn=lambda value: change_config(value, "embedder_model_custom") if not client_mode else None, 
-                inputs=[custom_embedders], 
+                fn=(lambda value: change_config(value, "embedder_model_custom")) if not client_mode else None, 
+                inputs=[
+                    custom_embedders
+                ], 
                 outputs=[]
             )
             embedder_mode.change(
                 js="(value) => window.ChangeConfig(value, 'embedders_mode')" if client_mode else None, 
-                fn=lambda value: change_config(value, "embedders_mode") if not client_mode else None, 
-                inputs=[embedder_mode], 
+                fn=(lambda value: change_config(value, "embedders_mode")) if not client_mode else None, 
+                inputs=[
+                    embedder_mode
+                ], 
+                outputs=[]
+            )
+        with gr.Row():
+            embedders_mix.change(
+                js="(value) => window.ChangeConfig(value, 'embedders_mix')" if client_mode else None, 
+                fn=(lambda value: change_config(value, "embedders_mix")) if not client_mode else None, 
+                inputs=[
+                    embedders_mix
+                ], 
+                outputs=[]
+            )
+            embedders_mix_layers.change(
+                js="(value) => window.ChangeConfig(value, 'embedders_mix_layers')" if client_mode else None, 
+                fn=(lambda value: change_config(value, "embedders_mix_layers")) if not client_mode else None, 
+                inputs=[
+                    embedders_mix_layers
+                ], 
+                outputs=[]
+            )
+            embedders_mix_ratio.change(
+                js="(value) => window.ChangeConfig(value, 'embedders_mix_ratio')" if client_mode else None, 
+                fn=(lambda value: change_config(value, "embedders_mix_ratio")) if not client_mode else None, 
+                inputs=[
+                    embedders_mix_ratio
+                ], 
                 outputs=[]
             )

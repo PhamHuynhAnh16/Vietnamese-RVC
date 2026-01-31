@@ -24,7 +24,10 @@ def load_presets(
     formant_qfrency, 
     formant_timbre, 
     proposal_pitch, 
-    proposal_pitch_threshold
+    proposal_pitch_threshold,
+    embedders_mix,
+    embedders_mix_layers,
+    embedders_mix_ratio
 ):
     if not presets: gr_warning(translations["provide_file_settings"])
     
@@ -51,7 +54,10 @@ def load_presets(
         file.get("formant_qfrency", formant_qfrency), 
         file.get("formant_timbre", formant_timbre), 
         file.get("proposal_pitch", proposal_pitch), 
-        file.get("proposal_pitch_threshold", proposal_pitch_threshold)
+        file.get("proposal_pitch_threshold", proposal_pitch_threshold),
+        file.get("embedders_mix", embedders_mix),
+        file.get("embedders_mix_layers", embedders_mix_layers),
+        file.get("embedders_mix_ratio", embedders_mix_ratio)
     ]
 
 def save_presets(
@@ -81,7 +87,10 @@ def save_presets(
     formant_qfrency, 
     formant_timbre, 
     proposal_pitch, 
-    proposal_pitch_threshold
+    proposal_pitch_threshold,
+    embedders_mix,
+    embedders_mix_layers,
+    embedders_mix_ratio
 ):  
     if not name: return gr_warning(translations["provide_filename_settings"])
 
@@ -139,10 +148,15 @@ def save_presets(
         ), 
         (
             formant_shifting_checkbox, 
-            {"formant_shifting": formant_shifting, "formant_qfrency": formant_qfrency, "formant_timbre": formant_timbre}), 
+            {"formant_shifting": formant_shifting, "formant_qfrency": formant_qfrency, "formant_timbre": formant_timbre}
+        ), 
         (
             proposal_pitch, 
             {"proposal_pitch": proposal_pitch, "proposal_pitch_threshold": proposal_pitch_threshold}
+        ),
+        (
+            embedders_mix,
+            {"embedders_mix_layers": embedders_mix_layers, "embedders_mix_ratio": embedders_mix_ratio}
         )
     ]:
         if checkbox: settings.update(data)

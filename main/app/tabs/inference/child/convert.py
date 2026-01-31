@@ -308,6 +308,12 @@ def convert_tab():
                     translations["hubert_model"], 
                     open=False
                 ):
+                    embedders_mix = gr.Checkbox(
+                        label=translations["embedders_mix"],
+                        info=translations["embedders_mix_info"],
+                        value=False,
+                        interactive=True
+                    )
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
@@ -331,6 +337,25 @@ def convert_tab():
                         interactive=True, 
                         visible=False
                     )    
+                    with gr.Column(visible=False) as embedders_mix_column:
+                        embedders_mix_layers = gr.Slider(
+                            label=translations["embedders_mix_layers"], 
+                            info=translations["embedders_mix_layers_info"],
+                            minimum=1, 
+                            maximum=12, 
+                            value=9, 
+                            step=1, 
+                            interactive=True
+                        )
+                        embedders_mix_ratio = gr.Slider(
+                            label=translations["embedders_mix_ratio"], 
+                            info=translations["embedders_mix_ratio_info"], 
+                            minimum=0.1, 
+                            maximum=1, 
+                            value=0.5, 
+                            step=0.1, 
+                            interactive=True
+                        )
                 with gr.Accordion(
                     translations["use_presets"], 
                     open=False
@@ -601,7 +626,10 @@ def convert_tab():
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ], 
             outputs=[
                 cleaner, 
@@ -619,7 +647,10 @@ def convert_tab():
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ]
         )
         refresh_preset_button.click(
@@ -658,7 +689,10 @@ def convert_tab():
                 formant_qfrency, 
                 formant_timbre,
                 proposal_pitch,
-                proposal_pitch_threshold
+                proposal_pitch_threshold,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ], 
             outputs=[
                 presets_name
@@ -945,6 +979,15 @@ def convert_tab():
             ]
         )
     with gr.Row():
+        embedders_mix.change(
+            fn=visible,
+            inputs=[
+                embedders_mix
+            ],
+            outputs=[
+                embedders_mix_column
+            ]
+        )
         convert_audio_button.click(
             fn=convert_selection,
             inputs=[
@@ -985,7 +1028,10 @@ def convert_tab():
                 proposal_pitch_threshold,
                 audio_processing,
                 alpha,
-                sids
+                sids,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ],
             outputs=[
                 convert_select_audio, 
@@ -1040,7 +1086,10 @@ def convert_tab():
                 proposal_pitch_threshold,
                 audio_processing,
                 alpha,
-                sids
+                sids,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio
             ],
             outputs=[
                 main_convert, 

@@ -17,6 +17,9 @@ def fushion_model_pth(
 ):
     if not name.endswith(".pth"): name = name + ".pth"
 
+    model_path_1 = os.path.join(configs["weights_path"], model_path_1) if not os.path.exists(model_path_1) else model_path_1
+    model_path_2 = os.path.join(configs["weights_path"], model_path_2) if not os.path.exists(model_path_2) else model_path_2
+
     if (
         not model_path_1 or 
         not os.path.exists(model_path_1) or 
@@ -137,6 +140,7 @@ def fushion_model(
     
 def onnx_export(model_path):    
     if not model_path.endswith(".pth"): model_path += ".pth"
+    model_path = os.path.join(configs["weights_path"], model_path) if not os.path.exists(model_path) else model_path
 
     if (
         not model_path or 
@@ -163,6 +167,8 @@ def onnx_export(model_path):
         return gr_error(e)
     
 def model_info(model_path):
+    model_path = os.path.join(configs["weights_path"], model_path) if not os.path.exists(model_path) else model_path
+
     if (
         not model_path or 
         not os.path.exists(model_path) or 

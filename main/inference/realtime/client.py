@@ -23,8 +23,8 @@ DEVICE_SAMPLE_RATE = 48000
 async def change_config(ws: WebSocket):
     global vc_instance, params
 
-    if vc_instance is None: return
     await ws.accept()
+    if vc_instance is None: return
 
     text = await ws.receive_text()
     jsons = json.loads(text)
@@ -339,7 +339,10 @@ async def websocket_audio(ws: WebSocket):
                 f0_autotune=params["f0_autotune"], 
                 f0_autotune_strength=params["f0_autotune_strength"], 
                 proposal_pitch=params["proposal_pitch"], 
-                proposal_pitch_threshold=params["proposal_pitch_threshold"]
+                proposal_pitch_threshold=params["proposal_pitch_threshold"],
+                embedders_mix=params["embedders_mix"],
+                embedders_mix_layers=params["embedders_mix_layers"],
+                embedders_mix_ratio=params["embedders_mix_ratio"],
             )
 
             await ws.send_text(json.dumps({"type": "latency", "value": perf[1], "volume": vol}))

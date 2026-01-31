@@ -40,6 +40,9 @@ def parse_arguments():
     parser.add_argument("--rms_extract", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--include_mutes", type=int, default=2)
+    parser.add_argument("--embedders_mix", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--embedders_mix_layers", type=int, default=9, required=False)
+    parser.add_argument("--embedders_mix_ratio", type=float, default=0.5)
 
     return parser.parse_args()
 
@@ -60,7 +63,10 @@ def main():
         f0_autotune_strength, 
         rms_extract, 
         alpha,
-        include_mutes
+        include_mutes,
+        embedders_mix,
+        embedders_mix_layers,
+        embedders_mix_ratio
     ) = (
         args.f0_method, 
         args.hop_length, 
@@ -76,7 +82,10 @@ def main():
         args.f0_autotune_strength, 
         args.rms_extract, 
         args.alpha,
-        args.include_mutes
+        args.include_mutes,
+        args.embedders_mix,
+        args.embedders_mix_layers,
+        args.embedders_mix_ratio
     )
 
     check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
@@ -108,7 +117,10 @@ def main():
         translations["embed_mode"]: embedders_mode, 
         translations["train&energy"]: rms_extract,
         translations["alpha_label"]: alpha,
-        translations["include_mutes"]: include_mutes
+        translations["include_mutes"]: include_mutes,
+        translations["embedders_mix"]: embedders_mix,
+        translations["embedders_mix_layers"]: embedders_mix_layers,
+        translations["embedders_mix_ratio"]: embedders_mix_ratio,
     }
 
     for key, value in log_data.items():
@@ -138,7 +150,10 @@ def main():
             devices, 
             embedder_model, 
             embedders_mode, 
-            config.is_half
+            config.is_half,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio
         )
         run_rms_extraction(
             exp_dir, 

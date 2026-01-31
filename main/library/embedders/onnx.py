@@ -5,8 +5,7 @@ class HubertModelONNX:
     def __init__(
         self, 
         embedder_model_path, 
-        providers, 
-        device
+        providers
     ):
         sess_options = onnxruntime.SessionOptions()
         sess_options.log_severity_level = 3
@@ -18,7 +17,6 @@ class HubertModelONNX:
         )
 
         self.final_proj = self._final_proj
-        self.device = device
 
     def _final_proj(self, source):
         return source
@@ -33,6 +31,6 @@ class HubertModelONNX:
             torch.as_tensor(
                 logits[int(output_layer != 9)], 
                 dtype=torch.float32, 
-                device=self.device
+                device=padding_mask.device
             )
         ]
