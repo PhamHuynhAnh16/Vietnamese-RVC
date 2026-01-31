@@ -536,7 +536,7 @@ def training(
         "--use_custom_reference", str(custom_reference),
         "--reference_path", str(reference_path),
         "--multiscale_mel_loss", str(multiscale_mel_loss),
-        "--cosine_annealing_lr", str(cosine_annealing_lr)
+        "--use_cosine_annealing_lr", str(cosine_annealing_lr)
     ])
 
     done = [False]
