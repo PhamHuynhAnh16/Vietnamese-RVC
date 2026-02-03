@@ -9,8 +9,7 @@ from main.library.speaker_diarization.whisper import Whisper, ModelDimensions, l
 class WhisperModel(torch.nn.Module):
     def __init__(
         self, 
-        model_path, 
-        device
+        model_path
     ):
         super().__init__()
         checkpoint = torch.load(model_path, map_location="cpu")
