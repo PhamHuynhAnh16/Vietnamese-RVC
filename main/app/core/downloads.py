@@ -75,7 +75,8 @@ def download_url(url):
 def move_file(
     file, 
     download_dir, 
-    model
+    model,
+    use_orig_weight_name=False
 ):
     weights_dir = configs["weights_path"]
     logs_dir = configs["logs_path"]
@@ -84,13 +85,14 @@ def move_file(
     if not os.path.exists(logs_dir): os.makedirs(logs_dir, exist_ok=True)
 
     if file.endswith(".zip"): shutil.unpack_archive(file, download_dir)
-    move_files_from_directory(download_dir, weights_dir, logs_dir, model)
+    move_files_from_directory(download_dir, weights_dir, logs_dir, model, use_orig_weight_name)
 
 def download_model(url=None, model=None):
     if not url: return gr_warning(translations["provide_url"])
 
     url = replace_url(url)
     download_dir = "download_model"
+    use_orig_weight_name = False
 
     os.makedirs(download_dir, exist_ok=True)
     
@@ -127,6 +129,7 @@ def download_model(url=None, model=None):
             return translations["not_support_url"]
         
         if not model: 
+            use_orig_weight_name = True
             modelname = os.path.basename(file)
 
             model = (
@@ -138,7 +141,7 @@ def download_model(url=None, model=None):
             if model is None: model = os.path.splitext(modelname)[0]
 
         model = replace_modelname(model)
-        move_file(file, download_dir, model)
+        move_file(file, download_dir, model, use_orig_weight_name)
 
         gr_info(translations["success"])
         return translations["success"]

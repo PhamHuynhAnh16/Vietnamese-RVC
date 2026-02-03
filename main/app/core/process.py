@@ -52,7 +52,8 @@ def move_files_from_directory(
     src_dir, 
     dest_weights, 
     dest_logs, 
-    model_name
+    model_name,
+    use_orig_weight_name=False
 ):
     for root, _, files in os.walk(src_dir):
         for file in files:
@@ -68,11 +69,11 @@ def move_files_from_directory(
             elif file.endswith(".pth") and not file.startswith("D_") and not file.startswith("G_"):
                 pth_path = process_output(os.path.join(dest_weights, model_name + ".pth"))
 
-                shutil.move(file_path, pth_path)
+                shutil.move(file_path, pth_path if not use_orig_weight_name else dest_weights)
             elif file.endswith(".onnx") and not file.startswith("D_") and not file.startswith("G_"):
                 pth_path = process_output(os.path.join(dest_weights, model_name + ".onnx"))
 
-                shutil.move(file_path, pth_path)
+                shutil.move(file_path, pth_path if not use_orig_weight_name else dest_weights)
 
 def extract_name_model(filename):
     match = re.search(
