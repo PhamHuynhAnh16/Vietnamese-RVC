@@ -29,7 +29,7 @@ def mute_file(
             "portuguese_hubert_base": "mute_portuguese.npy"
         }.get(embedders_model, None)
 
-    if mute_file is None:
+    if mute_file is None or not os.path.exists(mute_file):
         create_mute_file(
             rvc_version, 
             embedders_model, 
