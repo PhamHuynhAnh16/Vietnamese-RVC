@@ -15,7 +15,6 @@ def f0_extract(
         gr_warning(translations["input_not_valid"])
         return [None]*2
 
-    import librosa
     import numpy as np
     import matplotlib.pyplot as plt
 
@@ -61,7 +60,7 @@ def f0_extract(
     F_temp = np.array(pitchf, dtype=np.float32)
     F_temp[F_temp == 0] = np.nan
 
-    f0 = 1200 * np.log2(F_temp / librosa.midi_to_hz(0))
+    f0 = 1200 * np.log2(F_temp / 8.175798915643707)
 
     plt.figure(figsize=(10, 4))
     plt.plot(f0)
@@ -72,8 +71,8 @@ def f0_extract(
     plt.close()
 
     with open(txt_path, "w") as f:
-        for i, f0_value in enumerate(f0):
-            f.write(f"{i * 100.0},{f0_value}\n")
+        for i, f0_value in enumerate(pitchf):
+            f.write(f"{i},{f0_value}\n")
 
     gr_info(translations["extract_done"])
 

@@ -31,25 +31,24 @@ def post_process(
     f0 *= pow(2, f0_up_key / 12)
 
     if manual_f0 is not None:
+        start_frame = int(manual_x_pad * tf0)
+
         replace_f0 = np.interp(
-            list(
-                range(
-                    np.round(
-                        (manual_f0[:, 0].max() - manual_f0[:, 0].min()) * tf0 + 1
-                    ).astype(np.int16)
-                )
+            np.linspace(
+                manual_f0[:, 0][0], 
+                manual_f0[:, 0][-1], 
+                len(manual_f0[:, 0])
             ), 
-            manual_f0[:, 0] * 100, 
+            manual_f0[:, 0], 
             manual_f0[:, 1]
         )
 
-        f0[
-            manual_x_pad * tf0 : manual_x_pad * tf0 + len(replace_f0)
-        ] = replace_f0[
-            :f0[
-                manual_x_pad * tf0 : manual_x_pad * tf0 + len(replace_f0)
-            ].shape[0]
-        ]
+        end_frame = start_frame + len(replace_f0)
+        if end_frame > len(f0):
+            end_frame = len(f0)
+            replace_f0 = replace_f0[:end_frame - start_frame]
+
+        f0[start_frame:end_frame] = replace_f0
 
     f0_mel = 1127 * np.log(1 + f0 / 700)
     f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (f0_mel_max - f0_mel_min) + 1

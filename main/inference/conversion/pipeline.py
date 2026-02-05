@@ -191,9 +191,9 @@ class Pipeline:
         sid = torch.tensor(sid, device=self.device).unsqueeze(0).long()
         p_len = audio_pad.shape[0] // self.window
 
-        if hasattr(f0_file, "name"):
+        if f0_file and os.path.exists(f0_file) and f0_file.endswith(".txt"):
             try:
-                with open(f0_file.name, "r") as f:
+                with open(f0_file, "r") as f:
                     raw_lines = f.read()
 
                     if len(raw_lines) > 0:
