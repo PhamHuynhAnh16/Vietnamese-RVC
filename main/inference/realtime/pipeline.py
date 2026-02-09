@@ -217,6 +217,7 @@ class Pipeline:
 
                 feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
+            feats = feats.to(self.dtype)
             pitch = pitch if self.use_f0 else None
             pitchf = pitchf.to(self.dtype) if self.use_f0 else None
             energy = energy.to(self.dtype) if self.energy else None

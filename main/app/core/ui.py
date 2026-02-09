@@ -429,6 +429,8 @@ def change_embedders_mode(value):
         }
 
 def change_fp(fp):
+    global config
+
     fp16 = fp == "fp16"
 
     if fp16 and not config.allow_is_half: 
