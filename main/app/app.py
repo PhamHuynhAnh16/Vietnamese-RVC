@@ -125,7 +125,7 @@ with gr.Blocks(
         device = config.device.replace("privateuseone", "dml")
         if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"): device = device.replace("cuda", "hip")
 
-        logger.info(device)
+        logger.info(f"Pytorch: {device} | Onnxruntime: {config.providers[0].replace('Dml', 'Ocl') if device.startswith('ocl') else config.providers[0]}")
         logger.info(f'{translations["precision"]}: {("BF16" if config.brain else "FP16") if config.is_half else "FP32"}')
         logger.info(translations["start_app"])
         logger.info(translations["set_lang"].format(lang=language))

@@ -141,6 +141,6 @@ class Config:
         elif "CoreMLExecutionProvider" in ort_providers and self.device.startswith("mps"): 
             providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
         else: 
-            providers = ["CPUExecutionProvider", "CPUExecutionProvider"]
+            providers = ["CPUExecutionProvider"]
 
         return providers

@@ -29,7 +29,7 @@ class ONNXRVC:
         self.net_g = onnxruntime.InferenceSession(
             model_path, 
             sess_options=sess_options, 
-            providers=providers
+            providers=providers if not providers[0].startswith("DmlExecutionProvider") else ["CPUExecutionProvider"]
         )
 
     def get_onnx_argument(
