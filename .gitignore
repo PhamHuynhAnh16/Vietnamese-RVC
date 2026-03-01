@@ -20,6 +20,7 @@
 *.log
 *.nbc
 *.nbi
+*.pem
 
 audios
 dataset
@@ -28,6 +29,7 @@ assets/models
 assets/weights
 
 .vscode
+.gradio
 venv
 runtime
 env
