@@ -911,7 +911,8 @@ def training_model_tab():
                 clean_dataset_strength,
                 chunk_len, 
                 overlap_len,
-                normalization_mode
+                normalization_mode,
+                architecture
             ],
             outputs=[
                 preprocess_info

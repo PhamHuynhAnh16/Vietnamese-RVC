@@ -178,7 +178,8 @@ def preprocess(
     clean_strength, 
     chunk_len=3.0, 
     overlap_len=0.3, 
-    normalization_mode="none"
+    normalization_mode="none",
+    architecture="RVC"
 ):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
 
@@ -215,6 +216,7 @@ def preprocess(
         "--chunk_len", str(chunk_len),
         "--overlap_len", str(overlap_len),
         "--normalization_mode", normalization_mode,
+        "--architecture", architecture
     ])
 
     done = [False]

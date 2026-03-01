@@ -40,6 +40,7 @@ def parse_arguments():
     parser.add_argument("--chunk_len", type=float, default=3.0, required=False)
     parser.add_argument("--overlap_len", type=float, default=0.3, required=False)
     parser.add_argument("--normalization_mode", type=str, default="none", required=False)
+    parser.add_argument("--architecture", type=str, default="RVC")
 
     return parser.parse_args()
 
@@ -48,15 +49,14 @@ class PreProcess:
         self, 
         sr, 
         exp_dir, 
-        per
+        per,
+        architecture = "RVC"
     ):
+        if architecture == "RVC": slicer_params = {"sr": sr, "threshold": -42, "min_length": 1500, "min_interval": 400, "hop_size": 15, "max_sil_kept": 500}
+        else: slicer_params = {"sr": sr, "threshold": -40, "min_length": 7500, "min_interval": 100, "hop_size": 10, "max_sil_kept": 800}
+
         self.slicer = Slicer(
-            sr=sr, 
-            threshold=-42, 
-            min_length=1500, 
-            min_interval=400, 
-            hop_size=15, 
-            max_sil_kept=500
+            **slicer_params
         )
         self.b_high, self.a_high = signal.butter(
             N=5, 
@@ -268,10 +268,11 @@ def preprocess_training_set(
     clean_strength, 
     chunk_len, 
     overlap_len, 
-    normalization_mode
+    normalization_mode,
+    architecture = "RVC"
 ):
     start_time = time.time()
-    pp = PreProcess(sr, exp_dir, per)
+    pp = PreProcess(sr, exp_dir, per, architecture)
     logger.info(translations["start_preprocess"].format(num_processes=num_processes))
     dataset_length = 0
     files = []
@@ -334,7 +335,8 @@ def main():
         clean_strength, 
         chunk_len, 
         overlap_len, 
-        normalization_mode
+        normalization_mode,
+        architecture
     ) = (
         args.dataset_path, 
         args.sample_rate, 
@@ -344,7 +346,8 @@ def main():
         args.clean_strength, 
         args.chunk_len, 
         args.overlap_len, 
-        args.normalization_mode
+        args.normalization_mode,
+        args.architecture
     )
 
     os.makedirs(experiment_directory, exist_ok=True)
@@ -358,7 +361,8 @@ def main():
         translations['split_audio']: cut_preprocess, 
         translations['preprocess_effect']: preprocess_effects, 
         translations['clear_audio']: clean_dataset,
-        translations['clean_strength']: clean_strength
+        translations['clean_strength']: clean_strength,
+        translations["architecture"]: architecture
     }
 
     for key, value in log_data.items():
@@ -381,7 +385,8 @@ def main():
             clean_strength, 
             chunk_len, 
             overlap_len, 
-            normalization_mode
+            normalization_mode,
+            architecture
         )
     except Exception as e:
         logger.error(f"{translations['process_audio_error']} {e}")
