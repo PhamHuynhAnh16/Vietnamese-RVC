@@ -621,5 +621,6 @@
     "discord_presence": true,
     "check_new_requirements": true,
     "f0_min": 50,
-    "f0_max": 1100
+    "f0_max": 1100,
+    "allow_fp16_all_backend": false
 }

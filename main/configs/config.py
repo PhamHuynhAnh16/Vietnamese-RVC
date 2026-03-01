@@ -43,7 +43,7 @@ class Config:
         self.providers = self.get_providers()
 
         self.is_half = self.is_fp16()
-        self.allow_is_half = not self.device.startswith(("cpu", "mps", "ocl", "privateuseone"))
+        self.allow_is_half = not self.device.startswith(("cpu", "mps", "ocl", "privateuseone")) or self.configs.get("allow_fp16_all_backend", False)
 
         self.x_pad, self.x_query, self.x_center, self.x_max = self.device_config()
     
