@@ -152,8 +152,11 @@ class PreProcess:
         overlap_len, 
         normalization_mode
     ):
+        dataset_length = 0
+
         try:
             audio = load_audio(path, self.sr)
+            dataset_length = librosa.get_duration(y=audio, sr=self.sr)
 
             if process_effects: audio = signal.lfilter(self.b_high, self.a_high, audio)
             if normalization_mode == "pre": audio = self._normalize_audio(audio)
@@ -220,6 +223,10 @@ class PreProcess:
                             break
         except Exception as e:
             raise RuntimeError(f"{translations['process_audio_error']}: {e}")
+        return dataset_length
+
+def format_duration(seconds):
+    return f"{int(seconds // 3600):02}:{int((seconds % 3600) // 60):02}:{int(seconds % 60):02}"
 
 def process_file(args):
     (
@@ -236,7 +243,7 @@ def process_file(args):
 
     file_path, idx0, sid = file
 
-    pp.process_audio(
+    return pp.process_audio(
         file_path, 
         idx0, 
         sid, 
@@ -266,6 +273,7 @@ def preprocess_training_set(
     start_time = time.time()
     pp = PreProcess(sr, exp_dir, per)
     logger.info(translations["start_preprocess"].format(num_processes=num_processes))
+    dataset_length = 0
     files = []
     idx = 0
 
@@ -301,12 +309,13 @@ def preprocess_training_set(
 
             for future in as_completed(futures):
                 try:
-                    future.result() 
+                    dataset_length += future.result() 
                 except Exception as e:
                     raise RuntimeError(f"{translations['process_error']}: {e}")
                 pbar.update(1)
 
     elapsed_time = time.time() - start_time
+    logger.info(translations["dataset_duration"].format(duration=format_duration(dataset_length)))
     logger.info(translations["preprocess_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
 
 def main():

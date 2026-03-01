@@ -35,7 +35,7 @@ class PYWORLD:
             model_type, suffix = (
                 "world_linux", ".so"
             )
-        elif platform.system() == "Linux":
+        elif platform.system() == "Darwin":
             model_type, suffix = (
                 "world_mac", ".dylib"
             )

@@ -10,7 +10,7 @@ import warnings
 sys.path.append(os.getcwd())
 
 from main.app.variables import logger
-from main.library.algorithm.synthesizers import SynthesizerONNX
+from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
 warnings.filterwarnings("ignore")
 
@@ -31,7 +31,9 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
         model_hash, 
         vocoder, 
         creation_date, 
-        energy_use
+        energy_use,
+        speakers_id,
+        architecture
     ) = (
         cpt.get("model_name", None), 
         cpt.get("author", None), 
@@ -42,32 +44,46 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
         cpt.get("model_hash", None), 
         cpt.get("vocoder", "Default"), 
         cpt.get("creation_date", None), 
-        cpt.get("energy", False)
+        cpt.get("energy", False),
+        cpt.get("speakers_id", 1),
+        cpt.get("architecture", "RVC")
     )
 
     text_enc_hidden_dim = 768 if version == "v2" else 256
     tgt_sr = cpt["config"][-1]
 
-    net_g = SynthesizerONNX(
-        *cpt["config"], 
-        use_f0=f0, 
-        text_enc_hidden_dim=text_enc_hidden_dim, 
-        vocoder=vocoder, 
-        checkpointing=False, 
-        energy=energy_use
-    )
+    if architecture == "RVC":
+        net_g = Synthesizer(
+            *cpt["config"], 
+            use_f0=f0, 
+            text_enc_hidden_dim=text_enc_hidden_dim, 
+            vocoder=vocoder, 
+            checkpointing=False, 
+            energy=energy_use,
+            onnx=True
+        )
+    else:
+        net_g = SynthesizerSVC(
+            *cpt["config"], 
+            text_enc_hidden_dim=text_enc_hidden_dim, 
+            vocoder=vocoder, 
+            checkpointing=False, 
+            noise_scale=0.4,
+            onnx=True
+        )
+
+    net_g.forward = net_g.onnx_infer
     net_g.load_state_dict(cpt["weight"], strict=False)
     net_g.eval().to(device).to(torch.float16 if is_half else torch.float32)
     net_g.remove_weight_norm()
 
     phone = torch.rand(1, FEATS_LENGTH, text_enc_hidden_dim).to(device)
     phone_length = torch.tensor([FEATS_LENGTH]).long().to(device)
-    ds = torch.LongTensor([0]).to(device)
-    rnd = torch.rand(1, 192, FEATS_LENGTH).to(device)
+    sid = torch.LongTensor([0]).to(device)
 
-    args = [phone, phone_length, ds, rnd]
-    input_names = ["phone", "phone_lengths", "ds", "rnd"]
-    dynamic_axes = {"phone": [1], "rnd": [2]}
+    args = [phone, phone_length]
+    input_names = ["phone", "phone_lengths"]
+    dynamic_axes = {"phone": [1]}
 
     if f0:
         pitch = torch.randint(size=(1, FEATS_LENGTH), low=5, high=255).to(device)
@@ -76,6 +92,8 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
         args += [pitch, pitchf]
         input_names += ["pitch", "pitchf"]
         dynamic_axes.update({"pitch": [1], "pitchf": [1]})
+    
+    args += [sid]
 
     if energy_use:
         energy = torch.rand(1, FEATS_LENGTH).to(device)
@@ -115,7 +133,9 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
                             "creation_date": creation_date, 
                             "vocoder": vocoder, 
                             "text_enc_hidden_dim": text_enc_hidden_dim,
-                            "energy": energy_use
+                            "energy": energy_use,
+                            "speakers_id": speakers_id,
+                            "architecture": architecture
                         }
                     )
                 )

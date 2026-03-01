@@ -128,7 +128,6 @@ def create_reference_tab():
                     )
                 with gr.Column():
                     play_audio = gr.Audio(
-                        show_download_button=True, 
                         interactive=False, 
                         label=translations["input_audio"]
                     )

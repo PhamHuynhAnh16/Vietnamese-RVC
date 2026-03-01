@@ -87,6 +87,7 @@ def parse_arguments():
     parser.add_argument("--reference_path", type=str, default="")
     parser.add_argument("--multiscale_mel_loss", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--use_cosine_annealing_lr", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--architecture", type=str, default="RVC")
 
     return parser.parse_args()
 
@@ -125,7 +126,8 @@ args = parse_arguments()
     use_custom_reference, 
     reference_path, 
     multiscale_mel_loss,
-    use_cosine_annealing_lr
+    use_cosine_annealing_lr,
+    architecture
 ) = (
     args.model_name, 
     args.save_every_epoch, 
@@ -150,13 +152,19 @@ args = parse_arguments()
     args.use_custom_reference, 
     args.reference_path, 
     args.multiscale_mel_loss,
-    args.use_cosine_annealing_lr
+    args.use_cosine_annealing_lr,
+    args.architecture
 )
 
 disc_version = version if vocoder not in ["RefineGAN", "BigVGAN"] else "v3"
 
 is_half = main_config.is_half
 if main_config.brain: is_half = True
+
+if architecture == "SVC":
+    disc_version = version if vocoder != "Default" else "v0"
+    pitch_guidance = True
+    energy_use = False
 
 experiment_dir = os.path.join(logs_path, model_name) if not os.path.exists(model_name) else model_name
 training_file_path = os.path.join(experiment_dir, "training_data.json")
@@ -210,7 +218,8 @@ def main():
         translations["multiscale_mel_loss"]: multiscale_mel_loss,
         translations["model_author"].format(model_author=model_author): "",
         translations["vocoder"]: vocoder,
-        translations["cosine_annealing_lr"]: use_cosine_annealing_lr
+        translations["cosine_annealing_lr"]: use_cosine_annealing_lr,
+        translations["architecture"]: architecture
     }
 
     for key, value in log_data.items():
@@ -425,10 +434,13 @@ def run(
             train_dataset, 
             batch_size * n_gpus, 
             [50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 
-            num_replicas=n_gpus, rank=rank, shuffle=True), 
-            persistent_workers=True, 
-            prefetch_factor=8
-        )
+            num_replicas=n_gpus, 
+            rank=rank, 
+            shuffle=True
+        ) if architecture != "SVC" else None, 
+        persistent_workers=True, 
+        prefetch_factor=8
+    )
 
     if len(train_loader) < 3:
         logger.warning(translations["not_enough_data"])
@@ -458,19 +470,30 @@ def run(
 
     config.model.spk_embed_dim = spk_dim
 
-    from main.library.algorithm.synthesizers import Synthesizer
     from main.library.algorithm.discriminators import MultiPeriodDiscriminator
+    from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
     net_g, net_d = (
-        Synthesizer(
-            config.data.filter_length // 2 + 1, 
-            config.train.segment_size // config.data.hop_length, 
-            **config.model, 
-            use_f0=pitch_guidance, 
-            sr=config.data.sample_rate, 
-            vocoder=vocoder, 
-            checkpointing=checkpointing, 
-            energy=energy_use
+        (
+            Synthesizer(
+                config.data.filter_length // 2 + 1, 
+                config.train.segment_size // config.data.hop_length, 
+                **config.model, 
+                use_f0=pitch_guidance, 
+                sr=config.data.sample_rate, 
+                vocoder=vocoder, 
+                checkpointing=checkpointing, 
+                energy=energy_use
+            )
+        ) if architecture == "RVC" else (
+            SynthesizerSVC(
+                config.data.filter_length // 2 + 1, 
+                config.train.segment_size // config.data.hop_length, 
+                **config.model, 
+                sr=config.data.sample_rate, 
+                vocoder=vocoder, 
+                checkpointing=checkpointing, 
+            )
         ), 
         MultiPeriodDiscriminator(
             version=disc_version, 
@@ -563,6 +586,7 @@ def run(
                 if rank == 0: logger.info(translations["import_pretrain"].format(dg="G", pretrain=pretrainG))
 
                 ckptG = torch.load(pretrainG, map_location="cpu", weights_only=True)["model"]
+                if architecture == "SVC" and "emb_g.weight" not in ckptG: ckptG["emb_g.weight"] = net_g.module.emb_g.weight if hasattr(net_g, "module") else net_g.emb_g.weight
                 net_g.module.load_state_dict(ckptG, strict=strict) if hasattr(net_g, "module") else net_g.load_state_dict(ckptG, strict=strict)
                 del ckptG
 
@@ -636,18 +660,18 @@ def run(
             torch.LongTensor(np.load(os.path.join(reference_path, "pitch_coarse.npy"))[:-1]).unsqueeze(0).to(device) if pitch_guidance else None,
             torch.FloatTensor(np.load(os.path.join(reference_path, "pitch_fine.npy"))[:-1]).unsqueeze(0).to(device) if pitch_guidance else None,
             torch.LongTensor([0]).to(device),
-            torch.FloatTensor(np.load(os.path.join(reference_path, "energy.npy"))[:-1]).unsqueeze(0).to(device) if energy_use else None
         )
+        if architecture != "SVC": reference += (torch.FloatTensor(np.load(os.path.join(reference_path, "energy.npy"))[:-1]).unsqueeze(0).to(device) if energy_use else None,)
     else:
         info = next(iter(train_loader))
         reference = (info[0].to(device), info[1].to(device))
 
         if pitch_guidance:
             reference += (info[2].to(device), info[3].to(device), info[8].to(device))
-            reference += (info[9].to(device),) if energy_use else (None,)
+            if architecture != "SVC": reference += (info[9].to(device),) if energy_use else (None,)
         else:
             reference += (None, None, info[6].to(device))
-            reference += (info[7].to(device),) if energy_use else (None,)
+            if architecture != "SVC": reference += (info[7].to(device),) if energy_use else (None,)
 
     for epoch in range(epoch_str, total_epoch + 1):
         train_and_evaluate(
@@ -702,7 +726,7 @@ def train_and_evaluate(
     net_g, net_d = nets
     optim_g, optim_d = optims
 
-    train_loader.batch_sampler.set_epoch(epoch)
+    if architecture != "SVC": train_loader.batch_sampler.set_epoch(epoch)
     net_g.train(); net_d.train()
 
     if device.type == "cuda" and cache_data_in_gpu:
@@ -778,15 +802,20 @@ def train_and_evaluate(
                 energy = info[7] if energy_use else None
 
             with autocasts:
-                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(
+                net_g_params = (
                     phone, 
                     phone_lengths, 
                     pitch, 
                     pitchf, 
                     spec, 
                     spec_lengths, 
-                    sid, 
-                    energy
+                    sid,
+                )
+
+                if energy_use: net_g_params += (energy,)
+
+                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(
+                    *net_g_params
                 )
 
                 wave = commons.slice_segments(
@@ -1195,7 +1224,8 @@ def train_and_evaluate(
                     model_author=model_author, 
                     vocoder=vocoder, 
                     energy_use=energy_use,
-                    speakers_id=config.sid
+                    speakers_id=config.sid,
+                    architecture=architecture
                 )
 
         lowest_value_rounded = round(float(lowest_value["value"]), 3)

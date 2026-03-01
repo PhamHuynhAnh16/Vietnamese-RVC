@@ -729,34 +729,65 @@ def update_value_from_json(data):
         data.get("path", None),
     ]
 
-def get_speakers_id(model):
+def get_speakers_id_and_architecture(model):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
     if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")): 
-        return {
-            "visible": False, 
-            "value": 0, 
-            "choices": [0], 
-            "__type__": "update"
-        }
+        return [
+            {
+                "visible": False, 
+                "value": 0, 
+                "choices": [0], 
+                "__type__": "update"
+            },
+            {
+                "visible": False,
+                "value": 0.4,
+                "__type__": "update"
+            }
+        ]
 
     try:
-        model_data = torch.load(model_path, map_location="cpu", weights_only=True)
+        if model_path.endswith(".pth"):
+            model_data = torch.load(model_path, map_location="cpu", weights_only=True)
+        else:
+            import onnx
+
+            model_data = None
+            for prop in onnx.load(model_path).metadata_props:
+                if prop.key == "model_info":
+                    model_data = json.loads(prop.value)
+                    break
+
         speakers_id = model_data.get("speakers_id", 1)
 
-        return {
-            "visible": speakers_id and speakers_id != 1, 
-            "value": 0, 
-            "choices": list(range(speakers_id)),
-            "__type__": "update"
-        }
+        return [
+            {
+                "visible": speakers_id and speakers_id != 1, 
+                "value": 0, 
+                "choices": list(range(speakers_id)),
+                "__type__": "update"
+            },
+            {
+                "visible": model_data.get("architecture", "RVC") == "SVC",
+                "value": 0.4,
+                "__type__": "update"
+            }
+        ]
     except Exception:
-        return {
-            "visible": False, 
-            "value": 0, 
-            "choices": [0], 
-            "__type__": "update"
-        }
+        return [
+            {
+                "visible": False, 
+                "value": 0, 
+                "choices": [0], 
+                "__type__": "update"
+            },
+            {
+                "visible": False,
+                "value": 0.4,
+                "__type__": "update"
+            }
+        ]
  
 def run_commands(cmd):
     os.system(cmd)

@@ -366,7 +366,8 @@ def training(
     multiscale_mel_loss=False,
     embedders="hubert_base",
     custom_embedders=None,
-    cosine_annealing_lr=False
+    cosine_annealing_lr=False,
+    architecture="RVC"
 ):
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
@@ -401,11 +402,13 @@ def training(
                 True: {
                     32000: ("f0G32k.pth", "f0D32k.pth"), 
                     40000: ("f0G40k.pth", "f0D40k.pth"), 
+                    44100: ("f0G44k.pth", "f0D44k.pth"),
                     48000: ("f0G48k.pth", "f0D48k.pth")
                 }, 
                 False: {
                     32000: ("G32k.pth", "D32k.pth"), 
                     40000: ("G40k.pth", "D40k.pth"), 
+                    44100: ("G44k.pth", "D44k.pth"),
                     48000: ("G48k.pth", "D48k.pth")
                 }
             }
@@ -415,6 +418,7 @@ def training(
 
             if energy_use: pg2, pd2 = pg2 + "ENERGY_", pd2 + "ENERGY_"
             if vocoder != 'Default': pg2, pd2 = pg2 + vocoder + "_", pd2 + vocoder + "_"
+            if architecture != "RVC": pg2, pd2 = architecture + "_" + pg2, architecture + "_" + pd2
 
             pg2, pd2 = pg2 + pg, pd2 + pd
             pretrained_G, pretrained_D = (
@@ -536,7 +540,8 @@ def training(
         "--use_custom_reference", str(custom_reference),
         "--reference_path", str(reference_path),
         "--multiscale_mel_loss", str(multiscale_mel_loss),
-        "--use_cosine_annealing_lr", str(cosine_annealing_lr)
+        "--use_cosine_annealing_lr", str(cosine_annealing_lr),
+        "--architecture", architecture
     ])
 
     done = [False]

@@ -175,8 +175,8 @@ async def change_config(ws: WebSocket):
         predictor = Generator(
             sample_rate=params.get("sample_rate", vc_instance.vc_model.sample_rate), 
             hop_length=params.get("f0_method", vc_instance.vc_model.pipeline.predictor.hop_length), 
-            f0_min=50.0, 
-            f0_max=1100.0, 
+            f0_min=configs.get("f0_min", 50), 
+            f0_max=configs.get("f0_max", 1100), 
             alpha=0.5, 
             is_half=config.is_half, 
             device=config.device, 
@@ -313,8 +313,17 @@ async def websocket_audio(ws: WebSocket):
                 clean_strength=params["clean_strength"],
                 post_process=params["post_process"],
                 sid=params["sid"],
+                noise_scale=params["noise_scale"],
                 **params["kwargs"]
             ))
+
+        noise_scale = params["noise_scale"]
+        if (
+            vc_instance is not None and 
+            vc_instance.vc_model.pipeline.inference.architecture == "SVC" and 
+            vc_instance.vc_model.pipeline.inference.net_g.noise_scale != noise_scale
+        ): 
+            vc_instance.vc_model.pipeline.inference.net_g.noise_scale = noise_scale
         
         logger.info(translations["realtime_is_ready"])
 

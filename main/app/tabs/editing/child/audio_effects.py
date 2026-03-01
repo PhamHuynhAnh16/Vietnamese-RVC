@@ -624,12 +624,10 @@ def audio_effects_tab():
         gr.Markdown(translations["output_audio"])
     with gr.Row():
         audio_play_input = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["input_audio"]
         )
         audio_play_output = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["output_audio"]
         )

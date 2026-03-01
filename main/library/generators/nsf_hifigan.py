@@ -16,6 +16,54 @@ sys.path.append(os.getcwd())
 from main.library.algorithm.commons import init_weights
 from main.library.algorithm.residuals import ResBlock, LRELU_SLOPE
 
+class SineGen2(torch.nn.Module):
+    def __init__(
+        self, 
+        sampling_rate, 
+        harmonic_num=0,
+        sine_amp=0.1, 
+        noise_std=0.003,
+        voiced_threshold=0,
+    ):
+        super(SineGen2, self).__init__()
+        self.sine_amp = sine_amp
+        self.noise_std = noise_std
+        self.harmonic_num = harmonic_num
+        self.dim = self.harmonic_num + 1
+        self.sampling_rate = sampling_rate
+        self.voiced_threshold = voiced_threshold
+
+    def _f02uv(self, f0):
+        return (f0 > self.voiced_threshold).float()
+
+    def _f02sine(self, f0_values):
+        rad_values = (f0_values / self.sampling_rate) % 1
+        rand_ini = torch.rand(f0_values.shape[0], f0_values.shape[2], dtype=f0_values.dtype, device=f0_values.device)
+        rand_ini[:, 0] = 0
+        rad_values[:, 0, :] = rad_values[:, 0, :] + rand_ini
+        tmp_over_one = torch.cumsum(rad_values, 1) % 1
+        tmp_over_one_idx = (tmp_over_one[:, 1:, :] - tmp_over_one[:, :-1, :]) < 0
+        cumsum_shift = torch.zeros_like(rad_values)
+        cumsum_shift[:, 1:, :] = tmp_over_one_idx * -1.0
+
+        return (torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi).sin()
+
+    def forward(self, f0, upp):
+        with torch.no_grad():
+            sine_waves = self._f02sine(
+                torch.multiply(
+                    f0, 
+                    torch.FloatTensor([
+                        [range(1, self.harmonic_num + 2)]
+                    ]).to(f0.device)
+                )
+            ) * self.sine_amp
+
+            uv = self._f02uv(f0)
+            sine_waves = sine_waves * uv + ((uv * self.noise_std + (1 - uv) * self.sine_amp / 3) * torch.randn_like(sine_waves))
+
+        return sine_waves
+
 class SineGen(torch.nn.Module):
     def __init__(
         self, 
@@ -66,12 +114,14 @@ class SourceModuleHnNSF(torch.nn.Module):
         harmonic_num=0, 
         sine_amp=0.1, 
         add_noise_std=0.003, 
-        voiced_threshod=0
+        voiced_threshod=0,
+        sinegen_version="v1"
     ):
         super(SourceModuleHnNSF, self).__init__()
         self.sine_amp = sine_amp
         self.noise_std = add_noise_std
-        self.l_sin_gen = SineGen(sample_rate, harmonic_num, sine_amp, add_noise_std, voiced_threshod)
+        sine_gen_fn = SineGen if sinegen_version == "v1" else SineGen2
+        self.l_sin_gen = sine_gen_fn(sample_rate, harmonic_num, sine_amp, add_noise_std, voiced_threshod)
         self.l_linear = torch.nn.Linear(harmonic_num + 1, 1)
         self.l_tanh = torch.nn.Tanh()
 
@@ -96,14 +146,16 @@ class HiFiGANNSFGenerator(torch.nn.Module):
         upsample_kernel_sizes, 
         gin_channels, 
         sr, 
-        checkpointing = False
+        checkpointing = False,
+        harmonic_num = 0
     ):
         super(HiFiGANNSFGenerator, self).__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
         self.upp = math.prod(upsample_rates)
+        self.harmonic_num = harmonic_num
         self.f0_upsamp = torch.nn.Upsample(scale_factor=self.upp)
-        self.m_source = SourceModuleHnNSF(sample_rate=sr, harmonic_num=0)
+        self.m_source = SourceModuleHnNSF(sample_rate=sr, harmonic_num=harmonic_num, sinegen_version="v1" if harmonic_num == 0 else "v2")
 
         self.conv_pre = torch.nn.Conv1d(initial_channel, upsample_initial_channel, 7, 1, padding=3)
         self.checkpointing = checkpointing
@@ -152,12 +204,14 @@ class HiFiGANNSFGenerator(torch.nn.Module):
             for i in range(len(self.ups)) 
             for k, d in zip(resblock_kernel_sizes, resblock_dilation_sizes)
         ])
-        self.conv_post = torch.nn.Conv1d(channels[-1], 1, 7, 1, padding=3, bias=False)
+        self.conv_post = torch.nn.Conv1d(channels[-1], 1, 7, 1, padding=3, bias=bool(harmonic_num != 0))
+        if harmonic_num != 0: self.conv_pre, self.conv_post = weight_norm(self.conv_pre), weight_norm(self.conv_post)
 
         self.ups.apply(init_weights)
         if gin_channels != 0: self.cond = torch.nn.Conv1d(gin_channels, upsample_initial_channel, 1)
 
     def forward(self, x, f0, g = None):
+        if self.harmonic_num != 0: f0 = self.f0_upsamp(f0[:, None]).transpose(1, 2)
         har_source = self.m_source(f0, self.upp).transpose(1, 2)
         x = self.conv_pre(x)
         if g is not None: x += self.cond(g)
@@ -180,6 +234,12 @@ class HiFiGANNSFGenerator(torch.nn.Module):
         for l in self.ups:
             if hasattr(l, "parametrizations") and "weight" in l.parametrizations: parametrize.remove_parametrizations(l, "weight", leave_parametrized=True)
             else: remove_weight_norm(l)
+        
+        if self.harmonic_num != 0:
+            if hasattr(self.conv_pre, "parametrizations") and "weight" in self.conv_pre.parametrizations: parametrize.remove_parametrizations(self.conv_pre, "weight", leave_parametrized=True)
+            else: remove_weight_norm(self.conv_pre)
+            if hasattr(self.conv_post, "parametrizations") and "weight" in self.conv_post.parametrizations: parametrize.remove_parametrizations(self.conv_post, "weight", leave_parametrized=True)
+            else: remove_weight_norm(self.conv_post)
 
         for l in self.resblocks:
             l.remove_weight_norm()

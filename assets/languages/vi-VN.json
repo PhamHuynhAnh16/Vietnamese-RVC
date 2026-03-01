@@ -550,7 +550,7 @@
     "dataset_folder1": "Vui lòng nhập tên thư mục dữ liệu",
     "checkpointing_err": "Các tham số của mô hình đào tạo trước như tốc độ mẫu hoặc kiến trúc không khớp với mô hình đã chọn.",
     "start_onnx_export": "Bắt đầu chuyển đổi mô hình sang dạng onnx...",
-    "convert_model": "Chuyển Đổi Mô Hình",
+    "convert_model": "Chuyển Đổi Mô Hình ONNX",
     "pytorch2onnx": "Chuyển Đổi Mô Hình PYTORCH Sang ONNX",
     "pytorch2onnx_markdown": "Chuyển đổi mô hình RVC từ dạng pytorch sang onnx để tối ưu cho việc chuyển đổi âm thanh",
     "error_readfile": "Đã xảy ra lỗi khi đọc tệp!",
@@ -768,5 +768,18 @@
     "embedders_mix_ratio": "Tỉ lệ hòa trộn",
     "embedders_mix_ratio_info": "Tỉ lệ hòa trộn các tầng của mô hình nhúng, giá trị càng cao tỉ lệ của tầng càng cao",
     "cosine_annealing_lr": "Sử dụng phương pháp giảm LR Cosine",
-    "cosine_annealing_lr_info": "Bắt buộc sử dụng phương pháp giảm LR bằng Cosine Annealing có thể giúp cải thiện chất lượng phát âm."
+    "cosine_annealing_lr_info": "Bắt buộc sử dụng phương pháp giảm LR bằng Cosine Annealing có thể giúp cải thiện chất lượng phát âm.",
+    "dataset_duration": "Thời lượng của dữ liệu huấn luyện: {duration} giây.",
+    "noise_scale": "Tỉ lệ độ ồn",
+    "noise_scale_info": "Tùy chỉnh đặc biệt gây ảnh hưởng trực tiếp đến chất lượng của âm thanh, bạn không nên điều chỉnh nó.",
+    "architecture": "Kiến trúc mô hình",
+    "architecture_info": "Nếu bạn muốn hiệu năng với chất lượng âm thanh tốt hãy sử dụng RVC, nếu bạn muốn chất lượng cao hơn hãy thử SVC với mức tiêu thụ điện toán cực lớn có thể làm GPU của bạn trở thành 1 chiếc lò nướng bánh mì.",
+    "not_svc": "Mô hình không phải là mô hình SVC!",
+    "convert_model_svc": "Chuyển đổi mô hình SVC",
+    "config_path": "Đường dẫn tệp cấu hình SVC",
+    "config": "tệp cấu hình",
+    "drop_json": "Thả tệp cấu hình vào đây",
+    "start_convert_svc": "Bắt đầu chuyển đổi mô hình SVC...",
+    "convert_model_svc_markdown": "Chuyển đổi mô hình SVC sang định dạng dự án có thể đọc",
+    "convert_model_svc_markdown_2": "Chuyển đổi các mô hình SVC được huấn luyện từ Sovits SVC 4.1 thành định dạng mà dự án có thể đọc được. Hiện tại chỉ hỗ trợ mô hình với cấu hình gốc."
 }

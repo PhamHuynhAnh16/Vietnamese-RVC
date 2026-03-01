@@ -13,11 +13,11 @@ from main.app.core.ui import (
     unlock_f0, 
     shutil_move, 
     hoplength_show, 
-    get_speakers_id, 
     index_strength_show, 
     change_audios_choices, 
     change_models_choices, 
-    change_embedders_mode 
+    change_embedders_mode, 
+    get_speakers_id_and_architecture
 )
 
 from main.app.variables import (
@@ -135,7 +135,7 @@ def convert_with_whisper_tab():
                         visible=True
                     )
                 with gr.Row():
-                    sid_dict_1 = get_speakers_id(model_pth_1.value)
+                    sid_dict_1, architecture_dict_1 = get_speakers_id_and_architecture(model_pth_1.value)
                     sids_1 = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -143,6 +143,17 @@ def convert_with_whisper_tab():
                         value=sid_dict_1["value"], 
                         visible=sid_dict_1["visible"], 
                         interactive=True
+                    )
+                with gr.Row():
+                    noise_scale_1 = gr.Slider(
+                        minimum=0.1,
+                        maximum=1.0,
+                        label=translations["noise_scale"],
+                        info=translations["noise_scale_info"],
+                        value=0.4,
+                        step=0.01,
+                        interactive=True,
+                        visible=architecture_dict_1["visible"]
                     )
             with gr.Accordion(
                 translations["input_output"], 
@@ -225,7 +236,7 @@ def convert_with_whisper_tab():
                         visible=True
                     )
                 with gr.Row():
-                    sid_dict_2 = get_speakers_id(model_pth_2.value)
+                    sid_dict_2, architecture_dict_2 = get_speakers_id_and_architecture(model_pth_2.value)
                     sids_2 = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -233,6 +244,17 @@ def convert_with_whisper_tab():
                         value=sid_dict_2["value"], 
                         visible=sid_dict_2["visible"], 
                         interactive=True
+                    )
+                with gr.Row():
+                    noise_scale_2 = gr.Slider(
+                        minimum=0.1,
+                        maximum=1.0,
+                        label=translations["noise_scale"],
+                        info=translations["noise_scale_info"],
+                        value=0.4,
+                        step=0.01,
+                        interactive=True,
+                        visible=architecture_dict_2["visible"]
                     )
             with gr.Accordion(
                 translations["setting"], 
@@ -463,12 +485,10 @@ def convert_with_whisper_tab():
         gr.Markdown(translations["input_output"])
     with gr.Row():
         play_input_audio = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["input_audio"]
         )
         play_output_audio = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["output_file_tts_convert"]
         )
@@ -657,21 +677,23 @@ def convert_with_whisper_tab():
         )
     with gr.Row():
         model_pth_1.change(
-            fn=get_speakers_id, 
+            fn=get_speakers_id_and_architecture, 
             inputs=[
                 model_pth_1
             ], 
             outputs=[
-                sids_1
+                sids_1,
+                noise_scale_1
             ]
         )
         model_pth_2.change(
-            fn=get_speakers_id, 
+            fn=get_speakers_id_and_architecture, 
             inputs=[
                 model_pth_2
             ], 
             outputs=[
-                sids_2
+                sids_2,
+                noise_scale_2
             ]
         )
         embedders_mix.change(
@@ -729,7 +751,9 @@ def convert_with_whisper_tab():
                 sids_2,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale_1,
+                noise_scale_2
             ],
             outputs=[
                 play_output_audio

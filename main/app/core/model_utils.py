@@ -166,6 +166,59 @@ def onnx_export(model_path):
     except Exception as e:
         return gr_error(e)
     
+def svc_export(model_path, config_path, modelname, delete_when_success):    
+    if not model_path.endswith(".pth"): model_path += ".pth"
+    model_path = os.path.join(configs["weights_path"], model_path) if not os.path.exists(model_path) else model_path
+
+    if (
+        not model_path or 
+        not os.path.exists(model_path) or 
+        not model_path.endswith(".pth")
+    ): 
+        gr_warning(translations["provide_file"].format(filename=translations["model"]))
+        return None
+    
+    if (
+        not config_path or
+        not os.path.exists(config_path) or
+        not config_path.endswith(".json")
+    ):
+        gr_warning(translations["provide_file"].format(filename=translations["config"]))
+        return None
+
+    if modelname is None: modelname = os.path.basename(model_path)
+    if not modelname.endswith(".pth"): modelname += ".pth"
+    output_path = os.path.join(configs["weights_path"], modelname) if not os.path.exists(modelname) else modelname
+
+    if (
+        not model_path or 
+        not os.path.exists(model_path) or 
+        not model_path.endswith(".pth")
+    ): 
+        return gr_warning(translations["provide_file"].format(filename=translations["model"]))
+    
+    try:
+        gr_info(translations["start_convert_svc"])
+
+        from main.tools.export_svc import svc_converter
+
+        output = svc_converter(
+            model_path, 
+            config_path,
+            output_path, 
+            is_half=config.is_half
+        )
+
+        if output == translations["not_svc"]:
+            gr_warning(output)
+            return None
+        
+        if delete_when_success: os.remove(model_path); os.remove(config_path)
+        gr_info(translations["success"])
+        return output
+    except Exception as e:
+        return gr_error(e)
+
 def model_info(model_path):
     model_path = os.path.join(configs["weights_path"], model_path) if not os.path.exists(model_path) else model_path
 

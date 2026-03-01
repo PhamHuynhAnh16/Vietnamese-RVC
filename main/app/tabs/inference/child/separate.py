@@ -244,7 +244,6 @@ def separate_tab():
                     interactive=True
                 )
             audio_input = gr.Audio(
-                show_download_button=True, 
                 interactive=False, 
                 label=translations["input_audio"]
             )
@@ -252,25 +251,21 @@ def separate_tab():
         gr.Markdown(translations["output_separator"])
     with gr.Row():
         instruments_audio = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["instruments"],
             visible=True
         )
         original_vocals = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["original_vocal"],
             visible=True
         )
         main_vocals = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["main_vocal"], 
             visible=False
         )
         backing_vocals = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["backing_vocal"], 
             visible=False

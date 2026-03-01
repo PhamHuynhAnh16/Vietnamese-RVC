@@ -34,6 +34,7 @@ class RVC_Realtime:
         clean_strength=0.7, 
         post_process = False, 
         sid = 0,
+        noise_scale = 0.35,
         **kwargs
     ):
         self.model_path = model_path
@@ -46,6 +47,7 @@ class RVC_Realtime:
         self.hop_length = hop_length
         self.post_process = post_process
         self.sid = sid
+        self.noise_scale = noise_scale
         self.kwargs = kwargs
         self.pipeline = None
         self.convert_buffer = None
@@ -99,7 +101,8 @@ class RVC_Realtime:
             embedders_mode=self.embedders_mode, 
             sample_rate=self.sample_rate, 
             hop_length=self.hop_length, 
-            sid=self.sid
+            sid=self.sid,
+            noise_scale=self.noise_scale
         )
 
         if self.clean_audio:

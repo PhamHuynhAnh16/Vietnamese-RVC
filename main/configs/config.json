@@ -570,6 +570,7 @@
     "fushion_tab": true,
     "read_tab": true,
     "onnx_tab": true,
+    "svc_tab": true,
     "downloads_tab": true,
     "f0_extractor_tab": true,
     "settings_tab": true,
@@ -618,5 +619,7 @@
     "cpu_mode": false,
     "brain": false,
     "discord_presence": true,
-    "check_new_requirements": true
+    "check_new_requirements": true,
+    "f0_min": 50,
+    "f0_max": 1100
 }

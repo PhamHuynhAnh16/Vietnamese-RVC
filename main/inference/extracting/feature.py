@@ -11,8 +11,8 @@ import numpy as np
 sys.path.append(os.getcwd())
 
 from main.library.utils import load_audio
-from main.app.variables import config, logger, translations
 from main.inference.extracting.setup_path import setup_paths
+from main.app.variables import config, logger, translations, configs
 
 class FeatureInput:
     def __init__(
@@ -21,8 +21,8 @@ class FeatureInput:
         device=config.device
     ):
         self.sample_rate = 16000
-        self.f0_max = 1100.0
-        self.f0_min = 50.0
+        self.f0_min = configs.get("f0_min", 50)
+        self.f0_max = configs.get("f0_max", 1100)
         self.device = device
         self.is_half = is_half
 

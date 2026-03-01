@@ -9,7 +9,7 @@ from scipy import signal
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations
+from main.app.variables import translations, configs
 from main.library.utils import extract_features, change_rms, clear_gpu_cache, load_faiss_index
 
 bh, ah = signal.butter(
@@ -37,8 +37,8 @@ class Pipeline:
         self.t_query = self.sample_rate * self.x_query
         self.t_center = self.sample_rate * self.x_center
         self.t_max = self.sample_rate * self.x_max
-        self.f0_min = 50
-        self.f0_max = 1100
+        self.f0_min = configs.get("f0_min", 50)
+        self.f0_max = configs.get("f0_max", 1100)
         self.device = config.device
         self.is_half = config.is_half
         self.dtype = torch.float16 if self.is_half else torch.float32
@@ -118,15 +118,20 @@ class Pipeline:
             p_len = torch.tensor([p_len], device=self.device).long()
             feats = feats.to(self.dtype) 
 
+            infer_params = (
+                feats, 
+                p_len, 
+                pitch if pitch_guidance else None, 
+                pitchf.to(self.dtype) if pitch_guidance else None,
+                sid,
+            )
+
+            if energy_use: infer_params += (energy.to(self.dtype),)
+
             audio1 = (
                 (
                     net_g.infer(
-                        feats, 
-                        p_len, 
-                        pitch if pitch_guidance else None, 
-                        pitchf.to(self.dtype) if pitch_guidance else None,
-                        sid,
-                        energy.to(self.dtype) if energy_use else None
+                        *infer_params
                     )[0][0, 0]
                 ).data.cpu().float().numpy()
             )

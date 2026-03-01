@@ -8,15 +8,15 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import config, logger, translations
+from main.app.variables import config, logger, translations, configs
 from main.library.utils import load_embedders_model, extract_features, change_rms, load_faiss_index, load_model
 
 class Inference:
-    def get_synthesizer(self, model_path):
+    def get_synthesizer(self, model_path, noise_scale = 0.35):
         model = load_model(model_path)
 
         if model_path.endswith(".pth"):
-            from main.library.algorithm.synthesizers import Synthesizer
+            from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
             self.tgt_sr = model["config"][-1]
             model["config"][-3] = model["weight"]["emb_g.weight"].shape[0]
@@ -25,17 +25,27 @@ class Inference:
             self.version = model.get("version", "v1")
             self.vocoder = model.get("vocoder", "Default")
             self.energy = model.get("energy", False)
+            self.architecture = model.get("architecture", "RVC")
 
             if self.vocoder != "Default": config.is_half = False
 
-            net_g = Synthesizer(
-                *model["config"], 
-                use_f0=self.use_f0, 
-                text_enc_hidden_dim=768 if self.version == "v2" else 256, 
-                vocoder=self.vocoder, 
-                checkpointing=False, 
-                energy=self.energy
-            )
+            
+            if self.architecture == "RVC":
+                net_g = Synthesizer(
+                    *model["config"], 
+                    use_f0=self.use_f0, 
+                    text_enc_hidden_dim=768 if self.version == "v2" else 256, 
+                    vocoder=self.vocoder, 
+                    checkpointing=False, 
+                    energy=self.energy
+                )
+            else:
+                net_g = SynthesizerSVC(
+                    *model["config"], 
+                    text_enc_hidden_dim=768 if self.version == "v2" else 256, 
+                    vocoder=self.vocoder,
+                    noise_scale=noise_scale
+                )
 
             net_g.load_state_dict(model["weight"], strict=False)
             net_g.eval().to(config.device).to(torch.float16 if config.is_half else torch.float32)
@@ -62,14 +72,18 @@ class Inference:
         pitchf, 
         energy
     ):
+        infer_params = (
+            feats, 
+            p_len, 
+            pitch, 
+            pitchf,
+            sid,
+        )
+        if energy is not None: infer_params += (energy,)
+
         output = (
             self.net_g.infer(
-                feats, 
-                p_len, 
-                pitch, 
-                pitchf,
-                sid,
-                energy
+                *infer_params
             )[0][0, 0]
         )
 
@@ -101,8 +115,8 @@ class Pipeline:
         self.tgt_sr = inference.tgt_sr
         self.energy = inference.energy
         self.f0_method = f0_method
-        self.f0_min = 50.0
-        self.f0_max = 1100.0
+        self.f0_min = configs.get("f0_min", 50)
+        self.f0_max = configs.get("f0_max", 1100)
         self.device = config.device
         self.is_half = config.is_half
         self.dtype = torch.float16 if self.is_half else torch.float32
@@ -279,10 +293,11 @@ def create_pipeline(
     embedders_mode="fairseq", 
     sample_rate=16000, 
     hop_length=160,
-    sid=0
+    sid=0,
+    noise_scale=0.35
 ):
     inference = Inference()
-    inference = inference.get_synthesizer(model_path)
+    inference = inference.get_synthesizer(model_path, noise_scale)
 
     if inference.use_f0:
         from main.library.predictors.Generator import Generator
@@ -290,8 +305,8 @@ def create_pipeline(
         predictor = Generator(
             sample_rate=sample_rate, 
             hop_length=hop_length, 
-            f0_min=50.0, 
-            f0_max=1100.0, 
+            f0_min=configs.get("f0_min", 50), 
+            f0_max=configs.get("f0_max", 1100), 
             alpha=0.5, 
             is_half=config.is_half, 
             device=config.device, 

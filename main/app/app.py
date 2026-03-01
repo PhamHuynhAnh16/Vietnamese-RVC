@@ -10,6 +10,8 @@ import warnings
 
 import gradio as gr
 
+from packaging import version
+
 sys.path.append(os.getcwd())
 start_time = time.time()
 
@@ -91,14 +93,22 @@ css = """
 
 client_mode = "--client" in sys.argv
 
+gr_params = {
+    "js": (
+        ("() => {\n" + js_code + "\n}") 
+        if version.parse(gr.__version__) <= version.parse("6.0.0") else 
+        js_code
+    ) if client_mode else None, 
+    "theme": theme, 
+    "css": css
+}
+
 with gr.Blocks(
-    title="📱 Vietnamese-RVC GUI BY ANH", 
-    js=js_code if client_mode else None, 
-    theme=theme, 
-    css=css
+    title="📱 Vietnamese-RVC GUI BY ANH",
+    **gr_params if version.parse(gr.__version__) <= version.parse("6.0.0") else {}
 ) as app:
-    gr.HTML("<h1 style='text-align: center;'>🎵VIETNAMESE RVC BY ANH🎵</h1>")
-    gr.HTML(f"<h3 style='text-align: center;'>{translations['title']}</h3>")
+    gr.HTML("<h1 style='text-align: center;'>🎵VIETNAMESE RVC BY ANH🎵</h1>", padding=True)
+    gr.HTML(f"<h3 style='text-align: center;'>{translations['title']}</h3>", padding=True)
 
     with gr.Tabs():      
         inference_tab()
@@ -148,7 +158,8 @@ with gr.Blocks(
                     share=share, 
                     allowed_paths=allow_disk,
                     prevent_thread_lock=True,
-                    quiet=True
+                    quiet=True,
+                    **gr_params if version.parse(gr.__version__) >= version.parse("6.0.0") else {}
                 )
                 break
             except OSError:

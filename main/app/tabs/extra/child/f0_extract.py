@@ -36,7 +36,6 @@ def f0_extract_tab():
                 file_types=file_types
             )
             audioplay = gr.Audio(
-                show_download_button=True, 
                 interactive=False, 
                 label=translations["input_audio"]
             )
@@ -90,8 +89,7 @@ def f0_extract_tab():
         )
         image_output = gr.Image(
             label="", 
-            interactive=False, 
-            show_download_button=True
+            interactive=False
         )
     with gr.Row():
         upload_audio_file.upload(

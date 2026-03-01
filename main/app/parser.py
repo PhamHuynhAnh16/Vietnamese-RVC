@@ -117,6 +117,7 @@ elif argv_help_is_allows[1] in argv:
             - `--protect` (mặc định: `0.33`): Bảo vệ phụ âm.
             - `--hop_length` (mặc định: `64`): Bước nhảy khi xử lí âm thanh.
             - `--sid` (mặc định: `0`): Mã số nhận dạng giọng nói đối với mô hình đa giọng.
+            - `--noise_scale` (mặc định: `0.35`): Tùy chỉnh đặc biệt cho mô hình SVC gây ảnh hưởng trực tiếp đến chất lượng của âm thanh, bạn không nên điều chỉnh nó.
 
         2. Cấu hình F0:
             - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
@@ -211,7 +212,7 @@ elif argv_help_is_allows[4] in argv:
     print("""Các tham số của --extract:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
-            - `--rvc_version` (mặc định: `v2`): Phiên bản RVC (`v1`, `v2`).
+            - `--rvc_version` (mặc định: `v2`): Phiên bản mô hình (`v1`, `v2`).
 
         2. Cấu hình F0:
             - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
@@ -298,7 +299,7 @@ elif argv_help_is_allows[7] in argv:
     print("""Các tham số của --train:
         1. Cấu hình mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
-            - `--rvc_version` (mặc định: `v2`): Phiên bản RVC (`v1`, `v2`).
+            - `--rvc_version` (mặc định: `v2`): Phiên bản mô hình (`v1`, `v2`).
             - `--model_author` (tùy chọn): Tác giả của mô hình.
 
         2. Cấu hình lưu:
@@ -320,6 +321,7 @@ elif argv_help_is_allows[7] in argv:
             - `--d_pretrained_path` (mặc định: ``): Đường dẫn đến trọng số D đã huấn luyện trước.
             - `--vocoder` (mặc định: `Default`): Bộ mã hóa được sử dụng (`Default`, `MRF-HiFi-GAN`, `RefineGAN`).
             - `--energy_use` (mặc định: `False`): Sử dụng năng lượng rms.
+            - `--architecture` (mặc định: `RVC`): Kiến trúc của mô hình giọng nói (`RVC`, `SVC`).
 
         6. Phát hiện huấn luyện quá mức:
             - `--overtraining_detector` (mặc định: `False`): Bật/tắt chế độ phát hiện huấn luyện quá mức.
@@ -350,7 +352,7 @@ elif argv_help_is_allows[8] in argv:
         2. Cấu hình bộ tham chiếu:
             - `--pitch_guidance` (mặc định: `True`): Sử dụng hướng dẫn cao độ.
             - `--energy_use` (mặc định: `False`): Sử dụng năng lượng rms.
-            - `--version` (mặc định: `v2`): Phiên bản RVC (`v1`, `v2`).
+            - `--version` (mặc định: `v2`): Phiên bản mô hình (`v1`, `v2`).
 
         3. Cấu hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.

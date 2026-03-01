@@ -43,6 +43,21 @@ def forward_dml(ctx, x, scale):
     res = x.clone().detach()
     return res
 
+orig_conv_transpose1d = torch.nn.functional.conv_transpose1d
+
+def cpu_conv_transpose1d(input, weight, bias=None, stride=1, padding=0, output_padding=0, groups=1, dilation=1):
+    return orig_conv_transpose1d(
+        input.cpu(), 
+        weight.cpu(), 
+        bias.cpu() if bias is not None else bias, 
+        stride, 
+        padding, 
+        output_padding, 
+        groups, 
+        dilation
+    ).to(input.device)
+
 if torch_available: 
     torch.nn.GRU = GRU
     fairseq.GradMultiply.forward = forward_dml
+    torch.nn.functional.conv_transpose1d = cpu_conv_transpose1d

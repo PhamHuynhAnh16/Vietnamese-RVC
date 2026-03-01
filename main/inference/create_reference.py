@@ -18,7 +18,7 @@ from main.library.utils import load_audio, load_embedders_model, extract_feature
 
 warnings.filterwarnings("ignore")
 
-F0_MIN, F0_MAX, HOP_SIZE, SAMPLE_RATE, FRAME_LENGTH = 50, 1100, 160, 16000, 2048
+F0_MIN, F0_MAX, HOP_SIZE, SAMPLE_RATE, FRAME_LENGTH = configs.get("f0_min", 50), configs.get("f0_max", 1100), 160, 16000, 2048
 
 def parse_arguments():
     parser = argparse.ArgumentParser()

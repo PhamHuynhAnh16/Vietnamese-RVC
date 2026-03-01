@@ -31,7 +31,6 @@ from main.app.core.ui import (
     audio_device, 
     visibleFalse, 
     hoplength_show, 
-    get_speakers_id, 
     update_audio_device, 
     index_strength_show, 
     change_models_choices, 
@@ -39,7 +38,8 @@ from main.app.core.ui import (
     update_value_from_json, 
     update_button_from_json, 
     update_dropdowns_from_json, 
-    change_audio_device_choices
+    change_audio_device_choices,
+    get_speakers_id_and_architecture
 )
 
 input_channels_map, output_channels_map = audio_device()
@@ -256,7 +256,7 @@ def realtime_tab():
                             visible=True
                         )
                     with gr.Row():
-                        sid_dict = get_speakers_id(model_pth.value)
+                        sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
                         sids = gr.Dropdown(
                             label=translations["sids_label"], 
                             info=translations["sids_info"], 
@@ -438,7 +438,8 @@ def realtime_tab():
                             info=translations["silent_threshold_info"], 
                             value=-90, 
                             step=1, 
-                            interactive=True)
+                            interactive=True
+                        )
                         extra_convert_size = gr.Slider(
                             minimum=0.1, 
                             maximum=5, 
@@ -446,7 +447,8 @@ def realtime_tab():
                             info=translations["extra_convert_size_info"], 
                             value=0.5, 
                             step=0.1, 
-                            interactive=True)
+                            interactive=True
+                        )
                         cross_fade_overlap_size = gr.Slider(
                             minimum=0.05, 
                             maximum=0.2, 
@@ -454,7 +456,18 @@ def realtime_tab():
                             info=translations["cross_fade_overlap_size_info"], 
                             value=0.1, 
                             step=0.01, 
-                            interactive=True)
+                            interactive=True
+                        )
+                        noise_scale = gr.Slider(
+                            minimum=0.1,
+                            maximum=1.0,
+                            label=translations["noise_scale"],
+                            info=translations["noise_scale_info"],
+                            value=0.4,
+                            step=0.01,
+                            interactive=True,
+                            visible=architecture_dict["visible"]
+                        )
                     with gr.Row():
                         vad_sensitivity = gr.Slider(
                             minimum=0, 
@@ -1206,12 +1219,13 @@ def realtime_tab():
                 )
         with gr.Row():
             model_pth.change(
-                fn=get_speakers_id, 
+                fn=get_speakers_id_and_architecture, 
                 inputs=[
                     model_pth
                 ], 
                 outputs=[
-                    sids
+                    sids, 
+                    noise_scale
                 ]
             )
             if client_mode:
@@ -1290,6 +1304,7 @@ def realtime_tab():
                         clean_strength,
                         post_process,
                         sids,
+                        noise_scale,
                         embedders_mix,
                         embedders_mix_layers,
                         embedders_mix_ratio,
@@ -1403,6 +1418,7 @@ def realtime_tab():
                         exclusive_mode,
                         post_process,
                         sids,
+                        noise_scale,
                         embedders_mix,
                         embedders_mix_layers,
                         embedders_mix_ratio,
@@ -2057,6 +2073,15 @@ def realtime_tab():
                 fn=(lambda value: change_config(value, "embedders_mix_ratio")) if not client_mode else None, 
                 inputs=[
                     embedders_mix_ratio
+                ], 
+                outputs=[]
+            )
+        with gr.Row():
+            noise_scale.change(
+                js="(value) => window.ChangeConfig(value, 'noise_scale')" if client_mode else None, 
+                fn=(lambda value: change_config(value, "noise_scale")) if not client_mode else None, 
+                inputs=[
+                    noise_scale
                 ], 
                 outputs=[]
             )

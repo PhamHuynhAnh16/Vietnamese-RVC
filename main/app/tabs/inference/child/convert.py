@@ -38,7 +38,6 @@ from main.app.core.ui import (
     get_index, 
     shutil_move, 
     hoplength_show, 
-    get_speakers_id, 
     change_f0_choices, 
     index_strength_show, 
     change_embedders_mode, 
@@ -46,7 +45,8 @@ from main.app.core.ui import (
     change_preset_choices, 
     change_audios_choices, 
     valueFalse_interactive, 
-    change_backing_choices 
+    change_backing_choices, 
+    get_speakers_id_and_architecture
 )
 
 def convert_tab():
@@ -148,7 +148,6 @@ def convert_tab():
                 file_types=file_types
             )  
             play_audio = gr.Audio(
-                show_download_button=True, 
                 interactive=False, 
                 label=translations["input_audio"]
             )
@@ -188,7 +187,7 @@ def convert_tab():
                         visible=True
                     )
                 with gr.Row():
-                    sid_dict = get_speakers_id(model_pth.value)
+                    sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
                     sids = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -525,6 +524,16 @@ def convert_tab():
                         step=0.01, 
                         interactive=True
                     )
+                    noise_scale = gr.Slider(
+                        minimum=0.1,
+                        maximum=1.0,
+                        label=translations["noise_scale"],
+                        info=translations["noise_scale_info"],
+                        value=0.4,
+                        step=0.01,
+                        interactive=True,
+                        visible=architecture_dict["visible"]
+                    )
                 with gr.Row():
                     formant_qfrency = gr.Slider(
                         value=1.0, 
@@ -550,32 +559,27 @@ def convert_tab():
         gr.Markdown(translations["output_convert"])
     with gr.Row():
         main_convert = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["main_convert"],
             visible=True
         )
         backing_convert = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["convert_backing"], 
             visible=False
         )
         main_backing = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["main_or_backing"], 
             visible=False
         )  
     with gr.Row():
         original_convert = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["convert_original"], 
             visible=False
         )
         vocal_instrument = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["voice_or_instruments"], 
             visible=False
@@ -970,12 +974,13 @@ def convert_tab():
             ]
         )
         model_pth.change(
-            fn=get_speakers_id, 
+            fn=get_speakers_id_and_architecture, 
             inputs=[
                 model_pth
             ], 
             outputs=[
-                sids
+                sids,
+                noise_scale
             ]
         )
     with gr.Row():
@@ -1031,7 +1036,8 @@ def convert_tab():
                 sids,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             ],
             outputs=[
                 convert_select_audio, 
@@ -1089,7 +1095,8 @@ def convert_tab():
                 sids,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             ],
             outputs=[
                 main_convert, 

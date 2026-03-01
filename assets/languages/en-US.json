@@ -550,7 +550,7 @@
     "dataset_folder1": "Please enter the data folder name",
     "checkpointing_err": "Pretrained model parameters such as sample rate or architecture do not match the selected model.",
     "start_onnx_export": "Start converting model to onnx...",
-    "convert_model": "Convert Model",
+    "convert_model": "Convert ONNX Model",
     "pytorch2onnx": "Converting PYTORCH Model to ONNX Model",
     "pytorch2onnx_markdown": "Convert RVC model from pytorch to onnx to optimize audio conversion",
     "error_readfile": "An error occurred while reading the file!",
@@ -768,5 +768,18 @@
     "embedders_mix_ratio": "Mix Ratio",
     "embedders_mix_ratio_info": "Controls how much each layer contributes to the final embedding. Higher values give more weight to higher layers.",
     "cosine_annealing_lr": "Use Cosine Annealing LR",
-    "cosine_annealing_lr_info": "Enabling Cosine Annealing for learning rate decay can help produce clearer and more natural pronunciation."
+    "cosine_annealing_lr_info": "Enabling Cosine Annealing for learning rate decay can help produce clearer and more natural pronunciation.",
+    "dataset_duration": "Training dataset duration: {duration} seconds.",
+    "noise_scale": "Noise scale",
+    "noise_scale_info": "A special adjustment that directly affects audio quality; you should not modify it.",
+    "architecture": "Architecture",
+    "architecture_info": "If you want good performance with solid audio quality, use RVC. If you want even higher quality, try SVC—with extremely high computational demands that could turn your GPU into a toaster.",
+    "not_svc": "The model is not an SVC model!",
+    "convert_model_svc": "Convert SVC model",
+    "config_path": "Path to SVC configuration file",
+    "config": "configuration file",
+    "drop_json": "Drop the configuration file here",
+    "start_convert_svc": "Starting SVC model conversion...",
+    "convert_model_svc_markdown": "Convert SVC model to a readable project format",
+    "convert_model_svc_markdown_2": "Convert SVC models trained from Sovits SVC 4.1 into a format readable by the project. Currently, only models with the original configuration are supported."
 }

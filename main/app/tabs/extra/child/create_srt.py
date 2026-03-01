@@ -82,7 +82,6 @@ def create_srt_tab():
                 )
     with gr.Row():
         play_audio = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["input_audio"]
         )

@@ -16,35 +16,35 @@ from main.app.core.presets import (
 )
 
 from main.app.variables import (
-    translations, 
-    sample_rate_choice, 
+    configs, 
+    edgetts, 
+    f0_file, 
+    method_f0, 
     model_name, 
     index_path, 
-    method_f0, 
-    f0_file, 
+    presets_file, 
+    translations, 
     embedders_mode, 
     embedders_model, 
-    edgetts, 
     google_tts_voice, 
-    configs, 
-    presets_file, 
-    export_format_choices, 
-    hybrid_f0_method
+    hybrid_f0_method,
+    sample_rate_choice, 
+    export_format_choices
 )
 
 from main.app.core.ui import (
     visible, 
-    change_f0_choices, 
     unlock_f0, 
-    hoplength_show, 
-    change_models_choices, 
     get_index, 
+    shutil_move, 
+    hoplength_show, 
+    change_f0_choices, 
     index_strength_show, 
+    change_models_choices, 
+    change_preset_choices, 
     change_embedders_mode, 
     change_tts_voice_choices, 
-    shutil_move, 
-    change_preset_choices, 
-    get_speakers_id
+    get_speakers_id_and_architecture
 )
 
 def convert_tts_tab():
@@ -177,7 +177,7 @@ def convert_tts_tab():
                         visible=True
                     )
                 with gr.Row():
-                    sid_dict = get_speakers_id(model_pth.value)
+                    sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
                     sids = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -534,6 +534,16 @@ def convert_tts_tab():
                         step=0.01, 
                         interactive=True
                     )
+                    noise_scale = gr.Slider(
+                        minimum=0.1,
+                        maximum=1.0,
+                        label=translations["noise_scale"],
+                        info=translations["noise_scale_info"],
+                        value=0.4,
+                        step=0.01,
+                        interactive=True,
+                        visible=architecture_dict["visible"]
+                    )
                 with gr.Row():
                     formant_qfrency = gr.Slider(
                         value=1.0, 
@@ -559,12 +569,10 @@ def convert_tts_tab():
         gr.Markdown(translations["output_tts_markdown"])
     with gr.Row():
         tts_voice_audio = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["output_text_to_speech"]
         )
         tts_voice_convert = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["output_file_tts_convert"]
         )
@@ -785,7 +793,14 @@ def convert_tts_tab():
             ]
         )
     with gr.Row():
-        refresh.click(fn=change_models_choices, inputs=[], outputs=[model_pth, model_index])
+        refresh.click(
+            fn=change_models_choices, 
+            inputs=[], 
+            outputs=[
+                model_pth, 
+                model_index
+            ]
+        )
         embedders.change(
             fn=lambda embedders: visible(embedders == "custom"), 
             inputs=[
@@ -847,12 +862,13 @@ def convert_tts_tab():
             ]
         )
         model_pth.change(
-            fn=get_speakers_id, 
+            fn=get_speakers_id_and_architecture, 
             inputs=[
                 model_pth
             ], 
             outputs=[
-                sids
+                sids,
+                noise_scale
             ]
         )
         embedders_mix.change(
@@ -919,7 +935,8 @@ def convert_tts_tab():
                 sids,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             ],
             outputs=[
                 tts_voice_convert

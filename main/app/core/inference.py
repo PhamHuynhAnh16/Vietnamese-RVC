@@ -47,7 +47,8 @@ def convert(
     sid=0,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    noise_scale = 0.35
 ):    
     subprocess.run([
         python, 
@@ -86,6 +87,7 @@ def convert(
         "--embedders_mix", str(embedders_mix),
         "--embedders_mix_layers", str(embedders_mix_layers),
         "--embedders_mix_ratio", str(embedders_mix_ratio),
+        "--noise_scale", str(noise_scale)
     ])
 
 def convert_audio(
@@ -130,7 +132,8 @@ def convert_audio(
     sid=0,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    noise_scale = 0.35
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
@@ -256,7 +259,8 @@ def convert_audio(
             sid,
             embedders_mix,
             embedders_mix_layers,
-            embedders_mix_ratio
+            embedders_mix_ratio,
+            noise_scale
         )
 
         gr_info(translations["convert_success"])
@@ -299,7 +303,8 @@ def convert_audio(
                 sid,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             )
 
             gr_info(translations["convert_backup_success"])
@@ -430,7 +435,8 @@ def convert_audio(
                 sid,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             )
 
             gr_info(translations["batch_convert_success"])
@@ -478,7 +484,8 @@ def convert_audio(
                 sid,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             )
 
             gr_info(translations["convert_success"])
@@ -527,7 +534,8 @@ def convert_selection(
     sid=0,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    noise_scale = 0.35
 ):
     if use_audio:
         gr_info(translations["search_separate"])
@@ -614,7 +622,8 @@ def convert_selection(
                 sid,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                noise_scale
             )
 
             return [
@@ -705,7 +714,8 @@ def convert_selection(
             sid,
             embedders_mix,
             embedders_mix_layers,
-            embedders_mix_ratio
+            embedders_mix_ratio,
+            noise_scale
         )
 
         return [
@@ -801,7 +811,9 @@ def convert_with_whisper(
     sid_2=0,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    noise_scale_1 = 0.35,
+    noise_scale_2 = 0.35
 ):
     import librosa
     import multiprocessing as mp
@@ -1064,7 +1076,8 @@ def convert_with_whisper(
             sid_1,
             embedders_mix,
             embedders_mix_layers,
-            embedders_mix_ratio
+            embedders_mix_ratio,
+            noise_scale_1
         )
 
         convert(
@@ -1101,7 +1114,8 @@ def convert_with_whisper(
             sid_2,
             embedders_mix,
             embedders_mix_layers,
-            embedders_mix_ratio
+            embedders_mix_ratio,
+            noise_scale_2
         )
 
         gr_info(translations["convert_success"])
@@ -1160,7 +1174,8 @@ def convert_tts(
     sid=0,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    noise_scale = 0.35
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
@@ -1242,7 +1257,8 @@ def convert_tts(
         sid,
         embedders_mix,
         embedders_mix_layers,
-        embedders_mix_ratio
+        embedders_mix_ratio,
+        noise_scale
     )
 
     gr_info(translations["convert_success"])

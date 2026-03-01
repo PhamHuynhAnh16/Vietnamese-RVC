@@ -115,6 +115,33 @@ class TextEncoder(torch.nn.Module):
 
         return m, logs, x_mask
 
+class TextEncoderSVC(torch.nn.Module):
+    def __init__(
+        self,
+        out_channels,
+        hidden_channels,
+        filter_channels,
+        n_heads,
+        n_layers,
+        kernel_size,
+        p_dropout,
+        onnx=False
+    ):
+        super().__init__()
+        self.hidden_channels = hidden_channels
+        self.out_channels = out_channels
+        self.f0_emb = torch.nn.Embedding(256, hidden_channels)
+        self.proj = torch.nn.Conv1d(hidden_channels, out_channels * 2, 1)
+        self.encoder = Encoder(hidden_channels, filter_channels, n_heads, n_layers, kernel_size, float(p_dropout), window_size=4, onnx=onnx)
+
+    def forward(self, x, x_mask, f0=None, noise_scale=1):
+        x = x + self.f0_emb(f0).transpose(1, 2)
+
+        m, logs = (self.proj(self.encoder(x * x_mask, x_mask)) * x_mask).split(self.out_channels, dim=1)
+        z = (m + torch.randn_like(m) * logs.exp() * noise_scale) * x_mask
+
+        return z, m, logs, x_mask
+
 class PosteriorEncoder(torch.nn.Module):
     def __init__(
         self, 

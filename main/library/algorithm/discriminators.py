@@ -16,7 +16,10 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         super(MultiPeriodDiscriminator, self).__init__()
         self.checkpointing = checkpointing
 
-        if version == "v1":
+        if version == "v0":
+            periods = [2, 3, 5, 7, 11]
+            resolutions = []
+        elif version == "v1":
             periods = [2, 3, 5, 7, 11, 17]
             resolutions = []
         elif version == "v2": 

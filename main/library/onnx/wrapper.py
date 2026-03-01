@@ -29,7 +29,7 @@ class ONNXRVC:
         self.net_g = onnxruntime.InferenceSession(
             model_path, 
             sess_options=sess_options, 
-            providers=providers if not providers[0].startswith("DmlExecutionProvider") else ["CPUExecutionProvider"]
+            providers=providers
         )
 
     def get_onnx_argument(
@@ -43,27 +43,28 @@ class ONNXRVC:
     ):
         inputs = {
             self.net_g.get_inputs()[0].name: feats.cpu().numpy().astype(np.float32),
-            self.net_g.get_inputs()[1].name: p_len.cpu().numpy(),
-            self.net_g.get_inputs()[2].name: np.array([sid.cpu().item()], dtype=np.int64),
-            self.net_g.get_inputs()[3].name: np.random.randn(1, 192, p_len).astype(np.float32)
+            self.net_g.get_inputs()[1].name: p_len.cpu().numpy()
         }
 
         if self.cpt["energy"]:
             if self.cpt["use_f0"]:
                 inputs.update({
-                    self.net_g.get_inputs()[4].name: pitch.cpu().numpy().astype(np.int64),
-                    self.net_g.get_inputs()[5].name: pitchf.cpu().numpy().astype(np.float32),
-                    self.net_g.get_inputs()[6].name: energy.cpu().numpy().astype(np.float32)
+                    self.net_g.get_inputs()[2].name: pitch.cpu().numpy().astype(np.int64),
+                    self.net_g.get_inputs()[3].name: pitchf.cpu().numpy().astype(np.float32),
+                    self.net_g.get_inputs()[4].name: np.array([sid.cpu().item()], dtype=np.int64),
+                    self.net_g.get_inputs()[5].name: energy.cpu().numpy().astype(np.float32)
                 })
             else:
                 inputs.update({
-                    self.net_g.get_inputs()[4].name: energy.cpu().numpy().astype(np.float32)
+                    self.net_g.get_inputs()[2].name: np.array([sid.cpu().item()], dtype=np.int64),
+                    self.net_g.get_inputs()[3].name: energy.cpu().numpy().astype(np.float32)
                 })
         else:
             if self.cpt["use_f0"]:
                 inputs.update({
-                    self.net_g.get_inputs()[4].name: pitch.cpu().numpy().astype(np.int64),
-                    self.net_g.get_inputs()[5].name: pitchf.cpu().numpy().astype(np.float32)
+                    self.net_g.get_inputs()[2].name: pitch.cpu().numpy().astype(np.int64),
+                    self.net_g.get_inputs()[3].name: pitchf.cpu().numpy().astype(np.float32),
+                    self.net_g.get_inputs()[4].name: np.array([sid.cpu().item()], dtype=np.int64)
                 })
 
         return inputs

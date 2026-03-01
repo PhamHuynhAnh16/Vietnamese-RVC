@@ -34,6 +34,7 @@ class MultiHeadAttention(nn.Module):
         self.block_length = block_length
         self.proximal_bias = proximal_bias
         self.onnx = onnx
+        self.pad_fn = self.padding if onnx else F.pad
         self.conv_q = nn.Conv1d(channels, channels, 1)
         self.conv_k = nn.Conv1d(channels, channels, 1)
         self.conv_v = nn.Conv1d(channels, channels, 1)
@@ -131,7 +132,7 @@ class MultiHeadAttention(nn.Module):
             pad_shape = convert_pad_shape([[0, 0], [pad_length, pad_length], [0, 0]])
 
         if pad_length > 0:
-            relative_embeddings = F.pad(
+            relative_embeddings = self.pad_fn(
                 relative_embeddings, 
                 pad_shape
             )
@@ -142,32 +143,93 @@ class MultiHeadAttention(nn.Module):
         batch, heads, length, _ = x.size()
 
         if self.onnx:
-            pad = [0, 1, 0, 0, 0, 0, 0, 0]
-            pad_shape = [0, length - 1, 0, 0, 0, 0]
+            pad = [0, 1] 
+            pad_shape = [0, length - 1]
         else:
             pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])
             pad_shape = convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
 
-        pad = F.pad(x, pad).view([batch, heads, length * 2 * length])
-        return F.pad(pad, pad_shape).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
+        pad = self.pad_fn(x, pad).view([batch, heads, length * 2 * length])
+        return self.pad_fn(pad, pad_shape).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
 
     def _absolute_position_to_relative_position(self, x):
         batch, heads, length, _ = x.size()
 
         if self.onnx:
-            pad = [0, length - 1, 0, 0, 0, 0, 0, 0]
-            pad_shape = [length, 0, 0, 0, 0, 0]
+            pad = [0, length - 1]
+            pad_shape = [length, 0]
         else:
             pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
             pad_shape = convert_pad_shape([[0, 0], [0, 0], [length, 0]])
 
-        pad = F.pad(x, pad).view([batch, heads, length**2 + length * (length - 1)])
-        return F.pad(pad,  pad_shape).view([batch, heads, length, 2 * length])[:, :, :, 1:]
+        pad = self.pad_fn(x, pad).view([batch, heads, length**2 + length * (length - 1)])
+        return self.pad_fn(pad,  pad_shape).view([batch, heads, length, 2 * length])[:, :, :, 1:]
 
     def _attention_bias_proximal(self, length):
         r = torch.arange(length, dtype=torch.float32)
         diff = r.unsqueeze(0) - r.unsqueeze(1)
         return -diff.abs().log1p().unsqueeze(0).unsqueeze(0)
+
+    def padding(self, x, pad):
+        if len(pad) == 6:
+            _, _, pad_left, pad_right, _, _ = pad
+
+            if pad_left > 0 or pad_right > 0:
+                zeros = torch.zeros(
+                    x.size(0),
+                    pad_left,
+                    x.size(2),
+                    device=x.device,
+                    dtype=x.dtype
+                )
+
+                x = torch.cat(
+                    [zeros, x], 
+                    dim=1
+                )
+
+                zeros = torch.zeros(
+                    x.size(0),
+                    pad_right,
+                    x.size(2),
+                    device=x.device,
+                    dtype=x.dtype
+                )
+
+                x = torch.cat(
+                    [x, zeros], 
+                    dim=1
+                )
+        else:
+            left, right = pad[-2], pad[-1]
+
+            if left > 0:
+                zeros = torch.zeros(
+                    *x.shape[:-1], 
+                    left,
+                    device=x.device,
+                    dtype=x.dtype
+                )
+
+                x = torch.cat(
+                    [zeros, x], 
+                    dim=-1
+                )
+
+            if right > 0:
+                zeros = torch.zeros(
+                    *x.shape[:-1], 
+                    right,
+                    device=x.device,
+                    dtype=x.dtype
+                )
+
+                x = torch.cat(
+                    [x, zeros], 
+                    dim=-1
+                )
+
+        return x
 
 class FFN(nn.Module):
     def __init__(

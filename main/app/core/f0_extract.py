@@ -35,8 +35,8 @@ def f0_extract(
     f0_generator = Generator(
         16000, 
         160, 
-        50, 
-        1100, 
+        configs.get("f0_min", 50), 
+        configs.get("f0_max", 1100), 
         0.5, 
         is_half=config.is_half, 
         device=config.device, 

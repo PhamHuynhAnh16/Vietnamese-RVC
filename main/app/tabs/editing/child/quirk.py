@@ -25,7 +25,6 @@ def quirk_tab():
         gr.Markdown(translations["quirk_markdown"])
     with gr.Row():
         input_audio_play = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["input_audio"]
         )
@@ -78,7 +77,6 @@ def quirk_tab():
                 )
     with gr.Row():
         output_audio_play = gr.Audio(
-            show_download_button=True, 
             interactive=False, 
             label=translations["output_audio"]
         )

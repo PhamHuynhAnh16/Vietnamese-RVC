@@ -11,6 +11,7 @@ import numpy as np
 import soundfile as sf
 
 from tqdm import tqdm
+from scipy import signal
 from distutils.util import strtobool
 
 warnings.filterwarnings("ignore")
@@ -73,6 +74,7 @@ def parse_arguments():
     parser.add_argument("--embedders_mix", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--embedders_mix_layers", type=int, default=9, required=False)
     parser.add_argument("--embedders_mix_ratio", type=float, default=0.5)
+    parser.add_argument("--noise_scale", type=float, default=0.35)
 
     return parser.parse_args()
 
@@ -113,7 +115,8 @@ def main():
         sid,
         embedders_mix,
         embedders_mix_layers,
-        embedders_mix_ratio
+        embedders_mix_ratio,
+        noise_scale
     ) = (
         args.pitch, 
         args.filter_radius, 
@@ -148,7 +151,8 @@ def main():
         args.sid,
         args.embedders_mix,
         args.embedders_mix_layers,
-        args.embedders_mix_ratio
+        args.embedders_mix_ratio,
+        args.noise_scale
     )
     
     run_convert_script(
@@ -185,7 +189,8 @@ def main():
         sid=sid,
         embedders_mix=embedders_mix, 
         embedders_mix_layers=embedders_mix_layers, 
-        embedders_mix_ratio=embedders_mix_ratio
+        embedders_mix_ratio=embedders_mix_ratio,
+        noise_scale=noise_scale
     )
 
 def run_convert_script(
@@ -222,7 +227,8 @@ def run_convert_script(
     sid=0,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    noise_scale = 0.35
 ):
     check_assets(
         f0_method, 
@@ -263,7 +269,8 @@ def run_convert_script(
         translations["embedders_mix_layers"]: embedders_mix_layers,
         translations["embedders_mix_ratio"]: embedders_mix_ratio,
         translations["formant_qfrency"]: formant_qfrency,
-        translations["formant_timbre"]: formant_timbre
+        translations["formant_timbre"]: formant_timbre,
+        translations["noise_scale"]: noise_scale
     }
 
     for key, value in log_data.items():
@@ -273,7 +280,7 @@ def run_convert_script(
         logger.warning(translations["provide_file"].format(filename=translations["model"]))
         sys.exit(1)
 
-    cvt = VoiceConverter(pth_path, sid)
+    cvt = VoiceConverter(pth_path, sid, noise_scale)
     start_time = time.time()
 
     pid_path = os.path.join("assets", "convert_pid.txt")
@@ -369,7 +376,8 @@ class VoiceConverter:
     def __init__(
         self, 
         model_path, 
-        sid = 0
+        sid = 0,
+        noise_scale = 0.35
     ):
         self.config = config
         self.device = config.device
@@ -386,6 +394,7 @@ class VoiceConverter:
         self.checkpointing = False
         self.sample_rate = 16000
         self.sid = sid
+        self.noise_scale = noise_scale
         self.get_vc(model_path, sid)
 
     def convert_audio(
@@ -549,13 +558,8 @@ class VoiceConverter:
                         torch.from_numpy(audio_output).unsqueeze(0).to(self.device).float()
                     ).squeeze(0).cpu().detach().numpy()
 
-                if len(audio) / self.sample_rate > len(audio_output) / self.tgt_sr:
-                    padding = np.zeros(
-                        int(np.round(len(audio) / self.sample_rate * self.tgt_sr) - len(audio_output)), 
-                        dtype=audio_output.dtype
-                    )
-
-                    audio_output = np.concatenate([audio_output, padding])
+                target_len = int(np.round(len(audio) / self.sample_rate * self.tgt_sr))
+                if len(audio_output) != target_len: audio_output = signal.resample_poly(audio_output, target_len, len(audio_output))
 
                 try:
                     sf.write(
@@ -607,7 +611,7 @@ class VoiceConverter:
     def setup(self):
         if self.cpt is not None:
             if self.loaded_model.endswith(".pth"):
-                from main.library.algorithm.synthesizers import Synthesizer
+                from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
                 self.tgt_sr = self.cpt["config"][-1]
                 self.cpt["config"][-3] = self.cpt["weight"]["emb_g.weight"].shape[0]
@@ -616,17 +620,28 @@ class VoiceConverter:
                 self.version = self.cpt.get("version", "v1")
                 self.vocoder = self.cpt.get("vocoder", "Default")
                 self.energy = self.cpt.get("energy", False)
+                self.architecture = self.cpt.get("architecture", "RVC")
 
                 if self.vocoder != "Default": self.config.is_half = False
 
-                self.net_g = Synthesizer(
-                    *self.cpt["config"], 
-                    use_f0=self.use_f0, 
-                    text_enc_hidden_dim=768 if self.version == "v2" else 256, 
-                    vocoder=self.vocoder, 
-                    checkpointing=self.checkpointing, 
-                    energy=self.energy
-                )
+                if self.architecture == "RVC":
+                    self.net_g = Synthesizer(
+                        *self.cpt["config"], 
+                        use_f0=self.use_f0, 
+                        text_enc_hidden_dim=768 if self.version == "v2" else 256, 
+                        vocoder=self.vocoder, 
+                        checkpointing=self.checkpointing, 
+                        energy=self.energy
+                    )
+                else:
+                    self.net_g = SynthesizerSVC(
+                        *self.cpt["config"], 
+                        text_enc_hidden_dim=768 if self.version == "v2" else 256, 
+                        vocoder=self.vocoder, 
+                        checkpointing=self.checkpointing, 
+                        noise_scale=self.noise_scale
+                    )
+
                 del self.net_g.enc_q
 
                 self.net_g.load_state_dict(self.cpt["weight"], strict=False)

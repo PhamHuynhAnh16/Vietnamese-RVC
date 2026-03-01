@@ -24,7 +24,8 @@ def extract_model(
     model_author, 
     vocoder, 
     energy_use, 
-    speakers_id
+    speakers_id,
+    architecture
 ):
     try:
         logger.info(translations["savemodel"].format(model_dir=model_path, epoch=epoch, step=step))
@@ -41,7 +42,8 @@ def extract_model(
         )
 
         opt["config"] = [
-            hps.data.filter_length // 2 + 1, 32, 
+            hps.data.filter_length // 2 + 1, 
+            32 if architecture == "RVC" else (hps.train.segment_size / hps.data.hop_length), 
             hps.model.inter_channels, 
             hps.model.hidden_channels, 
             hps.model.filter_channels, 
@@ -71,6 +73,7 @@ def extract_model(
         opt["vocoder"] = vocoder
         opt["energy"] = energy_use
         opt["speakers_id"] = speakers_id
+        opt["architecture"] = architecture
 
         torch.save(
             replace_keys_in_dict(

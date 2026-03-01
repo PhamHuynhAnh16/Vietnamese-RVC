@@ -68,6 +68,7 @@ def training_model_tab():
                             "24k",
                             "32k", 
                             "40k", 
+                            "44.1k",
                             "48k"
                         ], 
                         value="48k", 
@@ -83,37 +84,39 @@ def training_model_tab():
                         value="v2", 
                         interactive=True
                     ) 
-                    with gr.Row():
-                        clean_dataset = gr.Checkbox(
-                            label=translations["clear_dataset"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        process_effects = gr.Checkbox(
-                            label=translations["preprocess_effect"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        pitch_guidance = gr.Checkbox(
-                            label=translations["training_pitch"], 
-                            value=True, 
-                            interactive=True
-                        )
-                        custom_reference = gr.Checkbox(
-                            label=translations["custom_reference"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        checkpointing = gr.Checkbox(
-                            label=translations["memory_efficient_training"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        dataset_upload = gr.Checkbox(
-                            label=translations["upload_dataset"], 
-                            value=False, 
-                            interactive=True
-                        )
+                    with gr.Group():
+                        with gr.Row():
+                            clean_dataset = gr.Checkbox(
+                                label=translations["clear_dataset"], 
+                                value=False, 
+                                interactive=True
+                            )
+                            process_effects = gr.Checkbox(
+                                label=translations["preprocess_effect"], 
+                                value=False, 
+                                interactive=True
+                            )
+                            pitch_guidance = gr.Checkbox(
+                                label=translations["training_pitch"], 
+                                value=True, 
+                                interactive=True
+                            )
+                        with gr.Row():
+                            custom_reference = gr.Checkbox(
+                                label=translations["custom_reference"], 
+                                value=False, 
+                                interactive=True
+                            )
+                            checkpointing = gr.Checkbox(
+                                label=translations["memory_efficient_training"], 
+                                value=False, 
+                                interactive=True
+                            )
+                            dataset_upload = gr.Checkbox(
+                                label=translations["upload_dataset"], 
+                                value=False, 
+                                interactive=True
+                            )
                     with gr.Row():
                         split_audio_mode = gr.Radio(
                             label=translations["split_audio_mode"], 
@@ -467,8 +470,21 @@ def training_model_tab():
                             interactive=True, 
                             visible=False
                         )
-                        with gr.Accordion(translations["setting_cpu_gpu"], 
-                        open=False):
+                        with gr.Accordion(
+                            translations["setting_cpu_gpu"], 
+                            open=False
+                        ):
+                            with gr.Row():
+                                architecture = gr.Radio(
+                                    label=translations["architecture"], 
+                                    info=translations["architecture_info"], 
+                                    choices=[
+                                        "RVC", 
+                                        "SVC"
+                                    ], 
+                                    value="RVC", 
+                                    interactive=True
+                                )
                             with gr.Column():
                                 gpu_number = gr.Textbox(
                                     label=translations["gpu_number"], 
@@ -980,7 +996,8 @@ def training_model_tab():
                 multiscale_mel_loss,
                 embedders, 
                 embedders_custom,
-                cosine_annealing_lr
+                cosine_annealing_lr,
+                architecture
             ],
             outputs=[
                 training_info
