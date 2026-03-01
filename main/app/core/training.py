@@ -369,6 +369,10 @@ def training(
     cosine_annealing_lr=False,
     architecture="RVC"
 ):
+    if architecture == "SVC":
+        pitch_guidance = True
+        energy_use = False
+
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
 
