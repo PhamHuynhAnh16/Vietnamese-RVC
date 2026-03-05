@@ -57,19 +57,19 @@ class MDXSeparator(CommonSeparator):
         self.audio_file_base = os.path.splitext(os.path.basename(audio_file_path))[0]
         mix = self.prepare_mix(self.audio_file_path)
         mix = spec_utils.normalize(wave=mix, max_peak=self.normalization_threshold)
-        source = self.demix(mix)
+        peak = np.abs(mix).max()
+        source = self.demix(mix) * peak
         output_files = []
 
-        if not isinstance(self.primary_source, np.ndarray):
-            self.primary_source = spec_utils.normalize(wave=source, max_peak=self.normalization_threshold).T
+        if not isinstance(self.primary_source, np.ndarray): self.primary_source = source.T
 
         if not isinstance(self.secondary_source, np.ndarray):
             raw_mix = self.demix(mix, is_match_mix=True)
 
             if self.invert_using_spec:
-                self.secondary_source = spec_utils.invert_stem(raw_mix, source)
+                self.secondary_source = spec_utils.invert_stem(raw_mix, self.primary_source * self.compensate)
             else:
-                self.secondary_source = mix.T - source.T
+                self.secondary_source = (-self.primary_source * self.compensate) + mix.T
 
         if not self.output_single_stem or self.output_single_stem.lower() == self.secondary_stem_name.lower():
             self.secondary_stem_output_path = os.path.join(f"{self.audio_file_base}_({self.secondary_stem_name})_{self.model_name}.{self.output_format.lower()}")
@@ -78,7 +78,6 @@ class MDXSeparator(CommonSeparator):
 
         if not self.output_single_stem or self.output_single_stem.lower() == self.primary_stem_name.lower():
             self.primary_stem_output_path = os.path.join(f"{self.audio_file_base}_({self.primary_stem_name})_{self.model_name}.{self.output_format.lower()}")
-            if not isinstance(self.primary_source, np.ndarray): self.primary_source = source.T
 
             self.final_process(self.primary_stem_output_path, self.primary_source, self.primary_stem_name)
             output_files.append(self.primary_stem_output_path)
@@ -95,7 +94,15 @@ class MDXSeparator(CommonSeparator):
     def initialize_mix(self, mix, is_ckpt=False):
         if is_ckpt:
             pad = self.gen_size + self.trim - (mix.shape[-1] % self.gen_size)
-            mixture = np.concatenate((np.zeros((2, self.trim), dtype="float32"), mix, np.zeros((2, pad), dtype="float32")), 1)
+            mixture = np.concatenate(
+                (
+                    np.zeros((2, self.trim), dtype=np.float32),
+                    mix,
+                    np.zeros((2, pad), dtype=np.float32),
+                    np.zeros((2, self.trim), dtype=np.float32),
+                ),
+                1
+            )
 
             num_chunks = mixture.shape[-1] // self.gen_size
             mix_waves = [mixture[:, i * self.gen_size : i * self.gen_size + self.chunk_size] for i in range(num_chunks)]
@@ -126,7 +133,7 @@ class MDXSeparator(CommonSeparator):
             overlap = self.overlap
 
         gen_size = chunk_size - 2 * self.trim
-        mixture = np.concatenate((np.zeros((2, self.trim), dtype="float32"), mix, np.zeros((2, gen_size + self.trim - ((mix.shape[-1]) % gen_size)), dtype="float32")), 1)
+        mixture = np.concatenate((np.zeros((2, self.trim), dtype=np.float32), mix, np.zeros((2, gen_size + self.trim - ((mix.shape[-1]) % gen_size)), dtype=np.float32)), 1)
         step = int((1 - overlap) * chunk_size)
 
         result = np.zeros((1, 2, mixture.shape[-1]), dtype=np.float32)
@@ -149,7 +156,7 @@ class MDXSeparator(CommonSeparator):
             
             if end != i + chunk_size:
                 pad_size = (i + chunk_size) - end
-                mix_part_ = np.concatenate((mix_part_, np.zeros((2, pad_size), dtype="float32")), axis=-1)
+                mix_part_ = np.concatenate((mix_part_, np.zeros((2, pad_size), dtype=np.float32)), axis=-1)
 
             mix_waves = torch.tensor([mix_part_], dtype=torch.float32).to(self.torch_device).split(self.batch_size)
 
@@ -172,10 +179,6 @@ class MDXSeparator(CommonSeparator):
         tar_waves = np.concatenate(np.vstack(tar_waves_)[:, :, self.trim : -self.trim], axis=-1)[:, : mix.shape[-1]]
 
         source = tar_waves[:, 0:None]
-
-        if not is_match_mix:
-            source *= self.compensate
-
         return source
 
     def run_model(self, mix, is_match_mix=False):

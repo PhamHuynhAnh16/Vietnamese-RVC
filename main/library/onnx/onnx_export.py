@@ -142,12 +142,7 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
             )
 
         if is_half:
-            try:
-                import onnxconverter_common
-            except:
-                os.system(f"{sys.executable} -m pip install onnxconverter_common")
-                import onnxconverter_common
-
+            import onnxconverter_common
             model = onnxconverter_common.convert_float_to_float16(model, keep_io_types=True)
 
         onnx.save(model, output_path)

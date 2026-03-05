@@ -36,35 +36,25 @@ class RMVPE:
         cents_mapping = 20 * np.arange(N_CLASS) + 1997.3794084376191
         self.cents_mapping = np.pad(cents_mapping, (4, 4))
 
-    def mel2hidden(self, mel, chunk_size = 32000):
+    def mel2hidden(self, mel):
         with torch.no_grad():
             n_frames = mel.shape[-1]
             mel = F.pad(mel, (0, 32 * ((n_frames - 1) // 32 + 1) - n_frames), mode="reflect")
 
-            output_chunks = []
-            pad_frames = mel.shape[-1]
+            if self.onnx:
+                mel = mel.cpu().numpy().astype(np.float32)
 
-            for start in range(0, pad_frames, chunk_size):
-                mel_chunk = mel[..., start:min(start + chunk_size, pad_frames)]
-                assert mel_chunk.shape[-1] % 32 == 0
+                hidden = torch.as_tensor(
+                    self.model.run(
+                        [self.model.get_outputs()[0].name], 
+                        {self.model.get_inputs()[0].name: mel}
+                    )[0], 
+                    device=self.device
+                )
+            else:
+                if self.is_half: mel = mel.half()
+                hidden = self.model(mel)
 
-                if self.onnx:
-                    mel_chunk = mel_chunk.cpu().numpy().astype(np.float32)
-
-                    out_chunk = torch.as_tensor(
-                        self.model.run(
-                            [self.model.get_outputs()[0].name], 
-                            {self.model.get_inputs()[0].name: mel_chunk}
-                        )[0], 
-                        device=self.device
-                    )
-                else: 
-                    if self.is_half: mel_chunk = mel_chunk.half()
-                    out_chunk = self.model(mel_chunk)
-
-                output_chunks.append(out_chunk)
-
-            hidden = torch.cat(output_chunks, dim=1)
             return hidden[:, :n_frames]
 
     def decode(self, hidden, thred=0.03):

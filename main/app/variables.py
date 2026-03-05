@@ -271,12 +271,7 @@ sample_rate_choice = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 480
 csv_path = configs["csv_path"]
 
 if "--allow_all_disk" in sys.argv and sys.platform == "win32":
-    try:
-        import win32api
-    except:
-        os.system(f"{python} -m pip install pywin32")
-        import win32api
-
+    import win32api
     allow_disk = win32api.GetLogicalDriveStrings().split('\x00')[:-1]
 else: allow_disk = []
 

@@ -46,7 +46,7 @@ class VRSeparator(CommonSeparator):
         self.model_samplerate = self.model_params.param["sr"]
         self.wav_subtype = "PCM_16"
 
-    def separate(self, audio_file_path, custom_output_names=None):
+    def separate(self, audio_file_path):
         self.primary_source = None
         self.secondary_source = None
         self.audio_file_path = audio_file_path
@@ -146,7 +146,6 @@ class VRSeparator(CommonSeparator):
                 X_mag_window = X_mag_pad[:, :, start : start + self.window_size]
                 X_dataset.append(X_mag_window)
 
-            total_iterations = patches // self.batch_size if not self.enable_tta else (patches // self.batch_size) * 2
             X_dataset = np.asarray(X_dataset)
             self.model_run.eval()
 
