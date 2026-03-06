@@ -104,10 +104,10 @@ gr_params = {
 }
 
 with gr.Blocks(
-    title="📱 Vietnamese-RVC GUI BY ANH",
+    title="📱 Vietnamese-RVC GUI",
     **gr_params if version.parse(gr.__version__) <= version.parse("6.0.0") else {}
 ) as app:
-    gr.HTML("<h1 style='text-align: center;'>🎵VIETNAMESE RVC BY ANH🎵</h1>", padding=True)
+    gr.HTML("<h1 style='text-align: center;'>🎵VIETNAMESE RVC🎵</h1>", padding=True)
     gr.HTML(f"<h3 style='text-align: center;'>{translations['title']}</h3>", padding=True)
 
     with gr.Tabs():      

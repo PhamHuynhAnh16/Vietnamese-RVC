@@ -1,7 +1,7 @@
 <div align="center">
 <img alt="LOGO" src="assets/ico.png" width="300" height="300" />
 
-# Vietnamese RVC BY ANH
+# Vietnamese RVC
 Công cụ chuyển đổi giọng nói chất lượng và hiệu suất cao đơn giản.
 
 [![Vietnamese RVC](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/PhamHuynhAnh16/Vietnamese-RVC)
