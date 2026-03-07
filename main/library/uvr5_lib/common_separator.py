@@ -5,8 +5,6 @@ import librosa
 import numpy as np
 import soundfile as sf
 
-from pydub import AudioSegment
-
 sys.path.append(os.getcwd())
 
 from main.library.uvr5_lib.spec_utils import normalize
@@ -101,7 +99,7 @@ class CommonSeparator:
         pass
 
     def final_process(self, stem_path, source, stem_name):
-        self.write_audio(stem_path, source)
+        self.write_audio_soundfile(stem_path, source)
         return {stem_name: source}
 
     def cached_sources_clear(self):
@@ -131,46 +129,15 @@ class CommonSeparator:
 
         return mix
 
-    def write_audio(self, stem_path, stem_source):
-        duration_seconds = librosa.get_duration(y=librosa.load(self.audio_file_path, sr=None)[0])
-        duration_hours = duration_seconds / 3600
-
-        if duration_hours >= 1:
-            self.write_audio_soundfile(stem_path, stem_source)
-        else:
-            self.write_audio_pydub(stem_path, stem_source)
-
-    def write_audio_pydub(self, stem_path, stem_source):
+    def write_audio_soundfile(self, stem_path, stem_source):
         stem_source = normalize(wave=stem_source, max_peak=self.normalization_threshold)
-
         if np.max(np.abs(stem_source)) < 1e-6: return
 
         if self.output_dir:
             os.makedirs(self.output_dir, exist_ok=True)
             stem_path = os.path.join(self.output_dir, stem_path)
 
-        if stem_source.dtype != np.int16: stem_source = (stem_source * 32767).astype(np.int16)
-        stem_source_interleaved = np.empty((2 * stem_source.shape[0],), dtype=np.int16)
-        stem_source_interleaved[0::2] = stem_source[:, 0] 
-        stem_source_interleaved[1::2] = stem_source[:, 1]
-
-        audio_segment = AudioSegment(stem_source_interleaved.tobytes(), frame_rate=self.sample_rate, sample_width=stem_source.dtype.itemsize, channels=2)
-        file_format = stem_path.lower().split(".")[-1]
-
-        if file_format == "m4a": file_format = "mp4"
-        elif file_format == "mka": file_format = "matroska"
-
-        audio_segment.export(stem_path, format=file_format, bitrate="320k" if file_format == "mp3" and self.output_bitrate is None else self.output_bitrate)
-
-    def write_audio_soundfile(self, stem_path, stem_source):
-        if stem_source.shape[1] == 2:
-            if stem_source.flags["F_CONTIGUOUS"]: stem_source = np.ascontiguousarray(stem_source)
-            else:
-                stereo_interleaved = np.empty((2 * stem_source.shape[0],), dtype=np.int16)
-                stereo_interleaved[0::2] = stem_source[:, 0]
-                stereo_interleaved[1::2] = stem_source[:, 1]
-                stem_source = stereo_interleaved
-
+        if stem_source.shape[1] == 2 and stem_source.flags["F_CONTIGUOUS"]: stem_source = np.ascontiguousarray(stem_source)
         sf.write(stem_path, stem_source, self.sample_rate)
 
     def clear_file_specific_paths(self):
