@@ -202,7 +202,7 @@ paths_for_files = sorted([
     os.path.abspath(os.path.join(root, f)) 
     for root, _, files in os.walk(configs["audios_path"]) 
     for f in files 
-    if os.path.splitext(f)[1].lower() in file_types
+    if os.path.splitext(f)[1].lower() in file_types and not f.startswith(("Convert", "output", "Instruments"))
 ])
 
 reference_list = sorted([
@@ -270,10 +270,13 @@ font = configs.get("font", "https://fonts.googleapis.com/css2?family=Saira&displ
 sample_rate_choice = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 csv_path = configs["csv_path"]
 
-if "--allow_all_disk" in sys.argv and sys.platform == "win32":
-    import win32api
-    allow_disk = win32api.GetLogicalDriveStrings().split('\x00')[:-1]
-else: allow_disk = []
+try:
+    if "--allow_all_disk" in sys.argv and sys.platform == "win32":
+        import win32api
+        allow_disk = win32api.GetLogicalDriveStrings().split('\x00')[:-1]
+    else: allow_disk = []
+except:
+    allow_disk = []
 
 try:
     if os.path.exists(csv_path): reader = list(csv.DictReader(open(csv_path, newline='', encoding='utf-8')))

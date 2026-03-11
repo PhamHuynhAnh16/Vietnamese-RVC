@@ -124,7 +124,7 @@ def change_audios_choices(input_audio):
     audios = sorted([
         os.path.abspath(os.path.join(root, f)) 
         for root, _, files in os.walk(configs["audios_path"]) 
-        for f in files if os.path.splitext(f)[1].lower() in file_types
+        for f in files if os.path.splitext(f)[1].lower() in file_types and not f.startswith(("Convert", "output", "Instruments"))
     ])
 
     return {

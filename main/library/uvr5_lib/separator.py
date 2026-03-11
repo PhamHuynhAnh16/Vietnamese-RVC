@@ -94,7 +94,7 @@ class Separator:
                 hardware_acceleration_enabled = True
             elif opencl.is_available() or directml.is_available():
                 hardware_acceleration_enabled = True
-                self.configure_amd(ort_providers)
+                self.configure_dml(ort_providers)
             elif torch.backends.mps.is_available():
                 self.configure_mps(ort_providers)
                 hardware_acceleration_enabled = True
@@ -114,8 +114,8 @@ class Separator:
         else: 
             self.logger.warning(translations["onnx_not_have"].format(backends='CUDAExecutionProvider'))
 
-    def configure_amd(self, ort_providers):
-        self.logger.info(translations["running_in_amd"].format(backends=config.device.upper()))
+    def configure_dml(self, ort_providers):
+        self.logger.info(translations["running_in_amd"].format(backends=config.device.replace("privateuseone", "dml").split(":")[0].upper()))
         self.torch_device = torch.device(config.device)
 
         if "ROCMExecutionProvider" in ort_providers:

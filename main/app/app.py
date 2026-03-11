@@ -51,7 +51,11 @@ def check_requirements():
     else:
         logger.warning(translations["check_requirements_failed"])
 
-if configs.get("check_new_requirements", True): check_requirements()
+try:
+    if configs.get("check_new_requirements", True): check_requirements()
+except:
+    logger.warning(translations["check_requirements_failed"])
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
 warnings.filterwarnings("ignore")
