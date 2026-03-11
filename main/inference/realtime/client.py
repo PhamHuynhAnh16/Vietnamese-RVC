@@ -338,6 +338,8 @@ async def websocket_audio(ws: WebSocket):
                     arr[:block_frame].astype(np.float32)
                 )
 
+            if vc_instance is not None: return
+
             audio_output, vol, perf = vc_instance.on_request(
                 arr * (params["input_audio_gain"] / 100.0), 
                 f0_up_key=params["f0_up_key"], 
