@@ -60,6 +60,7 @@ class Inference:
             self.use_f0 = self.model.cpt.get("f0", 1)
             self.version = self.model.cpt.get("version", "v1")
             self.energy = self.model.cpt.get("energy", False)
+            self.architecture = self.model.cpt.get("architecture", "RVC")
 
         return self
     
