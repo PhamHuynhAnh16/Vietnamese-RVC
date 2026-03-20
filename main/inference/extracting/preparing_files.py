@@ -40,7 +40,7 @@ def mute_file(
 
     return os.path.join(mute_base_path, f"{rvc_version}_extracted", mute_file)
 
-def generate_config(rvc_version, sample_rate, model_path):
+def generate_config(rvc_version, sample_rate, model_path, architecture = "RVC"):
     config_save_path = os.path.join(model_path, "config.json")
 
     if not os.path.exists(config_save_path): 
@@ -48,6 +48,14 @@ def generate_config(rvc_version, sample_rate, model_path):
             os.path.join("main", "configs", rvc_version, f"{sample_rate}.json"), 
             config_save_path
         )
+
+    if os.path.exists(config_save_path) and architecture == "SVC": 
+        with open(config_save_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            data["data"]["hop_length"] = 441
+
+        with open(config_save_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
 
 def generate_filelist(
     pitch_guidance, 

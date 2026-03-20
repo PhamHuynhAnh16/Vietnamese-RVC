@@ -15,14 +15,6 @@ from packaging import version
 sys.path.append(os.getcwd())
 start_time = time.time()
 
-from main.app.core.realtime import js_code
-from main.app.tabs.extra.extra import extra_tab
-from main.app.tabs.editing.editing import editing_tab
-from main.app.tabs.training.training import training_tab
-from main.app.tabs.realtime.realtime import realtime_tab
-from main.app.tabs.downloads.downloads import download_tab
-from main.app.tabs.inference.inference import inference_tab
-from main.configs.rpc import connect_discord_ipc, send_discord_rpc
 from main.app.variables import logger, config, translations, theme, font, configs, language, allow_disk, python
 
 def check_requirements():
@@ -55,6 +47,15 @@ try:
     if configs.get("check_new_requirements", True): check_requirements()
 except:
     logger.warning(translations["check_requirements_failed"])
+
+from main.app.core.realtime import js_code
+from main.app.tabs.extra.extra import extra_tab
+from main.app.tabs.editing.editing import editing_tab
+from main.app.tabs.training.training import training_tab
+from main.app.tabs.realtime.realtime import realtime_tab
+from main.app.tabs.downloads.downloads import download_tab
+from main.app.tabs.inference.inference import inference_tab
+from main.configs.rpc import connect_discord_ipc, send_discord_rpc
 
 ssl._create_default_https_context = ssl._create_unverified_context
 

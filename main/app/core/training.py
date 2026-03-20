@@ -248,7 +248,8 @@ def extract(
     include_mutes=2,
     embedders_mix = False,
     embedders_mix_layers = 9,
-    embedders_mix_ratio = 0.5
+    embedders_mix_ratio = 0.5,
+    architecture = "RVC"
 ):
     f0_method, embedder_model = (
         method if method != "hybrid" else hybrid_method, 
@@ -293,7 +294,8 @@ def extract(
         "--include_mutes", str(include_mutes),
         "--embedders_mix", str(embedders_mix),
         "--embedders_mix_layers", str(embedders_mix_layers),
-        "--embedders_mix_ratio", str(embedders_mix_ratio)
+        "--embedders_mix_ratio", str(embedders_mix_ratio),
+        "--architecture", architecture
     ])
     
     done = [False]

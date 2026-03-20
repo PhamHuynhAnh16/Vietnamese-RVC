@@ -43,6 +43,7 @@ def parse_arguments():
     parser.add_argument("--embedders_mix", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--embedders_mix_layers", type=int, default=9, required=False)
     parser.add_argument("--embedders_mix_ratio", type=float, default=0.5)
+    parser.add_argument("--architecture", type=str, default="RVC")
 
     return parser.parse_args()
 
@@ -66,7 +67,8 @@ def main():
         include_mutes,
         embedders_mix,
         embedders_mix_layers,
-        embedders_mix_ratio
+        embedders_mix_ratio,
+        architecture
     ) = (
         args.f0_method, 
         args.hop_length, 
@@ -85,7 +87,8 @@ def main():
         args.include_mutes,
         args.embedders_mix,
         args.embedders_mix_layers,
-        args.embedders_mix_ratio
+        args.embedders_mix_ratio,
+        args.architecture
     )
 
     check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
@@ -121,6 +124,7 @@ def main():
         translations["embedders_mix"]: embedders_mix,
         translations["embedders_mix_layers"]: embedders_mix_layers,
         translations["embedders_mix_ratio"]: embedders_mix_ratio,
+        translations["architecture"]: architecture
     }
 
     for key, value in log_data.items():
@@ -164,7 +168,8 @@ def main():
         generate_config(
             version, 
             sample_rate, 
-            exp_dir
+            exp_dir,
+            architecture
         )
         generate_filelist(
             pitch_guidance, 

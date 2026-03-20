@@ -943,7 +943,8 @@ def training_model_tab():
                 include_mutes,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                architecture
             ],
             outputs=[
                 extract_info
