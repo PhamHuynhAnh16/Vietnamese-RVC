@@ -5,6 +5,7 @@ import torch
 import logging
 import librosa
 import argparse
+import warnings
 
 import numpy as np
 import torch.multiprocessing as mp
@@ -21,8 +22,10 @@ from main.library.utils import load_audio
 from main.inference.preprocess.slicer2 import Slicer
 from main.app.variables import config, logger, translations, configs, file_types
 
-for l in ["numba.core.byteflow", "numba.core.ssa", "numba.core.interpreter"]:
-    logging.getLogger(l).setLevel(logging.ERROR)
+if not config.debug_mode:
+    warnings.filterwarnings("ignore")
+    for l in ["numba.core.byteflow", "numba.core.ssa", "numba.core.interpreter"]:
+        logging.getLogger(l).setLevel(logging.ERROR)
 
 OVERLAP, MAX_AMPLITUDE, ALPHA, HIGH_PASS_CUTOFF, SAMPLE_RATE_16K = 0.3, 0.9, 0.75, 48, 16000
 

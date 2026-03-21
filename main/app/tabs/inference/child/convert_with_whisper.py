@@ -26,6 +26,7 @@ from main.app.variables import (
     model_name, 
     index_path, 
     file_types, 
+    audio_params, 
     translations, 
     whisper_model, 
     embedders_mode, 
@@ -136,6 +137,9 @@ def convert_with_whisper_tab():
                     )
                 with gr.Row():
                     sid_dict_1, architecture_dict_1 = get_speakers_id_and_architecture(model_pth_1.value)
+                    if sid_dict_1["visible"] == "hidden": sid_dict_1["visible"] = False
+                    if architecture_dict_1["visible"] == "hidden": architecture_dict_1["visible"] = False
+
                     sids_1 = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -237,6 +241,9 @@ def convert_with_whisper_tab():
                     )
                 with gr.Row():
                     sid_dict_2, architecture_dict_2 = get_speakers_id_and_architecture(model_pth_2.value)
+                    if sid_dict_2["visible"] == "hidden": sid_dict_2["visible"] = False
+                    if architecture_dict_2["visible"] == "hidden": architecture_dict_2["visible"] = False
+
                     sids_2 = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -486,11 +493,13 @@ def convert_with_whisper_tab():
     with gr.Row():
         play_input_audio = gr.Audio(
             interactive=False, 
-            label=translations["input_audio"]
+            label=translations["input_audio"],
+            **audio_params
         )
         play_output_audio = gr.Audio(
             interactive=False, 
-            label=translations["output_file_tts_convert"]
+            label=translations["output_file_tts_convert"],
+            **audio_params
         )
     with gr.Row():
         autotune.change(

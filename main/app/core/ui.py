@@ -14,22 +14,23 @@ from main.library.backends import directml, opencl
 from main.inference.realtime.audio import list_audio_device
 
 from main.app.variables import (
+    logger, 
     config, 
     configs, 
-    configs_json, 
-    logger, 
-    translations, 
     edgetts, 
-    google_tts_voice, 
     method_f0, 
-    method_f0_full, 
     vr_models, 
     mdx_models, 
-    demucs_models, 
-    embedders_model, 
     spin_model, 
+    file_types, 
+    configs_json, 
+    translations, 
     whisper_model, 
-    file_types
+    demucs_models, 
+    method_f0_full, 
+    gradio_version, 
+    embedders_model, 
+    google_tts_voice 
 )
 
 def gr_info(message):
@@ -261,7 +262,7 @@ def change_download_choices(select):
 
     return [
         {
-            "visible": selects[i], 
+            "visible": selects[i] if gradio_version else (selects[i] or "hidden"), 
             "__type__": "update"
         } 
         for i in range(len(selects))
@@ -281,7 +282,7 @@ def change_download_pretrained_choices(select):
 
     return [
         {
-            "visible": selects[i], 
+            "visible": selects[i] if gradio_version else (selects[i] or "hidden"), 
             "__type__": "update"
         } 
         for i in range(len(selects))
@@ -304,13 +305,15 @@ def get_index(model):
     } if model else None
 
 def index_strength_show(index):
+    index_strength_visible = (
+        index != "" and 
+        index != None and 
+        os.path.exists(index) and 
+        os.path.isfile(index)
+    )
+
     return {
-        "visible": (
-            index != "" and 
-            index != None and 
-            os.path.exists(index) and 
-            os.path.isfile(index)
-        ), 
+        "visible": index_strength_visible if gradio_version else (index_strength_visible or "hidden"), 
         "value": 0.5, 
         "__type__": "update"
     }
@@ -340,19 +343,19 @@ def hoplength_show(
         else: visible = False
     
     return {
-        "visible": visible, 
+        "visible": visible if gradio_version else (visible or "hidden"), 
         "__type__": "update"
     }
 
 def visible(value):
     return {
-        "visible": value, 
+        "visible": value if gradio_version else (value or "hidden"), 
         "__type__": "update"
     }
 
 def visibleFalse(value):
     return {
-        "visible": value, 
+        "visible": value if gradio_version else (value or "hidden"), 
         "value": False, 
         "__type__": "update"
     }
@@ -367,7 +370,7 @@ def valueFalse_interactive(value):
 def valueEmpty_visible1(value): 
     return {
         "value": "", 
-        "visible": value, 
+        "visible": value if gradio_version else (value or "hidden"), 
         "__type__": "update"
     }
 
@@ -592,9 +595,9 @@ def audio_device():
 def update_audio_device(input_device, output_device, monitor_device, monitor):
     input_channels_map, output_channels_map = audio_device()
 
-    input_is_asio = "ASIO" in input_device if input_device else False
-    output_is_asio = "ASIO" in output_device if output_device else False
-    monitor_is_asio = "ASIO" in monitor_device if monitor_device else False
+    input_is_asio = "ASIO" in input_device if input_device else (False if gradio_version else "hidden")
+    output_is_asio = "ASIO" in output_device if output_device else (False if gradio_version else "hidden")
+    monitor_is_asio = "ASIO" in monitor_device if monitor_device else (False if gradio_version else "hidden")
 
     try:
         input_max_ch = input_channels_map.get(input_device, [])[1]
@@ -659,7 +662,12 @@ def replace_punctuation(filename):
         .replace("{", "").replace("}", "")
         .replace("-_-", "_").replace("_-_", "_")
         .replace("-", "_").replace("---", "_")
-        .replace("___", "_").strip()
+        .replace("___", "_").replace("/", "")
+        .replace("__", "_").replace(":", "")
+        .replace("<", "").replace(">", "")
+        .replace('"', "").replace("'", "")
+        .replace("?", "").replace("*", "")
+        .strip()
     )
 
 def replace_url(url):
@@ -735,13 +743,13 @@ def get_speakers_id_and_architecture(model):
     if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")): 
         return [
             {
-                "visible": False, 
+                "visible": False if gradio_version else "hidden", 
                 "value": 0, 
                 "choices": [0], 
                 "__type__": "update"
             },
             {
-                "visible": False,
+                "visible": False if gradio_version else "hidden",
                 "value": 0.4,
                 "__type__": "update"
             }
@@ -760,16 +768,18 @@ def get_speakers_id_and_architecture(model):
                     break
 
         speakers_id = model_data.get("speakers_id", 1)
+        speakers_id_visible = speakers_id and speakers_id != 1
+        noise_scale_visible = model_data.get("architecture", "RVC") == "SVC"
 
         return [
             {
-                "visible": speakers_id and speakers_id != 1, 
+                "visible": speakers_id_visible if gradio_version else (speakers_id_visible or "hidden"), 
                 "value": 0, 
                 "choices": list(range(speakers_id)),
                 "__type__": "update"
             },
             {
-                "visible": model_data.get("architecture", "RVC") == "SVC",
+                "visible": noise_scale_visible if gradio_version else (noise_scale_visible or "hidden"),
                 "value": 0.4,
                 "__type__": "update"
             }
@@ -777,13 +787,13 @@ def get_speakers_id_and_architecture(model):
     except Exception:
         return [
             {
-                "visible": False, 
+                "visible": False if gradio_version else "hidden", 
                 "value": 0, 
                 "choices": [0], 
                 "__type__": "update"
             },
             {
-                "visible": False,
+                "visible": False if gradio_version else "hidden",
                 "value": 0.4,
                 "__type__": "update"
             }

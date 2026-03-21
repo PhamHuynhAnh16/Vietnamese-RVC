@@ -22,6 +22,7 @@ from main.app.variables import (
     vr_models, 
     mdx_models, 
     file_types, 
+    audio_params,
     translations, 
     reverb_models, 
     karaoke_models, 
@@ -245,7 +246,8 @@ def separate_tab():
                 )
             audio_input = gr.Audio(
                 interactive=False, 
-                label=translations["input_audio"]
+                label=translations["input_audio"],
+                **audio_params
             )
     with gr.Row():
         gr.Markdown(translations["output_separator"])
@@ -253,22 +255,26 @@ def separate_tab():
         instruments_audio = gr.Audio(
             interactive=False, 
             label=translations["instruments"],
-            visible=True
+            visible=True,
+            **audio_params
         )
         original_vocals = gr.Audio(
             interactive=False, 
             label=translations["original_vocal"],
-            visible=True
+            visible=True,
+            **audio_params
         )
         main_vocals = gr.Audio(
             interactive=False, 
             label=translations["main_vocal"], 
-            visible=False
+            visible=False,
+            **audio_params
         )
         backing_vocals = gr.Audio(
             interactive=False, 
             label=translations["backing_vocal"], 
-            visible=False
+            visible=False,
+            **audio_params
         )
     with gr.Row():
         model_name.change(

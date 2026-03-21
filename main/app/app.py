@@ -7,15 +7,14 @@ import torch
 import codecs
 import logging
 import warnings
+import torch.version
 
 import gradio as gr
-
-from packaging import version
 
 sys.path.append(os.getcwd())
 start_time = time.time()
 
-from main.app.variables import logger, config, translations, theme, font, configs, language, allow_disk, python
+from main.app.variables import logger, config, translations, theme, font, configs, language, allow_disk, python, gradio_version
 
 def check_requirements():
     import requests
@@ -35,8 +34,7 @@ def check_requirements():
             with open("requirements.txt", "w", encoding="utf-8") as f:
                 f.write(online_requirements)
 
-            os.system(f"{python} -m pip install uv")
-            os.system(f"{python} -m uv pip install -r requirements.txt")
+            os.system(f"{python} -m pip install -r requirements.txt")
             os.system("cls" if sys.platform == "win32" else "clear")
         
         logger.info(translations["update_requirements_complete"])
@@ -59,9 +57,10 @@ from main.configs.rpc import connect_discord_ipc, send_discord_rpc
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-warnings.filterwarnings("ignore")
-for l in ["httpx", "gradio", "uvicorn", "httpcore", "urllib3"]:
-    logging.getLogger(l).setLevel(logging.ERROR)
+if not config.debug_mode:
+    warnings.filterwarnings("ignore")
+    for l in ["httpx", "gradio", "uvicorn", "httpcore", "urllib3"]:
+        logging.getLogger(l).setLevel(logging.ERROR)
 
 css = """
 <style>
@@ -101,27 +100,29 @@ client_mode = "--client" in sys.argv
 gr_params = {
     "js": (
         ("() => {\n" + js_code + "\n}") 
-        if version.parse(gr.__version__) <= version.parse("6.0.0") else 
+        if gradio_version else 
         js_code
     ) if client_mode else None, 
     "theme": theme, 
     "css": css
 }
 
+is_zluda = torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]")
+
 with gr.Blocks(
     title="📱 Vietnamese-RVC GUI",
-    **gr_params if version.parse(gr.__version__) <= version.parse("6.0.0") else {}
+    **gr_params if gradio_version else {}
 ) as app:
     gr.HTML("<h1 style='text-align: center;'>🎵VIETNAMESE RVC🎵</h1>", padding=True)
     gr.HTML(f"<h3 style='text-align: center;'>{translations['title']}</h3>", padding=True)
 
     with gr.Tabs():      
-        inference_tab()
-        editing_tab()
-        realtime_tab()
-        training_tab()
-        download_tab()
-        extra_tab(app)
+        if configs.get("inference_tab", True): inference_tab()
+        if configs.get("editing_tab", True): editing_tab()
+        if configs.get("realtime_tab", True) and not is_zluda: realtime_tab()
+        if configs.get("create_and_training_tab", True): training_tab()
+        if configs.get("downloads_tab", True): download_tab()
+        if configs.get("extra_tab", True): extra_tab(app)
 
     with gr.Row(): 
         gr.Markdown(
@@ -138,7 +139,8 @@ with gr.Blocks(
     
     if __name__ == "__main__":
         device = config.device.replace("privateuseone", "dml")
-        if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"): device = device.replace("cuda", "hip")
+        if is_zluda: device = device.replace("cuda", "zluda")
+        if torch.version.hip is not None: device = device.replace("cuda", "hip")
 
         logger.info(f"Pytorch: {device} | Onnxruntime: {config.providers[0].replace('Dml', 'Ocl') if device.startswith('ocl') else config.providers[0]}")
         logger.info(f'{translations["precision"]}: {("BF16" if config.brain else "FP16") if config.is_half else "FP32"}')
@@ -164,7 +166,7 @@ with gr.Blocks(
                     allowed_paths=allow_disk,
                     prevent_thread_lock=True,
                     quiet=True,
-                    **gr_params if version.parse(gr.__version__) >= version.parse("6.0.0") else {}
+                    **gr_params if not gradio_version else {}
                 )
                 break
             except OSError:

@@ -19,31 +19,38 @@ from main.app.tabs.extra.child.convert_model_svc import convert_svc_model_tab
 from main.app.tabs.extra.child.convert_model_onnx import convert_onnx_model_tab
 
 def extra_tab(app):
-    with gr.TabItem(translations["extra"], visible=configs.get("extra_tab", True)):
-        with gr.TabItem(translations["fushion"], visible=configs.get("fushion_tab", True)):
-            gr.Markdown(translations["fushion_markdown"])
-            fushion_tab()
+    with gr.TabItem(translations["extra"]):
+        if configs.get("fushion_tab", True):
+            with gr.TabItem(translations["fushion"]):
+                gr.Markdown(translations["fushion_markdown"])
+                fushion_tab()
 
-        with gr.TabItem(translations["read_model"], visible=configs.get("read_tab", True)):
-            gr.Markdown(translations["read_model_markdown"])
-            read_model_tab()
+        if configs.get("read_tab", True):
+            with gr.TabItem(translations["read_model"]):
+                gr.Markdown(translations["read_model_markdown"])
+                read_model_tab()
 
-        with gr.TabItem(translations["convert_model"], visible=configs.get("onnx_tab", True)):
-            gr.Markdown(translations["pytorch2onnx"])
-            convert_onnx_model_tab()
+        if configs.get("onnx_tab", True):
+            with gr.TabItem(translations["convert_model"]):
+                gr.Markdown(translations["pytorch2onnx"])
+                convert_onnx_model_tab()
         
-        with gr.TabItem(translations["convert_model_svc"], visible=configs.get("svc_tab", True)):
-            gr.Markdown(translations["convert_model_svc_markdown"])
-            convert_svc_model_tab()
+        if configs.get("svc_tab", True):
+            with gr.TabItem(translations["convert_model_svc"]):
+                gr.Markdown(translations["convert_model_svc_markdown"])
+                convert_svc_model_tab()
 
-        with gr.TabItem(translations["f0_extractor_tab"], visible=configs.get("f0_extractor_tab", True)):
-            gr.Markdown(translations["f0_extractor_markdown"])
-            f0_extract_tab()
+        if configs.get("f0_extractor_tab", True):
+            with gr.TabItem(translations["f0_extractor_tab"]):
+                gr.Markdown(translations["f0_extractor_markdown"])
+                f0_extract_tab()
 
-        with gr.TabItem(translations["create_srt_tab"], visible=configs.get("create_srt_tab", True)):
-            gr.Markdown(translations["create_srt_markdown"])
-            create_srt_tab()
+        if configs.get("create_srt_tab", True):
+            with gr.TabItem(translations["create_srt_tab"]):
+                gr.Markdown(translations["create_srt_markdown"])
+                create_srt_tab()
 
-        with gr.TabItem(translations["settings"], visible=configs.get("settings_tab", True)):
-            gr.Markdown(translations["settings_markdown"])
-            settings_tab(app)
+        if configs.get("settings_tab", True):
+            with gr.TabItem(translations["settings"]):
+                gr.Markdown(translations["settings_markdown"])
+                settings_tab(app)

@@ -16,6 +16,7 @@ from main.app.variables import (
     configs, 
     file_types, 
     translations, 
+    audio_params,
     whisper_model, 
     paths_for_files 
 )
@@ -83,7 +84,8 @@ def create_srt_tab():
     with gr.Row():
         play_audio = gr.Audio(
             interactive=False, 
-            label=translations["input_audio"]
+            label=translations["input_audio"],
+            **audio_params
         )
     with gr.Row():
         output_srt = gr.File(

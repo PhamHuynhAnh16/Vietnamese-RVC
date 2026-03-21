@@ -17,6 +17,7 @@ from main.app.variables import (
     configs, 
     method_f0, 
     file_types, 
+    audio_params, 
     translations, 
     paths_for_files 
 )
@@ -37,7 +38,8 @@ def f0_extract_tab():
             )
             audioplay = gr.Audio(
                 interactive=False, 
-                label=translations["input_audio"]
+                label=translations["input_audio"],
+                **audio_params
             )
         with gr.Column():
             with gr.Accordion(

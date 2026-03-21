@@ -4,17 +4,18 @@ import torch
 import inspect
 import warnings
 import functools
+import contextlib
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations
+from main.app.variables import translations, config
 
 def load_model(path_or_package, strict=False):
     if isinstance(path_or_package, dict): 
         package = path_or_package
     elif isinstance(path_or_package, (str, os.PathLike)):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with warnings.catch_warnings() if not config.debug_mode else contextlib.nullcontext():
+            if not config.debug_mode: warnings.simplefilter("ignore")
 
             package = torch.load(
                 path_or_package, 

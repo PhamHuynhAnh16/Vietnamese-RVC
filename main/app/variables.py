@@ -8,6 +8,10 @@ import logging
 import urllib.request
 import logging.handlers
 
+import gradio as gr
+
+from packaging import version
+
 sys.path.append(os.getcwd())
 
 from main.configs.config import Config
@@ -20,6 +24,15 @@ python = sys.executable
 translations = config.translations 
 configs_json = os.path.join("main", "configs", "config.json")
 configs = json.load(open(configs_json, "r"))
+
+gradio_version = version.parse(gr.__version__) <= version.parse("6.0.0")
+
+audio_params = {
+    "show_download_button": True,
+    "show_share_button": True
+} if gradio_version else {
+    "buttons": ["download", "share"]
+}
 
 if not logger.hasHandlers():
     console_handler = logging.StreamHandler()

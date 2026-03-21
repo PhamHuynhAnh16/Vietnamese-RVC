@@ -23,6 +23,7 @@ from main.app.variables import (
     configs, 
     file_types, 
     translations, 
+    audio_params, 
     paths_for_files, 
     sample_rate_choice, 
     export_format_choices,
@@ -625,11 +626,13 @@ def audio_effects_tab():
     with gr.Row():
         audio_play_input = gr.Audio(
             interactive=False, 
-            label=translations["input_audio"]
+            label=translations["input_audio"],
+            **audio_params
         )
         audio_play_output = gr.Audio(
             interactive=False, 
-            label=translations["output_audio"]
+            label=translations["output_audio"],
+            **audio_params
         )
     with gr.Row():
         reverb_check_box.change(

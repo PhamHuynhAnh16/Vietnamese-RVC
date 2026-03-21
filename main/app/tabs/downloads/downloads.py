@@ -32,8 +32,7 @@ from main.app.core.process import (
 
 def download_tab():
     with gr.TabItem(
-        translations["downloads"], 
-        visible=configs.get("downloads_tab", True)
+        translations["downloads"]
     ):
         gr.Markdown(translations["download_markdown"])
         with gr.Row():

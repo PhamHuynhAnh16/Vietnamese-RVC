@@ -1,6 +1,5 @@
 import os
 import sys
-import torch
 
 import gradio as gr
 
@@ -14,10 +13,10 @@ from main.app.core.realtime import (
 )
 
 from main.app.variables import (
-    configs, 
     method_f0, 
     model_name, 
     index_path, 
+    audio_params,
     translations, 
     embedders_mode, 
     embedders_model,
@@ -46,7 +45,7 @@ input_channels_map, output_channels_map = audio_device()
 client_mode = "--client" in sys.argv
 
 def realtime_tab():
-    with gr.TabItem(translations["realtime"], visible=configs.get("realtime_tab", True) and not (torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"))):
+    with gr.TabItem(translations["realtime"]):
         gr.Markdown(translations["realtime_markdown"])
         with gr.Row():
             gr.Markdown(translations["realtime_markdown_2"])
@@ -198,8 +197,13 @@ def realtime_tab():
                     value="wav",
                     interactive=True,
                 )
-                record_audio = gr.Button(translations["start_record"])
-                record_output = gr.Audio(label=translations["output_audio"])
+                record_audio = gr.Button(
+                    translations["start_record"]
+                )
+                record_output = gr.Audio(
+                    label=translations["output_audio"],
+                    **audio_params
+                )
         with gr.Row():
             chunk_size = gr.Slider(
                 minimum=2.7, 
@@ -257,6 +261,9 @@ def realtime_tab():
                         )
                     with gr.Row():
                         sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
+                        if sid_dict["visible"] == "hidden": sid_dict["visible"] = False
+                        if architecture_dict["visible"] == "hidden": architecture_dict["visible"] = False
+
                         sids = gr.Dropdown(
                             label=translations["sids_label"], 
                             info=translations["sids_info"], 

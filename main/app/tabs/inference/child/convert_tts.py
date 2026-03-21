@@ -24,6 +24,7 @@ from main.app.variables import (
     index_path, 
     presets_file, 
     translations, 
+    audio_params, 
     embedders_mode, 
     embedders_model, 
     google_tts_voice, 
@@ -178,6 +179,9 @@ def convert_tts_tab():
                     )
                 with gr.Row():
                     sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
+                    if sid_dict["visible"] == "hidden": sid_dict["visible"] = False
+                    if architecture_dict["visible"] == "hidden": architecture_dict["visible"] = False
+
                     sids = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -570,11 +574,13 @@ def convert_tts_tab():
     with gr.Row():
         tts_voice_audio = gr.Audio(
             interactive=False, 
-            label=translations["output_text_to_speech"]
+            label=translations["output_text_to_speech"],
+            **audio_params
         )
         tts_voice_convert = gr.Audio(
             interactive=False, 
-            label=translations["output_file_tts_convert"]
+            label=translations["output_file_tts_convert"],
+            **audio_params
         )
     with gr.Row():
         load_preset_button.click(

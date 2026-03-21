@@ -17,9 +17,10 @@ from main.app.variables import config, logger, translations, configs
 from main.inference.extracting.embedding import run_embedding_extraction
 from main.inference.extracting.preparing_files import generate_config, generate_filelist
 
-warnings.filterwarnings("ignore")
-for l in ["torch", "faiss", "httpx", "httpcore", "faiss.loader", "numba.core", "urllib3", "matplotlib"]:
-    logging.getLogger(l).setLevel(logging.ERROR)
+if not config.debug_mode:
+    warnings.filterwarnings("ignore")
+    for l in ["torch", "faiss", "httpx", "httpcore", "faiss.loader", "numba.core", "urllib3", "matplotlib"]:
+        logging.getLogger(l).setLevel(logging.ERROR)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()

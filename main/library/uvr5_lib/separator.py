@@ -19,7 +19,7 @@ from main.library.backends import directml, opencl
 from main.tools.huggingface import HF_download_file
 from main.app.variables import config, translations
 
-warnings.filterwarnings("ignore")
+if not config.debug_mode: warnings.filterwarnings("ignore")
 
 class Separator: 
     def __init__(

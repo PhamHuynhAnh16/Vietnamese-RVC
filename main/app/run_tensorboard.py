@@ -12,9 +12,10 @@ sys.path.append(os.getcwd())
 from main.app.variables import config, translations, logger
 
 def launch_tensorboard():
-    warnings.filterwarnings("ignore")
-    for l in ["root", "tensorboard"]:
-        logging.getLogger(l).setLevel(logging.ERROR)
+    if not config.debug_mode:
+        warnings.filterwarnings("ignore")
+        for l in ["root", "tensorboard"]:
+            logging.getLogger(l).setLevel(logging.ERROR)
 
     tb = program.TensorBoard()
     tb.configure(

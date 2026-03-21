@@ -15,6 +15,7 @@ from main.app.core.ui import (
 from main.app.variables import (
     configs, 
     file_types, 
+    audio_params, 
     translations, 
     paths_for_files, 
     export_format_choices
@@ -26,7 +27,8 @@ def quirk_tab():
     with gr.Row():
         input_audio_play = gr.Audio(
             interactive=False, 
-            label=translations["input_audio"]
+            label=translations["input_audio"],
+            **audio_params
         )
     with gr.Row():
         quirk_choice = gr.Radio(
@@ -78,7 +80,8 @@ def quirk_tab():
     with gr.Row():
         output_audio_play = gr.Audio(
             interactive=False, 
-            label=translations["output_audio"]
+            label=translations["output_audio"],
+            **audio_params
         )
     with gr.Row():
         quirk_upload_audio.upload(

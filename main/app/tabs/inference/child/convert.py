@@ -22,6 +22,7 @@ from main.app.variables import (
     file_types, 
     model_name, 
     index_path, 
+    audio_params, 
     presets_file, 
     translations, 
     embedders_mode, 
@@ -149,7 +150,8 @@ def convert_tab():
             )  
             play_audio = gr.Audio(
                 interactive=False, 
-                label=translations["input_audio"]
+                label=translations["input_audio"],
+                **audio_params
             )
         with gr.Column():
             with gr.Accordion(
@@ -188,6 +190,9 @@ def convert_tab():
                     )
                 with gr.Row():
                     sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
+                    if sid_dict["visible"] == "hidden": sid_dict["visible"] = False
+                    if architecture_dict["visible"] == "hidden": architecture_dict["visible"] = False
+
                     sids = gr.Dropdown(
                         label=translations["sids_label"], 
                         info=translations["sids_info"], 
@@ -561,28 +566,33 @@ def convert_tab():
         main_convert = gr.Audio(
             interactive=False, 
             label=translations["main_convert"],
-            visible=True
+            visible=True,
+            **audio_params
         )
         backing_convert = gr.Audio(
             interactive=False, 
             label=translations["convert_backing"], 
-            visible=False
+            visible=False,
+            **audio_params
         )
         main_backing = gr.Audio(
             interactive=False, 
             label=translations["main_or_backing"], 
-            visible=False
+            visible=False,
+            **audio_params
         )  
     with gr.Row():
         original_convert = gr.Audio(
             interactive=False, 
             label=translations["convert_original"], 
-            visible=False
+            visible=False,
+            **audio_params
         )
         vocal_instrument = gr.Audio(
             interactive=False, 
             label=translations["voice_or_instruments"], 
-            visible=False
+            visible=False,
+            **audio_params
         )  
     with gr.Row():
         upload_f0_file.upload(

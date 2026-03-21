@@ -9,10 +9,10 @@ import warnings
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import logger
+from main.app.variables import logger, config
 from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
-warnings.filterwarnings("ignore")
+if not config.debug_mode: warnings.filterwarnings("ignore")
 
 FEATS_LENGTH = 200
 

@@ -6,6 +6,7 @@ import torch
 import faiss
 import codecs
 import logging
+import warnings
 
 import numpy as np
 
@@ -17,8 +18,10 @@ from main.tools import huggingface
 from main.library.backends import directml, opencl
 from main.app.variables import translations, configs, config, logger, embedders_model, spin_model, whisper_model
 
-for l in ["httpx", "httpcore"]:
-    logging.getLogger(l).setLevel(logging.ERROR)
+if not config.debug_mode:
+    warnings.filterwarnings("ignore")
+    for l in ["httpx", "httpcore"]:
+        logging.getLogger(l).setLevel(logging.ERROR)
 
 def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairseq"):
     predictors_url = codecs.decode(

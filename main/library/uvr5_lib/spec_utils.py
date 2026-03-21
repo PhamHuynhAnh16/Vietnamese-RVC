@@ -1078,8 +1078,8 @@ def __rubberband(y, sr, **kwargs):
 
         y_out, _ = sf.read(outfile, always_2d=True)
         if y.ndim == 1: y_out = np.squeeze(y_out)
-    except OSError as exc:
-        six.raise_from(RuntimeError(translations["rubberband"]), exc)
+    except OSError as e:
+        six.raise_from(RuntimeError(translations["rubberband"]), e)
     finally:
         os.unlink(infile)
         os.unlink(outfile)

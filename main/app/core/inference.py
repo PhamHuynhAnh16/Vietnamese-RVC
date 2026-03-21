@@ -10,8 +10,8 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import logger, config, configs, translations, python, file_types
 from main.app.core.ui import gr_info, gr_warning, gr_error, process_output, replace_export_format
+from main.app.variables import logger, config, configs, translations, python, file_types, gradio_version
 
 def convert(
     pitch, 
@@ -562,7 +562,7 @@ def convert_selection(
                     "choices": [], 
                     "value": "", 
                     "interactive": False, 
-                    "visible": False, 
+                    "visible": False if gradio_version else "hidden", 
                     "__type__": "update"
                 }, 
                 None, 
@@ -575,7 +575,7 @@ def convert_selection(
                     "__type__": "update"
                 }, 
                 {
-                    "visible": False, 
+                    "visible": False if gradio_version else "hidden", 
                     "__type__": "update"
                 }
             ]
@@ -631,7 +631,7 @@ def convert_selection(
                     "choices": [], 
                     "value": "", 
                     "interactive": False, 
-                    "visible": False, 
+                    "visible": False if gradio_version else "hidden", 
                     "__type__": "update"
                 }, 
                 convert_output[0], 
@@ -644,7 +644,7 @@ def convert_selection(
                     "__type__": "update"
                 }, 
                 {
-                    "visible": False, 
+                    "visible": False if gradio_version else "hidden", 
                     "__type__": "update"
                 }
             ]
@@ -663,7 +663,7 @@ def convert_selection(
                 None, 
                 None, 
                 {
-                    "visible": False, 
+                    "visible": False if gradio_version else "hidden", 
                     "__type__": "update"
                 }, 
                 {
@@ -723,7 +723,7 @@ def convert_selection(
                 "choices": [], 
                 "value": "", 
                 "interactive": False, 
-                "visible": False, 
+                "visible": False if gradio_version else "hidden", 
                 "__type__": "update"
             }, 
             main_convert[0], 
@@ -736,7 +736,7 @@ def convert_selection(
                 "__type__": "update"
             }, 
             {
-                "visible": False, 
+                "visible": False if gradio_version else "hidden", 
                 "__type__": "update"
             }
         ]

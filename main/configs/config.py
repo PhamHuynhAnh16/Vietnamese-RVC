@@ -129,18 +129,14 @@ class Config:
 
     def get_providers(self):
         ort_providers = onnxruntime.get_available_providers()
+        providers = []
 
-        if "CUDAExecutionProvider" in ort_providers and self.device.startswith("cuda"): 
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        elif "ROCMExecutionProvider" in ort_providers and self.device.startswith("cuda"):
-            providers = ["ROCMExecutionProvider", "CPUExecutionProvider"]
-        elif "DmlExecutionProvider" in ort_providers and self.device.startswith("cuda"):
-            providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
-        elif "DmlExecutionProvider" in ort_providers and self.device.startswith(("ocl", "privateuseone")): 
-            providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
-        elif "CoreMLExecutionProvider" in ort_providers and self.device.startswith("mps"): 
-            providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
-        else: 
-            providers = ["CPUExecutionProvider"]
+        if self.device.startswith("cuda"): 
+            if "CUDAExecutionProvider" in ort_providers: providers.append("CUDAExecutionProvider")
+            elif "ROCMExecutionProvider" in ort_providers: providers.append("ROCMExecutionProvider")
+            elif "DmlExecutionProvider" in ort_providers: providers.append("DmlExecutionProvider")
+        elif "DmlExecutionProvider" in ort_providers and self.device.startswith(("ocl", "privateuseone")): providers.append("DmlExecutionProvider")
+        elif "CoreMLExecutionProvider" in ort_providers and self.device.startswith("mps"): providers.append("CoreMLExecutionProvider")
 
+        providers.append("CPUExecutionProvider")
         return providers

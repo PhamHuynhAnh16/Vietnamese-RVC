@@ -55,8 +55,9 @@ from main.inference.training.utils import (
 from main.app.variables import config as main_config
 from main.app.variables import configs as main_configs
 
-warnings.filterwarnings("ignore")
-logging.getLogger("torch").setLevel(logging.ERROR)
+if not main_config.debug_mode:
+    warnings.filterwarnings("ignore")
+    logging.getLogger("torch").setLevel(logging.ERROR)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()

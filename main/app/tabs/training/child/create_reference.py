@@ -19,6 +19,7 @@ from main.app.variables import (
     configs, 
     method_f0, 
     file_types, 
+    audio_params, 
     translations, 
     embedders_mode, 
     paths_for_files, 
@@ -129,7 +130,8 @@ def create_reference_tab():
                 with gr.Column():
                     play_audio = gr.Audio(
                         interactive=False, 
-                        label=translations["input_audio"]
+                        label=translations["input_audio"],
+                        **audio_params
                     )
         with gr.Column() as f0_method_column:
             with gr.Accordion(
