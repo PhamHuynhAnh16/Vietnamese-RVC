@@ -604,7 +604,7 @@ python -m uv pip install faiss-cpu==1.13.2
 
 ## Tài Liệu Sử Dụng
 
-**Tài liệu văn bản: [Words](/assets/Vietnamese-RVC-DOCS.docx)**
+**Tài liệu văn bản: [Words](/assets/Vietnamese-RVC-DOCS.pdf)**
 
 ## Sử Dụng Trên Máy Tính
 
