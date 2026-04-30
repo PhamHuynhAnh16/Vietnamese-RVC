@@ -8,6 +8,7 @@ sys.path.append(os.getcwd())
 from main.app.core.f0_extract import f0_extract
 
 from main.app.core.ui import (
+    visible,
     unlock_f0, 
     shutil_move,
     change_audios_choices 
@@ -50,13 +51,21 @@ def f0_extract_tab():
                     with gr.Row():
                         predictor_onnx = gr.Checkbox(
                             label=translations["predictor_onnx"], 
-                            info=translations["predictor_onnx_info"], 
                             value=False, 
                             interactive=True
                         )
                         unlock_full_method = gr.Checkbox(
                             label=translations["f0_unlock"], 
-                            info=translations["f0_unlock_info"], 
+                            value=False, 
+                            interactive=True
+                        )
+                        autotune = gr.Checkbox(
+                            label=translations["autotune"], 
+                            value=False, 
+                            interactive=True
+                        )
+                        proposal_pitch = gr.Checkbox(
+                            label=translations["proposal_pitch"], 
                             value=False, 
                             interactive=True
                         )
@@ -65,6 +74,44 @@ def f0_extract_tab():
                         info=translations["f0_method_info"], 
                         choices=[m for m in method_f0 if m != "hybrid"], 
                         value="rmvpe", 
+                        interactive=True
+                    )
+                    pitch = gr.Slider(
+                        minimum=-24, 
+                        maximum=24, 
+                        step=1, 
+                        info=translations["pitch_info"], 
+                        label=translations["pitch"], 
+                        value=0, 
+                        interactive=True
+                    )
+                    f0_autotune_strength = gr.Slider(
+                        minimum=0, 
+                        maximum=1, 
+                        label=translations["autotune_rate"], 
+                        info=translations["autotune_rate_info"], 
+                        value=1, 
+                        step=0.1, 
+                        interactive=True, 
+                        visible=False
+                    )
+                    proposal_pitch_threshold = gr.Slider(
+                        minimum=50.0, 
+                        maximum=1200.0, 
+                        label=translations["proposal_pitch_threshold"], 
+                        info=translations["proposal_pitch_threshold_info"], 
+                        value=255.0, 
+                        step=0.1, 
+                        interactive=True, 
+                        visible=False
+                    )
+                    filter_radius = gr.Slider(
+                        minimum=0, 
+                        maximum=7, 
+                        label=translations["filter_radius"], 
+                        info=translations["filter_radius_info"], 
+                        value=3, 
+                        step=1, 
                         interactive=True
                     )
             with gr.Accordion(
@@ -125,6 +172,25 @@ def f0_extract_tab():
             ]
         )
     with gr.Row():
+        autotune.change(
+            fn=visible, 
+            inputs=[
+                autotune
+            ], 
+            outputs=[
+                f0_autotune_strength
+            ]
+        )
+        proposal_pitch.change(
+            fn=visible, 
+            inputs=[
+                proposal_pitch
+            ], 
+            outputs=[
+                proposal_pitch_threshold
+            ]
+        )
+    with gr.Row():
         unlock_full_method.change(
             fn=lambda method: {
                 "choices": [m for m in unlock_f0(method)["choices"] if m != "hybrid"], 
@@ -143,7 +209,13 @@ def f0_extract_tab():
             inputs=[
                 input_audio_path,
                 f0_method_extract,
-                predictor_onnx
+                predictor_onnx,
+                pitch,
+                filter_radius,
+                autotune,
+                f0_autotune_strength,
+                proposal_pitch,
+                proposal_pitch_threshold
             ],
             outputs=[
                 file_output, 

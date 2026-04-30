@@ -10,7 +10,7 @@ sys.path.append(os.getcwd())
 
 from main.tools import huggingface
 from main.app.core.ui import gr_info, gr_warning
-from main.app.variables import python, translations, configs, file_types
+from main.app.variables import python, translations, configs, file_types, logger
 
 def if_done(done, p):
     while 1:
@@ -408,12 +408,14 @@ def training(
 
             pretrained_selector = {
                 True: {
+                    24000: ("f0G24k.pth", "f0D24k.pth"), 
                     32000: ("f0G32k.pth", "f0D32k.pth"), 
                     40000: ("f0G40k.pth", "f0D40k.pth"), 
                     44100: ("f0G44k.pth", "f0D44k.pth"),
                     48000: ("f0G48k.pth", "f0D48k.pth")
                 }, 
                 False: {
+                    24000: ("G24k.pth", "D24k.pth"), 
                     32000: ("G32k.pth", "D32k.pth"), 
                     40000: ("G40k.pth", "D40k.pth"), 
                     44100: ("G44k.pth", "D44k.pth"),
@@ -426,9 +428,12 @@ def training(
 
             if energy_use: pg2, pd2 = pg2 + "ENERGY_", pd2 + "ENERGY_"
             if vocoder != 'Default': pg2, pd2 = pg2 + vocoder + "_", pd2 + vocoder + "_"
+            if embedders not in ["hubert_base", "contentvec_base"]: pg2, pd2 = pg2 + embedders + "_", pd2 + embedders + "_"
             if architecture != "RVC": pg2, pd2 = architecture + "_" + pg2, architecture + "_" + pd2
 
             pg2, pd2 = pg2 + pg, pd2 + pd
+            logger.debug("PG: " + pg2 + " PD: " + pd2)
+
             pretrained_G, pretrained_D = (
                 os.path.join(
                     pretrain_dir,

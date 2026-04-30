@@ -1049,7 +1049,7 @@ class HTDemucs(nn.Module):
         x = x * std[:, None] + mean[:, None]
         device_type = x.device.type
         device_load = f"{device_type}:{x.device.index}" if not device_type == "mps" else device_type
-        x_is_other_gpu = not device_type in ["cuda", "cpu"]
+        x_is_other_gpu = not device_type in ["cuda", "xpu", "cpu"]
         if x_is_other_gpu: x = x.cpu()
         zout = self._mask(z, x)
 

@@ -123,7 +123,7 @@ def download_tab():
         with gr.Row():
             with gr.Accordion(
                 translations["download_pretrained_2"], 
-                open=False
+                open=True
             ):
                 with gr.Row():
                     download_pretrain_method = gr.Radio(

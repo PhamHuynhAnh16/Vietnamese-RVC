@@ -75,6 +75,10 @@ def ddp_barrier():
         torch.distributed.barrier(
             device_ids=[torch.cuda.current_device()]
         )
+    elif hasattr(torch, "xpu") and hasattr(torch.distributed.Backend, "XCCL") and torch.distributed.get_backend() == torch.distributed.Backend.XCCL:
+        torch.distributed.barrier(
+            device_ids=[torch.xpu.current_device()]
+        )
     else: torch.distributed.barrier()
 
 class Resample(torch.nn.Module):

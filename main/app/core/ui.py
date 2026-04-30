@@ -11,7 +11,7 @@ import sounddevice as sd
 sys.path.append(os.getcwd())
 
 from main.library.backends import directml, opencl
-from main.inference.realtime.audio import list_audio_device
+from main.inference.realtime.audio import audio_device
 
 from main.app.variables import (
     logger, 
@@ -32,6 +32,8 @@ from main.app.variables import (
     embedders_model, 
     google_tts_voice 
 )
+
+input_channels_map, output_channels_map = audio_device()
 
 def gr_info(message):
     gr.Info(message, duration=2)
@@ -55,6 +57,17 @@ def get_gpu_info():
         for i in range(ngpu) 
         if torch.cuda.is_available() or ngpu != 0
     ]
+
+    if len(gpu_infos) == 0 and hasattr(torch, "xpu") and torch.xpu.is_available():
+        ngpu = torch.xpu.device_count()
+        gpu_infos = [
+            (
+                f"{i}: {torch.xpu.get_device_name(i)} " + 
+                f"({int(torch.xpu.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)"
+            ) 
+            for i in range(ngpu) 
+            if torch.xpu.is_available() or ngpu != 0
+        ]
 
     if len(gpu_infos) == 0:
         if directml.torch_available:
@@ -90,17 +103,23 @@ def gpu_number_str():
     if config.cpu_mode: return "-"
     ngpu = torch.cuda.device_count()
 
+    if ngpu == 0 and hasattr(torch, "xpu") and torch.xpu.is_available():
+        ngpu = torch.xpu.device_count()
+        if ngpu != 0: return "0"
+
     if ngpu == 0: 
         ngpu = (
             directml.device_count() 
             if directml.torch_available else 
             opencl.device_count()
         )
+        if ngpu != 0: return "0"
 
     return str(
         "-".join(map(str, range(ngpu))) 
         if (
             torch.cuda.is_available() or 
+            (hasattr(torch, "xpu") and torch.xpu.is_available()) or 
             directml.is_available() or 
             opencl.is_available()
         ) else 
@@ -125,7 +144,7 @@ def change_audios_choices(input_audio):
     audios = sorted([
         os.path.abspath(os.path.join(root, f)) 
         for root, _, files in os.walk(configs["audios_path"]) 
-        for f in files if os.path.splitext(f)[1].lower() in file_types and not f.startswith(("Convert", "output", "Instruments"))
+        for f in files if os.path.splitext(f)[1].lower() in file_types and not f.startswith(("Convert", "output"))
     ])
 
     return {
@@ -217,6 +236,16 @@ def change_effect_preset_choices():
         "choices": sorted(list(
             f for f in os.listdir(configs["presets_path"]) 
             if f.endswith(".effect.json")
+        )), 
+        "__type__": "update"
+    }
+
+def change_realtime_preset_choices():
+    return {
+        "value": "", 
+        "choices": sorted(list(
+            f for f in os.listdir(configs["presets_path"]) 
+            if f.endswith(".realtime.json")
         )), 
         "__type__": "update"
     }
@@ -367,6 +396,12 @@ def valueFalse_interactive(value):
         "__type__": "update"
     }
 
+def interactive(value): 
+    return {
+        "interactive": value, 
+        "__type__": "update"
+    }
+
 def valueEmpty_visible1(value): 
     return {
         "value": "", 
@@ -431,7 +466,7 @@ def change_embedders_mode(value):
             "__type__": "update"
         }
 
-def change_fp(fp):
+def change_fp(fp, bf16, tf32):
     global config
 
     fp16 = fp == "fp16"
@@ -444,6 +479,8 @@ def change_fp(fp):
 
         configs = json.load(open(configs_json, "r"))
         configs["fp16"] = config.is_half = fp16
+        configs["brain"] = config.brain = bf16
+        configs["tf32"] = config.tf32 = tf32
 
         with open(configs_json, "w") as f:
             json.dump(configs, f, indent=4)
@@ -520,7 +557,7 @@ def separate_change(
         visible(is_vr and enable_denoise),
         valueFalse_interactive(is_vr),
         valueFalse_interactive(is_vr),
-        valueFalse_interactive(is_vr)
+        interactive(is_vr) if is_vr else valueFalse_interactive(is_vr)
     ]
 
 def create_dataset_change(
@@ -556,101 +593,99 @@ def create_dataset_change(
         visible(is_vr and enable_denoise),
         valueFalse_interactive(is_vr),
         valueFalse_interactive(is_vr),
-        valueFalse_interactive(is_vr)
+        interactive(is_vr) if is_vr else valueFalse_interactive(is_vr)
     ]
 
-def audio_device():
-    try:
-        input_devices, output_devices = list_audio_device()
-
-        def priority(name):
-            n = name.lower()
-
-            if "virtual" in n:
-                return 0
-            if "vb" in n:
-                return 1
-
-            return 2
-
-        output_sorted = sorted(
-            output_devices, 
-            key=lambda d: priority(d.name)
-        )
-        input_sorted = sorted(
-            input_devices, key=lambda d: priority(d.name), reverse=True
-        )
-
-        input_device_list = {
-            f"{input_sorted.index(d)+1}: {d.name} ({d.host_api})": [d.index, d.max_input_channels] for d in input_sorted
-        }
-        output_device_list = {
-            f"{output_sorted.index(d)+1}: {d.name} ({d.host_api})": [d.index, d.max_output_channels] for d in output_sorted
-        }
-
-        return input_device_list, output_device_list
-    except Exception:
-        return {}, {}
-
 def update_audio_device(input_device, output_device, monitor_device, monitor):
-    input_channels_map, output_channels_map = audio_device()
-
     input_is_asio = "ASIO" in input_device if input_device else (False if gradio_version else "hidden")
     output_is_asio = "ASIO" in output_device if output_device else (False if gradio_version else "hidden")
     monitor_is_asio = "ASIO" in monitor_device if monitor_device else (False if gradio_version else "hidden")
 
-    try:
-        input_max_ch = input_channels_map.get(input_device, [])[1]
-        output_max_ch = output_channels_map.get(output_device, [])[1]
-        monitor_max_ch = output_channels_map.get(monitor_device, [])[1] if monitor else 128
-    except:
-        input_max_ch = output_max_ch = monitor_max_ch = -1
+    if input_is_asio or output_is_asio or monitor_is_asio:
+        sd._terminate()
+        sd._initialize()
+
+        try:
+            input_max_ch = input_channels_map.get(input_device, [])[1]
+            output_max_ch = output_channels_map.get(output_device, [])[1]
+            monitor_max_ch = output_channels_map.get(monitor_device, [])[1] if monitor else 128
+        except:
+            input_max_ch = output_max_ch = monitor_max_ch = 2
+    else: input_max_ch = output_max_ch = monitor_max_ch = 2
 
     return [
         visible(monitor),
         visible(monitor),
-        visible(monitor_is_asio),
         visible(
             input_is_asio or output_is_asio or monitor_is_asio
         ),
         gr.update(
             visible=input_is_asio, 
-            maximum=input_max_ch
+            maximum=input_max_ch - 1
         ),
         gr.update(
             visible=output_is_asio,
-            maximum=output_max_ch
+            maximum=output_max_ch - 1
         ),
         gr.update(
             visible=monitor_is_asio, 
-            maximum=monitor_max_ch
-        )
+            maximum=monitor_max_ch - 1
+        ),
+        gr.update(
+            value=resolve_sample_rate(input_channels_map[input_device][0]) if input_is_asio else 48000
+        ),
+        gr.update(
+            value=resolve_sample_rate(output_channels_map[output_device][0]) if output_is_asio else 48000
+        ),
+        gr.update(
+            visible=monitor, 
+            value=resolve_sample_rate(output_channels_map[monitor_device][0]) if monitor_is_asio else 48000
+        ),
+        gr.update(
+            visible=output_is_asio, 
+            value=True
+        ),
+        gr.update(
+            visible=monitor_is_asio, 
+            value=True
+        ),
     ]
 
 def change_audio_device_choices():
+    global input_channels_map, output_channels_map
+
     sd._terminate()
     sd._initialize()
 
     input_channels_map, output_channels_map = audio_device()
-    input_channels_map, output_channels_map = list(input_channels_map.keys()), list(output_channels_map.keys())
+    input_channels_map_list, output_channels_map_list = list(input_channels_map.keys()), list(output_channels_map.keys())
 
     return [
         {
-            "value": input_channels_map[0] if len(input_channels_map) >= 1 else "", 
-            "choices": input_channels_map, 
+            "value": input_channels_map_list[0] if len(input_channels_map_list) >= 1 else "", 
+            "choices": input_channels_map_list, 
             "__type__": "update"
         }, 
         {
-            "value": output_channels_map[0] if len(output_channels_map) >= 1 else "", 
-            "choices": output_channels_map, 
+            "value": output_channels_map_list[0] if len(output_channels_map_list) >= 1 else "", 
+            "choices": output_channels_map_list, 
             "__type__": "update"
         },
         {
-            "value": output_channels_map[0] if len(output_channels_map) >= 1 else "", 
-            "choices": output_channels_map, 
+            "value": output_channels_map_list[0] if len(output_channels_map_list) >= 1 else "", 
+            "choices": output_channels_map_list, 
             "__type__": "update"
         }
     ]
+
+def resolve_sample_rate(input_device_id):
+    if configs.get("asio_enabled", False): return 48000
+
+    try:
+        device = sd.query_devices(input_device_id)
+        return int(device["default_samplerate"])
+    except Exception:
+        return 48000
 
 def replace_punctuation(filename):
     return (filename

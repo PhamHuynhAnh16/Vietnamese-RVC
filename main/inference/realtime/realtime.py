@@ -70,7 +70,6 @@ class RVC_Realtime:
         self.input_sensitivity = 10 ** (silent_threshold / 20)
         self.window_size = sample_rate // 100
         self.dtype = torch.float16 if config.is_half else torch.float32
-        self.kwargs = None
 
     def initialize(self):
         check_assets(
@@ -144,7 +143,7 @@ class RVC_Realtime:
 
         board = Pedalboard([HighpassFilter()])
 
-        if ["chorus"]:
+        if kwargs["chorus"]:
             board.append(
                 Chorus(
                     depth=kwargs["chorus_depth"], 
@@ -274,9 +273,11 @@ class RVC_Realtime:
             convert_size_16k = convert_size_16k + (self.window_size - modulo)
 
         self.convert_feature_size_16k = convert_size_16k // self.window_size
+        self.block_frame_16k = block_frame_16k
         self.skip_head = extra_frame_16k // self.window_size
         self.return_length = self.convert_feature_size_16k - self.skip_head
         self.silence_front = extra_frame_16k - (self.window_size * 5) if self.silence_front else 0
+        self.warmup_blocks = int(np.ceil(convert_size_16k / block_frame_16k)) + 1
 
         audio_buffer_size = block_frame_16k + crossfade_frame_16k
 
@@ -336,38 +337,8 @@ class RVC_Realtime:
         tg = self.tg
         board = self.board
 
-        if self.vad is not None:
-            is_speech = self.vad.is_speech(audio_in_16k.cpu().numpy().copy())
-
-            if not is_speech: 
-                audio_model = self.pipeline.execute(
-                    self.convert_buffer,
-                    self.pitch_buffer,
-                    self.pitchf_buffer,
-                    f0_up_key,
-                    index_rate,
-                    self.convert_feature_size_16k,
-                    self.silence_front,
-                    self.skip_head,
-                    self.return_length,
-                    protect,
-                    filter_radius,
-                    rms_mix_rate,
-                    f0_autotune, 
-                    f0_autotune_strength, 
-                    proposal_pitch, 
-                    proposal_pitch_threshold,
-                    tg,
-                    board,
-                    embedders_mix,
-                    embedders_mix_layers,
-                    embedders_mix_ratio
-                )
-
-                return torch.zeros(audio_model.shape, dtype=self.dtype, device=config.device), vol
-
-        if vol < self.input_sensitivity:
-            audio_model = self.pipeline.execute(
+        def inference_with_silent():
+            self.pipeline.execute(
                 self.convert_buffer,
                 self.pitch_buffer,
                 self.pitchf_buffer,
@@ -388,11 +359,22 @@ class RVC_Realtime:
                 board,
                 embedders_mix,
                 embedders_mix_layers,
-                embedders_mix_ratio
+                embedders_mix_ratio,
+                block_size_16k=self.block_frame_16k
             )
 
-            return torch.zeros(audio_model.shape, dtype=self.dtype, device=config.device), vol
+            return None, vol
 
+        if self.warmup_blocks > 0:
+            self.warmup_blocks -= 1
+            circular_write(audio_in_16k, self.convert_buffer)
+            return inference_with_silent()
+
+        if self.vad is not None:
+            is_speech = self.vad.is_speech(audio_in_16k.cpu().numpy().copy())
+            if not is_speech: return inference_with_silent()
+
+        if vol < self.input_sensitivity: return inference_with_silent()
         circular_write(audio_in_16k, self.convert_buffer)
 
         audio_model = self.pipeline.execute(
@@ -416,7 +398,8 @@ class RVC_Realtime:
             board,
             embedders_mix,
             embedders_mix_layers,
-            embedders_mix_ratio
+            embedders_mix_ratio,
+            block_size_16k=self.block_frame_16k
         )
 
         audio_out = self.resample_out(audio_model * vol_t.sqrt())
@@ -428,18 +411,22 @@ class VoiceChanger:
         read_chunk_size, 
         cross_fade_overlap_size, 
         input_sample_rate, 
+        output_sample_rate,
         extra_convert_size
     ):
         self.input_sample_rate = input_sample_rate
+        self.output_sample_rate = output_sample_rate
         self.block_frame = read_chunk_size * 128
         self.crossfade_frame = int(cross_fade_overlap_size * input_sample_rate)
         self.extra_frame = int(extra_convert_size * input_sample_rate)
         self.sola_search_frame = input_sample_rate // 100
+        self.cor_den_ones = torch.ones(1, 1, self.crossfade_frame, device=config.device)
+        self.fade_linspace = torch.linspace(0.0, 1.0, steps=self.crossfade_frame, device=config.device, dtype=torch.float32)
         self.vc_model = None
         self.sola_buffer = None
         self.generate_strength()
 
-    def initialize(self, vc_model, record_audio = False, record_audio_path = None, export_format = "wav",):
+    def initialize(self, vc_model, record_audio = False, record_audio_path = None, export_format = "wav"):
         self.vc_model = vc_model
         self.record_audio = record_audio
         self.record_audio_path = record_audio_path
@@ -460,14 +447,14 @@ class VoiceChanger:
         self.soundfile = sf.SoundFile(
             self.record_audio_path,
             mode="w",
-            samplerate=self.input_sample_rate,
+            samplerate=self.output_sample_rate,
             channels=1,
             format=self.export_format.lower(),
         ) if self.record_audio else None
 
     def generate_strength(self):
         self.fade_in_window = (
-            0.5 * np.pi * torch.linspace(0.0, 1.0, steps=self.crossfade_frame, device=config.device, dtype=torch.float32)
+            0.5 * np.pi * self.fade_linspace
         ).sin() ** 2
         self.fade_out_window = 1 - self.fade_in_window
 
@@ -511,36 +498,52 @@ class VoiceChanger:
             embedders_mix_ratio
         )
 
+        if audio is None: 
+            audio = np.zeros(block_size, dtype=np.float32)
+            if self.record_audio and self.soundfile is not None: self.soundfile.write(audio)
+            return audio, vol
+
+        is_onset = not self.sola_buffer.any()
         conv_input = audio[None, None, : self.crossfade_frame + self.sola_search_frame].float()
         cor_nom = F.conv1d(conv_input, self.sola_buffer[None, None, :])
 
         cor_den = (
             F.conv1d(
                 conv_input ** 2, 
-                torch.ones(
-                    1, 
-                    1, 
-                    self.crossfade_frame, 
-                    device=config.device
-                )
+                self.cor_den_ones
             ) + 1e-8
         ).sqrt()
 
         sola_offset = (cor_nom[0, 0] / cor_den[0, 0]).argmax()
-
         audio = audio[sola_offset:]
-        audio[: self.crossfade_frame] *= self.fade_in_window
-        audio[: self.crossfade_frame] += (self.sola_buffer * self.fade_out_window)
 
-        min_len = block_size + self.crossfade_frame + self.sola_search_frame
-        if audio.shape[0] < min_len: audio = F.pad(audio, (0, min_len - audio.shape[0]))
+        if is_onset:
+            n_hops = block_size // 160
+            if n_hops >= 1:
+                hop_energy = audio[: n_hops * 160].reshape(n_hops, 160).abs().max(dim=1).values
+                peak = hop_energy.max().item()
+                onset_sample = 0
+
+                if peak > 1e-4:
+                    above = (hop_energy > 0.1 * peak).nonzero(as_tuple=False)
+                    if len(above) > 0: onset_sample = int(above[0].item()) * 160
+            else: onset_sample = 0
+
+            audio[:onset_sample] = 0.0
+            fade_len = min(block_size - onset_sample, self.crossfade_frame)
+
+            if fade_len > 0: audio[onset_sample : onset_sample + fade_len] *= ((0.5 * np.pi * torch.linspace(0.0, 1.0, steps=fade_len, device=config.device, dtype=torch.float32)).sin() ** 2)
+        else:
+            audio[: self.crossfade_frame] *= self.fade_in_window
+            audio[: self.crossfade_frame] += self.sola_buffer * self.fade_out_window
+
+        min_len = block_size + self.crossfade_frame
+        if audio.shape[0] < min_len: audio = torch.cat([audio, torch.zeros(min_len - audio.shape[0], device=config.device, dtype=audio.dtype)])
 
         self.sola_buffer[:] = audio[block_size : block_size + self.crossfade_frame]
         audio_output = audio[:block_size].detach().cpu().numpy()
 
-        if self.record_audio and self.soundfile is not None:
-            self.soundfile.write(audio_output)
-
+        if self.record_audio and self.soundfile is not None: self.soundfile.write(audio_output)
         return audio_output, vol
     
     @torch.no_grad()

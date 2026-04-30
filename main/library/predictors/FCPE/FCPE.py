@@ -356,7 +356,9 @@ class InferCFNaiveMelPE(torch.nn.Module):
     def __init__(
         self, 
         args, 
-        state_dict
+        state_dict,
+        compile_model = False,
+        compile_mode = None
     ):
         super().__init__()
         self.model = CFNaiveMelPE(
@@ -375,6 +377,7 @@ class InferCFNaiveMelPE(torch.nn.Module):
         )
         self.model.load_state_dict(state_dict)
         self.model.eval()
+        if compile_model: self.model.net, self.model.input_stack = torch.compile(self.model.net, mode=compile_mode), torch.compile(self.model.input_stack, mode=compile_mode)
         self.register_buffer("tensor_device_marker", torch.tensor(1.0).float(), persistent=False)
 
     def forward(self, mel, decoder_mode = "local_argmax", threshold = 0.006):
@@ -431,7 +434,9 @@ class FCPEInfer_LEGACY:
         providers=None, 
         onnx=False, 
         f0_min=50, 
-        f0_max=1100
+        f0_max=1100,
+        compile_model=False,
+        compile_mode=None
     ):
         if device is None: device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
@@ -457,9 +462,9 @@ class FCPEInfer_LEGACY:
                 f0_min=self.f0_min, 
                 confidence=self.args.model.confidence
             )
-            model.to(self.device).to(self.dtype)
             model.load_state_dict(ckpt["model"])
-            model.eval()
+            model.to(self.device).to(self.dtype).eval()
+            if compile_model: model.decoder, model.stack = torch.compile(model.decoder, mode=compile_mode), torch.compile(model.stack, mode=compile_mode)
             self.model = model
 
     @torch.no_grad()
@@ -498,7 +503,9 @@ class FCPEInfer:
         providers=None, 
         onnx=False, 
         f0_min=50, 
-        f0_max=1100
+        f0_max=1100,
+        compile_model=False,
+        compile_mode=None
     ):
         if device is None: device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
@@ -516,7 +523,7 @@ class FCPEInfer:
             ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             ckpt["config_dict"]["model"]["conv_dropout"] = ckpt["config_dict"]["model"]["atten_dropout"] = 0.0
             self.args = DotDict(ckpt["config_dict"])
-            model = InferCFNaiveMelPE(self.args, ckpt["model"])
+            model = InferCFNaiveMelPE(self.args, ckpt["model"], compile_model=compile_model, compile_mode=compile_mode)
             self.model = model.to(device).to(self.dtype).eval()
 
     @torch.no_grad()
@@ -559,10 +566,12 @@ class FCPE:
         threshold=0.05, 
         providers=None, 
         onnx=False, 
-        legacy=False
+        legacy=False,
+        compile_model=False,
+        compile_mode=None
     ):
         self.model = FCPEInfer_LEGACY if legacy else FCPEInfer
-        self.fcpe = self.model(configs, model_path, device=device, dtype=dtype, providers=providers, onnx=onnx, f0_min=f0_min, f0_max=f0_max)
+        self.fcpe = self.model(configs, model_path, device=device, dtype=dtype, providers=providers, onnx=onnx, f0_min=f0_min, f0_max=f0_max, compile_model=compile_model, compile_mode=compile_mode)
         self.hop_length = hop_length
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.threshold = threshold

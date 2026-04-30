@@ -58,8 +58,8 @@ def create_reference_tab():
         )
     with gr.Row():
         f0_up_key = gr.Slider(
-            minimum=-20, 
-            maximum=20, 
+            minimum=-24, 
+            maximum=24, 
             step=1, 
             info=translations["pitch_info"], 
             label=translations["pitch"], 

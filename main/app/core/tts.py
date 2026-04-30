@@ -40,12 +40,13 @@ def synthesize_tts(
                 "ie": "UTF-8", 
                 "q": prompt, 
                 "tl": voice, 
-                "ttsspeed": speed, 
+                "ttsspeed": max(0.24, min(4.0, 1 + speed / 100)), 
                 "client": "tw-ob"
             }, 
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
-            }
+            },
+            timeout=15
         )
 
         if response.status_code == 200:
@@ -65,10 +66,11 @@ def synthesize_tts(
                         n_steps=pitch
                     )
 
-                if speed != 0: 
+                rate = max(0.01, 1 + speed / 100)
+                if rate != 1.0: 
                     y = librosa.effects.time_stretch(
                         y, 
-                        rate=speed
+                        rate=rate
                     )
 
                 sf.write(
@@ -130,13 +132,7 @@ def srt_tts(
             )
 
             audio, file_sr = sf.read(wav_path, dtype=np.float32)
-
-            if file_sr != sr: 
-                audio = np.interp(
-                    np.linspace(0, len(audio) - 1, int(len(audio) * sr / file_sr)), 
-                    np.arange(len(audio)), 
-                    audio
-                )
+            if file_sr != sr: audio = librosa.resample(audio, orig_sr=file_sr, target_sr=sr, res_type="soxr_vhq")
 
             adjusted = time_stretch(
                 audio, 

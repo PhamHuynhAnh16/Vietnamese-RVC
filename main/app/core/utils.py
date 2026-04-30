@@ -1,13 +1,49 @@
 import os
 import sys
+import time
 import json
+import signal
 import codecs
 import requests
+import subprocess
 
 sys.path.append(os.getcwd())
 
 from main.app.core.ui import gr_info, gr_warning
 from main.app.variables import translations, configs
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except:
+        return False
+
+def pid_kill(pid):
+    if not alive(pid): return True
+
+    try:
+        os.kill(pid, signal.CTRL_BREAK_EVENT if sys.platform == "win32" else signal.SIGINT)
+    except:
+        pass
+
+    for _ in range(15):
+        if not alive(pid): return True
+        time.sleep(0.1)
+
+    try:
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    except:
+        pass
+
+    for _ in range(10):
+        if not alive(pid): return True
+        time.sleep(0.1)
+
+    return False
 
 def stop_pid(
     pid_file, 
@@ -27,7 +63,7 @@ def stop_pid(
                 pids = [int(pid) for pid in pid_file.readlines()]
 
             for pid in pids:
-                os.kill(pid, 9)
+                pid_kill(pid)
 
             if os.path.exists(pid_file_path): os.remove(pid_file_path)
 
@@ -44,7 +80,7 @@ def stop_pid(
                 json.dump(pid_data, pid_file, indent=4)
 
             for pid in pids:
-                os.kill(pid, 9)
+                pid_kill(pid)
 
             gr_info(translations["end_pid"])
     except:

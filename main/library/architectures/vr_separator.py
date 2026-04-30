@@ -110,7 +110,6 @@ class VRSeparator(CommonSeparator):
         audio_file = spec_utils.write_array_to_mem(self.audio_file_path, subtype=self.wav_subtype)
         is_mp3 = audio_file.endswith(".mp3") if isinstance(audio_file, str) else False
 
-        self.logger.debug(f"loading_mix iteraring through {bands_n} bands")
         for d in tqdm(range(bands_n, 0, -1)):
             bp = self.model_params.param["band"][str(d)]
 

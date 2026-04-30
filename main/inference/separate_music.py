@@ -467,7 +467,7 @@ def demucs_main(
         output_dir=output_dirs, 
         model_filename=demucs_models.get(model_name, model_name), 
         export_format=export_format, 
-        segment_size=(segments_size / 2), 
+        segment_size=int(segments_size // 4), 
         overlap=overlap, 
         shifts=shifts, 
         sample_rate=sample_rate

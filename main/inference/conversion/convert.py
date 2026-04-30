@@ -463,7 +463,9 @@ class VoiceConverter:
 
                 if not self.hubert_model:
                     models = load_embedders_model(embedder_model, embedders_mode)
-                    if isinstance(models, torch.nn.Module): models = models.to(self.device).to(torch.float16 if self.config.is_half else torch.float32).eval()
+                    if isinstance(models, torch.nn.Module): 
+                        models = models.to(self.device).to(torch.float16 if self.config.is_half else torch.float32).eval()
+                        if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=self.config.compile_mode)
                     self.hubert_model = models
 
                 pbar.update(1)
@@ -536,17 +538,6 @@ class VoiceConverter:
                         self.tgt_sr
                     )
 
-                if self.tgt_sr != resample_sr and resample_sr > 0: 
-                    audio_output = librosa.resample(
-                        audio_output, 
-                        orig_sr=self.tgt_sr, 
-                        target_sr=resample_sr, 
-                        res_type="soxr_vhq"
-                    )
-
-                    self.tgt_sr = resample_sr
-
-                pbar.update(1)
                 if clean_audio:
                     from main.tools.noisereduce import TorchGate
 
@@ -563,14 +554,29 @@ class VoiceConverter:
                 target_len = int(np.round(len(audio) / self.sample_rate * self.tgt_sr))
                 if len(audio_output) != target_len: audio_output = signal.resample_poly(audio_output, target_len, len(audio_output))
 
+                audio_output_resample = None
+                if self.tgt_sr != resample_sr and resample_sr > 0: 
+                    audio_output_resample = librosa.resample(
+                        audio_output, 
+                        orig_sr=self.tgt_sr, 
+                        target_sr=resample_sr, 
+                        res_type="soxr_vhq"
+                    )
+
+                    self.tgt_sr = resample_sr
+
+                pbar.update(1)
+
                 try:
                     sf.write(
                         audio_output_path, 
-                        audio_output, 
+                        audio_output if audio_output_resample is None else audio_output_resample, 
                         self.tgt_sr, 
                         format=export_format
                     )
                 except:
+                    logger.info(translations["sr_not_support"])
+
                     sf.write(
                         audio_output_path, 
                         librosa.resample(
@@ -648,7 +654,8 @@ class VoiceConverter:
 
                 self.net_g.load_state_dict(self.cpt["weight"], strict=False)
                 self.net_g.eval().to(self.device)
-                self.net_g = self.net_g.to(torch.float16 if self.config.is_half else torch.float32)
+                self.net_g.to(torch.float16 if self.config.is_half else torch.float32)
+                if config.compile_all: self.net_g = torch.compile(self.net_g, mode=self.config.compile_mode)
                 self.n_spk = self.cpt["config"][-3]
             else:
                 self.net_g = self.cpt.to(config.device)

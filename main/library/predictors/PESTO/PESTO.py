@@ -14,7 +14,9 @@ class PESTO:
         sample_rate=16000, 
         device=None, 
         providers=None, 
-        onnx=False
+        onnx=False,
+        compile_model=False,
+        compile_mode=None
     ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.step_size = step_size
@@ -33,7 +35,7 @@ class PESTO:
             from main.library.predictors.PESTO.model import PPESTO, Resnet1d
             from main.library.predictors.PESTO.preprocessor import Preprocessor
 
-            ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
+            ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             model = PPESTO(
                 Resnet1d(
                     **ckpt["hparams"]["encoder"]
@@ -47,8 +49,10 @@ class PESTO:
                 reduction=ckpt["hparams"]["reduction"]
             )
             model.load_state_dict(ckpt["state_dict"], strict=False)
-            self.model = model.to(self.device).eval()
+            model.to(self.device).eval()
+            self.model = model
             self.model.reduction = self.reduction
+            if compile_model: self.model = torch.compile(self.model, mode=compile_mode)
 
     def compute_f0(self, x):
         assert x.ndim <= 2

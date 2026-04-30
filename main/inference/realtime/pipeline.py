@@ -28,7 +28,6 @@ class Inference:
             self.architecture = model.get("architecture", "RVC")
 
             if self.vocoder != "Default": config.is_half = False
-
             
             if self.architecture == "RVC":
                 net_g = Synthesizer(
@@ -50,6 +49,7 @@ class Inference:
             net_g.load_state_dict(model["weight"], strict=False)
             net_g.eval().to(config.device).to(torch.float16 if config.is_half else torch.float32)
             net_g.remove_weight_norm()
+            if config.compile_all: net_g = torch.compile(net_g, mode=config.compile_mode)
 
             self.net_g = net_g
             self.model = model
@@ -148,17 +148,19 @@ class Pipeline:
         board = None,
         embedders_mix = False,
         embedders_mix_layers = 9,
-        embedders_mix_ratio = 0.5
+        embedders_mix_ratio = 0.5,
+        block_size_16k = None,
     ):
         with torch.no_grad():     
             assert audio.dim() == 1, audio.dim()
             formant_length = int(np.ceil(return_length * 1.0))
+            shift = (block_size_16k or skip_head * self.predictor.window) // self.predictor.window
 
-            pitch, pitchf = self.predictor.realtime_calculator(
-                audio[silence_front:], 
+            pitch_new, pitchf_new = self.predictor.realtime_calculator(
+                audio[silence_front:],
                 self.f0_method, 
-                pitch, 
-                pitchf, 
+                None, 
+                None, 
                 f0_up_key, 
                 filter_radius, 
                 f0_autotune, 
@@ -166,6 +168,16 @@ class Pipeline:
                 proposal_pitch, 
                 proposal_pitch_threshold
             ) if self.use_f0 else (None, None)
+
+            pitch_new, pitchf_new = pitch_new.squeeze(0), pitchf_new.squeeze(0)
+            pitch[:-shift] = pitch[shift:].clone()
+            pitchf[:-shift] = pitchf[shift:].clone()
+
+            interior_pitch = pitch_new[3:-1] if pitch_new.shape[0] > 4 else pitch_new
+            interior_pitchf = pitchf_new[3:-1] if pitchf_new.shape[0] > 4 else pitchf_new
+
+            pitch[-interior_pitch.shape[0]:] = interior_pitch
+            pitchf[-interior_pitchf.shape[0]:] = interior_pitchf
 
             energy = self.rms(
                 audio[silence_front:].to(self.device).unsqueeze(0)
@@ -212,8 +224,8 @@ class Pipeline:
 
             if self.use_f0: 
                 pitch, pitchf = (
-                    pitch[:, -audio_feats_len:], 
-                    pitchf[:, -audio_feats_len:] * (formant_length / return_length)
+                    pitch[-audio_feats_len:].unsqueeze(0), 
+                    pitchf[-audio_feats_len:].unsqueeze(0) * (formant_length / return_length)
                 )
 
             if self.energy: 
@@ -244,18 +256,24 @@ class Pipeline:
                 p_len, 
                 self.torch_sid, 
                 pitch, 
-                pitchf, 
+                pitchf,
                 energy
             ).float()
 
             if rms_mix_rate != 1: 
+                rms_src = audio[-(return_length * self.predictor.window):].cpu().numpy()
                 out_audio = torch.as_tensor(change_rms(
-                    audio.cpu().numpy(), 
+                    rms_src, 
                     self.predictor.sample_rate, 
                     out_audio.cpu().numpy(), 
                     self.tgt_sr, 
                     rms_mix_rate
                 ), device=self.device)
+
+            if torchgate is not None: 
+                out_audio = torchgate(
+                    out_audio.unsqueeze(0)
+                ).squeeze(0)
 
             scaled_window = int(np.floor(1.0 * self.model_window))
         
@@ -268,11 +286,6 @@ class Pipeline:
                     ).to(self.device)
 
                 out_audio = self.resamplers[scaled_window](out_audio[: return_length * scaled_window])
-
-            if torchgate is not None: 
-                out_audio = torchgate(
-                    out_audio.unsqueeze(0)
-                ).squeeze(0)
 
             if board is not None: 
                 out_audio = torch.as_tensor(
@@ -308,7 +321,7 @@ def create_pipeline(
             hop_length=hop_length, 
             f0_min=configs.get("f0_min", 50), 
             f0_max=configs.get("f0_max", 1100), 
-            alpha=0.5, 
+            alpha=0, 
             is_half=config.is_half, 
             device=config.device, 
             predictor_onnx=predictor_onnx, 
@@ -339,6 +352,7 @@ def create_pipeline(
     if isinstance(embedder, torch.nn.Module): 
         dtype = torch.float16 if config.is_half else torch.float32
         embedder = embedder.to(config.device).to(dtype).eval()
+        if config.compile_all and embedders_mode != "whisper": embedder = torch.compile(embedder, mode=config.compile_mode)
 
     pipeline = Pipeline(
         inference,

@@ -59,5 +59,6 @@ def cpu_conv_transpose1d(input, weight, bias=None, stride=1, padding=0, output_p
 
 if torch_available: 
     torch.nn.GRU = GRU
+    torch.inference_mode = torch.no_grad
     fairseq.GradMultiply.forward = forward_dml
     torch.nn.functional.conv_transpose1d = cpu_conv_transpose1d

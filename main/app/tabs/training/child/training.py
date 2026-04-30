@@ -467,6 +467,7 @@ def training_model_tab():
                             value=50, 
                             step=1, 
                             label=translations["threshold"], 
+                            info=translations["overtraining_threshold"],
                             interactive=True, 
                             visible=False
                         )
@@ -548,13 +549,13 @@ def training_model_tab():
                             label=translations["deterministic"], 
                             info=translations["deterministic_info"], 
                             value=False, 
-                            interactive=config.device.startswith("cuda")
+                            interactive=config.device.startswith("cuda") and not config.is_zluda
                         )
                         benchmark = gr.Checkbox(
                             label=translations["benchmark"], 
                             info=translations["benchmark_info"], 
                             value=False, 
-                            interactive=config.device.startswith("cuda")
+                            interactive=config.device.startswith("cuda") and not config.is_zluda
                         )
                     with gr.Row():
                         optimizer = gr.Radio(

@@ -103,7 +103,12 @@ class Audio:
             waveform = file["waveform"]
             sample_rate = file["sample_rate"]
         elif "audio" in file:
-            waveform, sample_rate = torchaudio.load(file["audio"], backend=self.backend)
+            try:
+                waveform, sample_rate = torchaudio.load(file["audio"], backend=self.backend)
+            except:
+                y, sample_rate = librosa.load(file["audio"], sr=None, mono=False)
+                waveform = torch.from_numpy(y)
+
             if isinstance(file["audio"], IOBase): file["audio"].seek(0)
 
         channel = file.get("channel", None)
@@ -159,12 +164,23 @@ class Audio:
             data = file["waveform"][:, start_frame:end_frame]
         else:
             try:
-                data, _ = torchaudio.load(
-                    file["audio"], 
-                    frame_offset=start_frame, 
-                    num_frames=num_frames, 
-                    backend=self.backend
-                )
+                try:
+                    data, _ = torchaudio.load(
+                        file["audio"], 
+                        frame_offset=start_frame, 
+                        num_frames=num_frames, 
+                        backend=self.backend
+                    )
+                except:
+                    y, _ = librosa.load(
+                        file["audio"], 
+                        sr=sample_rate, 
+                        offset=start_frame / sample_rate, 
+                        duration=num_frames / sample_rate, 
+                        mono=False
+                    )
+                    data = torch.from_numpy(y)
+                    data = data.unsqueeze(0) if len(data.shape) == 1 else data
 
                 if isinstance(file["audio"], IOBase): file["audio"].seek(0)
             except RuntimeError:

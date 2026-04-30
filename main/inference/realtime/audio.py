@@ -1,6 +1,6 @@
 import os
 import sys
-import librosa
+import soxr
 import traceback
 
 import numpy as np
@@ -102,6 +102,39 @@ def list_audio_device():
 
     return audio_input_device, audio_output_device
 
+def audio_device():
+    try:
+        input_devices, output_devices = list_audio_device()
+
+        def priority(name):
+            n = name.lower()
+
+            if "virtual" in n:
+                return 0
+            if "vb" in n:
+                return 1
+
+            return 2
+
+        output_sorted = sorted(
+            output_devices, 
+            key=lambda d: priority(d.name)
+        )
+        input_sorted = sorted(
+            input_devices, key=lambda d: priority(d.name), reverse=True
+        )
+
+        input_device_list = {
+            f"{input_sorted.index(d)+1}: {d.name} ({d.host_api})": [d.index, d.max_input_channels] for d in input_sorted
+        }
+        output_device_list = {
+            f"{output_sorted.index(d)+1}: {d.name} ({d.host_api})": [d.index, d.max_output_channels] for d in output_sorted
+        }
+
+        return input_device_list, output_device_list
+    except Exception:
+        return {}, {}
+
 class Audio:
     def __init__(
         self, 
@@ -148,29 +181,25 @@ class Audio:
         self.embedders_mix_layers = embedders_mix_layers
         self.embedders_mix_ratio = embedders_mix_ratio
 
-    def get_input_audio_device(self, index):
-        audioinput, _ = list_audio_device()
+    def get_audio_device(self, input_index, output_index):
+        audioinput, audiooutput = list_audio_device()
 
-        serverAudioDevice = [
-            x for x in audioinput 
-            if x.index == index
-        ]
+        inputs, outputs = (
+            [
+                x for x in audioinput 
+                if x.index == input_index
+            ],
+            [
+                x for x in audiooutput 
+                if x.index == output_index
+            ]
+        )
 
-        return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
+        return (inputs[0] if len(inputs) > 0 else None), (outputs[0] if len(outputs) > 0 else None)
 
-    def get_output_audio_device(self, index):
-        _, audiooutput = list_audio_device()
-
-        serverAudioDevice = [
-            x for x in audiooutput 
-            if x.index == index
-        ]
-
-        return serverAudioDevice[0] if len(serverAudioDevice) > 0 else None
-    
     def process_data(self, indata):
         indata = indata * self.input_audio_gain
-        unpacked_data = librosa.to_mono(indata.T)
+        unpacked_data = np.mean(indata, axis=1) if indata.shape[1] > 1 else indata.flatten()
 
         return self.callbacks.change_voice(
             unpacked_data, 
@@ -190,7 +219,7 @@ class Audio:
     
     def process_data_with_time(self, indata):
         out_wav, vol, perf, _ = self.process_data(indata)
-        self.performance = perf
+        self.performance = perf[1]
         self.volume = vol
 
         self.callbacks.emit_to(self.performance, self.volume)
@@ -218,13 +247,14 @@ class Audio:
             logger.error(translations["error_occurred"].format(e=e))
             logger.debug(traceback.format_exc())
 
-    def audio_queue(self, outdata, gain):
+    def audio_queue(self, outdata, gain, sample_rate, sample_rate_out = None):
         try:
             mon_wav = self.mon_queue.get()
 
             while self.mon_queue.qsize() > 0:
                 self.mon_queue.get()
-
+            
+            if sample_rate != sample_rate_out: mon_wav = soxr.resample(mon_wav, sample_rate, sample_rate_out)
             output_channels = outdata.shape[1]
 
             outdata[:] = (
@@ -241,15 +271,24 @@ class Audio:
         output_device_id, 
         output_monitor_id, 
         input_audio_sample_rate, 
+        output_audio_sample_rate,
         output_monitor_sample_rate, 
         input_max_channel, 
         output_max_channel, 
         output_monitor_max_channel, 
         input_extra_setting, 
         output_extra_setting, 
-        output_monitor_extra_setting
+        output_monitor_extra_setting,
+        use_asio = False
     ):
-        if input_device_id != output_device_id:
+        if use_asio:
+            try:
+                sd._terminate()
+                sd._initialize()
+            except:
+                pass
+
+        if input_device_id != output_device_id or input_audio_sample_rate != output_audio_sample_rate:
             self.input_stream = sd.InputStream(
                 callback=self.audio_stream_no_output_callback,
                 latency="low",
@@ -261,12 +300,12 @@ class Audio:
                 extra_settings=input_extra_setting
             )
             self.output_stream = sd.OutputStream(
-                callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.output_audio_gain),
+                callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.output_audio_gain, input_audio_sample_rate, output_audio_sample_rate),
                 latency="low",
                 dtype=np.float32,
                 device=output_device_id,
-                blocksize=block_frame,
-                samplerate=input_audio_sample_rate,
+                blocksize=int(block_frame / input_audio_sample_rate * output_audio_sample_rate) if input_audio_sample_rate != output_audio_sample_rate else block_frame,
+                samplerate=output_audio_sample_rate,
                 channels=output_max_channel,
                 extra_settings=output_extra_setting
             )
@@ -289,11 +328,11 @@ class Audio:
 
         if self.use_monitor:
             self.monitor = sd.OutputStream(
-                callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.monitor_audio_gain),
+                callback=lambda outdata, frames, times, status: self.audio_queue(outdata, self.monitor_audio_gain, input_audio_sample_rate, output_monitor_sample_rate),
                 latency="low",
                 dtype=np.float32,
                 device=output_monitor_id,
-                blocksize=block_frame,
+                blocksize=int(block_frame / input_audio_sample_rate * output_monitor_sample_rate) if input_audio_sample_rate != output_monitor_sample_rate else block_frame,
                 samplerate=output_monitor_sample_rate,
                 channels=output_monitor_max_channel,
                 extra_settings=output_monitor_extra_setting
@@ -330,20 +369,20 @@ class Audio:
         asio_output_monitor_channel, 
         read_chunk_size, 
         input_audio_sample_rate, 
-        output_monitor_sample_rate
+        output_audio_sample_rate,
+        output_monitor_sample_rate,
+        asio_output_stereo = True,
+        asio_monitor_stereo = True
     ):
         self.stop()
-
-        input_audio_device, output_audio_device = (
-            self.get_input_audio_device(input_device_id), 
-            self.get_output_audio_device(output_device_id)
-        )
+        input_audio_device, output_audio_device = self.get_audio_device(input_device_id, output_device_id)
 
         input_channels, output_channels = (
             input_audio_device.max_input_channels, 
             output_audio_device.max_output_channels
         )
     
+        use_asio = False
         input_extra_setting, output_extra_setting = None, None
         output_monitor_extra_setting, monitor_channels = None, None
 
@@ -364,6 +403,7 @@ class Audio:
                 channel_selectors=[asio_input_channel]
             )
             input_channels = 1
+            use_asio = True
 
         if (
             output_audio_device and 
@@ -378,10 +418,10 @@ class Audio:
             "ASIO" in input_audio_device.host_api and 
             asio_output_channel != -1
         ):
-            output_extra_setting = sd.AsioSettings(
-                channel_selectors=[asio_output_channel]
-            )
-            output_channels = 1
+            output_selectors = [asio_output_channel, asio_output_channel + 1] if asio_output_stereo else [asio_output_channel]
+            output_extra_setting = sd.AsioSettings(channel_selectors=output_selectors)
+            output_channels = len(output_selectors)
+            use_asio = True
 
         if self.use_monitor:
             output_monitor_device = self.get_output_audio_device(output_monitor_id)
@@ -400,12 +440,12 @@ class Audio:
                 "ASIO" in output_monitor_device.host_api and 
                 asio_output_monitor_channel != -1
             ):
-                output_monitor_extra_setting = sd.AsioSettings(
-                    channel_selectors=[asio_output_monitor_channel]
-                )
-                monitor_channels = 1
+                monitor_selectors = [output_monitor_device, output_monitor_device + 1] if asio_monitor_stereo else [output_monitor_device]
+                output_monitor_extra_setting = sd.AsioSettings(channel_selectors=monitor_selectors)
+                monitor_channels = len(monitor_selectors)
+                use_asio = True
 
-        block_frame = int((read_chunk_size * 128 / 48000) * input_audio_sample_rate)
+        block_frame = read_chunk_size * 128
 
         try:
             self.run_audio_stream(
@@ -414,13 +454,15 @@ class Audio:
                 output_device_id, 
                 output_monitor_id, 
                 input_audio_sample_rate, 
+                output_audio_sample_rate,
                 output_monitor_sample_rate, 
                 input_channels, 
                 output_channels, 
                 monitor_channels, 
                 input_extra_setting, 
                 output_extra_setting, 
-                output_monitor_extra_setting
+                output_monitor_extra_setting,
+                use_asio=use_asio
             )
             self.running = True
         except Exception as e:

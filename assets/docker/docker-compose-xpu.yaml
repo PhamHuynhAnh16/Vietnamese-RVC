@@ -4,7 +4,7 @@ services:
   rvc:
     build:
       context: .
-      dockerfile: Dockerfile.ocl
+      dockerfile: Dockerfile.xpu
     container_name: rvc
     ports:
       - 7860:7860
@@ -12,6 +12,6 @@ services:
       resources:
         reservations:
           devices:
-            - driver: amd
+            - driver: intel
               count: 1
               capabilities: [gpu]

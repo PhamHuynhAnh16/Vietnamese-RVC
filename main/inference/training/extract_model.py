@@ -43,7 +43,7 @@ def extract_model(
 
         opt["config"] = [
             hps.data.filter_length // 2 + 1, 
-            32 if architecture == "RVC" else (hps.train.segment_size / hps.data.hop_length), 
+            hps.train.segment_size // hps.data.hop_length, 
             hps.model.inter_channels, 
             hps.model.hidden_channels, 
             hps.model.filter_channels, 

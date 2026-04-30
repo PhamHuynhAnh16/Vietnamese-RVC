@@ -26,12 +26,12 @@ def inference_tab():
                 gr.Markdown(f"## {translations['convert_audio']}")
                 convert_tab()
 
-        if configs.get("convert_with_whisper", True):
-            from main.app.tabs.inference.child.convert_with_whisper import convert_with_whisper_tab
+        if configs.get("convert_with_vad_tab", True):
+            from main.app.tabs.inference.child.convert_with_vad import convert_with_vad_tab
 
-            with gr.TabItem(translations["convert_with_whisper"]):
-                gr.Markdown(f"## {translations['convert_with_whisper']}")
-                convert_with_whisper_tab()
+            with gr.TabItem(translations["convert_with_vad"]):
+                gr.Markdown(f"## {translations['convert_with_vad']}")
+                convert_with_vad_tab()
 
         if configs.get("tts_tab", True):
             from main.app.tabs.inference.child.convert_tts import convert_tts_tab

@@ -72,6 +72,9 @@ def realtime_post_process(
     f0_coarse = torch.round(f0_mel, out=f0_mel).long()
 
     if pitch is not None and pitchf is not None:
+        f0_coarse = f0_coarse[3:-1] if f0_coarse.shape[0] > 4 else f0_coarse
+        f0 = f0[3:-1] if f0.shape[0] > 4 else f0
+
         circular_write(f0_coarse, pitch)
         circular_write(f0, pitchf)
     else:
@@ -102,6 +105,9 @@ class Generator:
         self.providers = config.providers
         self.predictor_onnx = predictor_onnx
         self.delete_predictor_onnx = delete_predictor_onnx
+        self.resize = configs.get("turn_on_resize_f0_for_all", False)
+        self.compile_model = config.compile_all
+        self.compile_mode = config.compile_mode
         self.window = 160
         self.batch_size = 512
         self.alpha = alpha
@@ -268,7 +274,7 @@ class Generator:
         )
 
     def _resize_f0(self, x, target_len):
-        if len(x) == target_len: return x
+        if target_len is None or len(x) == target_len: return x
 
         source = np.array(x)
         source[source < 0.001] = np.nan
@@ -328,7 +334,8 @@ class Generator:
                 clipping="clipping" in f0_method, 
                 filter_radius=filter_radius, 
                 hpa="hpa" in f0_method,
-                previous="previous" in f0_method
+                previous="previous" in f0_method,
+                mix="mix" in f0_method
             )
         elif f0_method in ["yin", "pyin", "piptrack"]:
             f0 = self.get_f0_librosa(
@@ -465,7 +472,7 @@ class Generator:
                 mode="constant"
             )
 
-        return f0
+        return self._resize_f0(f0, p_len if self.resize else None)
     
     def get_f0_mangio_crepe(self, x, p_len, model="full"):
         if not hasattr(self, "mangio_crepe"):
@@ -485,7 +492,9 @@ class Generator:
                 sample_rate=self.sample_rate, 
                 providers=self.providers, 
                 onnx=self.predictor_onnx, 
-                return_periodicity=False
+                return_periodicity=False,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         x = x.astype(np.float32)
@@ -517,7 +526,9 @@ class Generator:
                 sample_rate=self.sample_rate, 
                 providers=self.providers, 
                 onnx=self.predictor_onnx, 
-                return_periodicity=True
+                return_periodicity=True,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         f0, pd = self.crepe.compute_f0(torch.tensor(np.copy(x))[None].float(), pad=True)
@@ -526,7 +537,7 @@ class Generator:
         f0, pd = mean(f0, filter_radius), median(pd, filter_radius)
         f0[pd < 0.1] = 0
 
-        return self._resize_f0(f0[0].cpu().numpy(), p_len)
+        return self._resize_f0(f0[0].cpu().numpy(), p_len if self.resize else None)
     
     def get_f0_fcpe(self, x, p_len, legacy=False, previous=False, filter_radius=3):
         if not hasattr(self, "fcpe"): 
@@ -555,15 +566,17 @@ class Generator:
                 ), 
                 providers=self.providers, 
                 onnx=self.predictor_onnx, 
-                legacy=legacy
+                legacy=legacy,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
         
         f0 = self.fcpe.compute_f0(x, p_len)
         if self.predictor_onnx and self.delete_predictor_onnx: del self.fcpe.fcpe.model, self.fcpe
 
-        return f0
+        return self._resize_f0(f0, p_len if self.resize else None)
     
-    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False):
+    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False):
         if not hasattr(self, "rmvpe"): 
             from main.library.predictors.RMVPE.RMVPE import RMVPE
 
@@ -575,14 +588,16 @@ class Generator:
                             "hpa-rmvpe-76000" 
                             if previous else 
                             "hpa-rmvpe-112000"
-                        ) if hpa else "rmvpe"
+                        ) if hpa else ("rmvpe-mix" if mix else "rmvpe")
                     ) + (".onnx" if self.predictor_onnx else ".pt")
                 ), 
                 is_half=self.is_half, 
                 device=self.device, 
                 onnx=self.predictor_onnx, 
                 providers=self.providers,
-                hpa=hpa
+                hpa=hpa,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         filter_radius = filter_radius / 100
@@ -602,7 +617,7 @@ class Generator:
         )
         
         if self.predictor_onnx and self.delete_predictor_onnx: del self.rmvpe.model, self.rmvpe
-        return self._resize_f0(f0, p_len)
+        return self._resize_f0(f0, p_len if self.resize else None)
     
     def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest", use_stonemask=True):
         if not hasattr(self, "pw"): 
@@ -637,7 +652,7 @@ class Generator:
             for index, pitch in enumerate(f0):
                 f0[index] = round(pitch, 1)
 
-        return self._resize_f0(f0, p_len)
+        return self._resize_f0(f0, p_len if self.resize else None)
     
     def get_f0_swipe(self, x, p_len, filter_radius=3, use_stonemask=True):
         f0, t = swipe(
@@ -657,7 +672,7 @@ class Generator:
                 f0
             )
 
-        return self._resize_f0(f0, p_len)
+        return self._resize_f0(f0, p_len if self.resize else None)
     
     def get_f0_librosa(self, x, p_len, mode="yin", filter_radius=3):
         if mode != "piptrack":
@@ -686,7 +701,7 @@ class Generator:
             max_indexes = np.argmax(magnitudes, axis=0)
             f0 = pitches[max_indexes, range(magnitudes.shape[1])]
 
-        return self._resize_f0(f0, p_len)
+        return self._resize_f0(f0, p_len if self.resize else None)
 
     def get_f0_penn(self, x, p_len, filter_radius=3):
         if not hasattr(self, "penn"):
@@ -705,6 +720,8 @@ class Generator:
                 device=self.device, 
                 providers=self.providers, 
                 onnx=self.predictor_onnx, 
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         f0, pd = self.penn.compute_f0(torch.tensor(np.copy((x)))[None].float())
@@ -735,7 +752,9 @@ class Generator:
                 device=self.device, 
                 providers=self.providers, 
                 onnx=self.predictor_onnx, 
-                interp_unvoiced_at=0.1
+                interp_unvoiced_at=0.1,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         x = x.astype(np.float32)
@@ -769,7 +788,9 @@ class Generator:
                 device=self.device, 
                 onnx=self.predictor_onnx, 
                 svs=svs,
-                providers=self.providers
+                providers=self.providers,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         filter_radius /= 10
@@ -789,7 +810,7 @@ class Generator:
         )
         
         if self.predictor_onnx and self.delete_predictor_onnx: del self.djcm.model, self.djcm
-        return self._resize_f0(f0, p_len)
+        return self._resize_f0(f0, p_len if self.resize else None)
     
     def get_f0_swift(self, x, p_len, filter_radius=3):
         if not hasattr(self, "swift"): 
@@ -806,7 +827,7 @@ class Generator:
             )
 
         pitch_hz, _, _ = self.swift.detect_from_array(x, self.sample_rate)
-        return self._resize_f0(pitch_hz, p_len)
+        return self._resize_f0(pitch_hz, p_len if self.resize else None)
 
     def get_f0_pesto(self, x, p_len):
         if not hasattr(self, "pesto"):
@@ -823,7 +844,9 @@ class Generator:
                 sample_rate=self.sample_rate, 
                 device=self.device, 
                 providers=self.providers, 
-                onnx=self.predictor_onnx
+                onnx=self.predictor_onnx,
+                compile_model=self.compile_model,
+                compile_mode=self.compile_mode
             )
 
         x = x.astype(np.float32)
@@ -835,4 +858,4 @@ class Generator:
         f0 = self.pesto.compute_f0(audio.detach())[0]
         if self.predictor_onnx and self.delete_predictor_onnx: del self.pesto.model, self.pesto
 
-        return self._resize_f0(f0.squeeze(0).cpu().float().numpy(), p_len)
+        return self._resize_f0(f0.squeeze(0).cpu().float().numpy(), p_len if self.resize else None)

@@ -86,14 +86,14 @@ class PreProcess:
             logger.debug(f"{sid}-{idx0}-{idx1}-filtered")
             return
         
-        if normalization_mode == "post": 
-            normalized_audio = self._normalize_audio(normalized_audio)
+        if normalization_mode == "post": normalized_audio = self._normalize_audio(normalized_audio)
         
         wavfile.write(
             os.path.join(self.gt_wavs_dir, f"{sid}_{idx0}_{idx1}.wav"), 
             self.sr, 
             normalized_audio.astype(np.float32)
         )
+
         wavfile.write(
             os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{idx1}.wav"), 
             SAMPLE_RATE_16K, 

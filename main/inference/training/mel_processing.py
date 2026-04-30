@@ -5,17 +5,11 @@ import librosa
 
 sys.path.append(os.getcwd())
 
-def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
-    return (x.clamp(min=clip_val) * C).log()
-
-def dynamic_range_decompression_torch(x, C=1):
-    return x.exp() / C
-
 def spectral_normalize_torch(magnitudes):
-    return dynamic_range_compression_torch(magnitudes)
+    return (magnitudes.clamp(min=1e-5) * 1.0).log()
 
 def spectral_de_normalize_torch(magnitudes):
-    return dynamic_range_decompression_torch(magnitudes)
+    return magnitudes.exp() / 1.0
 
 stft = None
 mel_basis, hann_window = {}, {}

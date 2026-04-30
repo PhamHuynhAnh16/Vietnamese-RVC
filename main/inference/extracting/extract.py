@@ -101,7 +101,7 @@ def main():
         (
             f"cuda:{idx}"
         ) if config.device.startswith("cuda") else (
-            f"{'ocl' if config.device.startswith('ocl') else 'privateuseone'}:{idx}"
+            f"xpu:{idx}" if config.device.startswith("xpu") else f"{'ocl' if config.device.startswith('ocl') else 'privateuseone'}:{idx}"
         ) 
         for idx in gpus.split("-")
     ]

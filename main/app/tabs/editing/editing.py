@@ -19,7 +19,7 @@ def editing_tab():
                 gr.Markdown(translations["apply_audio_effects"])
                 audio_effects_tab()
             
-        if configs.get("quirk", True):
+        if configs.get("quirk_tab", True):
             from main.app.tabs.editing.child.quirk import quirk_tab
 
             with gr.TabItem(translations["quirk"]):

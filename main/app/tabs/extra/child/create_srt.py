@@ -18,7 +18,8 @@ from main.app.variables import (
     translations, 
     audio_params,
     whisper_model, 
-    paths_for_files 
+    paths_for_files, 
+    whisper_languages
 )
 
 def create_srt_tab():
@@ -29,24 +30,26 @@ def create_srt_tab():
             srt_content = gr.Textbox(
                 label=translations["srt_content"], 
                 value="", 
-                lines=9, 
-                max_lines=9, 
+                lines=11, 
+                max_lines=11, 
                 interactive=False
             )
         with gr.Column():
-            word_timestamps = gr.Checkbox(
-                label=translations["word_timestamps"], 
-                info=translations["word_timestamps_info"], 
-                value=False, 
-                interactive=True
-            )
-            model_size = gr.Radio(
-                label=translations["model_size"], 
-                info=translations["model_size_info"], 
-                choices=whisper_model, 
-                value=whisper_model[0], 
-                interactive=True
-            )
+            with gr.Group():
+                language = gr.Dropdown(
+                    label=translations["whisper_languages"],
+                    value="vi",
+                    choices=whisper_languages,
+                    info=translations["whisper_languages_info"],
+                    interactive=True
+                )
+                model_size = gr.Radio(
+                    label=translations["model_size"], 
+                    info=translations["model_size_info"], 
+                    choices=whisper_model, 
+                    value=whisper_model[0], 
+                    interactive=True
+                )
     with gr.Row():
         convert_button = gr.Button(
             translations["convert_audio"], 
@@ -67,7 +70,7 @@ def create_srt_tab():
                     interactive=True
                 )
                 output_file = gr.Textbox(
-                    label=translations["srt_output_file"], 
+                    label=translations["srt_path_output_file"], 
                     value="srt/output.srt", 
                     placeholder="srt/output.srt", 
                     interactive=True
@@ -132,7 +135,7 @@ def create_srt_tab():
                 model_size, 
                 input_audio, 
                 output_file, 
-                word_timestamps
+                language
             ],
             outputs=[
                 output_srt,

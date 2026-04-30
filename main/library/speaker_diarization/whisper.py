@@ -380,7 +380,6 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
             end, 
             probability
         ) 
-
         for word, tokens, start, end, probability in zip(
             words, 
             word_tokens, 

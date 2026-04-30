@@ -10,10 +10,13 @@ COPY . .
 
 RUN python3 -m venv /app/.venv && \
     . /app/.venv/bin/activate && \
+    python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()" && \
     pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir six packaging python-dateutil platformdirs pywin32 && \
-    pip install --no-cache-dir torch==2.7.0 torchvision torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128 && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir six packaging python-dateutil platformdirs wget && \
+    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 && \
+    pip install --no-cache-dir onnxruntime-gpu && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir faiss-cpu==1.13.2
 
 VOLUME [ "/app/assets" ]
 ENV PATH="/app/.venv/bin:$PATH"

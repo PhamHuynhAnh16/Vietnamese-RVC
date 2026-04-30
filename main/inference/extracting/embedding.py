@@ -132,8 +132,8 @@ def create_mute_file(version, embedder_model, embedders_mode, is_half):
 
     process_file_embedding(
         [(
-            os.path.join("assets", "logs", "mute", "sliced_audios_16k", "mute.wav"), 
-            os.path.join("assets", "logs", "mute", f"{version}_extracted", f"mute_{embedder_model}.npy")
+            os.path.join(config.configs["logs_path"], "mute", "sliced_audios_16k", "mute.wav"), 
+            os.path.join(config.configs["logs_path"], "mute", f"{version}_extracted", f"mute_{embedder_model}.npy")
         )], 
         embedder_model, 
         embedders_mode, 

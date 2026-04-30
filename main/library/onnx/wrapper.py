@@ -95,4 +95,4 @@ class ONNXRVC:
             )
         )
 
-        return torch.as_tensor(output, device=self.device)
+        return [torch.from_numpy(output[0]).to(self.device)]

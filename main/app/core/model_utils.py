@@ -258,15 +258,14 @@ def model_info(model_path):
     gr_info(translations["read_info"])
 
     epochs = model_data.get("epoch", None)
-    if epochs is None: 
+    if not epochs: 
         epochs = model_data.get("info", None)
 
         try:
-            epoch = epochs.replace("epoch", "").replace("e", "").isdigit()
-            if epoch and epochs is None: 
-                epochs = translations["not_found"].format(name=translations["epoch"])
+            epochs = int(epochs.split("e")[0].isdigit())
+            if not epochs: epochs = translations["not_found"].format(name=translations["epoch"])
         except: 
-            pass
+            epochs = translations["not_found"].format(name=translations["epoch"])
 
     steps = model_data.get("step", translations["not_found"].format(name=translations["step"]))
     sr = model_data.get("sr", translations["not_found"].format(name=translations["sr"]))
@@ -280,18 +279,23 @@ def model_info(model_path):
     model_author = model_data.get("author", translations["not_author"])
     vocoder = model_data.get("vocoder", "Default")
     rms_extract = model_data.get("energy", False)
+    speakers_id = model_data.get("speakers_id", 1)
+    architecture = model_data.get("architecture", "RVC")
 
     gr_info(translations["success"])
 
     return translations["model_info"].format(
         model_name=model_name, 
         model_author=model_author, 
-        epochs=epochs, steps=steps, 
+        epochs=epochs, 
+        steps=steps, 
         version=version, 
         sr=sr, 
         pitch_guidance=pitch_guidance, 
         model_hash=model_hash, 
         creation_date_str=creation_date_str, 
         vocoder=vocoder, 
-        rms_extract=rms_extract
+        rms_extract=rms_extract,
+        speakers_id=speakers_id,
+        architecture=architecture
     )

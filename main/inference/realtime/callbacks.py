@@ -12,7 +12,7 @@ from main.inference.realtime.realtime import VoiceChanger, RVC_Realtime
 
 class AudioCallbacks:
     def emit_to(self, performance, volume):
-        self.latency = performance[1]
+        self.latency = performance
         self.volume = volume
     
     def __init__(
@@ -61,6 +61,8 @@ class AudioCallbacks:
         embedders_mix_ratio = 0.5,
         **kwargs
     ):
+        self.latency = 0
+        self.volume = 0
         self.pass_through = pass_through
         self.input_sample_rate = input_sample_rate
         self.output_sample_rate = output_sample_rate
@@ -69,6 +71,7 @@ class AudioCallbacks:
             read_chunk_size, 
             cross_fade_overlap_size, 
             input_sample_rate, 
+            output_sample_rate,
             extra_convert_size
         )
         self.audio = Audio(

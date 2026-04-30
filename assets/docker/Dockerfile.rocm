@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 EXPOSE 7860
 
@@ -10,12 +10,13 @@ COPY . .
 
 RUN python3 -m venv /app/.venv && \
     . /app/.venv/bin/activate && \
+    python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()" && \
     pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir six packaging python-dateutil platformdirs pywin32 && \
-    pip install --no-cache-dir torch==2.4.1 torchaudio==2.4.1 torchvision && \
-    pip install --no-cache-dir torch-directml==0.2.5.dev240914 && \
-    pip install --no-cache-dir onnxruntime-directml && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm7.2 && \
+    pip install --no-cache-dir onnxruntime-rocm && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir faiss-cpu==1.13.2
 
 VOLUME [ "/app/assets" ]
 ENV PATH="/app/.venv/bin:$PATH"

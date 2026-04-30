@@ -52,7 +52,7 @@ def convert_onnx_model_tab():
     with gr.Row():
         output_model_file = gr.File(
             label=translations["output_model_path"], 
-            file_types=[".pth", ".onnx"], 
+            file_types=[".onnx"], 
             interactive=False, 
             visible=False
         )

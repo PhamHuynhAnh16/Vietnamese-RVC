@@ -40,11 +40,11 @@ def fushion_tab():
         with gr.Row():
             upload_model_1 = gr.File(
                 label=f"{translations['model_name']} 1", 
-                file_types=[".pth", ".onnx"]
+                file_types=[".pth"]
             ) 
             upload_model_2 = gr.File(
                 label=f"{translations['model_name']} 2", 
-                file_types=[".pth", ".onnx"]
+                file_types=[".pth"]
             )
         with gr.Row():
             model_path_1 = gr.Dropdown(

@@ -93,7 +93,7 @@ def convert(
 def convert_audio(
     clean_audio, 
     autotune, 
-    use_audio, 
+    use_separate_audio, 
     use_original, 
     convert_backing, 
     not_merge_backing, 
@@ -105,8 +105,8 @@ def convert_audio(
     index_rate, 
     input_path, 
     output_path, 
-    format, 
-    method, 
+    export_format, 
+    f0_method, 
     hybrid_method, 
     hop_length, 
     embedders, 
@@ -141,7 +141,7 @@ def convert_audio(
     return_none[5] = {"visible": True, "__type__": "update"}
 
     if (
-        not use_audio and (
+        not use_separate_audio and (
             merge_instrument or 
             not_merge_backing or 
             convert_backing or 
@@ -169,11 +169,11 @@ def convert_audio(
         return return_none
 
     f0method, embedder_model = (
-        method if method != "hybrid" else hybrid_method, 
+        f0_method if f0_method != "hybrid" else hybrid_method, 
         embedders if embedders != "custom" else custom_embedders
     )
 
-    if use_audio:
+    if use_separate_audio:
         output_audio = os.path.join(configs["audios_path"], input_audio_name)
 
         from main.library.utils import pydub_load
@@ -184,10 +184,10 @@ def convert_audio(
             if not matching_files: return translations["notfound"]   
             return os.path.join(output_audio, matching_files[0])
 
-        output_path = os.path.join(output_audio, f"Convert_Vocals.{format}")
-        output_backing = os.path.join(output_audio, f"Convert_Backing.{format}")
-        output_merge_backup = os.path.join(output_audio, f"Vocals+Backing.{format}")
-        output_merge_instrument = os.path.join(output_audio, f"Vocals+Instruments.{format}")
+        output_path = os.path.join(output_audio, f"Convert_Vocals.{export_format}")
+        output_backing = os.path.join(output_audio, f"Convert_Backing.{export_format}")
+        output_merge_backup = os.path.join(output_audio, f"Vocals+Backing.{export_format}")
+        output_merge_instrument = os.path.join(output_audio, f"Vocals+Instruments.{export_format}")
 
         if os.path.exists(output_audio): os.makedirs(output_audio, exist_ok=True)
         output_path = process_output(output_path)
@@ -240,7 +240,7 @@ def convert_audio(
             autotune, 
             clean_audio, 
             clean_strength, 
-            format, 
+            export_format, 
             embedder_model, 
             resample_sr, 
             split_audio, 
@@ -284,7 +284,7 @@ def convert_audio(
                 autotune, 
                 clean_audio, 
                 clean_strength, 
-                format, 
+                export_format, 
                 embedder_model, 
                 resample_sr, 
                 split_audio, 
@@ -331,7 +331,7 @@ def convert_audio(
                     )
                 ).export(
                     output_merge_backup, 
-                    format=format
+                    format=export_format
                 )
 
                 gr_info(translations["merge_success"])
@@ -362,7 +362,7 @@ def convert_audio(
                         )
                     ).export(
                         output_merge_instrument, 
-                        format=format
+                        format=export_format
                     )
                 
                 gr_info(translations["merge_success"])
@@ -386,7 +386,7 @@ def convert_audio(
             gr_warning(translations["output_not_valid"])
             return return_none
         
-        output_path = replace_export_format(output_path, format)
+        output_path = replace_export_format(output_path, export_format)
 
         if os.path.isdir(input_path):
             gr_info(translations["is_folder"])
@@ -416,7 +416,7 @@ def convert_audio(
                 autotune, 
                 clean_audio, 
                 clean_strength, 
-                format, 
+                export_format, 
                 embedder_model, 
                 resample_sr, 
                 split_audio, 
@@ -465,7 +465,7 @@ def convert_audio(
                 autotune, 
                 clean_audio, 
                 clean_strength, 
-                format, 
+                export_format, 
                 embedder_model, 
                 resample_sr, 
                 split_audio, 
@@ -496,7 +496,7 @@ def convert_audio(
 def convert_selection(
     clean_audio,
     autotune,
-    use_audio,
+    use_separate_audio,
     use_original,
     convert_backing,
     not_merge_backing,
@@ -508,8 +508,8 @@ def convert_selection(
     index_rate,
     input_path,
     output_path,
-    format,
-    method,
+    export_format,
+    f0_method,
     hybrid_method,
     hop_length,
     embedders,
@@ -537,7 +537,7 @@ def convert_selection(
     embedders_mix_ratio = 0.5,
     noise_scale = 0.35
 ):
-    if use_audio:
+    if use_separate_audio:
         gr_info(translations["search_separate"])
         choice = [
             f for f in os.listdir(configs["audios_path"]) 
@@ -583,7 +583,7 @@ def convert_selection(
             convert_output = convert_audio(
                 clean_audio, 
                 autotune, 
-                use_audio, 
+                use_separate_audio, 
                 use_original, 
                 convert_backing, 
                 not_merge_backing, 
@@ -595,8 +595,8 @@ def convert_selection(
                 index_rate, 
                 None, 
                 None, 
-                format, 
-                method, 
+                export_format, 
+                f0_method, 
                 hybrid_method, 
                 hop_length, 
                 embedders, 
@@ -675,7 +675,7 @@ def convert_selection(
         main_convert = convert_audio(
             clean_audio, 
             autotune, 
-            use_audio, 
+            use_separate_audio, 
             use_original, 
             convert_backing, 
             not_merge_backing, 
@@ -687,8 +687,8 @@ def convert_selection(
             index_rate, 
             input_path, 
             output_path, 
-            format, 
-            method, 
+            export_format, 
+            f0_method, 
             hybrid_method, 
             hop_length, 
             embedders, 
@@ -741,36 +741,8 @@ def convert_selection(
             }
         ]
 
-def whisper_process(
-    model_size, 
-    input_audio, 
-    configs, 
-    device, 
-    out_queue, 
-    word_timestamps=True
-):
-    from main.library.speaker_diarization.whisper import load_model
-
-    try:
-        segments = load_model(
-            model_size, 
-            device=device
-        ).transcribe(
-            input_audio, 
-            fp16=configs.get("fp16", False), 
-            word_timestamps=word_timestamps
-        )
-
-        out_queue.put(segments["segments"])
-    except Exception as e:
-        out_queue.put(e)
-    finally:
-        del segments
-        gc.collect()
-
-def convert_with_whisper(
+def convert_with_vad(
     num_spk, 
-    model_size, 
     cleaner, 
     clean_strength, 
     autotune, 
@@ -788,7 +760,7 @@ def convert_with_whisper(
     input_audio, 
     output_audio, 
     predictor_onnx, 
-    method, 
+    f0_method, 
     hybrid_method, 
     hop_length, 
     embed_mode, 
@@ -813,10 +785,11 @@ def convert_with_whisper(
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5,
     noise_scale_1 = 0.35,
-    noise_scale_2 = 0.35
+    noise_scale_2 = 0.35,
+    vad_sensitivity = 3,
+    vad_frame_ms = 30
 ):
     import librosa
-    import multiprocessing as mp
 
     from pydub import AudioSegment
     from sklearn.cluster import AgglomerativeClustering
@@ -826,8 +799,9 @@ def convert_with_whisper(
     from main.library.speaker_diarization.segment import Segment
     from main.library.utils import check_spk_diarization, pydub_load
     from main.library.speaker_diarization.embedding import SpeechBrainPretrainedSpeakerEmbedding
+    from main.inference.realtime.vad_utils import VADProcessor
     
-    check_spk_diarization(model_size)
+    check_spk_diarization(model_size=None)
     model_pth_1, model_pth_2 = (
         os.path.join(configs["weights_path"], model_1) if not os.path.exists(model_1) else model_1, 
         os.path.join(configs["weights_path"], model_2) if not os.path.exists(model_2) else model_2
@@ -859,61 +833,82 @@ def convert_with_whisper(
         return None
     
     output_audio = process_output(output_audio)
-    gr_info(translations["start_whisper"])
+    gr_info(translations["start_vad"])
     
     try:
-        try:
-            mp.set_start_method("spawn")
-        except:
-            pass
+        y, sr = librosa.load(input_audio, sr=48000)
 
-        whisper_queue = mp.Queue()
-        whisperprocess = mp.Process(
-            target=whisper_process, 
-            args=(
-                model_size, 
-                input_audio, 
-                configs, 
-                config.device, 
-                whisper_queue, 
-                True
-            )
-        )
+        vad_processor = VADProcessor(sensitivity_mode=vad_sensitivity, frame_duration_ms=vad_frame_ms, sample_rate=sr)
+        segments = vad_processor.get_speech(librosa.util.normalize(y))
 
-        whisperprocess.start()
-        segments = whisper_queue.get()
+        if not segments:
+            gr_warning(translations["speech_not_in_segments"])
+            return None
+        
         audio = Audio()
 
         embedding_model = SpeechBrainPretrainedSpeakerEmbedding(
             embedding=os.path.join(configs["speaker_diarization_path"], "models", "speechbrain"), 
             device=config.device
         )
-
-        y, sr = librosa.load(input_audio, sr=None)  
-        duration = len(y) / sr
             
         def segment_embedding(segment):
             waveform, _ = audio.crop(
                 input_audio, 
                 Segment(
                     segment["start"], 
-                    min(duration, segment["end"])
+                    segment["end"]
                 )
             )
 
             return embedding_model(
                 waveform.mean(dim=0, keepdim=True)[None] if waveform.shape[0] == 2 else waveform[None]
             )  
-        
-        def time(secs):
-            return datetime.timedelta(seconds=round(secs))
+
+        def get_formatted_stats(merged_segments):
+            rows, lines = [], []
+            speaker_stats = {}
+            headers = translations["headers"].split(" ")
+
+            for seg in merged_segments:
+                spk = seg["speaker"]
+                start_t = seg["start"]
+                end_t = seg["end"]
+                dur = end_t - start_t
+
+                time_range = f"{str(datetime.timedelta(seconds=int(start_t)))} -> {str(datetime.timedelta(seconds=int(end_t)))}"
+                dur_str = f"{dur:.2f}s"
+
+                rows.append([spk, time_range, dur_str])
+                speaker_stats[spk] = speaker_stats.get(spk, 0.0) + dur
+            col_widths = []
+            for i in range(3):
+                max_len = max(len(headers[i].replace("-", " ")), *(len(row[i]) for row in rows))
+                col_widths.append(max_len)
+
+            def make_line(left, mid, right):
+                return left + mid.join("─" * (w + 2) for w in col_widths) + right
+
+            def format_row(row):
+                return "│ " + " │ ".join(f"{cell:<{col_widths[i]}}" for i, cell in enumerate(row)) + " │"
+            
+            lines.append("\n")
+            lines.append(make_line("┌", "┬", "┐"))
+            lines.append(format_row(headers))
+            lines.append(make_line("├", "┼", "┤"))
+
+            for row in rows:
+                lines.append(format_row(row))
+
+            lines.append(make_line("└", "┴", "┘"))
+            return "\n".join(lines)
         
         def merge_audio(
             files_list, 
             time_stamps, 
             original_file_path, 
             output_path, 
-            format
+            export_format
         ):
             def extract_number(filename):
                 match = re.search(r'_(\d+)', filename)
@@ -937,7 +932,7 @@ def convert_with_whisper(
                     duration=total_duration - current_position
                 )
 
-            combined.export(output_path, format=format)
+            combined.export(output_path, format=export_format)
             return output_path
 
         embeddings = np.zeros(shape=(len(segments), 192))
@@ -946,57 +941,30 @@ def convert_with_whisper(
 
         labels = AgglomerativeClustering(num_spk).fit(np.nan_to_num(embeddings)).labels_
         for i in range(len(segments)):
-            segments[i]["speaker"] = 'SPEAKER ' + str(labels[i] + 1)
+            segments[i]["speaker"] = f"SPEAKER {labels[i] + 1}"
+        
+        merged_segments = []
 
-        merged_segments, current_text = [], []
-        current_speaker, current_start = None, None
+        if segments:
+            curr = segments[0].copy()
 
-        for i, segment in enumerate(segments):
-            speaker = segment["speaker"]
-            start_time = segment["start"]
-            text = segment["text"][1:]  
+            for i in range(1, len(segments)):
+                if segments[i]["speaker"] == curr["speaker"]: curr["end"] = segments[i]["end"]
+                else:
+                    merged_segments.append(curr)
+                    curr = segments[i].copy()
 
-            if speaker == current_speaker:
-                current_text.append(text)
-                end_time = segment["end"]
-            else:
-                if current_speaker is not None: 
-                    merged_segments.append({
-                        "speaker": current_speaker, 
-                        "start": current_start, 
-                        "end": end_time, 
-                        "text": " ".join(current_text)
-                    })
-                
-                current_speaker = speaker
-                current_start = start_time
-                current_text = [text]
-                end_time = segment["end"]
+            merged_segments.append(curr)
 
-        if current_speaker is not None: 
-            merged_segments.append({
-                "speaker": current_speaker, 
-                "start": current_start, 
-                "end": end_time, 
-                "text": " ".join(current_text)
-            })
-
-        gr_info(translations["whisper_done"])
-
-        x = ""
-        for segment in merged_segments:
-            x += f"\n{segment['speaker']} {str(time(segment['start']))} - {str(time(segment['end']))}\n"
-            x += segment["text"] + "\n"
-
-        logger.info(x)
-
+        gr_info(translations["analysis_completed"].format(length=len(merged_segments)))
+        
         del audio, embedding_model, segments, labels
         clear_gpu_cache()
         gc.collect()
 
         gr_info(translations["process_audio"])
 
-        audio = pydub_load(input_audio)
+        pydub_audio = pydub_load(input_audio)
         output_folder = "audios_temp"
 
         if os.path.exists(output_folder): shutil.rmtree(output_folder, ignore_errors=True)
@@ -1009,34 +977,20 @@ def convert_with_whisper(
             os.makedirs(f, exist_ok=True)
 
         time_stamps, processed_segments = [], []
-        for i, segment in enumerate(merged_segments):
-            start_ms = int(segment["start"] * 1000) 
-            end_ms = int(segment["end"] * 1000)
+        for i, seg in enumerate(merged_segments):
+            model_id = 1 if int(seg["speaker"].split()[-1]) % 2 != 0 else 2
+            start_ms, end_ms = int(seg["start"] * 1000), int(seg["end"] * 1000)
 
-            index = i + 1
+            target_path = os.path.join(output_folder, str(model_id), f"segment_{i+1}.wav")
+            pydub_audio[start_ms:end_ms].export(target_path, format="wav")
+            
+            processed_segments.append(os.path.join(output_folder, str(model_id), f"segment_{i+1}_output.wav"))
+            time_stamps.append((start_ms, end_ms))
 
-            segment_filename = os.path.join(
-                output_folder, 
-                "1" if i % 2 == 1 else "2", 
-                f"segment_{index}.wav"
-            )
-
-            audio[start_ms:end_ms].export(segment_filename, format="wav")
-
-            processed_segments.append(
-                os.path.join(
-                    output_folder, 
-                    "1" if i % 2 == 1 else "2", 
-                    f"segment_{index}_output.wav"
-                )
-            )
-
-            time_stamps.append(
-                (start_ms, end_ms)
-            )
+        logger.info(get_formatted_stats(merged_segments))
 
         f0method, embedder_model = (
-            method if method != "hybrid" else hybrid_method, 
+            f0_method if f0_method != "hybrid" else hybrid_method, 
             embedders if embedders != "custom" else custom_embedders
         )
 
@@ -1059,7 +1013,7 @@ def convert_with_whisper(
             clean_strength, 
             "wav", 
             embedder_model, 
-            resample_sr, 
+            48000 if resample_sr == 0 else resample_sr, 
             False, 
             f0_autotune_strength, 
             checkpointing, 
@@ -1097,7 +1051,7 @@ def convert_with_whisper(
             clean_strength, 
             "wav", 
             embedder_model, 
-            resample_sr, 
+            48000 if resample_sr == 0 else resample_sr, 
             False, 
             f0_autotune_strength, 
             checkpointing, 
@@ -1148,7 +1102,7 @@ def convert_tts(
     index_rate, 
     input_path, 
     output_path, 
-    format, 
+    export_format, 
     method, 
     hybrid_method, 
     hop_length, 
@@ -1208,8 +1162,8 @@ def convert_tts(
         gr_warning(translations["output_not_valid"])
         return None
     
-    output_path = replace_export_format(output_path, format)
-    if os.path.isdir(output_path): output_path = os.path.join(output_path, f"tts.{format}")
+    output_path = replace_export_format(output_path, export_format)
+    if os.path.isdir(output_path): output_path = os.path.join(output_path, f"tts.{export_format}")
 
     output_dir = os.path.dirname(output_path)
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
@@ -1238,7 +1192,7 @@ def convert_tts(
         autotune, 
         clean_audio, 
         clean_strength, 
-        format, 
+        export_format, 
         embedder_model, 
         resample_sr, 
         split_audio, 

@@ -159,7 +159,7 @@ class MDXSeparator(CommonSeparator):
                 pad_size = (i + chunk_size) - end
                 mix_part_ = np.concatenate((mix_part_, np.zeros((2, pad_size), dtype=np.float32)), axis=-1)
 
-            mix_waves = torch.tensor([mix_part_], dtype=torch.float32).to(self.torch_device).split(self.batch_size)
+            mix_waves = torch.from_numpy(np.array([mix_part_])).float().to(self.torch_device).split(self.batch_size)
 
             with torch.no_grad():
                 batches_processed = 0
@@ -175,7 +175,7 @@ class MDXSeparator(CommonSeparator):
 
                     result[..., start:end] += tar_waves[..., : end - start]
 
-        tar_waves = result / divider
+        tar_waves = result / (divider + 1e-8)
         tar_waves_.append(tar_waves)
         tar_waves = np.concatenate(np.vstack(tar_waves_)[:, :, self.trim : -self.trim], axis=-1)[:, : mix.shape[-1]]
 
@@ -196,7 +196,7 @@ class MDXSeparator(CommonSeparator):
             else:
                 spec_pred = self.model_run(spek)
 
-        result = self.stft.inverse(torch.tensor(spec_pred).to(self.torch_device)).cpu().detach().numpy()
+        result = self.stft.inverse((torch.from_numpy(spec_pred) if spec_pred.dtype == np.float32 else spec_pred).to(self.torch_device)).cpu().detach().numpy()
         return result
 
 class STFT:
@@ -208,20 +208,20 @@ class STFT:
         self.hann_window = torch.hann_window(window_length=self.n_fft, periodic=True)
 
     def __call__(self, input_tensor):
-        is_non_standard_device = not input_tensor.device.type in ["cuda", "cpu"]
+        is_non_standard_device = not input_tensor.device.type in ["cuda", "xpu", "cpu"]
         if is_non_standard_device: input_tensor = input_tensor.cpu()
 
         batch_dimensions = input_tensor.shape[:-2]
         channel_dim, time_dim = input_tensor.shape[-2:]
 
-        permuted_stft_output = torch.stft(
+        permuted_stft_output = torch.view_as_real(torch.stft(
             input_tensor.reshape([-1, time_dim]), 
             n_fft=self.n_fft, 
             hop_length=self.hop_length, 
             window=self.hann_window.to(input_tensor.device), 
             center=True, 
-            return_complex=False
-        ).permute([0, 3, 1, 2])
+            return_complex=True
+        )).permute([0, 3, 1, 2])
 
         final_output = permuted_stft_output.reshape([*batch_dimensions, channel_dim, 2, -1, permuted_stft_output.shape[-1]]).reshape([*batch_dimensions, channel_dim * 2, -1, permuted_stft_output.shape[-1]])
 
@@ -242,7 +242,7 @@ class STFT:
         return permuted_tensor[..., 0] + permuted_tensor[..., 1] * 1.0j
 
     def inverse(self, input_tensor):
-        is_non_standard_device = not input_tensor.device.type in ["cuda", "cpu"]
+        is_non_standard_device = not input_tensor.device.type in ["cuda", "xpu", "cpu"]
         if is_non_standard_device: input_tensor = input_tensor.cpu()
 
         batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins = self.calculate_inverse_dimensions(input_tensor)

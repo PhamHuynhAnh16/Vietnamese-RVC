@@ -12,8 +12,8 @@ sys.path.append(os.getcwd())
 
 from main.app.variables import config
 from main.library.utils import clear_gpu_cache
-from main.library.uvr5_lib import spec_utils, common_separator
-from main.library.uvr5_lib.demucs import hdemucs, states, apply
+from main.library.uvr5_lib import common_separator
+from main.library.uvr5_lib.demucs import states, apply
 
 if not config.debug_mode: warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.join(os.getcwd(), "main", "library", "uvr5_lib"))
@@ -33,45 +33,18 @@ class DemucsSeparator(common_separator.CommonSeparator):
         self.overlap = arch_config.get("overlap", 0.25)
         self.segments_enabled = arch_config.get("segments_enabled", True)
         self.demucs_source_map = DEMUCS_4_SOURCE_MAPPER
-        self.audio_file_path = None
-        self.audio_file_base = None
-        self.demucs_model_instance = None
         if config.configs.get("demucs_cpu_mode", False): self.torch_device = torch.device("cpu")
+        self.demucs_model_instance = get_demucs_model(name=os.path.splitext(os.path.basename(self.model_path))[0], repo=os.path.dirname(self.model_path))
+        self.demucs_model_instance = apply.demucs_segments(self.segment_size, self.demucs_model_instance).to(self.torch_device).eval()
+
+    def cleanup(self):
+        del self.demucs_model_instance
+        self.demucs_model_instance = None
+        clear_gpu_cache()
 
     def separate(self, audio_file_path):
-        source = None
-        inst_source = {}
-        self.audio_file_path = audio_file_path
-        self.audio_file_base = os.path.splitext(os.path.basename(audio_file_path))[0]
-        mix = self.prepare_mix(self.audio_file_path)
-        self.demucs_model_instance = hdemucs.HDemucs(sources=["drums", "bass", "other", "vocals"])
-        self.demucs_model_instance = get_demucs_model(name=os.path.splitext(os.path.basename(self.model_path))[0], repo=os.path.dirname(self.model_path))
-        self.demucs_model_instance = apply.demucs_segments(self.segment_size, self.demucs_model_instance)
-        self.demucs_model_instance.to(self.torch_device)
-        self.demucs_model_instance.eval()
-        source = self.demix_demucs(mix)
-        del self.demucs_model_instance
-        clear_gpu_cache()
+        source = self.demix_demucs(audio_file_path)
         output_files = []
-
-        if isinstance(inst_source, np.ndarray):
-            inst_source[
-                self.demucs_source_map[
-                    common_separator.CommonSeparator.VOCAL_STEM
-                ]
-            ] = spec_utils.reshape_sources(
-                inst_source[
-                    self.demucs_source_map[
-                        common_separator.CommonSeparator.VOCAL_STEM
-                    ]
-                ], 
-                source[
-                    self.demucs_source_map[
-                        common_separator.CommonSeparator.VOCAL_STEM
-                    ]
-                ]
-            )
-            source = inst_source
 
         if isinstance(source, np.ndarray):
             source_length = len(source)
@@ -94,26 +67,28 @@ class DemucsSeparator(common_separator.CommonSeparator):
 
         for stem_name, stem_value in self.demucs_source_map.items():
             if self.output_single_stem is not None:
-                if stem_name.lower() != self.output_single_stem.lower():
-                    continue
+                if stem_name.lower() != self.output_single_stem.lower(): continue
 
             stem_path = os.path.join(
-                f"{self.audio_file_base}_({stem_name})_{self.model_name}.{self.output_format.lower()}"
+                f"{os.path.splitext(os.path.basename(audio_file_path))[0]}_({stem_name})_{self.model_name}.{self.output_format.lower()}"
             )
 
             self.final_process(stem_path, source[stem_value].T, stem_name)
             output_files.append(stem_path)
 
+        self.cleanup()
         return output_files
 
-    def demix_demucs(self, mix):
+    def demix_demucs(self, audio_file_path):
         processed = {}
-        mix = torch.tensor(mix, dtype=torch.float32)
+
+        mix = torch.tensor(self.prepare_mix(audio_file_path), dtype=torch.float32)
         ref = mix.mean(0)
+
         mix = (mix - ref.mean()) / ref.std()
         mix_infer = mix
 
-        with torch.no_grad():
+        with torch.inference_mode():
             sources = apply.apply_model(
                 model=self.demucs_model_instance, 
                 mix=mix_infer[None], 

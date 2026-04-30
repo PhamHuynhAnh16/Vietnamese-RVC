@@ -1,5 +1,4 @@
 import os
-from re import L
 import sys
 
 import gradio as gr
@@ -9,11 +8,7 @@ sys.path.append(os.getcwd())
 from main.app.core.utils import stop_pid
 from main.app.core.ui import change_fp, run_commands
 
-from main.app.core.restart import (
-    change_font, 
-    change_theme, 
-    change_language 
-)
+from main.app.core.restart import restart
 
 from main.app.variables import (
     font, 
@@ -23,6 +18,25 @@ from main.app.variables import (
     language, 
     translations 
 )
+
+reload_js = """
+() => {
+    function Checking() {
+        fetch(window.location.origin)
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    setTimeout(Checking, 3000);
+                }
+            })
+            .catch(err => {
+                setTimeout(Checking, 3000);
+            });
+    }
+    setTimeout(Checking, 10000);
+}
+"""
 
 def settings_tab(app):
     with gr.Row():
@@ -42,11 +56,6 @@ def settings_tab(app):
                 choices=configs.get("support_language", "vi-VN"), 
                 value=language
             )
-            change_lang = gr.Button(
-                translations["change_lang"], 
-                variant="primary", 
-                scale=2
-            )
         with gr.Column():
             theme_dropdown = gr.Dropdown(
                 label=translations["theme"], 
@@ -56,25 +65,6 @@ def settings_tab(app):
                 value=theme, 
                 allow_custom_value=True
             )
-            changetheme = gr.Button(
-                translations["theme_button"], 
-                variant="primary", 
-                scale=2
-            )
-    with gr.Row():
-        with gr.Column():
-            fp_choice = gr.Radio(
-                choices=["fp16","fp32"], 
-                value="fp16" if configs.get("fp16", False) else "fp32", 
-                label=translations["precision"], 
-                info=translations["precision_info"], 
-                interactive=config.allow_is_half
-            )
-            fp_button = gr.Button(
-                translations["update_precision"], 
-                variant="secondary", 
-                scale=2
-            )
         with gr.Column():
             font_choice = gr.Textbox(
                 label=translations["font"], 
@@ -82,8 +72,35 @@ def settings_tab(app):
                 value=font, 
                 interactive=True
             )
-            font_button = gr.Button(
-                translations["change_font"]
+    with gr.Row():
+        restart_button = gr.Button(
+            translations["restart_button"]
+        )
+    with gr.Row():
+        with gr.Column():
+            with gr.Group():
+                with gr.Row():
+                    bf16_checkbox = gr.Checkbox(
+                        label=translations["bf16"], 
+                        value=False, 
+                        interactive=config.device.startswith(("cuda", "xpu")) and config.bf16_support
+                    )
+                    tf32_checkbox = gr.Checkbox(
+                        label=translations["tf32"],
+                        value=False, 
+                        interactive=config.device.startswith("cuda") and config.tf32_support
+                    )
+                fp_choice = gr.Radio(
+                    choices=["fp16","fp32"], 
+                    value="fp16" if configs.get("fp16", False) else "fp32", 
+                    label=translations["precision"], 
+                    info=translations["precision_info"], 
+                    interactive=config.allow_is_half
+                )
+            fp_button = gr.Button(
+                translations["update_precision"], 
+                variant="primary", 
+                scale=2
             )
     with gr.Row():
         commands = gr.Textbox(
@@ -132,8 +149,14 @@ def settings_tab(app):
         )
         fp_button.click(
             fn=change_fp, 
-            inputs=[fp_choice], 
-            outputs=[fp_choice]
+            inputs=[
+                fp_choice, 
+                bf16_checkbox,
+                tf32_checkbox
+            ], 
+            outputs=[
+                fp_choice
+            ]
         )
         run_commands_button.click(
             fn=run_commands,
@@ -143,37 +166,14 @@ def settings_tab(app):
             outputs=[]
         )
     with gr.Row():
-        change_lang.click(
-            fn=lambda a: change_language(a, app), 
-            inputs=[language_dropdown], 
+        restart_button.click(
+            fn=lambda lang, theme, font: restart(lang, theme, font, app), 
+            inputs=[language_dropdown, theme_dropdown, font_choice], 
             outputs=[]
         )
-        changetheme.click(
-            fn=lambda a: change_theme(a, app) , 
-            inputs=[theme_dropdown], 
-            outputs=[]
-        )
-        font_button.click(
-            fn=lambda a: change_font(a, app), 
-            inputs=[font_choice], 
-            outputs=[]
-        )
-    with gr.Row():
-        change_lang.click(
+        restart_button.click(
             fn=None, 
-            js="setTimeout(function() {location.reload()}, 30000)", 
-            inputs=[], 
-            outputs=[]
-        )
-        changetheme.click(
-            fn=None, 
-            js="setTimeout(function() {location.reload()}, 30000)", 
-            inputs=[], 
-            outputs=[]
-        )
-        font_button.click(
-            fn=None, 
-            js="setTimeout(function() {location.reload()}, 30000)", 
+            js=reload_js, 
             inputs=[],
             outputs=[]
         )

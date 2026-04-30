@@ -16,6 +16,16 @@ if not config.debug_mode: warnings.filterwarnings("ignore")
 
 FEATS_LENGTH = 200
 
+def autocast(model):
+    orig_forward = model.forward
+
+    def _forward(*args, **kwargs):
+        dtype = next(model.parameters()).dtype
+        return orig_forward(*[a.to(dtype) if isinstance(a, torch.Tensor) and a.dtype.is_floating_point else a for a in args], **kwargs)
+
+    model.forward = _forward
+    return model
+
 def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
     if not device.startswith("cuda") or (torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]")): device = "cpu"
 
@@ -76,6 +86,7 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
     net_g.load_state_dict(cpt["weight"], strict=False)
     net_g.eval().to(device).to(torch.float16 if is_half else torch.float32)
     net_g.remove_weight_norm()
+    if is_half: net_g = autocast(net_g)
 
     phone = torch.rand(1, FEATS_LENGTH, text_enc_hidden_dim).to(device)
     phone_length = torch.tensor([FEATS_LENGTH]).long().to(device)
@@ -83,24 +94,36 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
 
     args = [phone, phone_length]
     input_names = ["phone", "phone_lengths"]
-    dynamic_axes = {"phone": [1]}
+    dynamic_axes = {
+        "phone": {0: "B", 1: "T"},
+        "phone_lengths": {0: "B"},
+    }
 
     if f0:
         pitch = torch.randint(size=(1, FEATS_LENGTH), low=5, high=255).to(device)
-        pitchf = torch.rand(1, FEATS_LENGTH).to(device)
+        nsff0 = torch.rand(1, FEATS_LENGTH).to(device)
 
-        args += [pitch, pitchf]
-        input_names += ["pitch", "pitchf"]
-        dynamic_axes.update({"pitch": [1], "pitchf": [1]})
+        args += [pitch, nsff0]
+        input_names += ["pitch", "nsff0"]
+        dynamic_axes.update({
+            "pitch": {0: "B", 1: "T"},
+            "nsff0": {0: "B", 1: "T"},
+        })
     
     args += [sid]
+    input_names += ["sid"]
+    dynamic_axes.update({
+        "sid": {0: "B"}
+    })
 
     if energy_use:
         energy = torch.rand(1, FEATS_LENGTH).to(device)
         args.append(energy)
 
         input_names.append("energy")
-        dynamic_axes.update({"energy": [1]})
+        dynamic_axes.update({
+            "energy": {0: "B", 1: "T"},
+        })
 
     try:
         with io.BytesIO() as model:
@@ -113,7 +136,8 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
                 verbose=False, 
                 input_names=input_names, 
                 output_names=["audio"], 
-                dynamic_axes=dynamic_axes
+                dynamic_axes=dynamic_axes,
+                dynamo=False
             )
 
             model = onnxslim.slim(onnx.load_model_from_string(model.getvalue()))
@@ -140,10 +164,6 @@ def onnx_exporter(input_path, output_path, is_half=False, device="cpu"):
                     )
                 )
             )
-
-        if is_half:
-            import onnxconverter_common
-            model = onnxconverter_common.convert_float_to_float16(model, keep_io_types=True)
 
         onnx.save(model, output_path)
         return output_path

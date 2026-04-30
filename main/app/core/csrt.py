@@ -1,18 +1,54 @@
 import os
+import gc
 import sys
 
 sys.path.append(os.getcwd())
 
-from main.app.core.inference import whisper_process
 from main.library.utils import check_spk_diarization
 from main.app.core.ui import gr_info, gr_warning, process_output
 from main.app.variables import config, translations, configs, logger
+
+def whisper_process(
+    model_size, 
+    input_audio, 
+    configs, 
+    device, 
+    out_queue, 
+    language="vi"
+):
+    from main.library.speaker_diarization.whisper import load_model
+
+    try:
+        model = load_model(
+            model_size, 
+            device=device
+        )
+
+        if config.compile_all:
+            import torch
+
+            model.encoder = torch.compile(model.encoder, mode=config.compile_mode)
+            model.decoder = torch.compile(model.decoder, mode=config.compile_mode)
+        
+        segments = model.transcribe(
+            input_audio, 
+            fp16=configs.get("fp16", False), 
+            word_timestamps=True,
+            language=language
+        )
+
+        out_queue.put(segments["segments"])
+    except Exception as e:
+        out_queue.put(e)
+    finally:
+        del segments
+        gc.collect()
 
 def create_srt(
     model_size, 
     input_audio, 
     output_file, 
-    word_timestamps
+    language
 ):
     import multiprocessing as mp
 
@@ -49,7 +85,7 @@ def create_srt(
             configs, 
             config.device, 
             whisper_queue, 
-            word_timestamps
+            language
         )
     )
 

@@ -1,6 +1,5 @@
 import os
 import sys
-import torch
 import librosa
 
 import numpy as np
@@ -19,7 +18,11 @@ def normalize_rms(x, target=0.08):
     return x if r < 1e-6 else x * (target / r)
 
 def soft_limiter(x, th=0.98):
-    return np.tanh(x / th) * th
+    return np.where(
+        np.abs(x) < th,
+        x,
+        th * np.sign(x) + (x - th * np.sign(x)) / (1 + ((x - th) / (1 - th))**2)
+    )
 
 def preprocess(
     audio,
@@ -36,10 +39,13 @@ def preprocess(
 
 def spectral_denoise_np(
     audio,
-    n_fft=2048,
-    hop=480,
-    alpha=2.0
+    n_fft=4096,
+    hop=1024,
+    alpha=2.5
 ):
+    if hop is None:
+        hop = n_fft // 4
+
     stft = librosa.stft(
         audio,
         n_fft=n_fft,
@@ -50,17 +56,10 @@ def spectral_denoise_np(
     mag = np.abs(stft)
     phase = np.angle(stft)
 
-    energy = np.mean(mag, axis=0)
-    ref = np.median(energy)
-    silent = energy < 0.6 * ref
+    energy = np.mean(mag**2, axis=0)
+    silent = energy < np.percentile(energy, 30)
 
-    noise = (
-        np.mean(mag[:, silent], axis=1, keepdims=True)
-        if np.any(silent)
-        else np.mean(mag, axis=1, keepdims=True)
-    )
-
-    mask = mag / (mag + alpha * noise + 1e-9)
+    mask = (mag ** 2) / (mag ** 2 + alpha * ((np.median(mag[:, silent], axis=1, keepdims=True) if np.any(silent) else np.median(mag, axis=1, keepdims=True)) ** 2) + 1e-9)
     clean = mask * mag
 
     out = librosa.istft(
@@ -75,10 +74,12 @@ def output_eq(audio, sr):
     out = audio.copy()
 
     bands = [
-        (0,   80,  -6.0),
-        (80,  200, -2.0),
-        (200, 3500, 0.0),
-        (3500, 9000, +2.0),
+        (0,   60,  -8.0),
+        (60,  200, -3.0),
+        (200, 1000, 0.0),
+        (1000, 3500, +2.5),
+        (3500, 8000, +3.0),
+        (8000, 16000, +1.5)
     ]
 
     for low, high, g in bands:
@@ -98,7 +99,7 @@ def presence_exciter(audio, sr, strength=0.03):
     b, a = signal.butter(2, [4000 / (sr / 2), 9000 / (sr / 2)], "band")
     band = signal.filtfilt(b, a, audio)
 
-    exc = np.tanh(band * 3.0)
+    exc = np.sign(band) * (1 - np.exp(-np.abs(band) * 4.0))
     return audio + strength * exc
 
 def postprocess(

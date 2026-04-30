@@ -27,6 +27,8 @@ dataset
 assets/logs
 assets/models
 assets/weights
+assets/cache
+assets/.uv
 
 .vscode
 .gradio

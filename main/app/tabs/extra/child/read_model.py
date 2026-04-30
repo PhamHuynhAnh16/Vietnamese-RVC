@@ -26,13 +26,10 @@ def read_model_tab():
             label=translations["drop_model"], 
             file_types=[".pth", ".onnx"]
         ) 
-    with gr.Row():
-        read_button = gr.Button(
-            translations["readmodel"], 
-            variant="primary", 
-            scale=2
-        )
-    with gr.Column():
+    with gr.Accordion(
+        label=translations["model_name"], 
+        open=True
+    ):
         model_path = gr.Dropdown(
             label=translations["model_name"], 
             choices=model_name, 
@@ -44,6 +41,13 @@ def read_model_tab():
             refresh_model = gr.Button(
                 translations["refresh"]
             )
+    with gr.Row():
+        read_button = gr.Button(
+            translations["readmodel"], 
+            variant="primary", 
+            scale=2
+        )
+    with gr.Row():
         output_info = gr.Textbox(
             label=translations["modelinfo"], 
             value="", 

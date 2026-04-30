@@ -28,8 +28,8 @@ sys.path.append(os.getcwd())
 os.environ["USE_LIBUV"] = "0" if sys.platform == "win32" else "1"
 
 from main.library.utils import clear_gpu_cache
-from main.library.backends import directml, opencl
 from main.app.variables import logger, translations
+from main.library.backends import directml, opencl, xpu
 
 from main.library.algorithm import commons
 from main.inference.training import losses
@@ -171,8 +171,11 @@ experiment_dir = os.path.join(logs_path, model_name) if not os.path.exists(model
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
 
-torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith(("ocl", "privateuseone")) else False
-torch.backends.cudnn.benchmark = args.benchmark if not main_config.device.startswith(("ocl", "privateuseone")) else False
+torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
+torch.backends.cudnn.benchmark = args.benchmark if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
+
+torch.backends.cuda.matmul.allow_tf32 = main_config.tf32 if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
+torch.backends.cudnn.allow_tf32 = main_config.tf32 if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
 
 lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
 global_step, last_loss_gen_all, overtrain_save_epoch = 0, 0, 0
@@ -240,8 +243,15 @@ def main():
             logger.warning(translations["not_found_dataset"])
             sys.exit(1)
 
-        if torch.cuda.is_available() and main_config.device.startswith("cuda"):
+        if gpus == "-":
+            device, gpus = torch.device("cpu"), [0]
+            n_gpus = 1
+            logger.warning(translations["not_gpu"])   
+        elif torch.cuda.is_available() and main_config.device.startswith("cuda"):
             device, gpus = torch.device("cuda"), [int(item) for item in gpus.split("-")]
+            n_gpus = len(gpus)
+        elif hasattr(torch, "xpu") and torch.xpu.is_available() and main_config.device.startswith("xpu"):
+            device, gpus = torch.device("xpu"), [int(item) for item in gpus.split("-")]
             n_gpus = len(gpus)
         elif opencl.is_available() and main_config.device.startswith("ocl"):
             device, gpus = torch.device("ocl"), [int(item) for item in gpus.split("-")]
@@ -394,17 +404,19 @@ def run(
     smoothed_value_gen, smoothed_value_disc = 0, 0
 
     dist.init_process_group(
-        backend="gloo" if sys.platform == "win32" or device.type != "cuda" else "nccl", 
+        backend="gloo" if sys.platform == "win32" or device.type not in ["cuda", "xpu"] else ("xccl" if device.type == "xpu" else "nccl"), 
         init_method="env://", 
-        world_size=n_gpus if device.type == "cuda" else 1, 
-        rank=rank if device.type == "cuda" else 0
+        world_size=n_gpus if device.type in ["cuda", "xpu"] else 1, 
+        rank=rank if device.type in ["cuda", "xpu"] else 0
     )
 
     torch.manual_seed(config.train.seed)
     if device.type == "cuda": torch.cuda.manual_seed(config.train.seed)
+    elif device.type == "xpu": torch.xpu.manual_seed(config.train.seed)
     elif device.type == "ocl": opencl.pytorch_ocl.manual_seed_all(config.train.seed)
 
     if torch.cuda.is_available(): torch.cuda.set_device(device_id)
+    elif hasattr(torch, "xpu") and torch.xpu.is_available(): torch.xpu.set_device(device_id)
 
     writer_eval = SummaryWriter(
         log_dir=os.path.join(experiment_dir, "eval")
@@ -427,6 +439,7 @@ def run(
         num_workers=4, 
         shuffle=False, 
         pin_memory=True, 
+        batch_size=1 if architecture != "SVC" else batch_size,
         collate_fn=TextAudioCollate(
             pitch_guidance=pitch_guidance, 
             energy=energy_use
@@ -507,6 +520,9 @@ def run(
         net_g.cuda(device_id), 
         net_d.cuda(device_id)
     ) if torch.cuda.is_available() else (
+        net_g.xpu(device_id), 
+        net_d.xpu(device_id)
+    ) if hasattr(torch, "xpu") and torch.xpu.is_available() else (
         net_g.to(device), 
         net_d.to(device)
     )
@@ -549,7 +565,7 @@ def run(
 
     fn_mel_loss = MultiScaleMelSpectrogramLoss(sample_rate=config.data.sample_rate) if multiscale_mel_loss else torch.nn.L1Loss()
 
-    if not device.type.startswith(("privateuseone", "ocl")): 
+    if not device.type.startswith(("privateuseone", "ocl", "mps", "xpu")): 
         net_g, net_d = (
             DDP(net_g, device_ids=[device_id]), 
             DDP(net_d, device_ids=[device_id])
@@ -644,7 +660,8 @@ def run(
             )
         )
 
-    scaler = GradScaler(device=device, enabled=is_half and device.type == "cuda")
+    if device.type == "xpu" and is_half: xpu.setup_gradscaler()
+    scaler = GradScaler(device=device, enabled=is_half and device.type in ["cuda", "xpu"])
     cache = []
 
     if len(scaler_dict) > 0: scaler.load_state_dict(scaler_dict)
@@ -743,6 +760,19 @@ def train_and_evaluate(
                 )
         else: 
             shuffle(cache)
+    elif device.type == "xpu" and cache_data_in_gpu:
+        data_iterator = cache
+
+        if cache == []:
+            for batch_idx, info in enumerate(train_loader):
+                cache.append(
+                    (batch_idx, [
+                        tensor.xpu(device_id, non_blocking=True) 
+                        for tensor in info
+                    ])
+                )
+        else: 
+            shuffle(cache)
     elif device.type in ["privateuseone", "ocl"] and cache_data_in_gpu:
         data_iterator = cache
 
@@ -761,7 +791,7 @@ def train_and_evaluate(
 
     epoch_recorder = EpochRecorder()
 
-    autocast_enabled = is_half and device.type == "cuda"
+    autocast_enabled = is_half and device.type in ["cuda", "xpu"]
     autocast_dtype = (
         torch.float32 
         if not autocast_enabled else 
@@ -772,13 +802,18 @@ def train_and_evaluate(
         device.type, 
         enabled=autocast_enabled, 
         dtype=autocast_dtype
-    ) if not device.type.startswith("ocl") else nullcontext()
+    ) if not device.type.startswith(("ocl", "privateuseone")) else nullcontext()
     
     with tqdm(total=len(train_loader), leave=False) as pbar:
         for batch_idx, info in data_iterator:
             if device.type == "cuda" and not cache_data_in_gpu: 
                 info = [
                     tensor.cuda(device_id, non_blocking=True) 
+                    for tensor in info
+                ]  
+            if device.type == "xpu" and not cache_data_in_gpu: 
+                info = [
+                    tensor.xpu(device_id, non_blocking=True) 
                     for tensor in info
                 ]  
             elif device.type in ["privateuseone", "ocl"] and not cache_data_in_gpu: 

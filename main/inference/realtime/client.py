@@ -291,6 +291,7 @@ async def websocket_audio(ws: WebSocket):
                 read_chunk_size=read_chunk_size, 
                 cross_fade_overlap_size=params["cross_fade_overlap_size"], 
                 input_sample_rate=DEVICE_SAMPLE_RATE, 
+                output_sample_rate=DEVICE_SAMPLE_RATE, 
                 extra_convert_size=params["extra_convert_size"]
             )
 

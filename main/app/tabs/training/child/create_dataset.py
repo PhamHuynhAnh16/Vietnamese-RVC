@@ -415,6 +415,31 @@ def create_dataset_tab():
                 enable_post_process,
             ]
         )
+        enable_post_process.change(
+            fn=create_dataset_change,
+            inputs=[
+                model_name, 
+                reverb_model, 
+                enable_post_process, 
+                separate_reverb, 
+                enable_denoise
+            ],
+            outputs=[
+                reverb_model,
+                overlap, 
+                segments_size, 
+                hop_length, 
+                batch_size,
+                shifts, 
+                window_size, 
+                aggression, 
+                post_process_threshold,
+                denoise_model,
+                enable_tta, 
+                high_end_process, 
+                enable_post_process,
+            ]
+        )
     with gr.Row():
         skip_seconds.change(
             fn=lambda a: [

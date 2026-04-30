@@ -8,18 +8,6 @@ try:
 except IndexError:
     argv = None
 
-argv_is_allows = [
-    "--audio_effects", 
-    "--convert", 
-    "--create_dataset", 
-    "--create_index", 
-    "--extract", 
-    "--preprocess", 
-    "--separate_music", 
-    "--train", 
-    "--create_reference", 
-]
-
 argv_help_is_allows = [
     "--help_audio_effects", 
     "--help_convert", 
@@ -33,11 +21,23 @@ argv_help_is_allows = [
     "--help"
 ]
 
-if argv not in argv_is_allows:
-    print("Cú pháp không hợp lệ! Sử dụng --help để biết thêm")
-    quit()
+COMMANDS = {
+    "--audio_effects": "main.inference.audio_effects",
+    "--convert": "main.inference.conversion.convert",
+    "--create_dataset": "main.inference.create_dataset",
+    "--create_index": "main.inference.create_index",
+    "--extract": "main.inference.extracting.extract",
+    "--preprocess": "main.inference.preprocess.preprocess",
+    "--separate_music": "main.inference.separate_music",
+    "--train": "main.inference.training.train",
+    "--create_reference": "main.inference.create_reference",
+}
 
-if argv_help_is_allows[0] in argv:
+if argv is None or argv not in list(COMMANDS) and "--help" not in argv:
+    print("Cú pháp không hợp lệ! Sử dụng --help để biết thêm")
+    sys.exit()
+
+if argv_help_is_allows[0] == argv:
     print("""Các tham số của `--audio_effects`:
         1. Đường dẫn tệp:
             - `--input_path` (bắt buộc): Đường dẫn đến tệp âm thanh đầu vào.
@@ -48,23 +48,23 @@ if argv_help_is_allows[0] in argv:
             - `--resample` (mặc định: `False`): Có lấy mẫu lại hay không.
             - `--resample_sr` (mặc định: `0`): Tần số lấy mẫu mới (Hz).
 
-        3. Hiệu ứng chorus:
+        3. Chorus:
             - `--chorus`: Bật/tắt chorus.
             - `--chorus_depth`, `--chorus_rate`, `--chorus_mix`, `--chorus_delay`, `--chorus_feedback`: Các thông số điều chỉnh chorus.
 
-        4. Hiệu ứng distortion:
+        4. Distortion:
             - `--distortion`: Bật/tắt distortion.
             - `--drive_db`: Mức độ méo âm thanh.
 
-        5. Hiệu ứng reverb:
+        5. Reverb:
             - `--reverb`: Bật/tắt hồi âm.
             - `--reverb_room_size`, `--reverb_damping`, `--reverb_wet_level`, `--reverb_dry_level`, `--reverb_width`, `--reverb_freeze_mode`: Điều chỉnh hồi âm.
 
-        6. Hiệu ứng pitch shift:
+        6. Pitchshift:
             - `--pitchshift`: Bật/tắt thay đổi cao độ.
             - `--pitch_shift`: Giá trị dịch cao độ.
 
-        7. Hiệu ứng delay:
+        7. Delay:
             - `--delay`: Bật/tắt delay.
             - `--delay_seconds`, `--delay_feedback`, `--delay_mix`: Điều chỉnh thời gian trễ, phản hồi và hòa trộn.
 
@@ -106,8 +106,8 @@ if argv_help_is_allows[0] in argv:
             - `--main_volume`: Âm lượng của âm thanh chính.
             - `--combination_volume`:: Âm lượng của âm thanh cần kết hợp.
     """)
-    quit()
-elif argv_help_is_allows[1] in argv:
+    sys.exit()
+elif argv_help_is_allows[1] == argv:
     print("""Các tham số của --convert:
         1. Cấu hình xử lí giọng nói:
             - `--pitch` (mặc định: `0`): Điều chỉnh cao độ.
@@ -159,8 +159,8 @@ elif argv_help_is_allows[1] in argv:
             - `--formant_qfrency` (mặc định: `0.8`): Hệ số dịch formant theo tần số.
             - `--formant_timbre` (mặc định: `0.8`): Hệ số thay đổi màu sắc giọng.
     """)
-    quit()
-elif argv_help_is_allows[2] in argv:
+    sys.exit()
+elif argv_help_is_allows[2] == argv:
     print("""Các tham số của --create_dataset:
         1. Đường dẫn & cấu hình dataset:
             - `--input_data` (bắt buộc): Đường dẫn liên kết đến âm thanh (Liên kết Youtube, có thể dùng dấu `,` để dùng nhiều liên kết).
@@ -199,16 +199,16 @@ elif argv_help_is_allows[2] in argv:
             - `--skip_start_audios` (mặc định: `0`): Thời gian (giây) cần bỏ qua ở đầu audio.
             - `--skip_end_audios` (mặc định: `0`): Thời gian (giây) cần bỏ qua ở cuối audio.
     """)
-    quit()
-elif argv_help_is_allows[3] in argv:
+    sys.exit()
+elif argv_help_is_allows[3] == argv:
     print("""Các tham số của --create_index:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
             - `--rvc_version` (mặc định: `v2`): Phiên bản (`v1`, `v2`).
             - `--index_algorithm` (mặc định: `Auto`): Thuật toán index sử dụng (`Auto`, `Faiss`, `KMeans`).
     """)
-    quit()
-elif argv_help_is_allows[4] in argv:
+    sys.exit()
+elif argv_help_is_allows[4] == argv:
     print("""Các tham số của --extract:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -239,8 +239,8 @@ elif argv_help_is_allows[4] in argv:
         4. RMS:
             - `--rms_extract` (mặc định: False): Trích xuất thêm năng lượng rms.
     """)
-    quit()
-elif argv_help_is_allows[5] in argv:
+    sys.exit()
+elif argv_help_is_allows[5] == argv:
     print("""Các tham số của --preprocess:
         1. Thông tin mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -261,8 +261,8 @@ elif argv_help_is_allows[5] in argv:
             - `--overlap_len` (mặc định: `0.3`): Độ dài của phần chồng chéo giữa các lát cắt đối với phương pháp 'Simple'.
             - `--normalization_mode` (mặc định: `none`): Có xử lí chuẩn hóa âm thanh không (`none`, `pre`, `post`)
     """)
-    quit()
-elif argv_help_is_allows[6] in argv:
+    sys.exit()
+elif argv_help_is_allows[6] == argv:
     print("""Các tham số của --separate_music:
         1. Cấu hình đầu vào, đầu ra:
             - `--input_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
@@ -294,8 +294,8 @@ elif argv_help_is_allows[6] in argv:
             - `--separate_backing` (mặc định: `False`): Tách bè giọng.
             - `--separate_reverb` (mặc định: `False`): Tách vang giọng.
     """)
-    quit()
-elif argv_help_is_allows[7] in argv:
+    sys.exit()
+elif argv_help_is_allows[7] == argv:
     print("""Các tham số của --train:
         1. Cấu hình mô hình:
             - `--model_name` (bắt buộc): Tên mô hình.
@@ -342,8 +342,8 @@ elif argv_help_is_allows[7] in argv:
             - `--use_custom_reference` (mặc định: `False`): Có tùy chỉnh bộ tham chiếu hay không.
             - `--reference_path` (mặc định: `False`): Đường dẫn đến bộ tham chiếu.
     """)
-    quit()
-elif argv_help_is_allows[8] in argv:
+    sys.exit()
+elif argv_help_is_allows[8] == argv:
     print("""Các tham số của --create_reference:
         1. Đường dẫn tệp:
             - `--audio_path` (bắt buộc): Đường dẫn tệp âm thanh đầu vào.
@@ -373,8 +373,8 @@ elif argv_help_is_allows[8] in argv:
             - `--proposal_pitch_threshold` (mặc định: `0.0`): Ngưỡng tần số ước tính cao độ.
             - `--alpha` (mặc định: `0.5`): Ngưỡng trộn cao độ khi ước tính cao độ hybrid.
     """)
-    quit()
-elif argv_help_is_allows[9] in argv:
+    sys.exit()
+elif argv_help_is_allows[9] == argv:
     print("""Sử dụng:
         1. `--help_audio_effects`: Trợ giúp về phần thêm hiệu ứng âm thanh.
         2. `--help_convert`: Trợ giúp về chuyển đổi âm thanh.
@@ -386,22 +386,22 @@ elif argv_help_is_allows[9] in argv:
         8. `--help_train`: Trợ giúp về huấn luyện mô hình.
         9. `--help_create_reference`: Trợ giúp về tạo bộ tham chiếu.
     """)
-    quit()
+    sys.exit()
+elif argv in COMMANDS:
+    import importlib
 
-elif argv_is_allows[0] in argv: from main.inference.audio_effects import main
-elif argv_is_allows[1] in argv: from main.inference.conversion.convert import main
-elif argv_is_allows[2] in argv: from main.inference.create_dataset import main
-elif argv_is_allows[3] in argv: from main.inference.create_index import main
-elif argv_is_allows[4] in argv: from main.inference.extracting.extract import main
-elif argv_is_allows[5] in argv: from main.inference.preprocess.preprocess import main
-elif argv_is_allows[6] in argv: from main.inference.separate_music import main
-elif argv_is_allows[7] in argv: from main.inference.training.train import main
-elif argv_is_allows[8] in argv: from main.inference.create_reference import main
+    module = importlib.import_module(COMMANDS[argv])
+    main = module.main
+else:
+    main = lambda: print("Cú pháp không hợp lệ!"); sys.exit()
 
 if __name__ == "__main__":
     import torch.multiprocessing as mp
 
-    if "--train" in argv: mp.set_start_method("spawn")
-    if "--preprocess" in argv or "--extract" in argv: mp.set_start_method("spawn", force=True)
+    try:
+        if "--train" in argv: mp.set_start_method("spawn")
+        if "--preprocess" in argv or "--extract" in argv: mp.set_start_method("spawn", force=True)
+    except:
+        pass
 
     main()

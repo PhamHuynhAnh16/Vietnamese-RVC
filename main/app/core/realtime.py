@@ -4,13 +4,12 @@ import time
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations, configs, config
-from main.app.core.ui import gr_info, gr_warning, audio_device
+from main.app.core.ui import gr_info, gr_warning
+from main.app.variables import translations, configs, config, logger
 
 running, callbacks, audio_manager = False, None, None
 
 PIPELINE_SAMPLE_RATE = 16000
-DEVICE_SAMPLE_RATE = 48000
 
 interactive_true = {"interactive": True, "__type__": "update"}
 interactive_false = {"interactive": False, "__type__": "update"}
@@ -602,6 +601,9 @@ def realtime_start(
     input_asio_channels,
     output_asio_channels,
     monitor_asio_channels,
+    input_audio_sample_rate,
+    output_audio_sample_rate,
+    monitor_audio_sample_rate,
     chunk_size,
     pitch,
     model_pth,
@@ -673,7 +675,7 @@ def realtime_start(
     phaser_depth,
     phaser_centre_frequency_hz,
     phaser_feedback,
-    phaser_mix,
+    phaser_mix
 ):
     global running, callbacks, audio_manager, callbacks_kwargs
     running = True
@@ -723,17 +725,28 @@ def realtime_start(
             interactive_false
         )
         return
+    
+    input_is_asio = "ASIO" in input_audio_device
+    output_is_asio = "ASIO" in output_audio_device
+    monitor_is_asio = "ASIO" in monitor_output_device
 
-    input_devices, output_devices = audio_device()
-    input_device_id = input_devices[input_audio_device][0]
-    output_device_id = output_devices[output_audio_device][0]
-    output_monitor_id = output_devices[monitor_output_device][0] if monitor else None
+    if input_is_asio or output_is_asio or monitor_is_asio:
+        import sounddevice as sd
+
+        sd._terminate()
+        sd._initialize()
+    
+    import main.app.core.ui as ui
+
+    input_device_id = ui.input_channels_map[input_audio_device][0]
+    output_device_id = ui.output_channels_map[output_audio_device][0]
+    output_monitor_id = ui.output_channels_map[monitor_output_device][0] if monitor else None
 
     input_audio_gain /= 100.0
     output_audio_gain /= 100.0
     monitor_audio_gain /= 100.0
 
-    chunk_size = int(chunk_size * DEVICE_SAMPLE_RATE / 1000 / 128)
+    chunk_size = int(chunk_size * input_audio_sample_rate / 1000 / 128)
 
     from main.inference.realtime.callbacks import AudioCallbacks
 
@@ -741,8 +754,8 @@ def realtime_start(
         "pass_through": False, 
         "read_chunk_size": chunk_size, 
         "cross_fade_overlap_size": cross_fade_overlap_size, 
-        "input_sample_rate": DEVICE_SAMPLE_RATE, 
-        "output_sample_rate": DEVICE_SAMPLE_RATE, 
+        "input_sample_rate": input_audio_sample_rate, 
+        "output_sample_rate": input_audio_sample_rate, 
         "extra_convert_size": extra_convert_size, 
         "model_path": model_pth, 
         "index_path": model_index, 
@@ -824,19 +837,40 @@ def realtime_start(
 
     callbacks = AudioCallbacks(**callbacks_kwargs)
 
-    audio_manager = callbacks.audio
-    audio_manager.start(
-        input_device_id=input_device_id, 
-        output_device_id=output_device_id, 
-        output_monitor_id=output_monitor_id, 
-        exclusive_mode=exclusive_mode, 
-        asio_input_channel=input_asio_channels, 
-        asio_output_channel=output_asio_channels, 
-        asio_output_monitor_channel=monitor_asio_channels,
-        read_chunk_size=chunk_size, 
-        input_audio_sample_rate=DEVICE_SAMPLE_RATE, 
-        output_monitor_sample_rate=DEVICE_SAMPLE_RATE
-    )
+    def stop_with_error():
+        global running
+
+        realtime_stop()
+        running = False
+
+        return (
+            translations["realtime_has_stop_with_error"], 
+            interactive_true, 
+            interactive_false
+        )
+
+    try:
+        audio_manager = callbacks.audio
+        audio_manager.start(
+            input_device_id=input_device_id, 
+            output_device_id=output_device_id, 
+            output_monitor_id=output_monitor_id, 
+            exclusive_mode=exclusive_mode, 
+            asio_input_channel=input_asio_channels, 
+            asio_output_channel=output_asio_channels, 
+            asio_output_monitor_channel=monitor_asio_channels,
+            read_chunk_size=chunk_size, 
+            input_audio_sample_rate=input_audio_sample_rate, 
+            output_audio_sample_rate=output_audio_sample_rate, 
+            output_monitor_sample_rate=monitor_audio_sample_rate
+        )
+    except Exception as e:
+        import traceback
+
+        logger.error(e)
+        logger.debug(traceback.format_exc())
+
+        return stop_with_error()
 
     gr_info(translations["realtime_is_ready"])
 
@@ -859,8 +893,8 @@ def change_callbacks_config():
     global callbacks
 
     if running and audio_manager is not None and callbacks is not None:
-        crossfade_frame = int(callbacks_kwargs.get("cross_fade_overlap_size", 0.1) * DEVICE_SAMPLE_RATE)
-        extra_frame = int(callbacks_kwargs.get("extra_convert_size", 0.5) * DEVICE_SAMPLE_RATE)
+        crossfade_frame = int(callbacks_kwargs.get("cross_fade_overlap_size", 0.1) * callbacks.input_sample_rate)
+        extra_frame = int(callbacks_kwargs.get("extra_convert_size", 0.5) * callbacks.input_sample_rate)
 
         if (
             callbacks.vc.crossfade_frame != crossfade_frame or

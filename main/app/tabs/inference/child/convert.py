@@ -104,8 +104,8 @@ def convert_tab():
                     ) 
             with gr.Row():
                 pitch = gr.Slider(
-                    minimum=-20, 
-                    maximum=20, 
+                    minimum=-24, 
+                    maximum=24, 
                     step=1, 
                     info=translations["pitch_info"], 
                     label=translations["pitch"], 

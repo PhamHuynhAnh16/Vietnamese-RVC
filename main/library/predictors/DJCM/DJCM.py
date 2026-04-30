@@ -23,10 +23,12 @@ class DJCM:
         providers = ["CPUExecutionProvider"], 
         batch_size = 1, 
         segment_len = 5.12, 
-        kernel_size = 3
+        kernel_size = 3,
+        compile_model = False,
+        compile_mode = None
     ):
         super(DJCM, self).__init__()
-        if svs: WINDOW_LENGTH = 2048
+        window_length = 2048 if svs else WINDOW_LENGTH
         self.onnx = onnx
 
         if self.onnx:
@@ -38,11 +40,12 @@ class DJCM:
         else:
             from main.library.predictors.DJCM.model import DJCMM
 
-            model = DJCMM(1, 1, 1, svs=svs, window_length=WINDOW_LENGTH, n_class=N_CLASS)
+            model = DJCMM(1, 1, 1, svs=svs, window_length=window_length, n_class=N_CLASS)
             model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
-            model.eval()
+            model.to(device).eval()
             if is_half: model = model.half()
-            self.model = model.to(device)
+            if compile_model: model = torch.compile(model, mode=compile_mode)
+            self.model = model
 
         self.batch_size = batch_size
         self.seg_len = int(segment_len * SAMPLE_RATE)
@@ -52,7 +55,7 @@ class DJCM:
         self.is_half = is_half
         self.kernel_size = kernel_size
 
-        self.spec_extractor = Spectrogram(int(SAMPLE_RATE // 100), WINDOW_LENGTH).to(device)
+        self.spec_extractor = Spectrogram(int(SAMPLE_RATE // 100), window_length).to(device)
         cents_mapping = 20 * np.arange(N_CLASS) + 1997.3794084376191
         self.cents_mapping = np.pad(cents_mapping, (4, 4))
 

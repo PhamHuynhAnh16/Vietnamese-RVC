@@ -2,6 +2,7 @@
 pip>=23.3
 wheel
 omegaconf>=2.0.6
+setuptools==81.0.0
 
 onnxruntime; sys_platform == 'darwin'
 onnxruntime-gpu; sys_platform != 'darwin'
@@ -15,7 +16,7 @@ tqdm>=4.63.1
 sortedcontainers
 torchvision>=0.18.1
 torchaudio>=2.3.1
-torchcodec>=0.8.1
+torchcodec==0.9.1
 
 faiss-cpu==1.7.3; python_version < "3.12"
 faiss-cpu>=1.7.3; python_version >= "3.12"
@@ -33,13 +34,13 @@ soundfile>=0.13.0
 pedalboard
 
 # Data processing and calculation
-numpy>=1.25.2,<2.0.0
+numpy>=1.25.2
 numba>=0.57.0
 scipy>=1.15.0
 matplotlib>=3.7.2
 
 # Implementation and web framework
-gradio>=5.23.3
+gradio==5.23.3
 requests>=2.32.3
 aiohttp
 pysrt
@@ -55,6 +56,7 @@ beautifulsoup4
 tensorboard
 onnx>=1.14
 onnxslim
+onnxscript
 onnx2torch>=1.5.15
 
 # Cryptography section

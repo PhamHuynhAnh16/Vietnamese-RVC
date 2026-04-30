@@ -16,8 +16,8 @@ from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
+from main.inference.separate_music import _separate
 from main.app.variables import config, logger, translations
-from main.inference.separate_music import _separate, vr_models
 
 dataset_temp = "dataset_temp"
 

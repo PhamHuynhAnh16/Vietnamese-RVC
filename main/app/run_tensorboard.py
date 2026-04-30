@@ -30,7 +30,7 @@ def launch_tensorboard():
     logger.info(f"{translations['tensorboard_url']}: {url}")
     if "--open" in sys.argv: webbrowser.open(url)
 
-    return f"{translations['tensorboard_url']}: {url}"
+    return url
 
 if __name__ == "__main__": 
     launch_tensorboard()

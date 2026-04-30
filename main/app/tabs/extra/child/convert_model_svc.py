@@ -24,7 +24,7 @@ def convert_svc_model_tab():
         gr.Markdown(translations["convert_model_svc_markdown_2"])
     with gr.Row():
         delete_when_success = gr.Checkbox(
-            label="Xóa các tệp gốc khi hoàn thành",
+            label=translations["delete_when_success"],
             value=True,
             interactive=True
         )

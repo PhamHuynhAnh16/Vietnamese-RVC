@@ -14,37 +14,7 @@ import gradio as gr
 sys.path.append(os.getcwd())
 start_time = time.time()
 
-from main.app.variables import logger, config, translations, theme, font, configs, language, allow_disk, python, gradio_version
-
-def check_requirements():
-    import requests
-
-    logger.info(translations["check_requirements"])
-    response = requests.get(codecs.decode("uggcf://enj.tvguhohfrepbagrag.pbz/CunzUhlauNau16/Ivrganzrfr-EIP/znva/erdhverzragf.gkg", "rot13"))
-
-    if response.status_code == 200:
-        online_requirements = response.text
-
-        with open("requirements.txt", "r", encoding="utf-8") as f:
-            local_requirements = f.read()
-
-        if local_requirements != online_requirements:
-            logger.info(translations["requirements_change"])
-
-            with open("requirements.txt", "w", encoding="utf-8") as f:
-                f.write(online_requirements)
-
-            os.system(f"{python} -m pip install -r requirements.txt")
-            os.system("cls" if sys.platform == "win32" else "clear")
-        
-        logger.info(translations["update_requirements_complete"])
-    else:
-        logger.warning(translations["check_requirements_failed"])
-
-try:
-    if configs.get("check_new_requirements", True): check_requirements()
-except:
-    logger.warning(translations["check_requirements_failed"])
+from main.app.variables import logger, config, translations, theme, font, configs, language, allow_disk, gradio_version
 
 from main.app.core.realtime import js_code
 from main.app.tabs.extra.extra import extra_tab
@@ -61,6 +31,19 @@ if not config.debug_mode:
     warnings.filterwarnings("ignore")
     for l in ["httpx", "gradio", "uvicorn", "httpcore", "urllib3"]:
         logging.getLogger(l).setLevel(logging.ERROR)
+
+if sys.platform == "win32":
+    import asyncio.proactor_events as _pe
+
+    _orig_ccl = _pe._ProactorBasePipeTransport._call_connection_lost
+
+    def _ccl_patched(self, exc):
+        try:
+            _orig_ccl(self, exc)
+        except ConnectionResetError:
+            pass
+
+    _pe._ProactorBasePipeTransport._call_connection_lost = _ccl_patched
 
 css = """
 <style>
@@ -107,8 +90,6 @@ gr_params = {
     "css": css
 }
 
-is_zluda = torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]")
-
 with gr.Blocks(
     title="📱 Vietnamese-RVC GUI",
     **gr_params if gradio_version else {}
@@ -119,7 +100,7 @@ with gr.Blocks(
     with gr.Tabs():      
         if configs.get("inference_tab", True): inference_tab()
         if configs.get("editing_tab", True): editing_tab()
-        if configs.get("realtime_tab", True) and not is_zluda: realtime_tab()
+        if configs.get("realtime_tab", True) and not config.is_zluda: realtime_tab()
         if configs.get("create_and_training_tab", True): training_tab()
         if configs.get("downloads_tab", True): download_tab()
         if configs.get("extra_tab", True): extra_tab(app)
@@ -139,10 +120,11 @@ with gr.Blocks(
     
     if __name__ == "__main__":
         device = config.device.replace("privateuseone", "dml")
-        if is_zluda: device = device.replace("cuda", "zluda")
+        if config.is_zluda: device = device.replace("cuda", "zluda")
         if torch.version.hip is not None: device = device.replace("cuda", "hip")
 
         logger.info(f"Pytorch: {device} | Onnxruntime: {config.providers[0].replace('Dml', 'Ocl') if device.startswith('ocl') else config.providers[0]}")
+        if config.compile_all: logger.info(translations["compile_model"].format(compile_mode=config.compile_mode))
         logger.info(f'{translations["precision"]}: {("BF16" if config.brain else "FP16") if config.is_half else "FP32"}')
         logger.info(translations["start_app"])
         logger.info(translations["set_lang"].format(lang=language))
@@ -165,7 +147,7 @@ with gr.Blocks(
                     share=share, 
                     allowed_paths=allow_disk,
                     prevent_thread_lock=True,
-                    quiet=True,
+                    quiet=not config.debug_mode,
                     **gr_params if not gradio_version else {}
                 )
                 break
@@ -177,9 +159,12 @@ with gr.Blocks(
                 sys.exit(1)
 
         if client_mode:
+            logger.debug(translations["mount_fastapi"])
+
             from main.inference.realtime.client import app as fastapi_app
             gradio_app.mount("/api", fastapi_app)
         
+        logger.debug("\n" + sys.stdout.getvalue())
         sys.stdout = original_stdout
 
         if configs.get("discord_presence", True):
@@ -194,6 +179,13 @@ with gr.Blocks(
 
         logger.info(f"{translations['running_local_url']}: {server_name}:{port}")
         if share: logger.info(f"{translations['running_share_url']}: {share_url}")
+
+        if "--tensorboard" in sys.argv:
+            logger.info(translations["run_tensorboard"])
+
+            from main.app.run_tensorboard import launch_tensorboard
+            launch_tensorboard()
+
         logger.info(f"{translations['gradio_start']}: {(time.time() - start_time):.2f}s")
 
         while 1:

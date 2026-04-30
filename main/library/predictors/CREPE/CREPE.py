@@ -23,7 +23,9 @@ class CREPE:
         sample_rate=16000, 
         providers=None, 
         onnx=False, 
-        return_periodicity=False
+        return_periodicity=False,
+        compile_model = False,
+        compile_mode = None
     ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.hop_length = hop_length
@@ -45,8 +47,9 @@ class CREPE:
 
             model = CREPEE(model_size)
             model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
-            model.eval()
-            self.model = model.to(device)
+            model.to(device).eval()
+            if compile_model: model = torch.compile(model, mode=compile_mode)
+            self.model = model
 
     def bins_to_frequency(self, bins):
         if str(bins.device).startswith(("ocl", "privateuseone")): bins = bins.to(torch.float32)

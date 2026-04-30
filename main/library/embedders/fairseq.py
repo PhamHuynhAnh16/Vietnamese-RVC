@@ -8,6 +8,7 @@ import contextlib
 
 import numpy as np
 import torch.nn.functional as F
+import torch.nn.utils.parametrize as parametrize
 
 from torch import nn
 from omegaconf import DictConfig, open_dict
@@ -1641,7 +1642,8 @@ class BaseFairseqModel(nn.Module):
 
         def apply_remove_weight_norm(module):
             try:
-                nn.utils.remove_weight_norm(module)
+                if hasattr(module, "parametrizations") and "weight" in module.parametrizations: parametrize.remove_parametrizations(module, "weight", leave_parametrized=True)
+                else: nn.utils.remove_weight_norm(module)
             except (AttributeError, ValueError):
                 return
 

@@ -12,7 +12,7 @@ from main.library.predictors.RMVPE.mel import MelSpectrogram
 N_MELS, N_CLASS = 128, 360
 
 class RMVPE:
-    def __init__(self, model_path, is_half, device=None, providers=None, onnx=False, hpa=False):
+    def __init__(self, model_path, is_half, device=None, providers=None, onnx=False, hpa=False, compile_model=False, compile_mode=None):
         self.onnx = onnx
 
         if self.onnx:
@@ -26,9 +26,10 @@ class RMVPE:
             model = E2E(4, 1, (2, 2), 5, 4, 1, 16, hpa=hpa)
 
             model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
-            model.eval()
+            model.to(device).eval()
             if is_half: model = model.half()
-            self.model = model.to(device)
+            if compile_model: model = torch.compile(model, mode=compile_mode)
+            self.model = model
 
         self.device = device
         self.is_half = is_half

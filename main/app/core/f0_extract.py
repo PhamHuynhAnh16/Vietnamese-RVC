@@ -9,7 +9,13 @@ from main.app.variables import config, translations, configs
 def f0_extract(
     audio, 
     f0_method, 
-    predictor_onnx
+    predictor_onnx,
+    pitch,
+    filter_radius,
+    f0_autotune,
+    f0_autotune_strength,
+    proposal_pitch,
+    proposal_pitch_threshold
 ):
     if not audio or not os.path.exists(audio) or os.path.isdir(audio): 
         gr_warning(translations["input_not_valid"])
@@ -33,11 +39,11 @@ def f0_extract(
     y = load_audio(audio, sample_rate=16000)
 
     f0_generator = Generator(
-        16000, 
-        160, 
-        configs.get("f0_min", 50), 
-        configs.get("f0_max", 1100), 
-        0.5, 
+        sample_rate=16000, 
+        hop_length=160, 
+        f0_min=configs.get("f0_min", 50), 
+        f0_max=configs.get("f0_max", 1100), 
+        alpha=0.5, 
         is_half=config.is_half, 
         device=config.device, 
         predictor_onnx=predictor_onnx, 
@@ -45,16 +51,17 @@ def f0_extract(
     )
 
     _, pitchf = f0_generator.calculator(
-        config.x_pad, 
-        f0_method, 
-        y, 
-        0, 
-        None, 
-        3, 
-        False, 
-        0, 
-        None, 
-        False
+        x_pad=config.x_pad, 
+        f0_method=f0_method, 
+        x=y, 
+        f0_up_key=pitch, 
+        p_len=None, 
+        filter_radius=filter_radius, 
+        f0_autotune=f0_autotune, 
+        f0_autotune_strength=f0_autotune_strength, 
+        manual_f0=None, 
+        proposal_pitch=proposal_pitch,
+        proposal_pitch_threshold=proposal_pitch_threshold
     )
 
     F_temp = np.array(pitchf, dtype=np.float32)

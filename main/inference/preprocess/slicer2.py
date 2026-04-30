@@ -70,9 +70,7 @@ class Slicer:
                 ].argmin()
 
                 pos += i - self.max_sil_kept
-                pos_r = (
-                    rms_list[i - self.max_sil_kept : i + 1].argmin() + i - self.max_sil_kept
-                )
+                pos_r = rms_list[i - self.max_sil_kept : i + 1].argmin() + i - self.max_sil_kept
 
                 if silence_start == 0:
                     sil_tags.append((0, pos_r))
@@ -171,7 +169,7 @@ class Slicer2(Slicer):
                 ].argmin()
 
                 pos += i - self.max_sil_kept
-                pos_r = (rms_list[i - self.max_sil_kept : i + 1].argmin() + i - self.max_sil_kept)
+                pos_r = rms_list[i - self.max_sil_kept : i + 1].argmin() + i - self.max_sil_kept
 
                 if silence_start == 0:
                     sil_tags.append((0, pos_r))
@@ -184,9 +182,7 @@ class Slicer2(Slicer):
 
                     clip_start = max(pos_r, pos)
             else:
-                pos_r = (
-                    rms_list[i - self.max_sil_kept : i + 1].argmin() + i - self.max_sil_kept
-                )
+                pos_r = rms_list[i - self.max_sil_kept : i + 1].argmin() + i - self.max_sil_kept  
 
                 sil_tags.append(
                     (

@@ -112,7 +112,11 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
                 "hpa-rmvpe-76000" 
                 if "previous" in f0_method else 
                 "hpa-rmvpe-112000"
-            ) if "hpa" in f0_method else "rmvpe"
+            ) if "hpa" in f0_method else (
+                "rmvpe-mix" 
+                if "mix" in f0_method else 
+                "rmvpe"
+            )
         elif "fcpe" in f0_method:
             modelname = (
                 "fcpe_legacy" 
@@ -124,7 +128,7 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
         elif "penn" in f0_method:
             modelname = "fcn"
         elif "djcm" in f0_method:
-            modelname = "djcm" + "-svs" if "svs" in f0_method else ""
+            modelname = "djcm" + ("-svs" if "svs" in f0_method else "")
         elif "pesto" in f0_method:
             modelname = "pesto"
         elif "swift" in f0_method:
@@ -182,7 +186,7 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
 def check_spk_diarization(model_size, speechbrain=True):
     whisper_model = os.path.join(configs["speaker_diarization_path"], "models", f"{model_size}.pt")
 
-    if not os.path.exists(whisper_model): 
+    if not os.path.exists(whisper_model) and model_size is not None: 
         huggingface.HF_download_file(
             "".join([
                 codecs.decode(
@@ -424,6 +428,7 @@ def clear_gpu_cache():
     gc.collect()
 
     if torch.cuda.is_available(): torch.cuda.empty_cache()
+    elif hasattr(torch, "xpu") and torch.xpu.is_available(): torch.xpu.empty_cache()
     elif torch.backends.mps.is_available(): torch.mps.empty_cache()
     elif directml.is_available(): directml.empty_cache()
     elif opencl.is_available(): opencl.pytorch_ocl.empty_cache()
@@ -489,3 +494,16 @@ def load_model(model_path, weights_only=True, log_severity_level=3):
             config.providers, 
             log_severity_level=log_severity_level
         )
+
+def check_ffmpeg():
+    try:
+        if not sys.platform == "win32": return
+        ffmpeg_url = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/sszcrt/", "rot13")
+
+        if not os.path.exists("ffmpeg.exe"): huggingface.HF_download_file(ffmpeg_url + "ffmpeg.exe", output_path="ffmpeg.exe")
+        if not os.path.exists("ffprobe.exe"): huggingface.HF_download_file(ffmpeg_url + "ffprobe.exe", output_path="ffprobe.exe")
+    except:
+        logger.error(translations["ffmpeg_error"])
+        return
+
+if configs.get("ffmpeg_download", True): check_ffmpeg()

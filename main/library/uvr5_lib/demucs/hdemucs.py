@@ -18,7 +18,7 @@ def spectro(x, n_fft=512, hop_length=None, pad=0):
     x = x.reshape(-1, length)
     device_type = x.device.type
 
-    is_other_gpu = not device_type in ["cuda", "cpu"]
+    is_other_gpu = not device_type in ["cuda", "xpu", "cpu"]
     if is_other_gpu: x = x.cpu()
 
     z = torch.stft(
@@ -44,7 +44,7 @@ def ispectro(z, hop_length=None, length=None, pad=0):
     win_length = n_fft // (1 + pad)
     device_type = z.device.type
 
-    is_other_gpu = not device_type in ["cuda", "cpu"]
+    is_other_gpu = not device_type in ["cuda", "xpu", "cpu"]
     if is_other_gpu: z = z.cpu()
 
     x = torch.istft(
@@ -146,7 +146,7 @@ def _invert(M, out = None):
         out[..., 1, 0, :] = _mul(-invDet, M[..., 1, 0, :], out[..., 1, 0, :])
         out[..., 0, 1, :] = _mul(-invDet, M[..., 0, 1, :], out[..., 0, 1, :])
         out[..., 1, 1, :] = _mul(invDet, M[..., 0, 0, :], out[..., 1, 1, :])
-    else: raise Exception("Torch == 2 Channels")
+    else: raise Exception
     return out
 
 def expectation_maximization(y, x, iterations = 2, eps = 1e-10, batch_size = 200):
@@ -983,7 +983,7 @@ class HDemucs(nn.Module):
         x = x * std[:, None] + mean[:, None]
         device_type = x.device.type
         device_load = f"{device_type}:{x.device.index}" if not device_type == "mps" else device_type
-        x_is_other_gpu = not device_type in ["cuda", "cpu"]
+        x_is_other_gpu = not device_type in ["cuda", "xpu", "cpu"]
         if x_is_other_gpu: x = x.cpu()
         zout = self._mask(z, x)
         x = self._ispec(zout, length)

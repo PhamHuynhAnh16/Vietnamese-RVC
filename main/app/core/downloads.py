@@ -41,9 +41,10 @@ def download_url(url):
         }
 
         gr_info(translations["start"].format(start=translations["download_music"]))
+        audio_output = ""
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            audio_output = os.path.join(
+            audio_output = process_output(os.path.join(
                 configs["audios_path"], 
                 re.sub(
                     r'\s+', '-', 
@@ -53,15 +54,14 @@ def download_url(url):
                         ydl.extract_info(url, download=False).get('title', 'video')
                     ).strip()
                 )
-            )
+            ) + ".wav")
 
             if os.path.exists(audio_output): 
                 shutil.rmtree(audio_output, ignore_errors=True)
 
-            ydl_opts['outtmpl'] = audio_output
+            ydl_opts['outtmpl'] = audio_output.replace(".wav", "")
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl: 
-            audio_output = process_output(audio_output + ".wav")
             ydl.download([url])
 
         gr_info(translations["success"])
@@ -311,7 +311,9 @@ def search_models(name):
                 if ("huggingface" in url) and (name_tag and url_tag): 
                     model_options[replace_modelname(name_tag.text)] = url
 
+        logger.debug(model_options)
         gr_info(translations["found"].format(results=len(model_options)))
+
         return [
             {
                 "value": "", 

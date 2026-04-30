@@ -69,7 +69,8 @@ def convert_tts_tab():
                     label=translations["text_to_speech"], 
                     value="", 
                     placeholder="Hello Words", 
-                    lines=3
+                    lines=5,
+                    max_lines=5
                 )
         with gr.Column():
             speed = gr.Slider(
@@ -81,8 +82,8 @@ def convert_tts_tab():
                 step=1
             )
             pitch = gr.Slider(
-                minimum=-20, 
-                maximum=20, 
+                minimum=-24, 
+                maximum=24, 
                 step=1, 
                 info=translations["pitch_info"], 
                 label=translations["pitch"], 
@@ -114,8 +115,8 @@ def convert_tts_tab():
                 value="vi-VN-NamMinhNeural"
             )
             tts_pitch = gr.Slider(
-                minimum=-20, 
-                maximum=20, 
+                minimum=-24, 
+                maximum=24, 
                 step=1, 
                 info=translations["pitch_info_2"], 
                 label=translations["pitch"], 
@@ -853,6 +854,13 @@ def convert_tts_tab():
             inputs=[
                 use_txt
             ], 
+            outputs=[
+                txt_input
+            ]
+        )
+        use_txt.change(
+            fn=lambda: None,
+            inputs=[],
             outputs=[
                 txt_input
             ]

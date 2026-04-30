@@ -5,7 +5,7 @@ import gradio as gr
 
 sys.path.append(os.getcwd())
 
-from main.app.core.inference import convert_with_whisper
+from main.app.core.inference import convert_with_vad
 
 from main.app.core.ui import (
     visible, 
@@ -28,7 +28,6 @@ from main.app.variables import (
     file_types, 
     audio_params, 
     translations, 
-    whisper_model, 
     embedders_mode, 
     embedders_model, 
     paths_for_files, 
@@ -37,9 +36,9 @@ from main.app.variables import (
     export_format_choices, 
 )
 
-def convert_with_whisper_tab():
+def convert_with_vad_tab():
     with gr.Row():
-        gr.Markdown(translations["convert_with_whisper_info"])
+        gr.Markdown(translations["convert_with_vad_info"])
     with gr.Row():
         with gr.Column():
             with gr.Group():
@@ -117,8 +116,8 @@ def convert_with_whisper_tab():
                     )
                 with gr.Row():
                     pitch_1 = gr.Slider(
-                        minimum=-20, 
-                        maximum=20, 
+                        minimum=-24, 
+                        maximum=24, 
                         step=1, 
                         info=translations["pitch_info"], 
                         label=translations["pitch"], 
@@ -221,8 +220,8 @@ def convert_with_whisper_tab():
                     )
                 with gr.Row():
                     pitch_2 = gr.Slider(
-                        minimum=-20, 
-                        maximum=20, 
+                        minimum=-24, 
+                        maximum=24, 
                         step=1, 
                         info=translations["pitch_info"], 
                         label=translations["pitch"], 
@@ -267,14 +266,6 @@ def convert_with_whisper_tab():
                 translations["setting"], 
                 open=False
             ):
-                with gr.Row():
-                    model_size = gr.Radio(
-                        label=translations["model_size"], 
-                        info=translations["model_size_info"], 
-                        choices=whisper_model, 
-                        value="medium", 
-                        interactive=True
-                    )
                 with gr.Accordion(
                     translations["f0_method"], 
                     open=False
@@ -445,6 +436,27 @@ def convert_with_whisper_tab():
                         value=0.5, 
                         step=0.01, 
                         interactive=True
+                    )
+                with gr.Row():
+                    vad_sensitivity = gr.Slider(
+                        minimum=0, 
+                        maximum=3, 
+                        label=translations["vad_sensitivity_label"], 
+                        info=translations["vad_sensitivity_info"], 
+                        value=3, 
+                        step=1, 
+                        interactive=True, 
+                        visible=False
+                    )
+                    vad_frame_ms = gr.Slider(
+                        minimum=10, 
+                        maximum=30, 
+                        label=translations["vad_frame_ms_label"], 
+                        info=translations["vad_frame_ms_info"], 
+                        value=30, 
+                        step=10, 
+                        interactive=True, 
+                        visible=False
                     )
                 with gr.Row():
                     formant_qfrency = gr.Slider(
@@ -716,10 +728,9 @@ def convert_with_whisper_tab():
         )
     with gr.Row():
         convert_button.click(
-            fn=convert_with_whisper,
+            fn=convert_with_vad,
             inputs=[
                 num_spk,
-                model_size,
                 cleaner,
                 clean_strength,
                 autotune,
@@ -762,10 +773,12 @@ def convert_with_whisper_tab():
                 embedders_mix_layers,
                 embedders_mix_ratio,
                 noise_scale_1,
-                noise_scale_2
+                noise_scale_2,
+                vad_sensitivity,
+                vad_frame_ms
             ],
             outputs=[
                 play_output_audio
             ],
-            api_name="convert_with_whisper"
+            api_name="convert_with_vad"
         )

@@ -7,8 +7,8 @@ import codecs
 import hashlib
 import requests
 import warnings
-import onnxruntime
 
+from contextlib import nullcontext
 from importlib import import_module
 
 now_dir = os.getcwd()
@@ -23,36 +23,36 @@ if not config.debug_mode: warnings.filterwarnings("ignore")
 
 class Separator: 
     def __init__(
-            self, 
-            logger, 
-            model_file_dir=config.configs["uvr5_path"], 
-            output_dir=None, 
-            output_format="wav", 
-            output_bitrate=None, 
-            normalization_threshold=0.9, 
-            sample_rate=44100, 
-            mdx_params={
-                "hop_length": 1024, 
-                "segment_size": 256, 
-                "overlap": 0.25, 
-                "batch_size": 1, 
-                "enable_denoise": False
-            }, 
-            demucs_params={
-                "segment_size": "Default", 
-                "shifts": 2, 
-                "overlap": 0.25, 
-                "segments_enabled": True
-            }, 
-            vr_params={
-                "batch_size": 1, 
-                "window_size": 512, 
-                "aggression": 5, 
-                "enable_tta": False, 
-                "enable_post_process": False, 
-                "post_process_threshold": 0.2, 
-                "high_end_process": False
-            }
+        self, 
+        logger, 
+        model_file_dir=config.configs["uvr5_path"], 
+        output_dir=None, 
+        output_format="wav", 
+        output_bitrate=None, 
+        normalization_threshold=0.9, 
+        sample_rate=44100, 
+        mdx_params={
+            "hop_length": 1024, 
+            "segment_size": 256, 
+            "overlap": 0.25, 
+            "batch_size": 1, 
+            "enable_denoise": False
+        }, 
+        demucs_params={
+            "segment_size": "Default", 
+            "shifts": 2, 
+            "overlap": 0.25, 
+            "segments_enabled": True
+        }, 
+        vr_params={
+            "batch_size": 1, 
+            "window_size": 512, 
+            "aggression": 5, 
+            "enable_tta": False, 
+            "enable_post_process": False, 
+            "post_process_threshold": 0.2, 
+            "high_end_process": False
+        }
     ):
         self.logger = logger
         self.logger.info(translations["separator_info"].format(output_dir=output_dir, output_format=output_format))
@@ -81,62 +81,41 @@ class Separator:
         self.torch_device_mps = None
         self.onnx_execution_provider = None
         self.model_instance = None
+        self.model_type = None
         self.setup_torch_device()
 
     def setup_torch_device(self):
-        hardware_acceleration_enabled = False
-        ort_providers = onnxruntime.get_available_providers()
         self.torch_device_cpu = torch.device("cpu")
+        providers = config.providers
 
-        if not config.cpu_mode:
-            if torch.cuda.is_available():
-                self.configure_cuda(ort_providers)
-                hardware_acceleration_enabled = True
-            elif opencl.is_available() or directml.is_available():
-                hardware_acceleration_enabled = True
-                self.configure_dml(ort_providers)
-            elif torch.backends.mps.is_available():
-                self.configure_mps(ort_providers)
-                hardware_acceleration_enabled = True
+        if len(providers) >= 2: providers.remove("CPUExecutionProvider")
+        self.onnx_execution_provider = providers
 
-        if not hardware_acceleration_enabled:
+        if providers[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]:
+            self.logger.info(translations["running_in_backends"].format(backends='CUDA'))
+            self.logger.info(translations["onnx_have"].format(backends='CUDA'))
+            self.torch_device = torch.device("cuda")
+        elif providers[0] in ["ROCMExecutionProvider", "MIGraphXExecutionProvider"]:
+            self.logger.info(translations["running_in_backends"].format(backends='HIP'))
+            self.logger.info(translations["onnx_have"].format(backends='HIP'))
+            self.torch_device = torch.device("cuda")
+        elif providers[0] in ["OpenVINOExecutionProvider", "DnnlExecutionProvider"]:
+            self.logger.info(translations["running_in_backends"].format(backends='XPU'))
+            self.logger.info(translations["onnx_have"].format(backends='XPU'))
+            self.torch_device = torch.device("xpu")
+        elif providers[0] in ["DmlExecutionProvider"]:
+            backends = (config.device.replace("privateuseone", "dml") if not torch.cuda.is_available() else config.device.replace("cuda", "hip")).split(":")[0].upper()
+            self.logger.info(translations["running_in_backends"].format(backends=backends))
+            self.logger.info(translations["onnx_have"].format(backends=backends))
+            self.torch_device = torch.device(config.device)
+        elif providers[0] in ["CoreMLExecutionProvider"]:
+            self.logger.info(translations["running_in_backends"].format(backends='MPS'))
+            self.logger.info(translations["onnx_have"].format(backends='MPS'))
+            self.torch_device = torch.device("mps")
+        else:
             self.logger.info(translations["running_in_cpu"])
+            self.logger.warning(translations["onnx_not_have"])
             self.torch_device = self.torch_device_cpu
-            self.onnx_execution_provider = ["CPUExecutionProvider"]
-
-    def configure_cuda(self, ort_providers):
-        self.logger.info(translations["running_in_cuda"])
-        self.torch_device = torch.device("cuda")
-
-        if "CUDAExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(backends='CUDAExecutionProvider'))
-            self.onnx_execution_provider = ["CUDAExecutionProvider"]
-        else: 
-            self.logger.warning(translations["onnx_not_have"].format(backends='CUDAExecutionProvider'))
-
-    def configure_dml(self, ort_providers):
-        self.logger.info(translations["running_in_amd"].format(backends=config.device.replace("privateuseone", "dml").split(":")[0].upper()))
-        self.torch_device = torch.device(config.device)
-
-        if "ROCMExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(backends='ROCMExecutionProvider'))
-            self.onnx_execution_provider = ["ROCMExecutionProvider"]
-        elif "DmlExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(backends='DmlExecutionProvider'))
-            self.onnx_execution_provider = ["DmlExecutionProvider"]
-        else: 
-            self.logger.warning(translations["onnx_not_have"].format(backends=('DmlExecutionProvider' if not config.device.startswith("ocl") else 'OclExecutionProvider') if not config.device.startswith("cuda") else 'ROCMExecutionProvider'))
-
-    def configure_mps(self, ort_providers):
-        self.logger.info(translations["set_torch_mps"])
-        self.torch_device_mps = torch.device("mps")
-        self.torch_device = self.torch_device_mps
-
-        if "CoreMLExecutionProvider" in ort_providers:
-            self.logger.info(translations["onnx_have"].format(backends='CoreMLExecutionProvider'))
-            self.onnx_execution_provider = ["CoreMLExecutionProvider"]
-        else: 
-            self.logger.warning(translations["onnx_not_have"].format(backends='CoreMLExecutionProvider'))
 
     def get_model_hash(self, model_path):
         try:
@@ -294,16 +273,19 @@ class Separator:
         module_name, class_name = separator_classes[model_type].split(".")
         separator_class = getattr(import_module(f"main.library.architectures.{module_name}"), class_name)
         self.model_instance = separator_class(common_config=common_params, arch_config=self.arch_specific_params[model_type])
+        self.model_type = model_type
 
     def separate(self, audio_file_path):
         self.logger.info(f"{translations['starting_separator']}: {audio_file_path}")
         separate_start_time = time.perf_counter()
 
-        with torch.amp.autocast(
-            self.torch_device.type if self.torch_device.type != "ocl" else "cpu", 
+        autocast = torch.amp.autocast(
+            self.torch_device.type, 
             enabled=config.is_half, 
             dtype=torch.float16 if config.is_half else torch.float32
-        ):
+        ) if not self.torch_device.type.startswith(("ocl", "privateuseone")) and self.model_type != "Demucs" else nullcontext()
+
+        with autocast:
             output_files = self.model_instance.separate(audio_file_path)
 
         clear_gpu_cache()

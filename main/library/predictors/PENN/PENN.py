@@ -100,7 +100,9 @@ class PENN:
         interp_unvoiced_at = None, 
         device = None, 
         providers = None, 
-        onnx = False
+        onnx = False,
+        compile_model = False,
+        compile_mode = None
     ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.hopsize = hop_length / SAMPLE_RATE
@@ -133,8 +135,9 @@ class PENN:
             model = FCN(256, PITCH_BINS, (2, 2))
             ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             model.load_state_dict(ckpt['model'])
-            model.eval()
-            self.model = model.to(device)
+            model.to(device).eval()
+            if compile_model: model = torch.compile(model, mode=compile_mode)
+            self.model = model
 
     def expected_frames(self, samples, sample_rate, hopsize, center):
         hopsize_resampled = seconds_to_samples(hopsize, sample_rate)

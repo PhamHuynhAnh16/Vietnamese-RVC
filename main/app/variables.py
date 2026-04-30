@@ -39,7 +39,7 @@ if not logger.hasHandlers():
     console_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.DEBUG if config.debug_mode else logging.INFO)
-    file_handler = logging.handlers.RotatingFileHandler(os.path.join(configs["logs_path"], "app.log"), maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+    file_handler = logging.handlers.RotatingFileHandler(os.path.join(configs["logs_path"], "app.log"), maxBytes=10*1024*1024, backupCount=3, encoding='utf-8')
     file_formatter = logging.Formatter(fmt="\n%(asctime)s.%(msecs)03d | %(levelname)s | %(module)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     file_handler.setFormatter(file_formatter)
     file_handler.setLevel(logging.DEBUG)
@@ -53,6 +53,10 @@ if config.device in ["cpu", "mps", "ocl:0", "privateuseone:0"] and configs.get("
 
     with open(configs_json, "w") as f:
         json.dump(configs, f, indent=4)
+
+if configs.get("asio_enabled", False):
+    logger.debug(translations["enabled_asio"])
+    os.environ["SD_ENABLE_ASIO"] = "1"
 
 models = {}
 model_options = {}
@@ -120,6 +124,8 @@ method_f0_full = [
     "fcpe-previous", 
     "rmvpe", 
     "rmvpe-medfilt", 
+    "rmvpe-mix", 
+    "rmvpe-mix-medfilt", 
     "hpa-rmvpe", 
     "hpa-rmvpe-medfilt", 
     "hpa-rmvpe-previous", 
@@ -211,11 +217,31 @@ whisper_model = [
     "large-v3-turbo"
 ]
 
+whisper_languages = configs.get("whisper_languages", ["vi", "en"])
+
+sample_rate_choice = [
+    8000, 
+    11025, 
+    12000, 
+    16000, 
+    22050, 
+    24000, 
+    32000, 
+    44100, 
+    48000, 
+    88200, 
+    96000, 
+    176400, 
+    192000, 
+    352800, 
+    384000
+]
+
 paths_for_files = sorted([
     os.path.abspath(os.path.join(root, f)) 
     for root, _, files in os.walk(configs["audios_path"]) 
     for f in files 
-    if os.path.splitext(f)[1].lower() in file_types and not f.startswith(("Convert", "output", "Instruments"))
+    if os.path.splitext(f)[1].lower() in file_types and not f.startswith(("Convert", "output"))
 ])
 
 reference_list = sorted([
@@ -239,24 +265,33 @@ index_path = sorted([
     if name.endswith(".index") and "trained" not in name
 ])
 
+pretraineds = os.listdir(configs["pretrained_custom_path"])
+
 pretrainedD = [
-    model for model in os.listdir(configs["pretrained_custom_path"]) 
+    model for model in pretraineds 
     if model.endswith(".pth") and "D" in model
 ]
 
 pretrainedG = [
-    model for model in os.listdir(configs["pretrained_custom_path"]) 
+    model for model in pretraineds 
     if model.endswith(".pth") and "G" in model
 ]
 
+all_presets = os.listdir(configs["presets_path"])
+
 presets_file = sorted(list(
-    f for f in os.listdir(configs["presets_path"]) 
+    f for f in all_presets 
     if f.endswith(".conversion.json")
 ))
 
 audio_effect_presets_file = sorted(list(
-    f for f in os.listdir(configs["presets_path"]) 
+    f for f in all_presets 
     if f.endswith(".effect.json")
+))
+
+realtime_presets_file = sorted(list(
+    f for f in all_presets 
+    if f.endswith(".realtime.json")
 ))
 
 f0_file = sorted([
@@ -280,7 +315,6 @@ denoise_models = configs.get("denoise_models", "")
 uvr_model = list(demucs_models.keys()) + list(vr_models.keys()) + list(mdx_models.keys())
 
 font = configs.get("font", "https://fonts.googleapis.com/css2?family=Saira&display=swap")
-sample_rate_choice = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 csv_path = configs["csv_path"]
 
 try:

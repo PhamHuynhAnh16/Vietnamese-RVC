@@ -15,7 +15,7 @@ class WhisperModel(torch.nn.Module):
         model_path
     ):
         super().__init__()
-        checkpoint = torch.load(model_path, map_location="cpu")
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
         dims = ModelDimensions(**checkpoint["dims"])
         self._final_proj = torch.nn.Linear(dims.n_text_state, 768)
         self.final_proj = torch.nn.Linear(768, 256)
@@ -31,7 +31,7 @@ class WhisperModel(torch.nn.Module):
             pad_or_trim(audio[0])
         ).to(audio.device)
 
-        autocast_enabled = config.is_half and audio.device.type == "cuda"
+        autocast_enabled = config.is_half and audio.device.type in ["cuda", "xpu"]
         autocast_dtype = (
             torch.float32 
             if not autocast_enabled else 
@@ -42,7 +42,7 @@ class WhisperModel(torch.nn.Module):
             audio.device.type, 
             enabled=autocast_enabled, 
             dtype=autocast_dtype
-        ) if not audio.device.type.startswith("ocl") else nullcontext()
+        ) if not audio.device.type.startswith(("ocl", "privateuseone")) else nullcontext()
 
         with torch.no_grad():
             with autocasts:
@@ -60,6 +60,7 @@ class WhisperModel(torch.nn.Module):
 
             self.model.to(padding_mask.device).eval()
             self.model.encoder.to(padding_mask.device).eval()
+            if config.compile_all: self.model.encoder = torch.compile(self.model.encoder, mode=config.compile_mode)
 
             if config.is_half: 
                 self.model.half()

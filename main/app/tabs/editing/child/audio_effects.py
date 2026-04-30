@@ -187,440 +187,438 @@ def audio_effects_tab():
             variant="primary", 
             scale=2
         )
-    with gr.Row():
-        with gr.Column():
-            with gr.Row():
-                with gr.Accordion(
-                    translations["reverb"], 
-                    open=False, 
-                    visible=False
-                ) as reverb_accordion:
-                    reverb_freeze_mode = gr.Checkbox(
-                        label=translations["reverb_freeze"], 
-                        info=translations["reverb_freeze_info"], 
+    with gr.Accordion(translations["audio_effects"], visible=False) as accordion:
+        with gr.Row():
+            with gr.Accordion(
+                translations["reverb"], 
+                open=True, 
+                visible=False
+            ) as reverb_accordion:
+                reverb_freeze_mode = gr.Checkbox(
+                    label=translations["reverb_freeze"], 
+                    info=translations["reverb_freeze_info"], 
+                    value=False, 
+                    interactive=True
+                )
+                reverb_room_size = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.15, 
+                    label=translations["room_size"], 
+                    info=translations["room_size_info"], 
+                    interactive=True
+                )
+                reverb_damping = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.7, 
+                    label=translations["damping"], 
+                    info=translations["damping_info"], 
+                    interactive=True
+                )
+                reverb_wet_level = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.2, 
+                    label=translations["wet_level"], 
+                    info=translations["wet_level_info"], 
+                    interactive=True
+                )
+                reverb_dry_level = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.8, 
+                    label=translations["dry_level"], 
+                    info=translations["dry_level_info"], 
+                    interactive=True
+                )
+                reverb_width = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=1, 
+                    label=translations["width"], 
+                    info=translations["width_info"], 
+                    interactive=True
+                )
+        with gr.Row():
+            with gr.Accordion(
+                translations["chorus"], 
+                open=True, 
+                visible=False
+            ) as chorus_accordion:
+                chorus_depth = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["chorus_depth"], 
+                    info=translations["chorus_depth_info"], 
+                    interactive=True
+                )
+                chorus_rate_hz = gr.Slider(
+                    minimum=0.1, 
+                    maximum=10, 
+                    step=0.1, 
+                    value=1.5, 
+                    label=translations["chorus_rate_hz"], 
+                    info=translations["chorus_rate_hz_info"], 
+                    interactive=True
+                )
+                chorus_mix = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["chorus_mix"], 
+                    info=translations["chorus_mix_info"], 
+                    interactive=True
+                )
+                chorus_center_delay_ms = gr.Slider(
+                    minimum=0, 
+                    maximum=50, 
+                    step=1, 
+                    value=10, 
+                    label=translations["chorus_center_delay_ms"], 
+                    info=translations["chorus_center_delay_ms_info"], 
+                    interactive=True
+                )
+                chorus_feedback = gr.Slider(
+                    minimum=-1, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0, 
+                    label=translations["chorus_feedback"], 
+                    info=translations["chorus_feedback_info"], 
+                    interactive=True
+                )
+        with gr.Row():
+            with gr.Accordion(
+                translations["delay"], 
+                open=True, 
+                visible=False
+            ) as delay_accordion:
+                delay_second = gr.Slider(
+                    minimum=0, 
+                    maximum=5, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["delay_seconds"], 
+                    info=translations["delay_seconds_info"], 
+                    interactive=True
+                )
+                delay_feedback = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["delay_feedback"], 
+                    info=translations["delay_feedback_info"], 
+                    interactive=True
+                )
+                delay_mix = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["delay_mix"], 
+                    info=translations["delay_mix_info"], 
+                    interactive=True
+                )
+        with gr.Row():
+            with gr.Accordion(
+                translations["phaser"], 
+                open=True, 
+                visible=False
+            ) as phaser_accordion:
+                phaser_depth = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["phaser_depth"], 
+                    info=translations["phaser_depth_info"], 
+                    interactive=True
+                )
+                phaser_rate_hz = gr.Slider(
+                    minimum=0.1, 
+                    maximum=10, 
+                    step=0.1, 
+                    value=1, 
+                    label=translations["phaser_rate_hz"], 
+                    info=translations["phaser_rate_hz_info"], 
+                    interactive=True
+                )
+                phaser_mix = gr.Slider(
+                    minimum=0, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0.5, 
+                    label=translations["phaser_mix"], 
+                    info=translations["phaser_mix_info"], 
+                    interactive=True
+                )
+                phaser_centre_frequency_hz = gr.Slider(
+                    minimum=50, 
+                    maximum=5000, 
+                    step=10, 
+                    value=1000, 
+                    label=translations["phaser_centre_frequency_hz"], 
+                    info=translations["phaser_centre_frequency_hz_info"], 
+                    interactive=True
+                )
+                phaser_feedback = gr.Slider(
+                    minimum=-1, 
+                    maximum=1, 
+                    step=0.01, 
+                    value=0, 
+                    label=translations["phaser_feedback"], 
+                    info=translations["phaser_feedback_info"], 
+                    interactive=True
+                )
+        with gr.Row():
+            with gr.Accordion(
+                translations["compressor"], 
+                open=True, 
+                visible=False
+            ) as compressor_accordion:
+                compressor_threshold_db = gr.Slider(
+                    minimum=-60, 
+                    maximum=0, 
+                    step=1, 
+                    value=-20, 
+                    label=translations["compressor_threshold_db"], 
+                    info=translations["compressor_threshold_db_info"], 
+                    interactive=True
+                )
+                compressor_ratio = gr.Slider(
+                    minimum=1, 
+                    maximum=20, 
+                    step=0.1, 
+                    value=1, 
+                    label=translations["compressor_ratio"], 
+                    info=translations["compressor_ratio_info"], 
+                    interactive=True
+                )
+                compressor_attack_ms = gr.Slider(
+                    minimum=0.1, 
+                    maximum=100, 
+                    step=0.1, 
+                    value=10, 
+                    label=translations["compressor_attack_ms"], 
+                    info=translations["compressor_attack_ms_info"], 
+                    interactive=True
+                )
+                compressor_release_ms = gr.Slider(
+                    minimum=10, 
+                    maximum=1000, 
+                    step=1, 
+                    value=100, 
+                    label=translations["compressor_release_ms"], 
+                    info=translations["compressor_release_ms_info"], 
+                    interactive=True
+                )   
+        with gr.Row():
+            with gr.Accordion(
+                translations["more_option"], 
+                open=True, 
+                visible=False
+            ) as more_accordion:
+                with gr.Row():
+                    fade = gr.Checkbox(
+                        label=translations["fade"], 
                         value=False, 
                         interactive=True
                     )
-                    reverb_room_size = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.15, 
-                        label=translations["room_size"], 
-                        info=translations["room_size_info"], 
+                    bass_or_treble = gr.Checkbox(
+                        label=translations["bass_or_treble"], 
+                        value=False, 
                         interactive=True
                     )
-                    reverb_damping = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.7, 
-                        label=translations["damping"], 
-                        info=translations["damping_info"], 
+                    limiter = gr.Checkbox(
+                        label=translations["limiter"], 
+                        value=False, 
                         interactive=True
                     )
-                    reverb_wet_level = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.2, 
-                        label=translations["wet_level"], 
-                        info=translations["wet_level_info"], 
+                    resample_checkbox = gr.Checkbox(
+                        label=translations["resample"], 
+                        value=False, 
                         interactive=True
                     )
-                    reverb_dry_level = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.8, 
-                        label=translations["dry_level"], 
-                        info=translations["dry_level_info"], 
+                with gr.Row():
+                    distortion_checkbox = gr.Checkbox(
+                        label=translations["distortion"], 
+                        value=False, 
                         interactive=True
                     )
-                    reverb_width = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=1, 
-                        label=translations["width"], 
-                        info=translations["width_info"], 
+                    gain_checkbox = gr.Checkbox(
+                        label=translations["gain"], 
+                        value=False, 
                         interactive=True
                     )
-            with gr.Row():
+                    bitcrush_checkbox = gr.Checkbox(
+                        label=translations["bitcrush"], 
+                        value=False, 
+                        interactive=True
+                    )
+                    clipping_checkbox = gr.Checkbox(
+                        label=translations["clipping"], 
+                        value=False, 
+                        interactive=True
+                    )
                 with gr.Accordion(
-                    translations["chorus"], 
-                    open=False, 
+                    translations["fade"], 
+                    open=True, 
                     visible=False
-                ) as chorus_accordion:
-                    chorus_depth = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["chorus_depth"], 
-                        info=translations["chorus_depth_info"], 
-                        interactive=True
-                    )
-                    chorus_rate_hz = gr.Slider(
-                        minimum=0.1, 
-                        maximum=10, 
-                        step=0.1, 
-                        value=1.5, 
-                        label=translations["chorus_rate_hz"], 
-                        info=translations["chorus_rate_hz_info"], 
-                        interactive=True
-                    )
-                    chorus_mix = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["chorus_mix"], 
-                        info=translations["chorus_mix_info"], 
-                        interactive=True
-                    )
-                    chorus_center_delay_ms = gr.Slider(
-                        minimum=0, 
-                        maximum=50, 
-                        step=1, 
-                        value=10, 
-                        label=translations["chorus_center_delay_ms"], 
-                        info=translations["chorus_center_delay_ms_info"], 
-                        interactive=True
-                    )
-                    chorus_feedback = gr.Slider(
-                        minimum=-1, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0, 
-                        label=translations["chorus_feedback"], 
-                        info=translations["chorus_feedback_info"], 
-                        interactive=True
-                    )
-            with gr.Row():
-                with gr.Accordion(
-                    translations["delay"], 
-                    open=False, 
-                    visible=False
-                ) as delay_accordion:
-                    delay_second = gr.Slider(
-                        minimum=0, 
-                        maximum=5, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["delay_seconds"], 
-                        info=translations["delay_seconds_info"], 
-                        interactive=True
-                    )
-                    delay_feedback = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["delay_feedback"], 
-                        info=translations["delay_feedback_info"], 
-                        interactive=True
-                    )
-                    delay_mix = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["delay_mix"], 
-                        info=translations["delay_mix_info"], 
-                        interactive=True
-                    )
-        with gr.Column():
-            with gr.Row():
-                with gr.Accordion(
-                    translations["more_option"], 
-                    open=False, 
-                    visible=False
-                ) as more_accordion:
+                ) as fade_accordion:
                     with gr.Row():
-                        fade = gr.Checkbox(
-                            label=translations["fade"], 
-                            value=False, 
+                        fade_in = gr.Slider(
+                            minimum=0, 
+                            maximum=10000, 
+                            step=100, 
+                            value=0, 
+                            label=translations["fade_in"], 
+                            info=translations["fade_in_info"], 
                             interactive=True
                         )
-                        bass_or_treble = gr.Checkbox(
-                            label=translations["bass_or_treble"], 
-                            value=False, 
+                        fade_out = gr.Slider(
+                            minimum=0, 
+                            maximum=10000, 
+                            step=100, 
+                            value=0, 
+                            label=translations["fade_out"], 
+                            info=translations["fade_out_info"], 
                             interactive=True
                         )
-                        limiter = gr.Checkbox(
-                            label=translations["limiter"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        resample_checkbox = gr.Checkbox(
-                            label=translations["resample"], 
-                            value=False, 
-                            interactive=True
-                        )
+                with gr.Accordion(
+                    translations["bass_or_treble"], 
+                    open=True, 
+                    visible=False
+                ) as bass_treble_accordion:
                     with gr.Row():
-                        distortion_checkbox = gr.Checkbox(
-                            label=translations["distortion"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        gain_checkbox = gr.Checkbox(
-                            label=translations["gain"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        bitcrush_checkbox = gr.Checkbox(
-                            label=translations["bitcrush"], 
-                            value=False, 
-                            interactive=True
-                        )
-                        clipping_checkbox = gr.Checkbox(
-                            label=translations["clipping"], 
-                            value=False, 
-                            interactive=True
-                        )
-                    with gr.Accordion(
-                        translations["fade"], 
-                        open=True, 
-                        visible=False
-                    ) as fade_accordion:
-                        with gr.Row():
-                            fade_in = gr.Slider(
-                                minimum=0, 
-                                maximum=10000, 
-                                step=100, 
-                                value=0, 
-                                label=translations["fade_in"], 
-                                info=translations["fade_in_info"], 
-                                interactive=True
-                            )
-                            fade_out = gr.Slider(
-                                minimum=0, 
-                                maximum=10000, 
-                                step=100, 
-                                value=0, 
-                                label=translations["fade_out"], 
-                                info=translations["fade_out_info"], 
-                                interactive=True
-                            )
-                    with gr.Accordion(
-                        translations["bass_or_treble"], 
-                        open=True, 
-                        visible=False
-                    ) as bass_treble_accordion:
-                        with gr.Row():
-                            bass_boost = gr.Slider(
-                                minimum=0, 
-                                maximum=20, 
-                                step=1, 
-                                value=0, 
-                                label=translations["bass_boost"], 
-                                info=translations["bass_boost_info"], 
-                                interactive=True
-                            )
-                            bass_frequency = gr.Slider(
-                                minimum=20, 
-                                maximum=200, 
-                                step=10, 
-                                value=100, 
-                                label=translations["bass_frequency"], 
-                                info=translations["bass_frequency_info"], 
-                                interactive=True
-                            )
-                        with gr.Row():
-                            treble_boost = gr.Slider(
-                                minimum=0, 
-                                maximum=20, 
-                                step=1, 
-                                value=0, 
-                                label=translations["treble_boost"], 
-                                info=translations["treble_boost_info"], 
-                                interactive=True
-                            )
-                            treble_frequency = gr.Slider(
-                                minimum=1000, 
-                                maximum=10000, 
-                                step=500, 
-                                value=3000, 
-                                label=translations["treble_frequency"], 
-                                info=translations["treble_frequency_info"], 
-                                interactive=True
-                            )
-                    with gr.Accordion(
-                        translations["limiter"], 
-                        open=True, 
-                        visible=False
-                    ) as limiter_accordion:
-                        with gr.Row():
-                            limiter_threshold_db = gr.Slider(
-                                minimum=-60, 
-                                maximum=0, 
-                                step=1, 
-                                value=-1, 
-                                label=translations["limiter_threshold_db"], 
-                                info=translations["limiter_threshold_db_info"], 
-                                interactive=True
-                            )
-                            limiter_release_ms = gr.Slider(
-                                minimum=10, 
-                                maximum=1000, 
-                                step=1, 
-                                value=100, 
-                                label=translations["limiter_release_ms"], 
-                                info=translations["limiter_release_ms_info"], 
-                                interactive=True
-                            )
-                    with gr.Column():
-                        pitch_shift_semitones = gr.Slider(
-                            minimum=-20, 
+                        bass_boost = gr.Slider(
+                            minimum=0, 
                             maximum=20, 
                             step=1, 
                             value=0, 
-                            label=translations["pitch"], 
-                            info=translations["pitch_info"], 
+                            label=translations["bass_boost"], 
+                            info=translations["bass_boost_info"], 
                             interactive=True
                         )
-                        audio_effect_resample_sr = gr.Radio(
-                            choices=[0]+sample_rate_choice, 
-                            value=0, 
-                            label=translations["resample"], 
-                            info=translations["resample_info"], 
-                            interactive=True, 
-                            visible=False
+                        bass_frequency = gr.Slider(
+                            minimum=20, 
+                            maximum=200, 
+                            step=10, 
+                            value=100, 
+                            label=translations["bass_frequency"], 
+                            info=translations["bass_frequency_info"], 
+                            interactive=True
                         )
-                        distortion_drive_db = gr.Slider(
+                    with gr.Row():
+                        treble_boost = gr.Slider(
                             minimum=0, 
-                            maximum=50, 
-                            step=1, 
-                            value=20, 
-                            label=translations["distortion"], 
-                            info=translations["distortion_info"], 
-                            interactive=True, 
-                            visible=False
-                        )
-                        gain_db = gr.Slider(
-                            minimum=-60, 
-                            maximum=60, 
+                            maximum=20, 
                             step=1, 
                             value=0, 
-                            label=translations["gain"], 
-                            info=translations["gain_info"], 
-                            interactive=True, 
-                            visible=False
+                            label=translations["treble_boost"], 
+                            info=translations["treble_boost_info"], 
+                            interactive=True
                         )
-                        clipping_threshold_db = gr.Slider(
+                        treble_frequency = gr.Slider(
+                            minimum=1000, 
+                            maximum=10000, 
+                            step=500, 
+                            value=3000, 
+                            label=translations["treble_frequency"], 
+                            info=translations["treble_frequency_info"], 
+                            interactive=True
+                        )
+                with gr.Accordion(
+                    translations["limiter"], 
+                    open=True, 
+                    visible=False
+                ) as limiter_accordion:
+                    with gr.Row():
+                        limiter_threshold_db = gr.Slider(
                             minimum=-60, 
                             maximum=0, 
                             step=1, 
                             value=-1, 
-                            label=translations["clipping_threshold_db"], 
-                            info=translations["clipping_threshold_db_info"], 
-                            interactive=True, 
-                            visible=False
+                            label=translations["limiter_threshold_db"], 
+                            info=translations["limiter_threshold_db_info"], 
+                            interactive=True
                         )
-                        bitcrush_bit_depth = gr.Slider(
-                            minimum=1, 
-                            maximum=24, 
+                        limiter_release_ms = gr.Slider(
+                            minimum=10, 
+                            maximum=1000, 
                             step=1, 
-                            value=16, 
-                            label=translations["bitcrush_bit_depth"], 
-                            info=translations["bitcrush_bit_depth_info"], 
-                            interactive=True, 
-                            visible=False
+                            value=100, 
+                            label=translations["limiter_release_ms"], 
+                            info=translations["limiter_release_ms_info"], 
+                            interactive=True
                         )
-            with gr.Row():
-                with gr.Accordion(
-                    translations["phaser"], 
-                    open=False, 
-                    visible=False
-                ) as phaser_accordion:
-                    phaser_depth = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["phaser_depth"], 
-                        info=translations["phaser_depth_info"], 
-                        interactive=True
-                    )
-                    phaser_rate_hz = gr.Slider(
-                        minimum=0.1, 
-                        maximum=10, 
-                        step=0.1, 
-                        value=1, 
-                        label=translations["phaser_rate_hz"], 
-                        info=translations["phaser_rate_hz_info"], 
-                        interactive=True
-                    )
-                    phaser_mix = gr.Slider(
-                        minimum=0, 
-                        maximum=1, 
-                        step=0.01, 
-                        value=0.5, 
-                        label=translations["phaser_mix"], 
-                        info=translations["phaser_mix_info"], 
-                        interactive=True
-                    )
-                    phaser_centre_frequency_hz = gr.Slider(
-                        minimum=50, 
-                        maximum=5000, 
-                        step=10, 
-                        value=1000, 
-                        label=translations["phaser_centre_frequency_hz"], 
-                        info=translations["phaser_centre_frequency_hz_info"], 
-                        interactive=True
-                    )
-                    phaser_feedback = gr.Slider(
-                        minimum=-1, 
-                        maximum=1, 
-                        step=0.01, 
+                with gr.Column():
+                    pitch_shift_semitones = gr.Slider(
+                        minimum=-20, 
+                        maximum=20, 
+                        step=1, 
                         value=0, 
-                        label=translations["phaser_feedback"], 
-                        info=translations["phaser_feedback_info"], 
+                        label=translations["pitch"], 
+                        info=translations["pitch_info"], 
                         interactive=True
                     )
-            with gr.Row():
-                with gr.Accordion(
-                    translations["compressor"], 
-                    open=False, 
-                    visible=False
-                ) as compressor_accordion:
-                    compressor_threshold_db = gr.Slider(
+                    audio_effect_resample_sr = gr.Radio(
+                        choices=[0]+sample_rate_choice, 
+                        value=0, 
+                        label=translations["resample"], 
+                        info=translations["resample_info"], 
+                        interactive=True, 
+                        visible=False
+                    )
+                    distortion_drive_db = gr.Slider(
+                        minimum=0, 
+                        maximum=50, 
+                        step=1, 
+                        value=20, 
+                        label=translations["distortion"], 
+                        info=translations["distortion_info"], 
+                        interactive=True, 
+                        visible=False
+                    )
+                    gain_db = gr.Slider(
+                        minimum=-60, 
+                        maximum=60, 
+                        step=1, 
+                        value=0, 
+                        label=translations["gain"], 
+                        info=translations["gain_info"], 
+                        interactive=True, 
+                        visible=False
+                    )
+                    clipping_threshold_db = gr.Slider(
                         minimum=-60, 
                         maximum=0, 
                         step=1, 
-                        value=-20, 
-                        label=translations["compressor_threshold_db"], 
-                        info=translations["compressor_threshold_db_info"], 
-                        interactive=True
+                        value=-1, 
+                        label=translations["clipping_threshold_db"], 
+                        info=translations["clipping_threshold_db_info"], 
+                        interactive=True, 
+                        visible=False
                     )
-                    compressor_ratio = gr.Slider(
+                    bitcrush_bit_depth = gr.Slider(
                         minimum=1, 
-                        maximum=20, 
-                        step=0.1, 
-                        value=1, 
-                        label=translations["compressor_ratio"], 
-                        info=translations["compressor_ratio_info"], 
-                        interactive=True
-                    )
-                    compressor_attack_ms = gr.Slider(
-                        minimum=0.1, 
-                        maximum=100, 
-                        step=0.1, 
-                        value=10, 
-                        label=translations["compressor_attack_ms"], 
-                        info=translations["compressor_attack_ms_info"], 
-                        interactive=True
-                    )
-                    compressor_release_ms = gr.Slider(
-                        minimum=10, 
-                        maximum=1000, 
+                        maximum=24, 
                         step=1, 
-                        value=100, 
-                        label=translations["compressor_release_ms"], 
-                        info=translations["compressor_release_ms_info"], 
-                        interactive=True
-                    )   
+                        value=16, 
+                        label=translations["bitcrush_bit_depth"], 
+                        info=translations["bitcrush_bit_depth_info"], 
+                        interactive=True, 
+                        visible=False
+                    )
     with gr.Row():
         gr.Markdown(translations["output_audio"])
     with gr.Row():
@@ -856,6 +854,80 @@ def audio_effects_tab():
             outputs=[
                 presets_name
             ]
+        )
+    with gr.Row():
+        reverb_check_box.change(
+            fn=lambda a, b, c, d, e, f: visible(max([a, b, c, d, e, f])), 
+            inputs=[
+                reverb_check_box, 
+                chorus_check_box, 
+                delay_check_box, 
+                phaser_check_box, 
+                compressor_check_box, 
+                more_options
+            ], 
+            outputs=[accordion]
+        )
+        chorus_check_box.change(
+            fn=lambda a, b, c, d, e, f: visible(max([a, b, c, d, e, f])), 
+            inputs=[
+                reverb_check_box, 
+                chorus_check_box, 
+                delay_check_box, 
+                phaser_check_box, 
+                compressor_check_box, 
+                more_options
+            ], 
+            outputs=[accordion]
+        )
+        delay_check_box.change(
+            fn=lambda a, b, c, d, e, f: visible(max([a, b, c, d, e, f])), 
+            inputs=[
+                reverb_check_box, 
+                chorus_check_box, 
+                delay_check_box, 
+                phaser_check_box, 
+                compressor_check_box, 
+                more_options
+            ], 
+            outputs=[accordion]
+        )
+    with gr.Row():
+        phaser_check_box.change(
+            fn=lambda a, b, c, d, e, f: visible(max([a, b, c, d, e, f])), 
+            inputs=[
+                reverb_check_box, 
+                chorus_check_box, 
+                delay_check_box, 
+                phaser_check_box, 
+                compressor_check_box, 
+                more_options
+            ], 
+            outputs=[accordion]
+        )
+        compressor_check_box.change(
+            fn=lambda a, b, c, d, e, f: visible(max([a, b, c, d, e, f])), 
+            inputs=[
+                reverb_check_box, 
+                chorus_check_box, 
+                delay_check_box, 
+                phaser_check_box, 
+                compressor_check_box, 
+                more_options
+            ], 
+            outputs=[accordion]
+        )
+        more_options.change(
+            fn=lambda a, b, c, d, e, f: visible(max([a, b, c, d, e, f])), 
+            inputs=[
+                reverb_check_box, 
+                chorus_check_box, 
+                delay_check_box, 
+                phaser_check_box, 
+                compressor_check_box, 
+                more_options
+            ], 
+            outputs=[accordion]
         )
     with gr.Row():
         load_preset_button.click(

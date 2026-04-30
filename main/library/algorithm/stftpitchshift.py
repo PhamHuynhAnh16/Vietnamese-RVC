@@ -193,13 +193,13 @@ class StftPitchShift:
         shape = input.shape
 
         input = np.squeeze(input)
-        if input.ndim != 1: raise ValueError('input.ndim != 1')
+        if input.ndim != 1: raise ValueError
 
         if np.issubdtype(dtype, np.integer):
             a, b = np.iinfo(dtype).min, np.iinfo(dtype).max
 
             input = ((input.astype(float) - a) / (b - a)) * 2 - 1
-        elif not np.issubdtype(dtype, np.floating): raise TypeError('not np.issubdtype(dtype, np.floating)')
+        elif not np.issubdtype(dtype, np.floating): raise TypeError
 
         def isnotnormal(x):
             return (np.isinf(x)) | (np.isnan(x)) | (abs(x) < np.finfo(x.dtype).tiny)

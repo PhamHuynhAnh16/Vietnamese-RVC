@@ -16,11 +16,7 @@ from main.library.backends.utils import GRU
 torch_available = pytorch_ocl != None
 if torch_available: adaptive_orig = torch.nn.AdaptiveAvgPool2d
 
-def check_amd_gpu(gpu):
-    for i in ["RX", "AMD", "Vega", "Radeon", "FirePro"]:
-        return i in gpu
-
-def get_amd_gpu_windows():
+def get_opencl_gpu_windows():
     gpus = ""
 
     try:
@@ -37,24 +33,22 @@ def get_amd_gpu_windows():
         )
 
     return [
-        gpu.strip() 
-        for gpu in gpus.decode().split('\n')[1:] 
-        if check_amd_gpu(gpu)
+        gpu.strip() for gpu in gpus.decode().split('\n')
+        if gpu.strip() != ""
     ]
 
-def get_amd_gpu_linux():
+def get_opencl_gpu_linux():
     try:
         return [
-            gpu.strip() 
-            for gpu in subprocess.check_output("lspci | grep VGA", shell=True).decode().split('\n') 
-            if check_amd_gpu(gpu)
+            gpu.strip() for gpu in subprocess.check_output("lspci | grep VGA", shell=True).decode().split('\n') 
+            if gpu.strip() != ""
         ]
     except:
         return []
 
 def get_gpu_list():
     return (
-        get_amd_gpu_windows() if platform.system() == "Windows" else get_amd_gpu_linux()
+        get_opencl_gpu_windows() if platform.system() == "Windows" else get_opencl_gpu_linux()
     ) if torch_available else []
 
 def device_count():
@@ -102,6 +96,7 @@ def AdaptiveAvgPool2d(input):
 
 if torch_available:
     torch.nn.GRU = GRU
-    torch.nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d
-    torch.nn.functional.group_norm = group_norm
     torch.jit.script = script
+    torch.inference_mode = torch.no_grad
+    torch.nn.functional.group_norm = group_norm
+    torch.nn.AdaptiveAvgPool2d = AdaptiveAvgPool2d

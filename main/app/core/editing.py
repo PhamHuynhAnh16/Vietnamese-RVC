@@ -284,7 +284,7 @@ def apply_voice_quirk(
             y, 
             np.sin(
                 2 * np.pi * np.linspace(0, 1, int(0.05 * sr))
-            ) * 0.02
+            ) * 0.04
         ])
     elif mode == 14: 
         y += np.random.normal(
@@ -293,7 +293,7 @@ def apply_voice_quirk(
             len(y)
         )
     elif mode == 15:
-        frame = int(sr * 0.2)
+        frame = int(sr * 0.8)
         chunks = [y[i:i + frame] for i in range(0, len(y), frame)]
 
         np.random.shuffle(chunks)

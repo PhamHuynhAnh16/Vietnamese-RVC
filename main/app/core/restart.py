@@ -10,7 +10,7 @@ from main.app.core.ui import gr_info
 from main.app.variables import python, translations, configs_json
 
 def restart_app(app):
-    gr_info(translations["30s"])
+    gr_info(translations["restart"])
     os.system("cls" if platform.system() == "Windows" else "clear")
     
     app.close()
@@ -19,7 +19,7 @@ def restart_app(app):
         os.path.join("main", "app", "app.py")
     ] + [arg for arg in sys.argv[1:] if arg != "--open"])
 
-def change_language(lang, app):
+def restart(lang, theme, font, app):
     configs = json.load(open(configs_json, "r"))
 
     if lang != configs["language"]:
@@ -27,25 +27,17 @@ def change_language(lang, app):
 
         with open(configs_json, "w") as f:
             json.dump(configs, f, indent=4)
-
-        restart_app(app)
-
-def change_theme(theme, app):
-    configs = json.load(open(configs_json, "r"))
     
     if theme != configs["theme"]:
         configs["theme"] = theme
+
         with open(configs_json, "w") as f:
             json.dump(configs, f, indent=4)
-
-        restart_app(app)
-
-def change_font(font, app):
-    configs = json.load(open(configs_json, "r"))
 
     if font != configs["font"]:
         configs["font"] = font
+
         with open(configs_json, "w") as f:
             json.dump(configs, f, indent=4)
 
-        restart_app(app)
+    restart_app(app)

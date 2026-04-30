@@ -46,7 +46,7 @@ def crop_center(h1, h2):
     h2_shape = h2.size()
 
     if h1_shape[3] == h2_shape[3]: return h1
-    elif h1_shape[3] < h2_shape[3]: raise ValueError("h1_shape[3] > h2_shape[3]")
+    elif h1_shape[3] < h2_shape[3]: raise ValueError
 
     s_time = (h1_shape[3] - h2_shape[3]) // 2
 
@@ -107,7 +107,7 @@ def merge_artifacts(y_mask, thres=0.01, min_range=64, fade_size=32):
     mask = y_mask
 
     try:
-        if min_range < fade_size * 2: raise ValueError("min_range >= fade_size * 2")
+        if min_range < fade_size * 2: raise ValueError
 
         idx = np.where(y_mask.min(axis=(0, 1)) > thres)[0]
         start_idx = np.insert(idx[np.where(np.diff(idx) != 1)[0] + 1], 0, idx[0])
@@ -172,7 +172,7 @@ def combine_spectrograms(specs, mp, is_v51_model=False):
         spec_c[:, offset : offset + h, :l] = specs[d][:, mp.param["band"][str(d)]["crop_start"] : mp.param["band"][str(d)]["crop_stop"], :l]
         offset += h
 
-    if offset > mp.param["bins"]: raise ValueError("offset > mp.param['bins']")
+    if offset > mp.param["bins"]: raise ValueError
 
     if mp.param["pre_filter_start"] > 0:
         if is_v51_model: spec_c *= get_lp_filter_mask(spec_c.shape[1], mp.param["pre_filter_start"], mp.param["pre_filter_stop"])

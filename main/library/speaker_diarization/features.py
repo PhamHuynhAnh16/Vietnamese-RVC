@@ -7,6 +7,7 @@ import functools
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
 from main.library.speaker_diarization.speechbrain import MAIN_PROC_ONLY, is_distributed_initialized, main_process_only
 
 WEAKREF_MARKER = "WEAKREF"
@@ -37,7 +38,7 @@ def torch_patched_state_dict_load(path, device="cpu"):
         torch.load(
             path, 
             map_location=device, 
-            weights_only=False
+            weights_only=True
         )
     )
 
@@ -78,12 +79,12 @@ def _cycliclrloader(obj, path, end_of_epoch):
 
     try:
         obj.load_state_dict(
-            torch.load(path, map_location="cpu", weights_only=False), 
+            torch.load(path, map_location="cpu", weights_only=True), 
             strict=True
         )
     except TypeError:
         obj.load_state_dict(
-            torch.load(path, map_location="cpu", weights_only=False)
+            torch.load(path, map_location="cpu", weights_only=True)
         )
 
 DEFAULT_LOAD_HOOKS = {
@@ -172,7 +173,7 @@ def ddp_all_reduce(communication_object, reduce_op):
 def fwd_default_precision(fwd = None, cast_inputs = torch.float32):
     if fwd is None: return functools.partial(fwd_default_precision, cast_inputs=cast_inputs)
 
-    wrapped_fwd = torch.cuda.amp.custom_fwd(fwd, cast_inputs=cast_inputs)
+    wrapped_fwd = torch.amp.custom_fwd(fwd, cast_inputs=cast_inputs, device_type=config.device if config.device.startswith(("cuda", "xpu")) else "cpu")
 
     @functools.wraps(fwd)
     def wrapper(*args, force_allow_autocast = False, **kwargs):
@@ -413,7 +414,7 @@ class STFT(torch.nn.Module):
         if len(or_shape) == 3: x = x.transpose(1, 2).reshape(or_shape[0] * or_shape[2], or_shape[1])
         
         device = x.device
-        if str(device) not in ["cuda", "cpu"]: x = x.cpu()
+        if str(device) not in ["cuda", "xpu", "cpu"]: x = x.cpu()
 
         stft = torch.view_as_real(
             torch.stft(
@@ -733,5 +734,5 @@ class InputNormalization(torch.nn.Module):
     @mark_as_loader
     def _load(self, path, end_of_epoch=False):
         del end_of_epoch  
-        stats = torch.load(path, map_location="cpu", weights_only=False)
+        stats = torch.load(path, map_location="cpu", weights_only=True)
         self._load_statistics_dict(stats)
