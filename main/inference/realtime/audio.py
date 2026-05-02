@@ -181,18 +181,18 @@ class Audio:
         self.embedders_mix_layers = embedders_mix_layers
         self.embedders_mix_ratio = embedders_mix_ratio
 
-    def get_audio_device(self, input_index, output_index):
+    def get_audio_device(self, input_index = None, output_index = None):
         audioinput, audiooutput = list_audio_device()
 
         inputs, outputs = (
             [
                 x for x in audioinput 
                 if x.index == input_index
-            ],
+            ] if input_index is not None else [],
             [
                 x for x in audiooutput 
                 if x.index == output_index
-            ]
+            ] if output_index is not None else []
         )
 
         return (inputs[0] if len(inputs) > 0 else None), (outputs[0] if len(outputs) > 0 else None)
@@ -424,7 +424,7 @@ class Audio:
             use_asio = True
 
         if self.use_monitor:
-            output_monitor_device = self.get_output_audio_device(output_monitor_id)
+            _, output_monitor_device = self.get_audio_device(output_index=output_monitor_id)
             monitor_channels = output_monitor_device.max_output_channels
 
             if (

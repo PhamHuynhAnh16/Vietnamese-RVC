@@ -89,6 +89,7 @@ def move_file(
 
 def download_model(url=None, model=None):
     if not url: return gr_warning(translations["provide_url"])
+    logger.debug(model + ": " + url)
 
     url = replace_url(url)
     download_dir = "download_model"
@@ -297,6 +298,8 @@ def search_models(name):
         gr_info(translations["not_found"].format(name=name))
         return [None]*2
     else:
+        from urllib.parse import unquote
+
         model_options.clear()
         
         for table in tables:
@@ -306,7 +309,7 @@ def search_models(name):
                     row.find("a", {"class": "btn btn-sm fw-bold btn-light ms-0 p-1 ps-2 pe-2"})
                 )
 
-                url = url_tag["href"].replace("https://easyaivoice.com/run?url=", "")
+                url = unquote(url_tag["href"].replace("https://easyaivoice.com/run?url=", ""))
 
                 if ("huggingface" in url) and (name_tag and url_tag): 
                     model_options[replace_modelname(name_tag.text)] = url
