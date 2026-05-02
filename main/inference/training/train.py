@@ -167,7 +167,11 @@ if architecture == "SVC":
     pitch_guidance = True
     energy_use = False
 
-experiment_dir = os.path.join(logs_path, model_name) if not os.path.exists(model_name) else model_name
+if not os.path.exists(model_name): experiment_dir = os.path.join(logs_path, model_name)
+else:
+    experiment_dir = model_name
+    custom_save_checkpoint_path = weights_path
+
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
 
