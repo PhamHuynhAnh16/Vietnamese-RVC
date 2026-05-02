@@ -185,19 +185,20 @@ def preprocess(
 
     if not model_name: return gr_warning(translations["provide_name"])
 
-    try:
-        found = False
-        if os.path.exists(dataset):
-            for root, _, files in os.walk(dataset):
-                for f in files:
-                    if f.lower().endswith(tuple(file_types)) and os.path.getsize(os.path.join(root, f)) > 0:
-                        found = True
-                        break
+    if configs.get("check_data", False):
+        try:
+            found = False
+            if os.path.exists(dataset):
+                for root, _, files in os.walk(dataset):
+                    for f in files:
+                        if f.lower().endswith(tuple(file_types)) and os.path.getsize(os.path.join(root, f)) > 0:
+                            found = True
+                            break
 
-                if found: break
-        if not found: return gr_warning(translations["not_found_data"])
-    except Exception:
-        return gr_warning(translations["not_found_data"])
+                    if found: break
+            if not found: return gr_warning(translations["not_found_data"])
+        except Exception:
+            return gr_warning(translations["not_found_data"])
     
     model_dir = os.path.join(configs["logs_path"], model_name)
     if os.path.exists(model_dir): shutil.rmtree(model_dir, ignore_errors=True)
@@ -261,17 +262,18 @@ def extract(
     if not model_name: return gr_warning(translations["provide_name"])
     model_dir = os.path.join(configs["logs_path"], model_name)
 
-    try:
-        if not any(
-            os.path.isfile(os.path.join(model_dir, "sliced_audios", f)) 
-            for f in os.listdir(os.path.join(model_dir, "sliced_audios"))
-        ) or not any(
-            os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f)) 
-            for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k"))
-        ): 
+    if configs.get("check_data", False):
+        try:
+            if not any(
+                os.path.isfile(os.path.join(model_dir, "sliced_audios", f)) 
+                for f in os.listdir(os.path.join(model_dir, "sliced_audios"))
+            ) or not any(
+                os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f)) 
+                for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k"))
+            ): 
+                return gr_warning(translations["not_found_data_preprocess"])
+        except:
             return gr_warning(translations["not_found_data_preprocess"])
-    except:
-        return gr_warning(translations["not_found_data_preprocess"])
     
     p = subprocess.Popen([
         python,
@@ -313,15 +315,16 @@ def create_index(
 ):
     if not model_name: return gr_warning(translations["provide_name"])
     model_dir = os.path.join(configs["logs_path"], model_name)
-    
-    try:
-        if not any(
-            os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) 
-            for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))
-        ): 
+
+    if configs.get("check_data", False):
+        try:
+            if not any(
+                os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) 
+                for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))
+            ): 
+                return gr_warning(translations["not_found_data_extract"])
+        except:
             return gr_warning(translations["not_found_data_extract"])
-    except:
-        return gr_warning(translations["not_found_data_extract"])
     
     p = subprocess.Popen([
         python, 
@@ -383,15 +386,16 @@ def training(
     model_dir = os.path.join(configs["logs_path"], model_name)
     if os.path.exists(os.path.join(model_dir, "train_pid.txt")): 
         os.remove(os.path.join(model_dir, "train_pid.txt"))
-    
-    try:
-        if not any(
-            os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) 
-            for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))
-        ): 
+
+    if configs.get("check_data", False):
+        try:
+            if not any(
+                os.path.isfile(os.path.join(model_dir, f"{rvc_version}_extracted", f)) 
+                for f in os.listdir(os.path.join(model_dir, f"{rvc_version}_extracted"))
+            ): 
+                return gr_warning(translations["not_found_data_extract"])
+        except:
             return gr_warning(translations["not_found_data_extract"])
-    except:
-        return gr_warning(translations["not_found_data_extract"])
     
     if not not_pretrain:
         if not custom_pretrained: 

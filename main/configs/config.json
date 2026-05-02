@@ -729,5 +729,6 @@
     "ffmpeg_download": true,
     "compile_all": false,
     "compile_mode": null,
-    "compile_cache_dir": "assets/cache"
+    "compile_cache_dir": "assets/cache",
+    "check_data": false
 }
