@@ -97,10 +97,6 @@ g_lr_coeff = 1.0
 d_step_per_g_step = 1
 use_clip_grad_value = False
 
-weights_path = main_configs["weights_path"]
-logs_path = main_configs["logs_path"]
-custom_save_checkpoint_path = None
-
 args = parse_arguments()
 
 (
@@ -167,10 +163,16 @@ if architecture == "SVC":
     pitch_guidance = True
     energy_use = False
 
+weights_path = main_configs["weights_path"]
+logs_path = main_configs["logs_path"]
+custom_save_checkpoint_path = None
+
 if not os.path.exists(model_name): experiment_dir = os.path.join(logs_path, model_name)
 else:
     experiment_dir = model_name
     custom_save_checkpoint_path = weights_path
+
+checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
 
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
@@ -472,8 +474,6 @@ def run(
         logger.debug(e)
 
     try:
-        checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
-
         g_path = os.path.join(checkpoint_path, "G_latest.pth")
         last_g = g_path if save_only_latest and os.path.exists(g_path) else latest_checkpoint_path(checkpoint_path, "G_*.pth")
 
@@ -584,14 +584,14 @@ def run(
 
         _, _, _, epoch_str, scaler_dict = load_checkpoint(
             logger, 
-            os.path.join(experiment_dir, "D_latest.pth") if save_only_latest else latest_checkpoint_path(experiment_dir, "D_*.pth"), 
+            os.path.join(checkpoint_path, "D_latest.pth") if save_only_latest else latest_checkpoint_path(checkpoint_path, "D_*.pth"), 
             net_d, 
             optim_d
         )
 
         _, _, _, epoch_str, _ = load_checkpoint(
             logger, 
-            os.path.join(experiment_dir, "G_latest.pth") if save_only_latest else latest_checkpoint_path(experiment_dir, "G_*.pth"), 
+            os.path.join(checkpoint_path, "G_latest.pth") if save_only_latest else latest_checkpoint_path(checkpoint_path, "G_*.pth"), 
             net_g, 
             optim_g
         )
@@ -1125,7 +1125,6 @@ def train_and_evaluate(
     
     if rank == 0:
         if epoch % save_every_epoch == False:
-            checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
             checkpoint_suffix = f"{'latest' if save_only_latest else global_step}.pth"
 
             save_checkpoint(
