@@ -3,11 +3,9 @@ import sys
 import time
 import argparse
 
-from distutils.util import strtobool
-
 sys.path.append(os.getcwd())
 
-from main.library.utils import pydub_load
+from main.library.utils import pydub_load, strtobool
 from main.library.uvr5_lib.separator import Separator
 from main.app.variables import config, logger, translations, vr_models, demucs_models, mdx_models, karaoke_models, reverb_models, denoise_models
 

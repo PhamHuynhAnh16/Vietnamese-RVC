@@ -13,12 +13,11 @@ import torch.multiprocessing as mp
 from tqdm import tqdm
 from scipy import signal
 from scipy.io import wavfile
-from distutils.util import strtobool
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import load_audio
+from main.library.utils import load_audio, strtobool
 from main.inference.preprocess.slicer2 import Slicer
 from main.app.variables import config, logger, translations, configs, file_types
 

@@ -15,6 +15,7 @@ class TextAudioLoader(tdata.Dataset):
     def __init__(
         self, 
         hparams, 
+        cache_spectrogram=True,
         pitch_guidance=True, 
         energy=False
     ):
@@ -26,6 +27,7 @@ class TextAudioLoader(tdata.Dataset):
         self.win_length = hparams.win_length
         self.min_text_len = getattr(hparams, "min_text_len", 1)
         self.max_text_len = getattr(hparams, "max_text_len", 5000)
+        self.cache_spectrogram = cache_spectrogram
         self.pitch_guidance = pitch_guidance
         self.energy = energy
         self._filter()
@@ -108,21 +110,8 @@ class TextAudioLoader(tdata.Dataset):
         audio_norm = audio.unsqueeze(0)
         spec_filename = filename.replace(".wav", ".spec.pt")
 
-        if os.path.exists(spec_filename):
-            try:
-                spec = torch.load(spec_filename, weights_only=True)
-            except Exception:
-                spec = spectrogram_torch(
-                    audio_norm, 
-                    self.filter_length, 
-                    self.hop_length, 
-                    self.win_length, 
-                    center=False
-                ).squeeze(0)
-
-                torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
-        else:
-            spec = spectrogram_torch(
+        def get_spectrogram(audio_norm):
+            return spectrogram_torch(
                 audio_norm, 
                 self.filter_length, 
                 self.hop_length, 
@@ -130,6 +119,16 @@ class TextAudioLoader(tdata.Dataset):
                 center=False
             ).squeeze(0)
 
+        if not self.cache_spectrogram:
+            spec = get_spectrogram(audio_norm)
+        elif os.path.exists(spec_filename):
+            try:
+                spec = torch.load(spec_filename, weights_only=True)
+            except Exception:
+                spec = get_spectrogram(audio_norm)
+                torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
+        else:
+            spec = get_spectrogram(audio_norm)
             torch.save(spec, spec_filename, _use_new_zipfile_serialization=False)
 
         return spec, audio_norm

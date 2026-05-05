@@ -6,11 +6,9 @@ import warnings
 
 import torch.multiprocessing as mp
 
-from distutils.util import strtobool
-
 sys.path.append(os.getcwd())
 
-from main.library.utils import check_assets
+from main.library.utils import check_assets, strtobool
 from main.inference.extracting.rms import run_rms_extraction
 from main.inference.extracting.feature import run_pitch_extraction
 from main.app.variables import config, logger, translations, configs

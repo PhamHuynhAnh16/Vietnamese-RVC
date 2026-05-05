@@ -12,7 +12,6 @@ import soundfile as sf
 
 from tqdm import tqdm
 from scipy import signal
-from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
@@ -20,7 +19,7 @@ from main.app.core.ui import replace_export_format
 from main.inference.conversion.pipeline import Pipeline
 from main.app.variables import config, logger, translations, file_types
 from main.inference.conversion.audio_processing import preprocess, postprocess
-from main.library.utils import check_assets, load_audio, load_embedders_model, cut, restore, clear_gpu_cache, load_model
+from main.library.utils import check_assets, load_audio, load_embedders_model, cut, restore, clear_gpu_cache, load_model, strtobool
 
 if not config.debug_mode:
     warnings.filterwarnings("ignore")

@@ -9,12 +9,11 @@ import argparse
 import numpy as np
 
 from tqdm import tqdm
-from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
 from main.app.variables import config, logger, translations, configs
-from main.library.utils import load_audio, load_embedders_model, extract_features, check_assets
+from main.library.utils import load_audio, load_embedders_model, extract_features, check_assets, strtobool
 
 warnings.filterwarnings("ignore")
 

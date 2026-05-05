@@ -495,6 +495,13 @@ def load_model(model_path, weights_only=True, log_severity_level=3):
             log_severity_level=log_severity_level
         )
 
+def strtobool(value):
+    value = value.lower()
+
+    if value in ('y', 'yes', 't', 'true', 'on', '1'): return 1
+    elif value in ('n', 'no', 'f', 'false', 'off', '0'): return 0
+    else: raise ValueError
+
 def check_ffmpeg():
     try:
         if not sys.platform == "win32": return

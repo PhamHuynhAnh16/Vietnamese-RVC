@@ -16,7 +16,6 @@ from tqdm import tqdm
 from collections import deque
 from contextlib import nullcontext
 from random import randint, shuffle
-from distutils.util import strtobool
 from torch.utils.data import DataLoader
 from torch.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
@@ -27,9 +26,9 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 sys.path.append(os.getcwd())
 os.environ["USE_LIBUV"] = "0" if sys.platform == "win32" else "1"
 
-from main.library.utils import clear_gpu_cache
 from main.app.variables import logger, translations
 from main.library.backends import directml, opencl, xpu
+from main.library.utils import clear_gpu_cache, strtobool
 
 from main.library.algorithm import commons
 from main.inference.training import losses
@@ -91,11 +90,6 @@ def parse_arguments():
     parser.add_argument("--architecture", type=str, default="RVC")
 
     return parser.parse_args()
-
-d_lr_coeff = 1.0
-g_lr_coeff = 1.0
-d_step_per_g_step = 1
-use_clip_grad_value = False
 
 args = parse_arguments()
 
@@ -170,12 +164,23 @@ custom_save_checkpoint_path = None
 if not os.path.exists(model_name): experiment_dir = os.path.join(logs_path, model_name)
 else:
     experiment_dir = model_name
+    model_name = os.path.basename(model_name)
     custom_save_checkpoint_path = weights_path
 
 checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
 
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
+filelist_path = os.path.join(experiment_dir, "filelist.txt")
+eval_dir = os.path.join(experiment_dir, "eval")
+
+d_lr_coeff = 1.0
+g_lr_coeff = 1.0
+d_step_per_g_step = 1
+
+save_the_pid = True
+cache_spectrogram = True
+use_clip_grad_value = False
 
 torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
 torch.backends.cudnn.benchmark = args.benchmark if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
@@ -202,7 +207,7 @@ with open(config_save_path, "r") as f:
     config = json.load(f)
 
 config = HParams(**config)
-config.data.training_files = os.path.join(experiment_dir, "filelist.txt")
+config.data.training_files = filelist_path
 
 def main():
     global training_file_path, last_loss_gen_all, smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, overtrain_save_epoch, model_author, vocoder, checkpointing, gpus, energy_use
@@ -283,40 +288,41 @@ def main():
             children = []
             pid_data = {"process_pids": []}
 
-            with open(config_save_path, "r") as pid_file:
-                try:
-                    pid_data.update(json.load(pid_file))
-                except json.JSONDecodeError:
-                    pass
+            if save_the_pid:
+                with open(config_save_path, "r") as pid_file:
+                    try:
+                        pid_data.update(json.load(pid_file))
+                    except json.JSONDecodeError:
+                        pass
 
-            with open(config_save_path, "w") as pid_file:
-                for rank, device_id in enumerate(gpus):
-                    subproc = mp.Process(
-                        target=run, 
-                        args=(
-                            rank, 
-                            n_gpus, 
-                            experiment_dir, 
-                            pretrainG, 
-                            pretrainD, 
-                            pitch_guidance, 
-                            total_epoch, 
-                            save_every_weights, 
-                            config, 
-                            device, 
-                            device_id, 
-                            model_author, 
-                            vocoder, 
-                            checkpointing, 
-                            energy_use
-                        )
+                pid_file = open(config_save_path, "w")
+
+            for rank, device_id in enumerate(gpus):
+                subproc = mp.Process(
+                    target=run, 
+                    args=(
+                        rank, 
+                        n_gpus, 
+                        pretrainG, 
+                        pretrainD, 
+                        pitch_guidance, 
+                        total_epoch, 
+                        save_every_weights, 
+                        config, 
+                        device, 
+                        device_id, 
+                        model_author, 
+                        vocoder, 
+                        checkpointing, 
+                        energy_use
                     )
+                )
 
-                    children.append(subproc)
-                    subproc.start()
-                    pid_data["process_pids"].append(subproc.pid)
+                children.append(subproc)
+                subproc.start()
+                pid_data["process_pids"].append(subproc.pid)
 
-                json.dump(pid_data, pid_file, indent=4)
+            if save_the_pid: json.dump(pid_data, pid_file, indent=4)
 
             for i in range(n_gpus):
                 children[i].join()
@@ -391,7 +397,6 @@ class EpochRecorder:
 def run(
     rank, 
     n_gpus, 
-    experiment_dir, 
     pretrainG, 
     pretrainD, 
     pitch_guidance, 
@@ -425,7 +430,7 @@ def run(
     elif hasattr(torch, "xpu") and torch.xpu.is_available(): torch.xpu.set_device(device_id)
 
     writer_eval = SummaryWriter(
-        log_dir=os.path.join(experiment_dir, "eval")
+        log_dir=eval_dir
     ) if rank == 0 else None
 
     from main.inference.training.data_utils import (
@@ -436,6 +441,7 @@ def run(
 
     train_dataset = TextAudioLoader(
         config.data, 
+        cache_spectrogram=cache_spectrogram,
         pitch_guidance=pitch_guidance, 
         energy=energy_use
     )
@@ -815,7 +821,7 @@ def train_and_evaluate(
                     tensor.cuda(device_id, non_blocking=True) 
                     for tensor in info
                 ]  
-            if device.type == "xpu" and not cache_data_in_gpu: 
+            elif device.type == "xpu" and not cache_data_in_gpu: 
                 info = [
                     tensor.xpu(device_id, non_blocking=True) 
                     for tensor in info
@@ -1314,17 +1320,18 @@ def train_and_evaluate(
         last_loss_gen_all = loss_gen_all
 
         if done: 
-            pid_file_path = os.path.join(experiment_dir, "config.json")
+            if save_the_pid:
+                pid_file_path = os.path.join(experiment_dir, "config.json")
 
-            with open(pid_file_path, "r") as pid_file:
-                pid_data = json.load(pid_file)
+                with open(pid_file_path, "r") as pid_file:
+                    pid_data = json.load(pid_file)
 
-            with open(pid_file_path, "w") as pid_file:
-                pid_data.pop("process_pids", None)
-                json.dump(pid_data, pid_file, indent=4)
+                with open(pid_file_path, "w") as pid_file:
+                    pid_data.pop("process_pids", None)
+                    json.dump(pid_data, pid_file, indent=4)
 
-            if os.path.exists(os.path.join(experiment_dir, "train_pid.txt")): 
-                os.remove(os.path.join(experiment_dir, "train_pid.txt"))
+                if os.path.exists(os.path.join(experiment_dir, "train_pid.txt")): 
+                    os.remove(os.path.join(experiment_dir, "train_pid.txt"))
 
             sys.exit(0)
 

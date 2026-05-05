@@ -12,10 +12,10 @@ import numpy as np
 import soundfile as sf
 
 from urllib.parse import urlparse
-from distutils.util import strtobool
 
 sys.path.append(os.getcwd())
 
+from main.library.utils import strtobool
 from main.inference.separate_music import _separate
 from main.app.variables import config, logger, translations
 

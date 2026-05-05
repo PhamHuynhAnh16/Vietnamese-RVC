@@ -6,7 +6,6 @@ import argparse
 import numpy as np
 import soundfile as sf
 
-from distutils.util import strtobool
 from scipy.signal import butter, filtfilt
 
 from pedalboard import (
@@ -27,9 +26,9 @@ from pedalboard import (
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import pydub_load
 from main.app.core.ui import replace_export_format
 from main.app.variables import translations, logger
+from main.library.utils import pydub_load, strtobool
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
