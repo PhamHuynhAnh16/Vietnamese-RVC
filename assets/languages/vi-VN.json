@@ -790,5 +790,6 @@
     "whisper_languages": "Ngôn ngữ đầu vào",
     "whisper_languages_info": "Đặt ngôn ngữ đầu vào để tránh mô hình xác nhận ngôn ngữ sai",
     "delete_when_success": "Xóa các tệp gốc khi hoàn thành",
-    "compile_model": "Đã kích hoạt chế độ biên dịch mô hình với phương thức: {compile_mode}"
+    "compile_model": "Đã kích hoạt chế độ biên dịch mô hình với phương thức: {compile_mode}",
+    "load_checkpoint": "Đã tải điểm lưu G: {g_path} | D: {d_path}!"
 }

@@ -167,7 +167,7 @@ with gr.Blocks(
         logger.debug("\n" + sys.stdout.getvalue())
         sys.stdout = original_stdout
 
-        if configs.get("discord_presence", True):
+        if configs.get("discord_presence", True) and "--no_discord" not in sys.argv:
             pipe = connect_discord_ipc()
             if pipe:
                 try:

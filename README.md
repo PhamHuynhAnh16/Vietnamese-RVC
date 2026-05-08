@@ -662,6 +662,8 @@ python main/app/parser.py --help
 
 `--debug`: Khi được thêm vào nó sẽ hiện thị tất cả gỡ lỗi của dự án.
 
+`--no_discord`: Khi được thêm vào nó sẽ không hiển thị discord RPC.
+
 ## Giải Thích Một Số Thứ
 
 **ONNX (Open Neural Network Exchange):**

@@ -3,6 +3,7 @@ import sys
 import time
 import shutil
 import codecs
+import datetime
 import threading
 import subprocess
 
@@ -19,11 +20,8 @@ def if_done(done, p):
 
     done[0] = True
 
-def log_read(done, name):
+def log_read(done, name, start_time):
     log_file = os.path.join(configs["logs_path"], "app.log")
-
-    f = open(log_file, "w", encoding="utf-8")
-    f.close()
 
     while 1:
         with open(log_file, "r", encoding="utf-8") as f:
@@ -32,7 +30,8 @@ def log_read(done, name):
                 if (
                     "DEBUG" not in line and 
                     name in line and 
-                    line.strip() != ""
+                    line.strip() != "" and
+                    datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f") >= start_time
                 )
             )
 
@@ -42,7 +41,12 @@ def log_read(done, name):
     with open(log_file, "r", encoding="utf-8") as f:
         log = "".join(
             line for line in f.readlines() 
-            if "DEBUG" not in line and line.strip() != ""
+            if (
+                "DEBUG" not in line and 
+                name in line and 
+                line.strip() != "" and
+                datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f") >= start_time
+            )
         )
 
     yield log
@@ -75,6 +79,7 @@ def create_dataset(
     clean_strength
 ):
     gr_info(translations["start"].format(start=translations["create"]))
+    start_time = datetime.datetime.now()
 
     p = subprocess.Popen([
         python,
@@ -110,7 +115,7 @@ def create_dataset(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, "create_dataset"):
+    for log in log_read(done, "create_dataset", start_time):
         yield log
 
 def create_reference(
@@ -135,6 +140,7 @@ def create_reference(
     embedders_mix_ratio = 0.5
 ):
     gr_info(translations["start"].format(start=translations["create_reference"]))
+    start_time = datetime.datetime.now()
 
     p = subprocess.Popen([
         python,
@@ -164,7 +170,7 @@ def create_reference(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, "create_reference"):
+    for log in log_read(done, "create_reference", start_time):
         yield log
 
 def preprocess(
@@ -200,6 +206,7 @@ def preprocess(
         except Exception:
             return gr_warning(translations["not_found_data"])
     
+    start_time = datetime.datetime.now()
     model_dir = os.path.join(configs["logs_path"], model_name)
     if os.path.exists(model_dir): shutil.rmtree(model_dir, ignore_errors=True)
 
@@ -225,7 +232,7 @@ def preprocess(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, "preprocess"):
+    for log in log_read(done, "preprocess", start_time):
         yield log
 
 def extract(
@@ -274,6 +281,8 @@ def extract(
                 return gr_warning(translations["not_found_data_preprocess"])
         except:
             return gr_warning(translations["not_found_data_preprocess"])
+        
+    start_time = datetime.datetime.now()
     
     p = subprocess.Popen([
         python,
@@ -305,7 +314,7 @@ def extract(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, "extract"):
+    for log in log_read(done, "extract", start_time):
         yield log
 
 def create_index(
@@ -326,6 +335,8 @@ def create_index(
         except:
             return gr_warning(translations["not_found_data_extract"])
     
+    start_time = datetime.datetime.now()
+
     p = subprocess.Popen([
         python, 
         configs["create_index_path"], 
@@ -339,7 +350,7 @@ def create_index(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, "create_index"):
+    for log in log_read(done, "create_index", start_time):
         yield log
 
 def training(
@@ -529,6 +540,8 @@ def training(
             reference_path = None
     else: reference_path = None
 
+    start_time = datetime.datetime.now()
+
     p = subprocess.Popen([
         python,
         configs["train_path"],
@@ -568,7 +581,7 @@ def training(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, "train"):
+    for log in log_read(done, "train", start_time):
         lines = log.splitlines()
 
         if len(lines) > 50: 

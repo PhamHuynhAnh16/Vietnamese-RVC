@@ -15,7 +15,6 @@ now_dir = os.getcwd()
 sys.path.append(now_dir)
 
 from main.library.utils import clear_gpu_cache
-from main.library.backends import directml, opencl
 from main.tools.huggingface import HF_download_file
 from main.app.variables import config, translations
 
@@ -86,36 +85,42 @@ class Separator:
 
     def setup_torch_device(self):
         self.torch_device_cpu = torch.device("cpu")
-        providers = config.providers
+        providers = config.providers.copy()
 
-        if len(providers) >= 2: providers.remove("CPUExecutionProvider")
+        if len(providers) >= 2 and "CPUExecutionProvider" in providers: providers.remove("CPUExecutionProvider")
         self.onnx_execution_provider = providers
 
         if providers[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]:
             self.logger.info(translations["running_in_backends"].format(backends='CUDA'))
             self.logger.info(translations["onnx_have"].format(backends='CUDA'))
             self.torch_device = torch.device("cuda")
+            return
         elif providers[0] in ["ROCMExecutionProvider", "MIGraphXExecutionProvider"]:
-            self.logger.info(translations["running_in_backends"].format(backends='HIP'))
-            self.logger.info(translations["onnx_have"].format(backends='HIP'))
+            self.logger.info(translations["running_in_backends"].format(backends='HIP' if config.is_zluda else 'ROCM'))
+            self.logger.info(translations["onnx_have"].format(backends='HIP' if config.is_zluda else 'ROCM'))
             self.torch_device = torch.device("cuda")
+            return
         elif providers[0] in ["OpenVINOExecutionProvider", "DnnlExecutionProvider"]:
             self.logger.info(translations["running_in_backends"].format(backends='XPU'))
             self.logger.info(translations["onnx_have"].format(backends='XPU'))
             self.torch_device = torch.device("xpu")
+            return
         elif providers[0] in ["DmlExecutionProvider"]:
             backends = (config.device.replace("privateuseone", "dml") if not torch.cuda.is_available() else config.device.replace("cuda", "hip")).split(":")[0].upper()
             self.logger.info(translations["running_in_backends"].format(backends=backends))
             self.logger.info(translations["onnx_have"].format(backends=backends))
             self.torch_device = torch.device(config.device)
+            return
         elif providers[0] in ["CoreMLExecutionProvider"]:
             self.logger.info(translations["running_in_backends"].format(backends='MPS'))
             self.logger.info(translations["onnx_have"].format(backends='MPS'))
             self.torch_device = torch.device("mps")
+            return
         else:
             self.logger.info(translations["running_in_cpu"])
             self.logger.warning(translations["onnx_not_have"])
             self.torch_device = self.torch_device_cpu
+            return
 
     def get_model_hash(self, model_path):
         try:

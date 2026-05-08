@@ -173,6 +173,7 @@ training_file_path = os.path.join(experiment_dir, "training_data.json")
 config_save_path = os.path.join(experiment_dir, "config.json")
 filelist_path = os.path.join(experiment_dir, "filelist.txt")
 eval_dir = os.path.join(experiment_dir, "eval")
+spec_dirs = None
 
 d_lr_coeff = 1.0
 g_lr_coeff = 1.0
@@ -441,6 +442,7 @@ def run(
 
     train_dataset = TextAudioLoader(
         config.data, 
+        spec_dirs=spec_dirs,
         cache_spectrogram=cache_spectrogram,
         pitch_guidance=pitch_guidance, 
         energy=energy_use
@@ -588,19 +590,24 @@ def run(
     try:
         if rank == 0: logger.info(translations["start_training"])
 
+        d_path = os.path.join(checkpoint_path, "D_latest.pth") if save_only_latest else latest_checkpoint_path(checkpoint_path, "D_*.pth")
+        g_path = os.path.join(checkpoint_path, "G_latest.pth") if save_only_latest else latest_checkpoint_path(checkpoint_path, "G_*.pth")
+
         _, _, _, epoch_str, scaler_dict = load_checkpoint(
             logger, 
-            os.path.join(checkpoint_path, "D_latest.pth") if save_only_latest else latest_checkpoint_path(checkpoint_path, "D_*.pth"), 
+            d_path, 
             net_d, 
             optim_d
         )
 
         _, _, _, epoch_str, _ = load_checkpoint(
             logger, 
-            os.path.join(checkpoint_path, "G_latest.pth") if save_only_latest else latest_checkpoint_path(checkpoint_path, "G_*.pth"), 
+            g_path, 
             net_g, 
             optim_g
         )
+
+        if rank == 0: logger.info(translations["load_checkpoint"].format(d_path=d_path, g_path=g_path))
         
         epoch_str += 1
         global_step = (epoch_str - 1) * len(train_loader)
@@ -624,8 +631,8 @@ def run(
                 net_d.module.load_state_dict(ckptD, strict=strict) if hasattr(net_d, "module") else net_d.load_state_dict(ckptD, strict=strict)
                 del ckptD
         except Exception as e:
-            logger.warning(translations["checkpointing_err"])
-            logger.error(e)
+            logger.error(translations["checkpointing_err"])
+            logger.debug(e)
             sys.exit(1)
 
     if optimizer_choice == "AdaBelief" or use_cosine_annealing_lr:

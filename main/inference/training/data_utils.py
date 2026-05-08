@@ -15,20 +15,22 @@ class TextAudioLoader(tdata.Dataset):
     def __init__(
         self, 
         hparams, 
+        spec_dirs=None,
         cache_spectrogram=True,
         pitch_guidance=True, 
         energy=False
     ):
         self.audiopaths_and_text = load_filepaths_and_text(hparams.training_files)
         self.max_wav_value = hparams.max_wav_value
-        self.sample_rate = hparams.sample_rate
         self.filter_length = hparams.filter_length
+        self.sample_rate = hparams.sample_rate
         self.hop_length = hparams.hop_length
         self.win_length = hparams.win_length
-        self.min_text_len = getattr(hparams, "min_text_len", 1)
         self.max_text_len = getattr(hparams, "max_text_len", 5000)
+        self.min_text_len = getattr(hparams, "min_text_len", 1)
         self.cache_spectrogram = cache_spectrogram
         self.pitch_guidance = pitch_guidance
+        self.spec_dirs = spec_dirs
         self.energy = energy
         self._filter()
 
@@ -109,6 +111,7 @@ class TextAudioLoader(tdata.Dataset):
 
         audio_norm = audio.unsqueeze(0)
         spec_filename = filename.replace(".wav", ".spec.pt")
+        if self.spec_dirs: spec_filename = os.path.join(self.spec_dirs, os.path.basename(spec_filename))
 
         def get_spectrogram(audio_norm):
             return spectrogram_torch(

@@ -790,5 +790,6 @@
     "whisper_languages": "Language",
     "whisper_languages_info": "Set input languages to avoid the model confirming the wrong language",
     "delete_when_success": "Delete original files when complete",
-    "compile_model": "Model compilation mode has been enabled with the method: {compile_mode}"
+    "compile_model": "Model compilation mode has been enabled with the method: {compile_mode}",
+    "load_checkpoint": "checkpoint G: {g_path} | D: {d_path} has been loaded!"
 }

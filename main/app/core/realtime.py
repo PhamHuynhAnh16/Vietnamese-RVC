@@ -1151,7 +1151,7 @@ def soundfile_record_audio(
             gr_info(translations["starting_record"])
 
             if not record_audio_path:
-                record_audio_path = os.path.join("audios", "record_audio.wav")
+                record_audio_path = os.path.join(configs["audios_path"], "record_audio.wav")
 
             callbacks.vc.record_audio = True
             callbacks.vc.record_audio_path = record_audio_path

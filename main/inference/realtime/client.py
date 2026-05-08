@@ -231,7 +231,7 @@ async def record(request: Request):
 
     if record_button == translations["start_record"]:
         if not record_audio_path:
-            record_audio_path = os.path.join("audios", "record_audio.wav")
+            record_audio_path = os.path.join(configs["audios_path"], "record_audio.wav")
 
         vc_instance.record_audio = True
         vc_instance.record_audio_path = record_audio_path
