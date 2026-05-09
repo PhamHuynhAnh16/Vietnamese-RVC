@@ -13,6 +13,9 @@ from main.tools import huggingface
 from main.app.core.ui import gr_info, gr_warning
 from main.app.variables import python, translations, configs, file_types, logger
 
+def getname(path):
+    return os.path.basename(path).replace(".py", "")
+
 def if_done(done, p):
     while 1:
         if p.poll() is None: time.sleep(0.5)
@@ -115,7 +118,7 @@ def create_dataset(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, "create_dataset", start_time):
+    for log in log_read(done, getname(configs["create_dataset_path"]), start_time):
         yield log
 
 def create_reference(
@@ -170,7 +173,7 @@ def create_reference(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, "create_reference", start_time):
+    for log in log_read(done, getname(configs["create_reference_path"]), start_time):
         yield log
 
 def preprocess(
@@ -232,7 +235,7 @@ def preprocess(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, "preprocess", start_time):
+    for log in log_read(done, getname(configs["preprocess_path"]), start_time):
         yield log
 
 def extract(
@@ -314,7 +317,7 @@ def extract(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, "extract", start_time):
+    for log in log_read(done, getname(configs["extract_path"]), start_time):
         yield log
 
 def create_index(
@@ -350,7 +353,7 @@ def create_index(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, "create_index", start_time):
+    for log in log_read(done, getname(configs["create_index_path"]), start_time):
         yield log
 
 def training(
@@ -581,7 +584,7 @@ def training(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, "train", start_time):
+    for log in log_read(done, getname(configs["train_path"]), start_time):
         lines = log.splitlines()
 
         if len(lines) > 50: 
