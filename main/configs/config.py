@@ -166,7 +166,7 @@ class Config:
         providers = []
 
         if self.device.startswith("cuda"): 
-            if "TensorrtExecutionProvider" in ort_providers: providers.append("TensorrtExecutionProvider")
+            if "TensorrtExecutionProvider" in ort_providers and "--tensorrt" in sys.argv: providers.append("TensorrtExecutionProvider")
             if "CUDAExecutionProvider" in ort_providers: providers.append("CUDAExecutionProvider")
             elif "ROCMExecutionProvider" in ort_providers: providers.append("ROCMExecutionProvider")
             elif "MIGraphXExecutionProvider" in ort_providers: providers.append("MIGraphXExecutionProvider")

@@ -664,6 +664,8 @@ python main/app/parser.py --help
 
 `--no_discord`: Khi được thêm vào nó sẽ không hiển thị discord RPC.
 
+`--tensorrt`: bật chế độ TensorRT cho ONNXRUNTIME.
+
 ## Giải Thích Một Số Thứ
 
 **ONNX (Open Neural Network Exchange):**
