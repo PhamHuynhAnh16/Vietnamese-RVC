@@ -3,9 +3,7 @@ import re
 import sys
 import csv
 import json
-import codecs
 import logging
-import urllib.request
 import logging.handlers
 
 import gradio as gr
@@ -326,25 +324,7 @@ except:
     allow_disk = []
 
 try:
-    if os.path.exists(csv_path): reader = list(csv.DictReader(open(csv_path, newline='', encoding='utf-8')))
-    else:
-        reader = list(
-            csv.DictReader([
-                line.decode('utf-8') 
-                for line in urllib.request.urlopen(
-                    codecs.decode(
-                        "uggcf://qbpf.tbbtyr.pbz/fcernqfurrgf/q/1gNHnDeRULtEfz1Yieaw14USUQjWJy0Oq9k0DrCrjApb/rkcbeg?sbezng=pfi&tvq=1977693859", 
-                        "rot13"
-                    )
-                ).readlines()
-            ])
-        )
-
-        writer = csv.DictWriter(open(csv_path, mode='w', newline='', encoding='utf-8'), fieldnames=reader[0].keys())
-        writer.writeheader()
-        writer.writerows(reader)
-
-    for row in reader:
+    for row in list(csv.DictReader(open(csv_path, newline='', encoding='utf-8'))):
         filename = row['Filename']
         url = None
 
