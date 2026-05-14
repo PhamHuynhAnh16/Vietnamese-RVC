@@ -204,7 +204,7 @@ avg_losses = {
     "gen_loss_50": deque(maxlen=50)
 }
 
-with open(config_save_path, "r") as f:
+with open(config_save_path, "r", encoding="utf-8") as f:
     config = json.load(f)
 
 config = HParams(**config)
@@ -290,13 +290,11 @@ def main():
             pid_data = {"process_pids": []}
 
             if save_the_pid:
-                with open(config_save_path, "r") as pid_file:
+                with open(config_save_path, "r", encoding="utf-8") as f:
                     try:
-                        pid_data.update(json.load(pid_file))
+                        pid_data.update(json.load(f))
                     except json.JSONDecodeError:
                         pass
-
-                pid_file = open(config_save_path, "w")
 
             for rank, device_id in enumerate(gpus):
                 subproc = mp.Process(
@@ -323,7 +321,9 @@ def main():
                 subproc.start()
                 pid_data["process_pids"].append(subproc.pid)
 
-            if save_the_pid: json.dump(pid_data, pid_file, indent=4)
+            if save_the_pid: 
+                with open(config_save_path, "w", encoding="utf-8") as f:
+                    json.dump(pid_data, f, indent=4)
 
             for i in range(n_gpus):
                 children[i].join()
@@ -1125,7 +1125,7 @@ def train_and_evaluate(
         loss_gen_history, 
         smoothed_loss_gen_history
     ):
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             json.dump({
                 "loss_disc_history": loss_disc_history, 
                 "smoothed_loss_disc_history": smoothed_loss_disc_history, 
@@ -1330,10 +1330,10 @@ def train_and_evaluate(
             if save_the_pid:
                 pid_file_path = os.path.join(experiment_dir, "config.json")
 
-                with open(pid_file_path, "r") as pid_file:
+                with open(pid_file_path, "r", encoding="utf-8") as pid_file:
                     pid_data = json.load(pid_file)
 
-                with open(pid_file_path, "w") as pid_file:
+                with open(pid_file_path, "w", encoding="utf-8") as pid_file:
                     pid_data.pop("process_pids", None)
                     json.dump(pid_data, pid_file, indent=4)
 
