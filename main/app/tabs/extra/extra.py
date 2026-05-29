@@ -11,6 +11,7 @@ from main.app.variables import (
 )
 
 from main.app.tabs.extra.child.fushion import fushion_tab
+from main.app.tabs.extra.child.analyzer import analyzer_tab
 from main.app.tabs.extra.child.settings import settings_tab
 from main.app.tabs.extra.child.read_model import read_model_tab
 from main.app.tabs.extra.child.f0_extract import f0_extract_tab
@@ -49,6 +50,11 @@ def extra_tab(app):
             with gr.TabItem(translations["create_srt_tab"]):
                 gr.Markdown(translations["create_srt_markdown"])
                 create_srt_tab()
+        
+        if configs.get("analyzer_tab", True):
+            with gr.TabItem(translations["analyzer_tab"]):
+                gr.Markdown(translations["analyzer_markdown"])
+                analyzer_tab()
 
         if configs.get("settings_tab", True):
             with gr.TabItem(translations["settings"]):

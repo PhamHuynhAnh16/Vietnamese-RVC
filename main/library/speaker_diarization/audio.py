@@ -79,17 +79,6 @@ class Audio:
 
         return waveform, sample_rate
 
-    def get_duration(self, file):
-        file = self.validate_file(file)
-
-        if "waveform" in file:
-            frames = len(file["waveform"].T)
-            sample_rate = file["sample_rate"]
-        else: 
-            return librosa.get_duration(file, sr=None)
-
-        return frames / sample_rate
-
     def get_num_samples(self, duration, sample_rate = None):
         sample_rate = sample_rate or self.sample_rate
         if sample_rate is None: raise ValueError

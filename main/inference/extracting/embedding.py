@@ -11,9 +11,10 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
+from main.library.audio.audio import load_audio
 from main.app.variables import logger, translations, config
 from main.inference.extracting.setup_path import setup_paths
-from main.library.utils import load_audio, load_embedders_model, extract_features
+from main.library.utils import load_embedders_model, extract_features
 
 def process_file_embedding(
     files, 
@@ -48,7 +49,7 @@ def process_file_embedding(
             if os.path.exists(out_file_path): return
 
             feats = torch.from_numpy(
-                load_audio(file, 16000)
+                load_audio(file, sample_rate=16000)
             ).to(device).to(dtype)
 
             with torch.no_grad():
@@ -56,7 +57,6 @@ def process_file_embedding(
                     model, 
                     feats.view(1, -1), 
                     version, 
-                    device,
                     mix=embedders_mix, 
                     mix_layers=embedders_mix_layers, 
                     mix_ratio=embedders_mix_ratio

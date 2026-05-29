@@ -87,7 +87,6 @@ def update(self, new_scale = None):
     self._per_optimizer_states = defaultdict(_refresh_per_optimizer_state)
 
 def setup_gradscaler():
-    if hasattr(torch, "xpu") and torch.xpu.is_available():
-        torch.amp.grad_scaler.GradScaler._unscale_grads_ = _unscale_grads_
-        torch.amp.grad_scaler.GradScaler.unscale_ = unscale_
-        torch.amp.grad_scaler.GradScaler.update = update
+    torch.amp.grad_scaler.GradScaler._unscale_grads_ = _unscale_grads_
+    torch.amp.grad_scaler.GradScaler.unscale_ = unscale_
+    torch.amp.grad_scaler.GradScaler.update = update

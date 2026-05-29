@@ -17,7 +17,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import load_audio, strtobool
+from main.library.utils import strtobool
+from main.library.audio.audio import load_audio
 from main.inference.preprocess.slicer2 import Slicer
 from main.app.variables import config, logger, translations, configs, file_types
 
@@ -69,7 +70,7 @@ class PreProcess:
         self.sr = sr
         self.per = per
         self.exp_dir = exp_dir
-        self.device = "cpu"
+        self.device = config.device
         self.gt_wavs_dir = os.path.join(exp_dir, "sliced_audios")
         self.wavs16k_dir = os.path.join(exp_dir, "sliced_audios_16k")
         os.makedirs(self.gt_wavs_dir, exist_ok=True)
@@ -157,7 +158,7 @@ class PreProcess:
         dataset_length = 0
 
         try:
-            audio = load_audio(path, self.sr)
+            audio = load_audio(path, sample_rate=self.sr)
             dataset_length = librosa.get_duration(y=audio, sr=self.sr)
 
             if process_effects: audio = signal.lfilter(self.b_high, self.a_high, audio)
@@ -165,7 +166,7 @@ class PreProcess:
 
             if clean_dataset: 
                 if not hasattr(self, "tg"): 
-                    from main.tools.noisereduce import TorchGate
+                    from main.library.audio.noisereduce import TorchGate
 
                     self.tg = TorchGate(
                         self.sr, 

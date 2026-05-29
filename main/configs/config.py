@@ -30,20 +30,30 @@ class Config:
         self.configs = json.load(open(self.configs_path, "r"))
 
         self.cpu_mode = self.configs.get("cpu_mode", False)
-        self.is_zluda = torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]")
-        self.bf16_support = (hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported() and torch.cuda.is_available()) or (hasattr(torch, "xpu") and torch.xpu.is_bf16_supported() and torch.xpu.is_available())
-        self.tf32_support = hasattr(torch.cuda, "is_tf32_supported") and torch.cuda.is_tf32_supported() and torch.cuda.is_available()
-        self.brain = self.configs.get("brain", False) and self.bf16_support and not self.cpu_mode
-        self.tf32 = self.configs.get("tf32", False) and self.tf32_support and not self.is_zluda and not self.cpu_mode
+        self.cuda_available = torch.cuda.is_available()
+        self.is_zluda = self.cuda_available and torch.cuda.get_device_name().endswith("[ZLUDA]")
+        self.hip_version = torch.version.hip if hasattr(torch.version, "hip") else None
+        if self.is_zluda: zluda.init_zluda()
 
-        self.debug_mode = self.configs.get("debug_mode", False) or "--debug" in sys.argv
+        self.debug_mode = self.configs.get("debug_mode", False)
         self.json_config = self.load_config_json()
         self.translations = self.multi_language()
 
         self.gpu_mem = None
         self.per_preprocess = 3.7
         self.device = self.get_default_device()
+        self.tensorrt = self.configs.get("tensorrt", False)
         self.providers = self.get_providers()
+
+        self.cuda_tf32 = self.cuda_available and  hasattr(torch.cuda, "is_tf32_supported") and torch.cuda.is_tf32_supported()
+        self.cuda_bf16 = self.cuda_available and hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported()
+        self.xpu_fp16 = hasattr(torch, "xpu") and torch.xpu.is_available() and hasattr(torch.xpu, "is_bf16_supported") and torch.xpu.is_bf16_supported()
+
+        self.tf32_support = self.device.startswith("cuda") and self.cuda_tf32
+        self.bf16_support = self.device.startswith(("cuda", "xpu")) and self.cuda_bf16 or self.xpu_fp16
+
+        self.brain = self.configs.get("brain", False) and self.bf16_support and not self.cpu_mode
+        self.tf32 = self.configs.get("tf32", False) and self.tf32_support and not self.is_zluda and not self.cpu_mode
 
         self.is_half = self.is_fp16()
         self.compile_all = self.device.startswith("cuda") and self.configs.get("compile_all", False)
@@ -166,7 +176,7 @@ class Config:
         providers = []
 
         if self.device.startswith("cuda"): 
-            if "TensorrtExecutionProvider" in ort_providers and "--tensorrt" in sys.argv: providers.append("TensorrtExecutionProvider")
+            if "TensorrtExecutionProvider" in ort_providers and self.tensorrt: providers.append("TensorrtExecutionProvider")
             if "CUDAExecutionProvider" in ort_providers: providers.append("CUDAExecutionProvider")
             elif "ROCMExecutionProvider" in ort_providers: providers.append("ROCMExecutionProvider")
             elif "MIGraphXExecutionProvider" in ort_providers: providers.append("MIGraphXExecutionProvider")

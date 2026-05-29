@@ -4,11 +4,12 @@ import soxr
 import traceback
 
 import numpy as np
-import sounddevice as sd
 
 from queue import Queue
 
 sys.path.append(os.getcwd())
+
+import main.library.audio.sounddevice as sd
 
 from main.app.variables import logger, translations
 
@@ -196,12 +197,12 @@ class Audio:
         )
 
         return (inputs[0] if len(inputs) > 0 else None), (outputs[0] if len(outputs) > 0 else None)
-
-    def process_data(self, indata):
+    
+    def process_data_with_time(self, indata):
         indata = indata * self.input_audio_gain
         unpacked_data = np.mean(indata, axis=1) if indata.shape[1] > 1 else indata.flatten()
 
-        return self.callbacks.change_voice(
+        out_wav, vol, perf, _ = self.callbacks.change_voice(
             unpacked_data, 
             self.f0_up_key, 
             self.index_rate, 
@@ -216,13 +217,9 @@ class Audio:
             self.embedders_mix_layers,
             self.embedders_mix_ratio
         )
-    
-    def process_data_with_time(self, indata):
-        out_wav, vol, perf, _ = self.process_data(indata)
+
         self.performance = perf[1]
         self.volume = vol
-
-        self.callbacks.emit_to(self.performance, self.volume)
         return out_wav
     
     def audio_stream_no_output_callback(self, indata, frames, times, status):
@@ -235,6 +232,11 @@ class Audio:
 
     def audio_stream_callback(self, indata, outdata, frames, times, status):
         try:
+            if not self.running:
+                outdata_fill = np.zeros_like(outdata)
+                outdata[:] = outdata_fill
+                return
+
             out_wav = self.process_data_with_time(indata)
             output_channels = outdata.shape[1]
             if self.use_monitor: self.mon_queue.put(out_wav)
@@ -249,6 +251,11 @@ class Audio:
 
     def audio_queue(self, outdata, gain, sample_rate, sample_rate_out = None):
         try:
+            if not self.running:
+                outdata_fill = np.zeros_like(outdata)
+                outdata[:] = outdata_fill
+                return
+
             mon_wav = self.mon_queue.get()
 
             while self.mon_queue.qsize() > 0:
@@ -283,8 +290,8 @@ class Audio:
     ):
         if use_asio:
             try:
-                sd._terminate()
-                sd._initialize()
+                sd.terminate()
+                sd.initialize()
             except:
                 pass
 
@@ -343,18 +350,22 @@ class Audio:
         self.running = False
 
         if self.stream is not None:
+            self.stream.stop()
             self.stream.close()
             self.stream = None
 
         if self.input_stream is not None:
+            self.input_stream.stop()
             self.input_stream.close()
             self.input_stream = None
 
         if self.output_stream is not None:
+            self.output_stream.stop()
             self.output_stream.close()
             self.output_stream = None
 
         if self.monitor is not None:
+            self.monitor.stop()
             self.monitor.close()
             self.monitor = None
 

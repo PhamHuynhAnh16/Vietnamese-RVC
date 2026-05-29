@@ -3,11 +3,9 @@ import io
 import ssl
 import sys
 import time
-import torch
 import codecs
 import logging
 import warnings
-import torch.version
 
 import gradio as gr
 
@@ -121,7 +119,7 @@ with gr.Blocks(
     if __name__ == "__main__":
         device = config.device.replace("privateuseone", "dml")
         if config.is_zluda: device = device.replace("cuda", "zluda")
-        if torch.version.hip is not None: device = device.replace("cuda", "hip")
+        if config.hip_version is not None: device = device.replace("cuda", "hip")
 
         logger.info(f"Pytorch: {device} | Onnxruntime: {config.providers[0].replace('Dml', 'Ocl') if device.startswith('ocl') else config.providers[0]}")
         if config.compile_all: logger.info(translations["compile_model"].format(compile_mode=config.compile_mode))

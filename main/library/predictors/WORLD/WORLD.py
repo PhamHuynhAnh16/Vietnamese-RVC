@@ -23,7 +23,7 @@ class HarvestOption(ctypes.Structure):
     ]
 
 class PYWORLD:
-    def __init__(self, world_path, model_path):
+    def __init__(self, world_path, model_path, harvest = True):
         self.world_path = world_path
         os.makedirs(self.world_path, exist_ok=True)
 
@@ -52,6 +52,7 @@ class PYWORLD:
                 w.write(model[model_type])
 
         self.world_dll = ctypes.CDLL(self.world_file_path)
+        self.infer = self.harvest if harvest else self.dio
 
     def harvest(
         self, 

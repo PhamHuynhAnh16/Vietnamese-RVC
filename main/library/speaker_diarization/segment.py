@@ -1,6 +1,10 @@
+import os
+import sys
 import numpy as np
 
-from sortedcontainers import SortedList
+sys.path.append(os.getcwd())
+
+from main.tools.sortedcontainers import SortedList
 
 class Timeline:
     @classmethod

@@ -9,8 +9,8 @@ from fastapi import FastAPI, WebSocketDisconnect, WebSocket, Request
 sys.path.append(os.getcwd())
 
 from main.library.utils import clear_gpu_cache
+from main.inference.realtime.realtime import VoiceChanger
 from main.app.variables import configs, translations, logger, config
-from main.inference.realtime.realtime import VoiceChanger, RVC_Realtime
 
 app = FastAPI()
 vc_instance = None
@@ -82,7 +82,7 @@ async def change_config(ws: WebSocket):
     if clean_audio is False:
         vc_instance.vc_model.tg = None
     elif clean_audio and vc_instance.vc_model.tg is None:
-        from main.tools.noisereduce import TorchGate
+        from main.library.audio.noisereduce import TorchGate
 
         vc_instance.vc_model.tg = (
             TorchGate(
@@ -105,29 +105,16 @@ async def change_config(ws: WebSocket):
         vc_instance.vc_model.board = new_board
         vc_instance.vc_model.kwargs = kwargs.copy()
 
+    noise_scale = params.get("noise_scale", 0.35)
     model_pth = params.get("model_path", vc_instance.vc_model.model_path)
     model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
 
     if model_pth and vc_instance.vc_model.model_path != model_pth:
         vc_instance.vc_model.model_path = model_pth
-        vc_instance.vc_model.pipeline.inference.get_synthesizer(model_pth)
-
-        vc_instance.vc_model.pipeline.version = vc_instance.vc_model.pipeline.inference.version
-        vc_instance.vc_model.pipeline.energy = vc_instance.vc_model.pipeline.inference.energy
-
-        if vc_instance.vc_model.pipeline.inference.energy:
-            from main.inference.extracting.rms import RMSEnergyExtractor
-
-            rms = RMSEnergyExtractor(
-                frame_length=2048, 
-                hop_length=160, 
-                center=True, 
-                pad_mode="reflect"
-            ).to(config.device).eval()
-
-            vc_instance.vc_model.pipeline.rms = rms
-        else:
-            vc_instance.vc_model.pipeline.rms = None
+        vc_instance.vc_model.pipeline.vc.setup(model_pth, noise_scale)
+        vc_instance.vc_model.pipeline.version = vc_instance.vc_model.pipeline.vc.version
+        vc_instance.vc_model.pipeline.energy = vc_instance.vc_model.pipeline.vc.energy
+        vc_instance.vc_model.pipeline.rms = vc_instance.vc_model.pipeline.setup_rms() if vc_instance.vc_model.pipeline.vc.energy else None
 
     sid = params.get("sid", vc_instance.vc_model.pipeline.sid)
     if vc_instance.vc_model.pipeline.sid != sid:
@@ -141,16 +128,18 @@ async def change_config(ws: WebSocket):
         if vc_instance.vc_model.index_path != index_path:
             from main.library.utils import load_faiss_index
 
+            nprobe = params.get("nprobe", 1)
             index, index_reconstruct = load_faiss_index(
                 index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added")
             )
 
             vc_instance.vc_model.pipeline.index = index
-            vc_instance.vc_model.pipeline.big_npy = index_reconstruct
+            if vc_instance.vc_model.pipeline.index.index is not None: vc_instance.vc_model.pipeline.index.index.nprobe = nprobe
+            vc_instance.vc_model.pipeline.big_tsr = index_reconstruct
             vc_instance.vc_model.index_path = index_path
     else:
         vc_instance.vc_model.pipeline.index = None
-        vc_instance.vc_model.pipeline.big_npy = None
+        vc_instance.vc_model.pipeline.big_tsr = None
         vc_instance.vc_model.index_path = None
 
     f0_method = params.get("f0_method", vc_instance.vc_model.pipeline.f0_method)
@@ -170,21 +159,7 @@ async def change_config(ws: WebSocket):
         old_predictor = vc_instance.vc_model.pipeline.predictor
         del old_predictor
 
-        from main.library.predictors.Generator import Generator
-
-        predictor = Generator(
-            sample_rate=params.get("sample_rate", vc_instance.vc_model.sample_rate), 
-            hop_length=params.get("f0_method", vc_instance.vc_model.pipeline.predictor.hop_length), 
-            f0_min=configs.get("f0_min", 50), 
-            f0_max=configs.get("f0_max", 1100), 
-            alpha=0.5, 
-            is_half=config.is_half, 
-            device=config.device, 
-            predictor_onnx=predictor_onnx, 
-            delete_predictor_onnx=False
-        )
-
-        vc_instance.vc_model.pipeline.predictor = predictor
+        vc_instance.vc_model.pipeline.predictor = vc_instance.vc_model.pipeline.setup_predictor(PIPELINE_SAMPLE_RATE, params.get("hop_length", vc_instance.vc_model.pipeline.predictor.hop_length), predictor_onnx)
         vc_instance.vc_model.pipeline.f0_method = f0_method
         vc_instance.vc_model.pipeline.predictor.predictor_onnx = predictor_onnx
 
@@ -196,21 +171,16 @@ async def change_config(ws: WebSocket):
             old_embedder = vc_instance.vc_model.pipeline.embedder
             del old_embedder
 
-            import torch
-            from main.library.utils import load_embedders_model
 
-            embedder = load_embedders_model(
-                embedder_model, 
-                embedders_mode=embedders_mode
-            )
-
-            if isinstance(embedder, torch.nn.Module): 
-                dtype = torch.float16 if config.is_half else torch.float32
-                embedder = embedder.to(config.device).to(dtype).eval()
-
-            vc_instance.vc_model.pipeline.embedder = embedder
+            vc_instance.vc_model.pipeline.embedder = vc_instance.vc_model.pipeline.setup_embedder(embedder_model, embedders_mode)
             vc_instance.vc_model.embedder_model = embedder_model
             vc_instance.vc_model.embedders_mode = embedders_mode
+
+        if (
+            vc_instance.vc_model.pipeline.vc.architecture == "SVC" and
+            vc_instance.vc_model.pipeline.vc.net_g.noise_scale != noise_scale
+        ): 
+            vc_instance.vc_model.pipeline.vc.net_g.noise_scale = noise_scale
 
 @app.post("/record")
 async def record(request: Request):
@@ -292,10 +262,7 @@ async def websocket_audio(ws: WebSocket):
                 cross_fade_overlap_size=params["cross_fade_overlap_size"], 
                 input_sample_rate=DEVICE_SAMPLE_RATE, 
                 output_sample_rate=DEVICE_SAMPLE_RATE, 
-                extra_convert_size=params["extra_convert_size"]
-            )
-
-            vc_instance.initialize(vc_model=RVC_Realtime(
+                extra_convert_size=params["extra_convert_size"],
                 model_path=model_pth, 
                 index_path=params["model_index"], 
                 f0_method=params["f0_method"], 
@@ -304,27 +271,29 @@ async def websocket_audio(ws: WebSocket):
                 embedders_mode=params["embedders_mode"], 
                 sample_rate=PIPELINE_SAMPLE_RATE, 
                 hop_length=params["hop_length"], 
-                silent_threshold=params["silent_threshold"], 
-                input_sample_rate=DEVICE_SAMPLE_RATE, 
-                output_sample_rate=DEVICE_SAMPLE_RATE, 
-                vad_enabled=params["vad_enabled"], 
-                vad_sensitivity=params["vad_sensitivity"], 
-                vad_frame_ms=params["vad_frame_ms"], 
+                silent_threshold=params["silent_threshold"],
+                vad_enabled=params["vad_enabled"],
+                vad_sensitivity=params["vad_sensitivity"],
+                vad_frame_ms=params["vad_frame_ms"],
                 clean_audio=params["clean_audio"], 
                 clean_strength=params["clean_strength"],
-                post_process=params["post_process"],
+                post_process=params["post_process"], 
                 sid=params["sid"],
                 noise_scale=params["noise_scale"],
+                nprobe=params["nprobe"],
+                record_audio=False,
+                record_audio_path=None,
+                export_format="wav",
                 **params["kwargs"]
-            ))
+            )
 
         noise_scale = params["noise_scale"]
         if (
             vc_instance is not None and 
-            vc_instance.vc_model.pipeline.inference.architecture == "SVC" and 
-            vc_instance.vc_model.pipeline.inference.net_g.noise_scale != noise_scale
+            vc_instance.vc_model.pipeline.vc.architecture == "SVC" and 
+            vc_instance.vc_model.pipeline.vc.net_g.noise_scale != noise_scale
         ): 
-            vc_instance.vc_model.pipeline.inference.net_g.noise_scale = noise_scale
+            vc_instance.vc_model.pipeline.vc.net_g.noise_scale = noise_scale
         
         logger.info(translations["realtime_is_ready"])
 

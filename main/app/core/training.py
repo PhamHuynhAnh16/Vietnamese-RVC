@@ -26,33 +26,28 @@ def if_done(done, p):
 def log_read(done, name, start_time):
     log_file = os.path.join(configs["logs_path"], "app.log")
 
-    while 1:
+    def read_logs():
+        logs = []
+
         with open(log_file, "r", encoding="utf-8") as f:
-            yield "".join(
-                line for line in f.readlines() 
-                if (
-                    "DEBUG" not in line and 
-                    name in line and 
-                    line.strip() != "" and
-                    datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f") >= start_time
-                )
-            )
+            for line in f:
+                try:
+                    if ("DEBUG" in line or name not in line or line.strip() == ""): continue
+                    timestamp = datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+                    if timestamp >= start_time: logs.append(line)
+                except ValueError:
+                    continue
+        return "".join(logs)
+
+    while 1:
+        yield read_logs()
 
         time.sleep(1)
-        if done[0]: break
 
-    with open(log_file, "r", encoding="utf-8") as f:
-        log = "".join(
-            line for line in f.readlines() 
-            if (
-                "DEBUG" not in line and 
-                name in line and 
-                line.strip() != "" and
-                datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f") >= start_time
-            )
-        )
+        if done[0]:
+            break
 
-    yield log
+    yield read_logs()
 
 def create_dataset(
     input_data,
@@ -323,7 +318,8 @@ def extract(
 def create_index(
     model_name, 
     rvc_version, 
-    index_algorithm
+    index_algorithm,
+    nprobe=1
 ):
     if not model_name: return gr_warning(translations["provide_name"])
     model_dir = os.path.join(configs["logs_path"], model_name)
@@ -345,7 +341,8 @@ def create_index(
         configs["create_index_path"], 
         "--model_name", model_name, 
         "--rvc_version", rvc_version,
-        "--index_algorithm", index_algorithm
+        "--index_algorithm", index_algorithm,
+        "--nprobe", str(nprobe)
     ])
 
     done = [False]

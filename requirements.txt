@@ -3,6 +3,7 @@ pip>=23.3
 wheel
 omegaconf>=2.0.6
 setuptools==81.0.0
+webrtcvad-wheels>=2.0.14
 
 onnxruntime; sys_platform == 'darwin'
 onnxruntime-gpu; sys_platform != 'darwin'
@@ -13,7 +14,6 @@ tiktoken
 hyperpyyaml
 torch>=2.3.1
 tqdm>=4.63.1
-sortedcontainers
 torchvision>=0.18.1
 torchaudio>=2.3.1
 torchcodec==0.9.1
@@ -48,9 +48,8 @@ pysrt
 # Utility section
 yt-dlp>=2026.03.17
 edge-tts>=7.2.7
-ffmpy==0.3.1
-ffmpeg-python>=0.2.0
 beautifulsoup4
+cffi>=2.0.0
 
 # Tensorboard and ONNX
 tensorboard
@@ -61,7 +60,3 @@ onnx2torch>=1.5.15
 
 # Cryptography section
 pycryptodome>=3.9.6,<4.0.0
-
-# Realtime and VAD
-sounddevice>=0.5.2
-webrtcvad-wheels>=2.0.14

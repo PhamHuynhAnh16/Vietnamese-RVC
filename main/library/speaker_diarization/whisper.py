@@ -20,8 +20,7 @@ from functools import cached_property, lru_cache
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import configs, logger
-from main.library.backends import directml, opencl
+from main.app.variables import config, configs, logger
 
 LANGUAGES = {
     "en": "english", 
@@ -335,7 +334,7 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
     for hook in hooks:
         hook.remove()
 
-    if not (opencl.is_available() or directml.is_available()):
+    if not config.device.startswith(("privateuseone", "ocl")):
         alignment_indices = model.alignment_heads.indices().T
     else:
         alignment_indices = [
@@ -354,7 +353,7 @@ def find_alignment(model, tokenizer, text_tokens, mel, num_frames, *, medfilt_wi
 
     std, mean = torch.std_mean(weights, dim=-2, keepdim=True, unbiased=False)
 
-    if directml.is_available():
+    if config.device.startswith("privateuseone"):
         weights = median_filter(
             ((weights - mean) / std).cpu(), 
             medfilt_width
@@ -504,11 +503,10 @@ def log_mel_spectrogram(audio, n_mels = 80, padding = 0, device = None):
 
     if not torch.is_tensor(audio):
         if isinstance(audio, str): 
-            from main.library.utils import load_audio
+            from main.library.audio.audio import load_audio
+            audio = load_audio(audio, sample_rate=SAMPLE_RATE)
 
-            audio = load_audio(audio, sample_rate=SAMPLE_RATE).astype(np.float32)
-
-        audio = torch.from_numpy(audio)
+        audio = torch.from_numpy(audio).float()
 
     if device is not None: audio = audio.to(device)
     if padding > 0: audio = F.pad(audio, (0, padding))
@@ -1185,7 +1183,7 @@ class Whisper(nn.Module):
 
         all_heads = torch.zeros(self.dims.n_text_layer, self.dims.n_text_head, dtype=torch.bool)
         all_heads[self.dims.n_text_layer // 2 :] = True
-        self.register_buffer("alignment_heads", all_heads if opencl.is_available() or directml.is_available() else all_heads.to_sparse(), persistent=False)
+        self.register_buffer("alignment_heads", all_heads if config.device.startswith(("privateuseone", "ocl")) else all_heads.to_sparse(), persistent=False)
 
     def set_alignment_heads(self, dump):
         alignment = torch.from_numpy(
@@ -1194,7 +1192,7 @@ class Whisper(nn.Module):
             ).copy()
         ).reshape(self.dims.n_text_layer, self.dims.n_text_head)
 
-        if not (opencl.is_available() or directml.is_available()): alignment = alignment.to_sparse()
+        if not config.device.startswith(("privateuseone", "ocl")): alignment = alignment.to_sparse()
         self.register_buffer("alignment_heads", alignment, persistent=False)
 
     def embed_audio(self, mel):
@@ -1420,7 +1418,7 @@ class GreedyDecoder(TokenDecoder):
     def update(self, tokens, logits, sum_logprobs):
         next_tokens = logits.argmax(dim=-1) if self.temperature == 0 else (
             Categorical(
-                logits=(logits / self.temperature).cpu() if opencl.is_available() else (logits / self.temperature)
+                logits=(logits / self.temperature).cpu() if config.device.startswith("ocl") else (logits / self.temperature)
             )
         ).sample().to(logits.device)
 
@@ -1719,7 +1717,7 @@ class DecodingTask:
 
                 logits = logits[:, -1]
                 for logit_filter in self.logit_filters:
-                    logit_filter.apply(logits.to("cpu") if opencl.is_available() else logits, tokens)
+                    logit_filter.apply(logits.cpu() if config.device.startswith("ocl") else logits, tokens)
 
                 tokens, completed = self.decoder.update(tokens, logits, sum_logprobs)
                 if completed or tokens.shape[-1] > self.n_ctx: break

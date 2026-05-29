@@ -24,7 +24,8 @@ def f0_extract(
     import numpy as np
     import matplotlib.pyplot as plt
 
-    from main.library.utils import check_assets, load_audio
+    from main.library.utils import check_assets
+    from main.library.audio.audio import load_audio
     from main.library.predictors.Generator import Generator
 
     check_assets(f0_method, "", predictor_onnx, "")
@@ -46,8 +47,7 @@ def f0_extract(
         alpha=0.5, 
         is_half=config.is_half, 
         device=config.device, 
-        predictor_onnx=predictor_onnx, 
-        delete_predictor_onnx=predictor_onnx
+        predictor_onnx=predictor_onnx
     )
 
     _, pitchf = f0_generator.calculator(

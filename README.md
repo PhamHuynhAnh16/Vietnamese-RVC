@@ -51,7 +51,7 @@ Dự án này có thể sẽ không cung cấp bản đóng gói sẳn, chỉ cu
 
 - Điều Chỉnh Mô Hình: Dung hợp nhiều giọng nói, đọc thông tin tệp mô hình, chuyển đổi định dạng ONNX và SVC.
 
-- Xử Lý Nâng Cao: Trích xuất cao độ (F0) và tự động tạo tệp phụ đề (SRT).
+- Xử Lý Nâng Cao: Trích xuất cao độ (F0), tự động tạo tệp phụ đề (SRT) và Phân tích âm thanh.
 
 - Tùy Chỉnh Hệ Thống: Thay đổi chế độ Sáng/Tối, ngôn ngữ, chủ đề và phông chữ linh hoạt.
 
@@ -702,6 +702,9 @@ Là kỹ thuật chuyển đổi giọng hát, tập trung vào việc giữ ngu
 - **Bộ mã hóa MRF HIFIGAN, REFINEGAN và BIGVGAN không hỗ trợ huấn luyện khi không không huấn luyện cao độ**
 - **Huấn luyện năng lương chỉ thêm lớp học năng lượng nhưng gần như không tăng chất lượng**
 - **Các mô hình trong kho lưu trữ Vietnamese-RVC được thu thập rải rác trên AI Hub, HuggingFace và các các kho lưu trữ khác. Có thể mang các giấy phép bản quyền khác nhau**
+- **Chế độ thời gian thực khi dùng có thể tồn lại cache trên VRAM do nằm trong luồng chính nên việc giải phóng VRAM có thể không được triệt để**
+- **Sử dụng Tăng độ phân giải âm thanh có thể làm tăng thời lượng chuyển đổi tệp âm thanh cực kì khủng kiếp**
+- **Việc điều chỉnh Số lượng cụm thăm dò gần như vô dụng trong dự án này, vì dự án này sử dụng một cách thức khác để thăm dò mang độ chính xác 100%. Nó chỉ hữu ích nếu dùng faiss-cpu hoặc đem chỉ mục sang dự án khác**
 
 ## Tuyên bố miễn trừ trách nhiệm
 
@@ -752,6 +755,10 @@ Là kỹ thuật chuyển đổi giọng hát, tập trung vào việc giữ ngu
 | **[RMVPE](https://github.com/yxlllc/RMVPE)**                                                                                   | yxlllc - Dream High           | Apache-2.0 License  |
 | **[HPA-RMVPE](https://github.com/PhamHuynhAnh16/HPA-RMVPE)**                                                                   | Phạm Huỳnh Anh - Vidalnt      | No License          |
 | **[DJCM](https://github.com/PhamHuynhAnh16/DJCM)**                                                                             | Phạm Huỳnh Anh - Dream High   | Apache-2.0 License  |
+| **[FlashSR](https://github.com/jakeoneijk/FlashSR_Inference)**                                                                 | JakeOne IM                    | No License          |
+| **[FFMPEG-PYTHON](https://github.com/kkroening/ffmpeg-python)**                                                                | Karl Kroening                 | Apache-2.0 License  |
+| **[SOUNDDEVICE](https://github.com/spatialaudio/python-sounddevice)**                                                          | Matthias Geier                | MIT License         |
+| **[SortedContainers](https://github.com/grantjenks/python-sortedcontainers)**                                                  | Grant Jenks                   | Apache-2.0 License  |
 
 ## Kho mô hình của công cụ tìm kiếm mô hình
 

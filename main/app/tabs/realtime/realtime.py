@@ -305,6 +305,16 @@ def realtime_tab():
                             interactive=True, 
                             visible=True
                         )
+                        nprobe = gr.Slider(
+                            label=translations["nprobe"], 
+                            info=translations["nprobe_info"], 
+                            minimum=1, 
+                            maximum=64, 
+                            value=9, 
+                            step=1, 
+                            interactive=True,
+                            visible=True
+                        )
                     with gr.Row():
                         sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
                         if sid_dict["visible"] == "hidden": sid_dict["visible"] = False
@@ -1107,7 +1117,8 @@ def realtime_tab():
                     model_index
                 ], 
                 outputs=[
-                    index_strength
+                    index_strength,
+                    nprobe
                 ]
             )
             model_refresh.click(
@@ -1458,7 +1469,8 @@ def realtime_tab():
                         phaser_depth,
                         phaser_centre_frequency_hz,
                         phaser_feedback,
-                        phaser_mix
+                        phaser_mix,
+                        nprobe
                     ],
                     outputs=[
                         status, 
@@ -1572,7 +1584,8 @@ def realtime_tab():
                         phaser_depth,
                         phaser_centre_frequency_hz,
                         phaser_feedback,
-                        phaser_mix
+                        phaser_mix,
+                        nprobe
                     ],
                     outputs=[
                         json_button_hidden
@@ -1679,6 +1692,14 @@ def realtime_tab():
                 fn=(lambda value: change_config(value, "index_rate")) if not client_mode else None, 
                 inputs=[
                     index_strength
+                ], 
+                outputs=[]
+            )
+            nprobe.change(
+                js="(value) => window.ChangeConfig(value, 'nprobe')" if client_mode else None, 
+                fn=(lambda value: change_config(value, "nprobe")) if not client_mode else None, 
+                inputs=[
+                    nprobe
                 ], 
                 outputs=[]
             )

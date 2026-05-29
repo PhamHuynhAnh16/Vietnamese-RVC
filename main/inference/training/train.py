@@ -26,8 +26,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 sys.path.append(os.getcwd())
 os.environ["USE_LIBUV"] = "0" if sys.platform == "win32" else "1"
 
+from main.library.backends import opencl, xpu
 from main.app.variables import logger, translations
-from main.library.backends import directml, opencl, xpu
 from main.library.utils import clear_gpu_cache, strtobool
 
 from main.library.algorithm import commons
@@ -259,19 +259,19 @@ def main():
             device, gpus = torch.device("cpu"), [0]
             n_gpus = 1
             logger.warning(translations["not_gpu"])   
-        elif torch.cuda.is_available() and main_config.device.startswith("cuda"):
+        elif main_config.device.startswith("cuda"):
             device, gpus = torch.device("cuda"), [int(item) for item in gpus.split("-")]
             n_gpus = len(gpus)
-        elif hasattr(torch, "xpu") and torch.xpu.is_available() and main_config.device.startswith("xpu"):
+        elif main_config.device.startswith("xpu"):
             device, gpus = torch.device("xpu"), [int(item) for item in gpus.split("-")]
             n_gpus = len(gpus)
-        elif opencl.is_available() and main_config.device.startswith("ocl"):
+        elif main_config.device.startswith("ocl"):
             device, gpus = torch.device("ocl"), [int(item) for item in gpus.split("-")]
             n_gpus = len(gpus)
-        elif directml.is_available() and main_config.device.startswith("privateuseone"):
+        elif main_config.device.startswith("privateuseone"):
             device, gpus = torch.device("privateuseone"), [int(item) for item in gpus.split("-")]
             n_gpus = len(gpus)
-        elif torch.backends.mps.is_available() and main_config.device.startswith("mps"):
+        elif main_config.device.startswith("mps"):
             device, gpus = torch.device("mps"), [0]
             n_gpus = 1
         else:
@@ -427,8 +427,8 @@ def run(
     elif device.type == "xpu": torch.xpu.manual_seed(config.train.seed)
     elif device.type == "ocl": opencl.pytorch_ocl.manual_seed_all(config.train.seed)
 
-    if torch.cuda.is_available(): torch.cuda.set_device(device_id)
-    elif hasattr(torch, "xpu") and torch.xpu.is_available(): torch.xpu.set_device(device_id)
+    if device.type == "cuda": torch.cuda.set_device(device_id)
+    elif device.type == "xpu": torch.xpu.set_device(device_id)
 
     writer_eval = SummaryWriter(
         log_dir=eval_dir
@@ -531,10 +531,10 @@ def run(
     net_g, net_d = (
         net_g.cuda(device_id), 
         net_d.cuda(device_id)
-    ) if torch.cuda.is_available() else (
+    ) if device.type == "cuda" else (
         net_g.xpu(device_id), 
         net_d.xpu(device_id)
-    ) if hasattr(torch, "xpu") and torch.xpu.is_available() else (
+    ) if device.type == "xpu" else (
         net_g.to(device), 
         net_d.to(device)
     )
@@ -581,7 +581,7 @@ def run(
         net_g, net_d = (
             DDP(net_g, device_ids=[device_id]), 
             DDP(net_d, device_ids=[device_id])
-        ) if torch.cuda.is_available() else (
+        ) if device.type.startswith("cuda") else (
             DDP(net_g), 
             DDP(net_d)
         )

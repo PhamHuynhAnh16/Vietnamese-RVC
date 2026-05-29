@@ -23,9 +23,6 @@ def bins_to_cents(bins):
 def frequency_to_cents(frequency):
     return OCTAVE * (frequency / 31).log2()
 
-def seconds_to_samples(seconds, sample_rate=8000):
-    return seconds * sample_rate
-
 def interpolate(pitch, periodicity, value):
     voiced = periodicity > value
     if not voiced.any(): return pitch

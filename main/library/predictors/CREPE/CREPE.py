@@ -4,9 +4,9 @@ import torch
 import librosa
 import scipy.stats
 
-import numpy as np
-
 sys.path.append(os.getcwd())
+
+from main.library.algorithm.viterbi import viterbi
 
 CENTS_PER_BIN, PITCH_BINS, SAMPLE_RATE, WINDOW_SIZE = 20, 360, 16000, 1024
 
@@ -27,21 +27,22 @@ class CREPE:
         compile_model = False,
         compile_mode = None
     ):
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.hop_length = hop_length
         self.batch_size = batch_size
         self.sample_rate = sample_rate
-        self.onnx = onnx
-        self.f0_min = f0_min
-        self.f0_max = f0_max
         self.return_periodicity = return_periodicity
 
-        if self.onnx:
+        self.f0_min_bin = (((1200 * torch.tensor(f0_min / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).floor().int()
+        self.f0_max_bin = (((1200 * torch.tensor(f0_max / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).ceil().int()
+        self.eps = torch.tensor(1e-10, device=device)
+
+        if onnx:
             import onnxruntime as ort
 
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
-            self.model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
+            model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
             from main.library.predictors.CREPE.model import CREPEE
 
@@ -49,7 +50,9 @@ class CREPE:
             model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
             model.to(device).eval()
             if compile_model: model = torch.compile(model, mode=compile_mode)
-            self.model = model
+
+        self.model = model
+        self.infer = self._infer_onnx if onnx else self._infer_torch
 
     def bins_to_frequency(self, bins):
         if str(bins.device).startswith(("ocl", "privateuseone")): bins = bins.to(torch.float32)
@@ -68,25 +71,15 @@ class CREPE:
 
         return 10 * 2 ** cents
 
-    def frequency_to_bins(self, frequency, quantize_fn=torch.floor):
-        return quantize_fn(((1200 * (frequency / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).int()
-
     def viterbi(self, logits):
         if not hasattr(self, 'transition'):
-            xx, yy = np.meshgrid(range(360), range(360))
-            transition = np.maximum(12 - abs(xx - yy), 0)
-            self.transition = transition / transition.sum(axis=1, keepdims=True)
+            idx = torch.arange(360, device=logits.device, dtype=logits.dtype)
+            transition = (12 - (idx[:, None] - idx[None, :]).abs()).clamp(min=0)
+            self.transition = transition / transition.sum(dim=1, keepdim=True)
 
         with torch.no_grad():
             probs = torch.nn.functional.softmax(logits, dim=1)
-
-        bins = torch.tensor(
-            np.array([
-                librosa.sequence.viterbi(sequence, self.transition).astype(np.int64) 
-                for sequence in probs.cpu().numpy()
-            ]), 
-            device=probs.device
-        )
+            bins = viterbi(probs, self.transition)
 
         return bins, self.bins_to_frequency(bins)
     
@@ -118,15 +111,13 @@ class CREPE:
                 audio[:, None, None, max(0, i * hop_length):min(audio.size(1), (i + batch_size - 1) * hop_length + WINDOW_SIZE)], 
                 kernel_size=(1, WINDOW_SIZE), 
                 stride=(1, hop_length)
-            )
+            ).transpose(1, 2)
             
-            if self.device.startswith(("ocl", "privateuseone")):
-                frames = frames.transpose(1, 2).contiguous().reshape(-1, WINDOW_SIZE).to(self.device)
-            else:
-                frames = frames.transpose(1, 2).reshape(-1, WINDOW_SIZE).to(self.device)
+            if self.device.startswith(("ocl", "privateuseone")): frames = frames.contiguous()
+            frames = frames.reshape(-1, WINDOW_SIZE).to(self.device)
 
             frames -= frames.mean(dim=1, keepdim=True)
-            frames /= torch.tensor(1e-10, device=frames.device).max(frames.std(dim=1, keepdim=True))
+            frames /= self.eps.max(frames.std(dim=1, keepdim=True))
 
             yield frames
 
@@ -138,8 +129,8 @@ class CREPE:
 
     def postprocess(self, probabilities):
         probabilities = probabilities.detach()
-        probabilities[:, :self.frequency_to_bins(torch.tensor(self.f0_min))] = -float('inf')
-        probabilities[:, self.frequency_to_bins(torch.tensor(self.f0_max), torch.ceil):] = -float('inf')
+        probabilities[:, :self.f0_min_bin] = -float('inf')
+        probabilities[:, self.f0_max_bin:] = -float('inf')
 
         bins, pitch = self.viterbi(probabilities)
 
@@ -149,31 +140,30 @@ class CREPE:
     def compute_f0(self, audio, pad=True):
         results = []
 
-        for frames in self.preprocess(audio, pad):
-            if self.onnx:
-                model = torch.tensor(
-                    self.model.run(
-                        [self.model.get_outputs()[0].name], 
-                        {
-                            self.model.get_inputs()[0].name: frames.cpu().numpy()
-                        }
-                    )[0].transpose(1, 0)[None],
-                    device=self.device
-                )
-            else:
-                with torch.no_grad():
-                    model = self.model(
-                        frames, 
-                        embed=False
-                    ).reshape(audio.size(0), -1, PITCH_BINS).transpose(1, 2)
-
-            result = self.postprocess(model)
-            results.append(
-                (result[0].to(audio.device), result[1].to(audio.device)) if isinstance(result, tuple) else result.to(audio.device)
-            )
+        with torch.no_grad():
+            for frames in self.preprocess(audio, pad):
+                result = self.postprocess(self.infer(audio, frames))
+                results.append((result[0].to(audio.device), result[1].to(audio.device)) if isinstance(result, tuple) else result.to(audio.device))
         
         if self.return_periodicity:
             pitch, periodicity = zip(*results)
             return torch.cat(pitch, 1), torch.cat(periodicity, 1)
         
         return torch.cat(results, 1)
+    
+    def _infer_torch(self, audio, frames):
+        return self.model(
+            frames, 
+            embed=False
+        ).reshape(audio.size(0), -1, PITCH_BINS).transpose(1, 2)
+
+    def _infer_onnx(self, audio, frames):
+        return torch.tensor(
+            self.model.run(
+                [self.model.get_outputs()[0].name], 
+                {
+                    self.model.get_inputs()[0].name: frames.cpu().numpy()
+                }
+            )[0].transpose(1, 0)[None],
+            device=self.device
+        )

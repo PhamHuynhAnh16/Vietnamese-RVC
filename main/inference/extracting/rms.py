@@ -3,7 +3,6 @@ import sys
 import time
 import tqdm
 import torch
-import librosa
 import traceback
 import concurrent.futures
 
@@ -12,7 +11,8 @@ import torch.nn as nn
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import load_audio
+from main.library.audio.features import rms
+from main.library.audio.audio import load_audio
 from main.app.variables import logger, translations
 from main.inference.extracting.setup_path import setup_paths
 
@@ -36,18 +36,17 @@ class RMSEnergyExtractor(nn.Module):
 
         if str(x.device).startswith(("ocl", "privateuseone")): x = x.contiguous()
 
-        rms = torch.from_numpy(
-            librosa.feature.rms(
-                y=x.squeeze(0).cpu().numpy(), 
-                frame_length=self.frame_length, 
-                hop_length=self.hop_length, 
-                center=self.center, 
-                pad_mode=self.pad_mode
-            )
+        output = rms(
+            y=x.squeeze(0), 
+            frame_length=self.frame_length, 
+            hop_length=self.hop_length, 
+            center=self.center, 
+            pad_mode=self.pad_mode,
+            device=x.device
         )
 
-        if str(x.device).startswith(("ocl", "privateuseone")): rms = rms.contiguous()
-        return rms.squeeze(-2).to(x.device)
+        if str(x.device).startswith(("ocl", "privateuseone")): output = output.contiguous()
+        return output.squeeze(-2).to(x.device)
     
 def process_file_rms(files, device, threads):
     threads = max(1, threads)
@@ -65,7 +64,7 @@ def process_file_rms(files, device, threads):
             out_file_path = os.path.join(out_path, os.path.basename(file))
 
             if os.path.exists(out_file_path + ".npy"): return
-            feats = torch.from_numpy(load_audio(file, 16000)).unsqueeze(0)
+            feats = torch.from_numpy(load_audio(file, sample_rate=16000)).unsqueeze(0)
 
             with torch.no_grad():
                 feats = module(

@@ -3,6 +3,7 @@ import sys
 import math
 import torch
 import random
+import functools
 
 import numpy as np
 
@@ -14,9 +15,16 @@ from torch.nn import functional as F
 sys.path.append(os.getcwd())
 
 from main.app.variables import translations
-from main.library.uvr5_lib.demucs.states import capture_init
 from main.library.uvr5_lib.demucs.demucs import rescale_module
 from main.library.uvr5_lib.demucs.hdemucs import pad1d, spectro, ispectro, wiener, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
+
+def capture_init(init):
+    @functools.wraps(init)
+    def __init__(self, *args, **kwargs):
+        self._init_args_kwargs = (args, kwargs)
+        init(self, *args, **kwargs)
+
+    return __init__
 
 def create_sin_embedding(
     length, 

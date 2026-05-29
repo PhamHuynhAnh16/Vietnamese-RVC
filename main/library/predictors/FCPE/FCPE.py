@@ -247,7 +247,6 @@ class FCPE_LEGACY(nn.Module):
         f0_max=1975.5, 
         f0_min=32.70, 
         confidence=False, 
-        threshold=0.05, 
         use_input_conv=True
     ):
         super().__init__()
@@ -255,7 +254,6 @@ class FCPE_LEGACY(nn.Module):
         self.f0_max = f0_max
         self.f0_min = f0_min
         self.confidence = confidence
-        self.threshold = threshold
         self.use_input_conv = use_input_conv
 
         self.cent_table_b = torch.Tensor(
@@ -305,7 +303,7 @@ class FCPE_LEGACY(nn.Module):
             )
         )
 
-    def forward(self, mel, return_hz_f0=False, cdecoder="local_argmax", output_interp_target_length=None):
+    def forward(self, mel, threshold=0.05, return_hz_f0=False, cdecoder="local_argmax", output_interp_target_length=None):
         x = self.decoder(self.stack(mel.transpose(1, 2)).transpose(1, 2) if self.use_input_conv else mel)
         x = self.dense_out(self.norm(x)).sigmoid()
 
@@ -315,7 +313,7 @@ class FCPE_LEGACY(nn.Module):
                     self.cent_table, 
                     x, 
                     self.confidence, 
-                    threshold=self.threshold, 
+                    threshold=threshold, 
                     mask=True
                 )
             ) if cdecoder == "argmax" else (
@@ -324,7 +322,7 @@ class FCPE_LEGACY(nn.Module):
                     x, 
                     self.n_out, 
                     self.confidence, 
-                    threshold=self.threshold, 
+                    threshold=threshold, 
                     mask=True
                 )
             )
@@ -438,18 +436,16 @@ class FCPEInfer_LEGACY:
         compile_model=False,
         compile_mode=None
     ):
-        if device is None: device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.dtype = dtype
-        self.onnx = onnx
         self.f0_min = f0_min
         self.f0_max = f0_max
         self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
 
-        if self.onnx:
+        if onnx:
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
-            self.model = ort.InferenceSession(decrypt_model(configs, model_path), sess_options=sess_options, providers=providers)
+            model = ort.InferenceSession(decrypt_model(configs, model_path), sess_options=sess_options, providers=providers)
         else:
             ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             self.args = DotDict(ckpt["config"])
@@ -463,35 +459,36 @@ class FCPEInfer_LEGACY:
                 confidence=self.args.model.confidence
             )
             model.load_state_dict(ckpt["model"])
-            model.to(self.device).to(self.dtype).eval()
             if compile_model: model.decoder, model.stack = torch.compile(model.decoder, mode=compile_mode), torch.compile(model.stack, mode=compile_mode)
-            self.model = model
+            model = model.to(self.device).to(self.dtype).eval()
+        
+        self.model = model
+        self.infer = self._infer_onnx if onnx else self._infer_torch
 
     @torch.no_grad()
-    def __call__(self, audio, sr, threshold=0.05, p_len=None):
-        if not self.onnx: self.model.threshold = threshold
-        if not hasattr(self, "numpy_threshold") and self.onnx: self.numpy_threshold = np.array(threshold, dtype=np.float32)
+    def __call__(self, audio, threshold=0.05, p_len=None):
+        return self.infer(self.wav2mel(audio=audio[None, :]).to(self.dtype), threshold, p_len)
 
-        mel = self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype)
+    def _infer_onnx(self, mel, threshold, p_len):
+        return torch.as_tensor(
+            self.model.run(
+                [self.model.get_outputs()[0].name], 
+                {
+                    self.model.get_inputs()[0].name: mel.detach().cpu().numpy(), 
+                    self.model.get_inputs()[1].name: np.array(threshold, dtype=np.float32)
+                }
+            )[0], 
+            dtype=self.dtype, 
+            device=self.device
+        )
 
-        if self.onnx:
-            return torch.as_tensor(
-                self.model.run(
-                    [self.model.get_outputs()[0].name], 
-                    {
-                        self.model.get_inputs()[0].name: mel.detach().cpu().numpy(), 
-                        self.model.get_inputs()[1].name: self.numpy_threshold
-                    }
-                )[0], 
-                dtype=self.dtype, 
-                device=self.device
-            )
-        else: 
-            return self.model(
-                mel=mel, 
-                return_hz_f0=True, 
-                output_interp_target_length=p_len
-            )
+    def _infer_torch(self, mel, threshold, p_len):
+        return self.model(
+            mel=mel, 
+            threshold=threshold,
+            return_hz_f0=True, 
+            output_interp_target_length=p_len
+        )
 
 class FCPEInfer:
     def __init__(
@@ -507,50 +504,50 @@ class FCPEInfer:
         compile_model=False,
         compile_mode=None
     ):
-        if device is None: device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         self.dtype = dtype
-        self.onnx = onnx
         self.f0_min = f0_min
         self.f0_max = f0_max
         self.wav2mel = Wav2Mel(device=self.device, dtype=self.dtype)
 
-        if self.onnx:
+        if onnx:
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
-            self.model = ort.InferenceSession(decrypt_model(configs, model_path), sess_options=sess_options, providers=providers)
+            model = ort.InferenceSession(decrypt_model(configs, model_path), sess_options=sess_options, providers=providers)
         else:
             ckpt = torch.load(model_path, map_location="cpu", weights_only=True)
             ckpt["config_dict"]["model"]["conv_dropout"] = ckpt["config_dict"]["model"]["atten_dropout"] = 0.0
-            self.args = DotDict(ckpt["config_dict"])
-            model = InferCFNaiveMelPE(self.args, ckpt["model"], compile_model=compile_model, compile_mode=compile_mode)
-            self.model = model.to(device).to(self.dtype).eval()
+            model = InferCFNaiveMelPE(DotDict(ckpt["config_dict"]), ckpt["model"], compile_model=compile_model, compile_mode=compile_mode)
+            model = model.to(device).to(self.dtype).eval()
+        
+        self.model = model
+        self.infer = self._infer_onnx if onnx else self._infer_torch
 
     @torch.no_grad()
-    def __call__(self, audio, sr, threshold=0.05, p_len=None):
-        if not hasattr(self, "numpy_threshold") and self.onnx: self.numpy_threshold = np.array(threshold, dtype=np.float32)
-        mel = self.wav2mel(audio=audio[None, :], sample_rate=sr).to(self.dtype)
+    def __call__(self, audio, threshold=0.05, p_len=None):
+        return self.infer(self.wav2mel(audio=audio[None, :]).to(self.dtype), threshold, p_len)
+            
+    def _infer_onnx(self, mel, threshold, p_len):
+        return torch.as_tensor(
+            self.model.run(
+                [self.model.get_outputs()[0].name], 
+                {
+                    self.model.get_inputs()[0].name: mel.detach().cpu().numpy(), 
+                    self.model.get_inputs()[1].name: np.array(threshold, dtype=np.float32)
+                }
+            )[0], 
+            dtype=self.dtype, 
+            device=self.device
+        ) 
 
-        if self.onnx:
-            return torch.as_tensor(
-                self.model.run(
-                    [self.model.get_outputs()[0].name], 
-                    {
-                        self.model.get_inputs()[0].name: mel.detach().cpu().numpy(), 
-                        self.model.get_inputs()[1].name: self.numpy_threshold
-                    }
-                )[0], 
-                dtype=self.dtype, 
-                device=self.device
-            ) 
-        else: 
-            return self.model.infer(
-                mel, 
-                threshold=threshold, 
-                f0_min=self.f0_min, 
-                f0_max=self.f0_max, 
-                output_interp_target_length=p_len
-            )
+    def _infer_torch(self, mel, threshold, p_len):
+        return self.model.infer(
+            mel, 
+            threshold=threshold, 
+            f0_min=self.f0_min, 
+            f0_max=self.f0_max, 
+            output_interp_target_length=p_len
+        )
 
 class FCPE:
     def __init__(
@@ -562,7 +559,6 @@ class FCPE:
         f0_max=1100, 
         dtype=torch.float32, 
         device=None, 
-        sample_rate=16000, 
         threshold=0.05, 
         providers=None, 
         onnx=False, 
@@ -570,21 +566,17 @@ class FCPE:
         compile_model=False,
         compile_mode=None
     ):
-        self.model = FCPEInfer_LEGACY if legacy else FCPEInfer
-        self.fcpe = self.model(configs, model_path, device=device, dtype=dtype, providers=providers, onnx=onnx, f0_min=f0_min, f0_max=f0_max, compile_model=compile_model, compile_mode=compile_mode)
+        model_fn = FCPEInfer_LEGACY if legacy else FCPEInfer
+        self.fcpe = model_fn(configs, model_path, device=device, dtype=dtype, providers=providers, onnx=onnx, f0_min=f0_min, f0_max=f0_max, compile_model=compile_model, compile_mode=compile_mode)
         self.hop_length = hop_length
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.threshold = threshold
-        self.sample_rate = sample_rate
         self.dtype = dtype
         self.legacy = legacy
 
     def compute_f0(self, wav, p_len=None):
-        x = torch.FloatTensor(wav).to(self.dtype).to(self.device)
-        p_len = (x.shape[0] // self.hop_length) if p_len is None else p_len
-
-        f0 = self.fcpe(x, sr=self.sample_rate, threshold=self.threshold, p_len=p_len)
+        if not torch.is_tensor(wav): wav = torch.FloatTensor(wav).to(self.dtype).to(self.device)
+        f0 = self.fcpe(wav, threshold=self.threshold, p_len=p_len)
         f0 = f0[:] if f0.dim() == 1 else f0[0, :, 0]
 
-        if torch.all(f0 == 0): return f0.cpu().numpy() if p_len is None else np.zeros(p_len)
-        return f0.cpu().numpy()
+        return f0

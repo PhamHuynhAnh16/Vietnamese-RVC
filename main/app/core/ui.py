@@ -6,9 +6,10 @@ import torch
 import shutil
 
 import gradio as gr
-import sounddevice as sd
 
 sys.path.append(os.getcwd())
+
+import main.library.audio.sounddevice as sd
 
 from main.library.backends import directml, opencl
 from main.inference.realtime.audio import audio_device
@@ -21,7 +22,6 @@ from main.app.variables import (
     method_f0, 
     vr_models, 
     mdx_models, 
-    spin_model, 
     file_types, 
     configs_json, 
     translations, 
@@ -52,39 +52,39 @@ def get_gpu_info():
     gpu_infos = [
         (
             f"{i}: {torch.cuda.get_device_name(i)} " + 
-            f"({int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)"
+            f"({int(torch.cuda.get_device_properties(i).total_memory / (1024**3) + 0.4)} GB)"
         ) 
         for i in range(ngpu) 
-        if torch.cuda.is_available() or ngpu != 0
+        if config.device.startswith("cuda") or ngpu != 0
     ]
 
-    if len(gpu_infos) == 0 and hasattr(torch, "xpu") and torch.xpu.is_available():
+    if len(gpu_infos) == 0 and config.device.startswith("xpu"):
         ngpu = torch.xpu.device_count()
         gpu_infos = [
             (
                 f"{i}: {torch.xpu.get_device_name(i)} " + 
-                f"({int(torch.xpu.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)} GB)"
+                f"({int(torch.xpu.get_device_properties(i).total_memory / (1024**3) + 0.4)} GB)"
             ) 
             for i in range(ngpu) 
-            if torch.xpu.is_available() or ngpu != 0
+            if config.device.startswith("xpu") or ngpu != 0
         ]
 
     if len(gpu_infos) == 0:
-        if directml.torch_available:
+        if config.device.startswith("privateuseone"):
             ngpu = directml.device_count()
 
             gpu_infos = [
                 f"{i}: {directml.device_name(i)}" 
                 for i in range(ngpu) 
-                if directml.is_available() or ngpu != 0
+                if config.device.startswith("privateuseone") or ngpu != 0
             ]
-        elif opencl.torch_available:
+        elif config.device.startswith("ocl"):
             ngpu = opencl.device_count()
 
             gpu_infos = [
                 f"{i}: {opencl.device_name(i)}" 
                 for i in range(ngpu) 
-                if opencl.is_available() or ngpu != 0
+                if config.device.startswith("ocl") or ngpu != 0
             ]
         else:
             ngpu = 0
@@ -103,28 +103,19 @@ def gpu_number_str():
     if config.cpu_mode: return "-"
     ngpu = torch.cuda.device_count()
 
-    if ngpu == 0 and hasattr(torch, "xpu") and torch.xpu.is_available():
+    if ngpu == 0 and config.device.startswith("xpu"):
         ngpu = torch.xpu.device_count()
         if ngpu != 0: return "0"
 
     if ngpu == 0: 
         ngpu = (
             directml.device_count() 
-            if directml.torch_available else 
+            if config.device.startswith("privateuseone") else 
             opencl.device_count()
         )
         if ngpu != 0: return "0"
 
-    return str(
-        "-".join(map(str, range(ngpu))) 
-        if (
-            torch.cuda.is_available() or 
-            (hasattr(torch, "xpu") and torch.xpu.is_available()) or 
-            directml.is_available() or 
-            opencl.is_available()
-        ) else 
-        "-"
-    )
+    return str("-".join(map(str, range(ngpu))) if config.device.startswith(("cuda", "xpu", "privateuseone", "ocl")) else "-")
 
 def change_f0_choices(): 
     f0_file = sorted([
@@ -171,11 +162,11 @@ def change_reference_choices():
 
 def change_models_choices():
     model, index = (
-        sorted(list(
+        sorted([
             model 
             for model in os.listdir(configs["weights_path"]) 
             if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_")
-        )), 
+        ]), 
         sorted([
             os.path.join(root, name) 
             for root, _, files in os.walk(configs["logs_path"], topdown=False) 
@@ -223,30 +214,30 @@ def change_pretrained_choices():
 def change_preset_choices():
     return {
         "value": "", 
-        "choices": sorted(list(
+        "choices": sorted([
             f for f in os.listdir(configs["presets_path"]) 
             if f.endswith(".conversion.json")
-        )), 
+        ]), 
         "__type__": "update"
     }
 
 def change_effect_preset_choices():
     return {
         "value": "", 
-        "choices": sorted(list(
+        "choices": sorted([
             f for f in os.listdir(configs["presets_path"]) 
             if f.endswith(".effect.json")
-        )), 
+        ]), 
         "__type__": "update"
     }
 
 def change_realtime_preset_choices():
     return {
         "value": "", 
-        "choices": sorted(list(
+        "choices": sorted([
             f for f in os.listdir(configs["presets_path"]) 
             if f.endswith(".realtime.json")
-        )), 
+        ]), 
         "__type__": "update"
     }
 
@@ -341,11 +332,18 @@ def index_strength_show(index):
         os.path.isfile(index)
     )
 
-    return {
-        "visible": index_strength_visible if gradio_version else (index_strength_visible or "hidden"), 
-        "value": 0.5, 
-        "__type__": "update"
-    }
+    return [
+        {
+            "visible": index_strength_visible if gradio_version else (index_strength_visible or "hidden"), 
+            "value": 0.5, 
+            "__type__": "update"
+        },
+        {
+            "visible": index_strength_visible if gradio_version else (index_strength_visible or "hidden"), 
+            "value": 9, 
+            "__type__": "update"
+        }
+    ]
 
 def hoplength_show(
     method, 
@@ -447,13 +445,7 @@ def unlock_version(value, vocoder):
     }
 
 def change_embedders_mode(value):
-    if value == "spin":
-        return {
-            "value": spin_model[0], 
-            "choices": spin_model, 
-            "__type__": "update"
-        }
-    elif value == "whisper":
+    if value == "whisper":
         return {
             "value": whisper_model[0], 
             "choices": whisper_model, 
@@ -602,8 +594,8 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
     monitor_is_asio = "ASIO" in monitor_device if monitor_device else (False if gradio_version else "hidden")
 
     if input_is_asio or output_is_asio or monitor_is_asio:
-        sd._terminate()
-        sd._initialize()
+        sd.terminate()
+        sd.initialize()
 
         try:
             input_max_ch = input_channels_map.get(input_device, [])[1]
@@ -654,8 +646,8 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
 def change_audio_device_choices():
     global input_channels_map, output_channels_map
 
-    sd._terminate()
-    sd._initialize()
+    sd.terminate()
+    sd.initialize()
 
     input_channels_map, output_channels_map = audio_device()
     input_channels_map_list, output_channels_map_list = list(input_channels_map.keys()), list(output_channels_map.keys())
@@ -688,22 +680,7 @@ def resolve_sample_rate(input_device_id):
         return 48000
 
 def replace_punctuation(filename):
-    return (filename
-        .replace(" ", "_").replace("-", "")
-        .replace("(", "").replace(")", "")
-        .replace("[", "").replace("]", "")
-        .replace(",", "").replace('"', "")
-        .replace("'", "").replace("|", "_")
-        .replace("{", "").replace("}", "")
-        .replace("-_-", "_").replace("_-_", "_")
-        .replace("-", "_").replace("---", "_")
-        .replace("___", "_").replace("/", "")
-        .replace("__", "_").replace(":", "")
-        .replace("<", "").replace(">", "")
-        .replace('"', "").replace("'", "")
-        .replace("?", "").replace("*", "")
-        .strip()
-    )
+    return re.sub(r"_+", "_", re.sub(r"[ \-|]+", "_", filename.translate(str.maketrans("", "", '()[],"\'{}<>?*:/\\')))).strip("_")
 
 def replace_url(url):
     return url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()

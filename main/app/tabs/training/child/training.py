@@ -369,6 +369,16 @@ def training_model_tab():
                             interactive=True
                         )
                     with gr.Row():
+                        nprobe = gr.Slider(
+                            label=translations["nprobe"], 
+                            info=translations["nprobe_info"], 
+                            minimum=1, 
+                            maximum=64, 
+                            value=9, 
+                            step=1, 
+                            interactive=True
+                        )
+                    with gr.Row():
                         cache_in_gpu = gr.Checkbox(
                             label=translations["cache_in_gpu"], 
                             info=translations["cache_in_gpu_info"], 
@@ -958,7 +968,8 @@ def training_model_tab():
             inputs=[
                 modelname, 
                 rvc_version, 
-                index_algorithm
+                index_algorithm,
+                nprobe
             ],
             outputs=[
                 training_info

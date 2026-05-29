@@ -23,6 +23,12 @@ translations = config.translations
 configs_json = os.path.join("main", "configs", "config.json")
 configs = json.load(open(configs_json, "r"))
 
+configs["debug_mode"] = "--debug" in sys.argv
+configs["tensorrt"] = "--tensorrt" in sys.argv
+
+with open(configs_json, "w") as f:
+    json.dump(configs, f, indent=4)
+
 gradio_version = version.parse(gr.__version__) <= version.parse("6.0.0")
 
 audio_params = {
@@ -180,7 +186,6 @@ embedders_mode = [
     "fairseq", 
     "onnx", 
     "transformers", 
-    "spin", 
     "whisper"
 ]
 
@@ -192,12 +197,9 @@ embedders_model = [
     "korean_hubert_base", 
     "chinese_hubert_base", 
     "portuguese_hubert_base", 
-    "custom"
-]
-
-spin_model = [
     "spin-v1", 
-    "spin-v2"
+    "spin-v2",
+    "custom"
 ]
 
 whisper_model = [
@@ -251,10 +253,10 @@ reference_list = sorted([
     )
 ])
 
-model_name = sorted(list(
+model_name = sorted([
     model for model in os.listdir(configs["weights_path"]) 
     if model.endswith((".pth", ".onnx")) and not model.startswith("G_") and not model.startswith("D_")
-))
+])
 
 index_path = sorted([
     os.path.join(root, name) 
@@ -277,20 +279,20 @@ pretrainedG = [
 
 all_presets = os.listdir(configs["presets_path"])
 
-presets_file = sorted(list(
+presets_file = sorted([
     f for f in all_presets 
     if f.endswith(".conversion.json")
-))
+])
 
-audio_effect_presets_file = sorted(list(
+audio_effect_presets_file = sorted([
     f for f in all_presets 
     if f.endswith(".effect.json")
-))
+])
 
-realtime_presets_file = sorted(list(
+realtime_presets_file = sorted([
     f for f in all_presets 
     if f.endswith(".realtime.json")
-))
+])
 
 f0_file = sorted([
     os.path.abspath(os.path.join(root, f)) 

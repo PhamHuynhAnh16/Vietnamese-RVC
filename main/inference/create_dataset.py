@@ -267,7 +267,7 @@ def create_dataset(
             ]
 
         if clean_dataset: 
-            from main.tools.noisereduce import TorchGate
+            from main.library.audio.noisereduce import TorchGate
 
             tg = TorchGate(
                 sr, 

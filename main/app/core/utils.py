@@ -14,8 +14,12 @@ from main.app.variables import translations, configs
 
 def alive(pid):
     try:
-        os.kill(pid, 0)
-        return True
+        if sys.platform == "win32":
+            subprocess.check_output(["tasklist", "/FI", f"PID eq {pid}"], stderr=subprocess.DEVNULL)
+            return True
+        else:
+            os.kill(pid, 0)
+            return True
     except:
         return False
 
@@ -23,7 +27,8 @@ def pid_kill(pid):
     if not alive(pid): return True
 
     try:
-        os.kill(pid, signal.CTRL_BREAK_EVENT if sys.platform == "win32" else signal.SIGINT)
+        if sys.platform == "win32": subprocess.run(["taskkill", "/PID", str(pid), "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else: os.kill(pid, signal.SIGINT)
     except:
         pass
 
@@ -32,10 +37,8 @@ def pid_kill(pid):
         time.sleep(0.1)
 
     try:
-        if sys.platform == "win32":
-            subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            os.kill(pid, signal.SIGKILL)
+        if sys.platform == "win32": subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else: os.kill(pid, signal.SIGKILL)
     except:
         pass
 

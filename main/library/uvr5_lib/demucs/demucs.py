@@ -3,6 +3,7 @@ import sys
 import math
 import torch
 import inspect
+import functools
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,7 +11,14 @@ import torch.nn.functional as F
 sys.path.append(os.getcwd())
 
 from main.library.uvr5_lib.demucs.utils import center_trim
-from main.library.uvr5_lib.demucs.states import capture_init
+
+def capture_init(init):
+    @functools.wraps(init)
+    def __init__(self, *args, **kwargs):
+        self._init_args_kwargs = (args, kwargs)
+        init(self, *args, **kwargs)
+
+    return __init__
 
 def unfold(a, kernel_size, stride):
     *shape, length = a.shape

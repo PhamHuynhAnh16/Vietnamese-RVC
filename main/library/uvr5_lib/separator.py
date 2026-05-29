@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import yaml
 import torch
 import codecs
 import hashlib
@@ -106,7 +105,7 @@ class Separator:
             self.torch_device = torch.device("xpu")
             return
         elif providers[0] in ["DmlExecutionProvider"]:
-            backends = (config.device.replace("privateuseone", "dml") if not torch.cuda.is_available() else config.device.replace("cuda", "hip")).split(":")[0].upper()
+            backends = (config.device.replace("privateuseone", "dml") if not config.device.startswith("cuda") else config.device.replace("cuda", "hip")).split(":")[0].upper()
             self.logger.info(translations["running_in_backends"].format(backends=backends))
             self.logger.info(translations["onnx_have"].format(backends=backends))
             self.torch_device = torch.device(config.device)
@@ -121,15 +120,6 @@ class Separator:
             self.logger.warning(translations["onnx_not_have"])
             self.torch_device = self.torch_device_cpu
             return
-
-    def get_model_hash(self, model_path):
-        try:
-            with open(model_path, "rb") as f:
-                f.seek(-10000 * 1024, 2)
-
-                return hashlib.md5(f.read()).hexdigest()
-        except IOError as e:
-            return hashlib.md5(open(model_path, "rb").read()).hexdigest()
 
     def download_file_if_not_exists(self, url, output_path):
         if os.path.isfile(output_path): return
@@ -152,8 +142,7 @@ class Separator:
                 **model_downloads_list["mdx_download_vip_list"]
             }, 
             "Demucs": {
-                key: value for key, value in model_downloads_list["demucs_download_list"].items() 
-                if key.startswith("Demucs v4")
+                **model_downloads_list["demucs_download_list"]
             },
             "VR": {
                 **model_downloads_list["vr_download_list"]
@@ -161,89 +150,54 @@ class Separator:
         }
     
     def download_model_files(self, model_filename):
+        model_repo = codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/hie5_zbqryf", "rot13")
         model_path = os.path.join(self.model_file_dir, model_filename)
         supported_models = self.list_supported_model_files()
-
-        model_repo = codecs.decode(
-            "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/hie5_zbqryf", 
-            "rot13"
-        )
 
         for model_type, model_list in supported_models.items():
             for _, files in model_list.items():
                 if isinstance(files, str) and files == model_filename:
                     try:
-                        self.download_file_if_not_exists(
-                            f"{model_repo}/MDX/{model_filename}", 
-                            model_path
-                        )
+                        self.download_file_if_not_exists(f"{model_repo}/MDX/{model_filename}", model_path)
                     except:
                         try:
-                            self.download_file_if_not_exists(
-                                f"{model_repo}/VR/{model_filename}", 
-                                model_path
-                            )
+                            self.download_file_if_not_exists(f"{model_repo}/VR/{model_filename}",  model_path)
                         except:
-                            self.download_file_if_not_exists(
-                                f"{model_repo}/Demucs/{model_filename}", 
-                                model_path
-                            )
+                            self.download_file_if_not_exists(f"{model_repo}/Demucs/{model_filename}", model_path)
 
-                    return model_filename, model_type, model_path
-
+                    return model_type, model_path
                 elif isinstance(files, dict) and any(model_filename in (k, v) for k, v in files.items()):
-                    for file_key, file_val in files.items():
-                        out_path = os.path.join(self.model_file_dir, file_key)
+                    for _, file_val in files.items():
+                        self.download_file_if_not_exists(f"{model_repo}/Demucs/{file_val}", os.path.join(self.model_file_dir, file_val))
 
-                        if file_val.startswith("http"):
-                            self.download_file_if_not_exists(
-                                file_val, 
-                                out_path
-                            )
-                        else:
-                            self.download_file_if_not_exists(
-                                f"{model_repo}/Demucs/{file_val}", 
-                                os.path.join(self.model_file_dir, file_val)
-                            )
-
-                    return model_filename, model_type, model_path
+                    return model_type, model_path
 
         raise ValueError
 
-    def load_model_data_from_yaml(self, yaml_config_filename):
-        model_data_yaml_filepath = os.path.join(
-            self.model_file_dir, yaml_config_filename
-        ) if not os.path.exists(yaml_config_filename) else yaml_config_filename
+    def load_model_data(self, model_path = None, model_type = None):
+        if model_type == "Demucs": model_data = {}
+        elif model_path is not None:
+            try:
+                with open(model_path, "rb") as f:
+                    f.seek(-10000 * 1024, 2)
 
-        model_data = yaml.load(
-            open(model_data_yaml_filepath, encoding="utf-8"), 
-            Loader=yaml.FullLoader
-        )
+                    model_hash = hashlib.md5(f.read()).hexdigest()
+            except IOError:
+                model_hash = hashlib.md5(open(model_path, "rb").read()).hexdigest()
 
-        return model_data
+            response = requests.get(codecs.decode("uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/enj/znva/wfba/zbqry_qngn.wfba", "rot13"))
+            response.raise_for_status()
+            model_data_object = response.json()
 
-    def load_model_data_using_hash(self, model_path):
-        model_hash = self.get_model_hash(model_path)
-        response = requests.get(
-            codecs.decode(
-                "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/enj/znva/wfba/zbqry_qngn.wfba", 
-                "rot13"
-            )
-        )
-
-        response.raise_for_status()
-        model_data_object = response.json()
-
-        if model_hash in model_data_object: model_data = model_data_object[model_hash]
+            if model_hash in model_data_object: model_data = model_data_object[model_hash]
+            else: raise ValueError
         else: raise ValueError
 
         return model_data
 
     def load_model(self, model_filename):
         self.logger.info(translations["loading_model"].format(model_filename=model_filename))
-        model_filename, model_type, model_path = self.download_model_files(model_filename)
-
-        yaml_config_filename = model_path if model_path.lower().endswith(".yaml") else None
+        model_type, model_path = self.download_model_files(model_filename)
 
         common_params = {
             "logger": self.logger, 
@@ -253,11 +207,7 @@ class Separator:
             "onnx_execution_provider": self.onnx_execution_provider, 
             "model_name": model_filename.split(".")[0], 
             "model_path": model_path, 
-            "model_data": (
-                self.load_model_data_from_yaml(yaml_config_filename) 
-                if yaml_config_filename is not None else 
-                self.load_model_data_using_hash(model_path)
-            ), 
+            "model_data": self.load_model_data(model_path, model_type), 
             "output_format": self.output_format, 
             "output_bitrate": self.output_bitrate, 
             "output_dir": self.output_dir, 
@@ -276,7 +226,7 @@ class Separator:
             raise ValueError(translations["model_type_not_support"].format(model_type=model_type))
 
         module_name, class_name = separator_classes[model_type].split(".")
-        separator_class = getattr(import_module(f"main.library.architectures.{module_name}"), class_name)
+        separator_class = getattr(import_module(f"main.library.uvr5_lib.{module_name}"), class_name)
         self.model_instance = separator_class(common_config=common_params, arch_config=self.arch_specific_params[model_type])
         self.model_type = model_type
 

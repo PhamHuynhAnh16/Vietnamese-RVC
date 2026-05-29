@@ -60,8 +60,9 @@ def median(signals, win_length):
     mask = mask.contiguous().view(mask.size()[:3] + (-1,))
 
     x_sorted, _ = torch.where(mask.bool(), x.float(), float("inf")).to(x).sort(dim=-1)
+    idx = ((mask.sum(dim=-1) - 1) // 2).clamp(min=0).unsqueeze(-1).long()
 
-    median_pooled = x_sorted.gather(-1, ((mask.sum(dim=-1) - 1) // 2).clamp(min=0).unsqueeze(-1).long()).squeeze(-1)
+    median_pooled = x_sorted.take_along_dim(idx, dim=-1).squeeze(-1) if str(x.device).startswith(("ocl", "privateuseone")) else x_sorted.gather(-1, idx).squeeze(-1)
     median_pooled[torch.isinf(median_pooled)] = float("nan")
 
     return median_pooled.squeeze(1)

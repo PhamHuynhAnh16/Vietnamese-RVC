@@ -54,12 +54,12 @@ class WhisperModel(torch.nn.Module):
 
         return [ppg]
     
-    def extract_features(self, source, padding_mask = None, output_layer = None):
+    def extract_features(self, source, output_layer = None):
         if self.rank == 0:
             self.rank += 1
 
-            self.model.to(padding_mask.device).eval()
-            self.model.encoder.to(padding_mask.device).eval()
+            self.model.to(source.device).eval()
+            self.model.encoder.to(source.device).eval()
             if config.compile_all: self.model.encoder = torch.compile(self.model.encoder, mode=config.compile_mode)
 
             if config.is_half: 

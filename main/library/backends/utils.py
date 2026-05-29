@@ -22,7 +22,6 @@ class STFT(torch.nn.Module):
         self.cutoff = int(self.filter_length / 2 + 1)
         self.win_length = win_length
         self.pad_mode = pad_mode
-        self.hann_window = {}
 
         fourier_basis = np.fft.fft(
             np.eye(self.filter_length)
@@ -52,7 +51,7 @@ class STFT(torch.nn.Module):
         forward_basis *= fft_window
         inverse_basis = (inverse_basis.T * fft_window).T
 
-        self.register_buffer("forward_basis", forward_basis.float())
+        self.register_buffer("forward_basis", forward_basis.float().unsqueeze(1))
         self.register_buffer("inverse_basis", inverse_basis.float())
         self.register_buffer("fft_window", fft_window.float())
 
@@ -70,8 +69,10 @@ class STFT(torch.nn.Module):
                 mode=self.pad_mode
             )
 
-        forward_transform = (
-            self.forward_basis @ input_data.unfold(1, self.filter_length, self.hop_length).permute(0, 2, 1)
+        forward_transform = F.conv1d(
+            input_data.unsqueeze(1), 
+            self.forward_basis, 
+            stride=self.hop_length
         )
 
         real_part = forward_transform[:, :self.cutoff, :]
@@ -142,50 +143,28 @@ class GRU(torch.nn.RNNBase):
             dtype=dtype
         )
 
-    @staticmethod
-    def _gru_cell(
-        x, 
-        hx, 
-        weight_ih, 
-        bias_ih, 
-        weight_hh, 
-        bias_hh
-    ):
-        gate_x = F.linear(x, weight_ih, bias_ih)
-        gate_h = F.linear(hx, weight_hh, bias_hh)
-
-        i_r, i_i, i_n = gate_x.chunk(3, 1)
-        h_r, h_i, h_n = gate_h.chunk(3, 1)
-
-        resetgate = (i_r + h_r).sigmoid()
-        inputgate = (i_i + h_i).sigmoid()
-        newgate = (i_n + resetgate * h_n).tanh()
-
-        hy = newgate + inputgate * (hx - newgate)
-        return hy
-
-    def _gru_layer(
-        self, 
-        x, 
-        hx, 
-        weights
-    ):
+    def _gru_layer(self, x, hx, weights):
         weight_ih, weight_hh, bias_ih, bias_hh = weights
-        outputs = []
+        B, T, _ = x.shape
 
-        for x_t in x.unbind(1):
-            hx = self._gru_cell(
-                x_t, 
-                hx, 
-                weight_ih, 
-                bias_ih, 
-                weight_hh, 
-                bias_hh
-            )
+        gate_x = F.linear(x, weight_ih, bias_ih) 
+        outputs = torch.empty(B, T, self.hidden_size, device=x.device, dtype=x.dtype)
 
-            outputs.append(hx)
+        if bias_hh is not None: b_hr, b_hz, b_hn = bias_hh.chunk(3)
+        else: b_hr = b_hz = b_hn = None
 
-        return torch.stack(outputs, dim=1), hx
+        w_hr, w_hz, w_hn = weight_hh.chunk(3, dim=0)
+
+        for t in range(T):
+            x_r, x_z, x_n = gate_x[:, t].chunk(3, dim=1)
+            r = (x_r + F.linear(hx, w_hr, b_hr)).sigmoid()
+            z = (x_z + F.linear(hx, w_hz, b_hz)).sigmoid()
+
+            n = (x_n + r * F.linear(hx, w_hn, b_hn)).tanh()
+            hx = n + z * (hx - n)
+            outputs[:, t] = hx
+
+        return outputs, hx
 
     def _gru(self, x, hx):
         if not self.batch_first: x = x.permute(1, 0, 2)

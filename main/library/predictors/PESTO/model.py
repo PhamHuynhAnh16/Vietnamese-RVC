@@ -37,20 +37,12 @@ class PPESTO(torch.nn.Module):
             confidence = confidence.view(batch_size, -1)
             vol = vol.view(batch_size, -1)
 
-        activations = activations.roll(-(self.shift * self.bins_per_semitone).round().int().item(), -1)
-        preds = self.reduce_activations(activations)
+        activations = activations.roll(-(self.shift * self.preprocessor.hcqt_kwargs["bins_per_semitone"]).round().int().item(), -1)
+        preds = self.reduce_activations(activations.cpu()).to(activations.device) if activations.device.type.startswith(("ocl", "privateuseone")) else self.reduce_activations(activations)
         if convert_to_freq: preds = 440 * 2 ** ((preds - 69) / 12)
 
         if return_activations: return preds, confidence, vol, activations
         return preds, confidence
-
-    @property
-    def bins_per_semitone(self):
-        return self.preprocessor.hcqt_kwargs["bins_per_semitone"]
-
-    @property
-    def hop_size(self):
-        return self.preprocessor.hop_size
     
     def reduce_activations(self, activations):
         device = activations.device

@@ -1,5 +1,4 @@
 import json
-import onnx
 import torch
 import onnxruntime
 
@@ -14,23 +13,20 @@ class ONNXRVC:
     ):
         sess_options = onnxruntime.SessionOptions()
         sess_options.log_severity_level = log_severity_level
+            
+        self.net_g = onnxruntime.InferenceSession(
+            model_path, 
+            sess_options=sess_options, 
+            providers=providers
+        )
 
-        metadata_dict = None
-        for prop in onnx.load(model_path).metadata_props:
-            if prop.key == "model_info":
-                metadata_dict = json.loads(prop.value)
-                break
+        metadata_dict = json.loads(self.net_g.get_modelmeta().custom_metadata_map["model_info"])
 
         self.cpt = {}
         self.cpt["tgt_sr"] = metadata_dict.get("sr", 32000)
         self.cpt["use_f0"] = metadata_dict.get("f0", 1)
         self.cpt["version"] = metadata_dict.get("version", "v1")
         self.cpt["energy"] = metadata_dict.get("energy", False)
-        self.net_g = onnxruntime.InferenceSession(
-            model_path, 
-            sess_options=sess_options, 
-            providers=providers
-        )
 
     def get_onnx_argument(
         self, 

@@ -261,6 +261,7 @@ window.StreamAudioRealtime = async function(
     phaser_centre_frequency_hz,
     phaser_feedback,
     phaser_mix,
+    nprobe
 ) {
     const SampleRate = 48000;
     const ReadChunkSize = Math.round(chunk_size * SampleRate / 1000 / 128);
@@ -373,6 +374,7 @@ window.StreamAudioRealtime = async function(
                     embedders_mix: embedders_mix,
                     embedders_mix_layers: embedders_mix_layers,
                     embedders_mix_ratio: embedders_mix_ratio,
+                    nprobe: nprobe,
                     kwargs: {
                         chorus: chorus,
                         distortion: distortion,
@@ -675,7 +677,8 @@ def realtime_start(
     phaser_depth,
     phaser_centre_frequency_hz,
     phaser_feedback,
-    phaser_mix
+    phaser_mix,
+    nprobe = 1
 ):
     global running, callbacks, audio_manager, callbacks_kwargs
     running = True
@@ -731,10 +734,10 @@ def realtime_start(
     monitor_is_asio = "ASIO" in monitor_output_device
 
     if input_is_asio or output_is_asio or monitor_is_asio:
-        import sounddevice as sd
+        import main.library.audio.sounddevice as sd
 
-        sd._terminate()
-        sd._initialize()
+        sd.terminate()
+        sd.initialize()
     
     import main.app.core.ui as ui
 
@@ -787,6 +790,7 @@ def realtime_start(
         "post_process": post_process,
         "sid": sid,
         "noise_scale": noise_scale,
+        "nprobe": nprobe,
         "embedders_mix": embedders_mix,
         "embedders_mix_layers": embedders_mix_layers,
         "embedders_mix_ratio": embedders_mix_ratio,
@@ -876,9 +880,9 @@ def realtime_start(
 
     while running and callbacks is not None and audio_manager is not None:
         time.sleep(0.1)
-        if hasattr(callbacks, "latency") and hasattr(callbacks, "volume"):
+        if hasattr(callbacks, "audio") and hasattr(callbacks.audio, "performance") and hasattr(callbacks.audio, "volume"):
             yield (
-                f"{translations['latency']}: {callbacks.latency:.2f} ms | {translations['volume']}: {callbacks.volume:.2f} dB", 
+                f"{translations['latency']}: {callbacks.audio.performance:.2f} ms | {translations['volume']}: {callbacks.audio.volume:.2f} dB", 
                 interactive_false, 
                 interactive_true
             )
@@ -941,7 +945,7 @@ def change_callbacks_config():
         if clean_audio is False:
             callbacks.vc.vc_model.tg = None
         elif clean_audio and callbacks.vc.vc_model.tg is None:
-            from main.tools.noisereduce import TorchGate
+            from main.library.audio.noisereduce import TorchGate
 
             callbacks.vc.vc_model.tg = (
                 TorchGate(
@@ -982,29 +986,16 @@ def change_callbacks_config():
         callbacks.audio.embedders_mix_layers = callbacks_kwargs.get("embedders_mix_layers", 9)
         callbacks.audio.embedders_mix_ratio = callbacks_kwargs.get("embedders_mix_ratio", 0.5)
 
+        noise_scale = callbacks_kwargs.get("noise_scale", 0.35)
         model_pth = callbacks_kwargs.get("model_path", callbacks.vc.vc_model.model_path)
         model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
 
         if model_pth and callbacks.vc.vc_model.model_path != model_pth:
             callbacks.vc.vc_model.model_path = model_pth
-            callbacks.vc.vc_model.pipeline.inference.get_synthesizer(model_pth)
-
-            callbacks.vc.vc_model.pipeline.version = callbacks.vc.vc_model.pipeline.inference.version
-            callbacks.vc.vc_model.pipeline.energy = callbacks.vc.vc_model.pipeline.inference.energy
-
-            if callbacks.vc.vc_model.pipeline.inference.energy:
-                from main.inference.extracting.rms import RMSEnergyExtractor
-
-                rms = RMSEnergyExtractor(
-                    frame_length=2048, 
-                    hop_length=160, 
-                    center=True, 
-                    pad_mode="reflect"
-                ).to(config.device).eval()
-
-                callbacks.vc.vc_model.pipeline.rms = rms
-            else:
-                callbacks.vc.vc_model.pipeline.rms = None
+            callbacks.vc.vc_model.pipeline.vc.setup(model_pth, noise_scale)
+            callbacks.vc.vc_model.pipeline.version = callbacks.vc.vc_model.pipeline.vc.version
+            callbacks.vc.vc_model.pipeline.energy = callbacks.vc.vc_model.pipeline.vc.energy
+            callbacks.vc.vc_model.pipeline.rms = callbacks.vc.vc_model.pipeline.setup_rms() if callbacks.vc.vc_model.pipeline.vc.energy else None
 
         sid = callbacks_kwargs.get("sid", callbacks.vc.vc_model.pipeline.sid)
         if callbacks.vc.vc_model.pipeline.sid != sid:
@@ -1018,16 +1009,19 @@ def change_callbacks_config():
             if callbacks.vc.vc_model.index_path != index_path:
                 from main.library.utils import load_faiss_index
 
+                nprobe = callbacks_kwargs.get("nprobe", 1)
                 index, index_reconstruct = load_faiss_index(
-                    index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added")
+                    index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"),
+                    nprobe=nprobe
                 )
 
                 callbacks.vc.vc_model.pipeline.index = index
-                callbacks.vc.vc_model.pipeline.big_npy = index_reconstruct
+                if callbacks.vc.vc_model.pipeline.index.index is not None: callbacks.vc.vc_model.pipeline.index.index.nprobe = nprobe
+                callbacks.vc.vc_model.pipeline.big_tsr = index_reconstruct
                 callbacks.vc.vc_model.index_path = index_path
         else:
             callbacks.vc.vc_model.pipeline.index = None
-            callbacks.vc.vc_model.pipeline.big_npy = None
+            callbacks.vc.vc_model.pipeline.big_tsr = None
             callbacks.vc.vc_model.index_path = None
 
         f0_method = callbacks_kwargs.get("f0_method", callbacks.vc.vc_model.pipeline.f0_method)
@@ -1047,21 +1041,7 @@ def change_callbacks_config():
             old_predictor = callbacks.vc.vc_model.pipeline.predictor
             del old_predictor
 
-            from main.library.predictors.Generator import Generator
-
-            predictor = Generator(
-                sample_rate=callbacks_kwargs.get("sample_rate", callbacks.vc.vc_model.sample_rate), 
-                hop_length=callbacks_kwargs.get("f0_method", callbacks.vc.vc_model.pipeline.predictor.hop_length), 
-                f0_min=configs.get("f0_min", 50), 
-                f0_max=configs.get("f0_max", 1100), 
-                alpha=0.5, 
-                is_half=config.is_half, 
-                device=config.device, 
-                predictor_onnx=predictor_onnx, 
-                delete_predictor_onnx=False
-            )
-
-            callbacks.vc.vc_model.pipeline.predictor = predictor
+            callbacks.vc.vc_model.pipeline.predictor = callbacks.vc.vc_model.pipeline.setup_predictor(PIPELINE_SAMPLE_RATE, callbacks_kwargs.get("hop_length", callbacks.vc.vc_model.pipeline.predictor.hop_length), predictor_onnx)
             callbacks.vc.vc_model.pipeline.f0_method = f0_method
             callbacks.vc.vc_model.pipeline.predictor.predictor_onnx = predictor_onnx
 
@@ -1073,28 +1053,15 @@ def change_callbacks_config():
                 old_embedder = callbacks.vc.vc_model.pipeline.embedder
                 del old_embedder
 
-                import torch
-                from main.library.utils import load_embedders_model
-
-                embedder = load_embedders_model(
-                    embedder_model, 
-                    embedders_mode=embedders_mode
-                )
-
-                if isinstance(embedder, torch.nn.Module): 
-                    dtype = torch.float16 if config.is_half else torch.float32
-                    embedder = embedder.to(config.device).to(dtype).eval()
-
-                callbacks.vc.vc_model.pipeline.embedder = embedder
+                callbacks.vc.vc_model.pipeline.embedder = callbacks.vc.vc_model.pipeline.setup_embedder(embedder_model, embedders_mode)
                 callbacks.vc.vc_model.embedder_model = embedder_model
                 callbacks.vc.vc_model.embedders_mode = embedders_mode
-        
-        noise_scale = callbacks_kwargs.get("noise_scale", 0.35)
+
         if (
-            callbacks.vc.vc_model.pipeline.inference.architecture == "SVC" and
-            callbacks.vc.vc_model.pipeline.inference.net_g.noise_scale != noise_scale
+            callbacks.vc.vc_model.pipeline.vc.architecture == "SVC" and
+            callbacks.vc.vc_model.pipeline.vc.net_g.noise_scale != noise_scale
         ): 
-            callbacks.vc.vc_model.pipeline.inference.net_g.noise_scale = noise_scale
+            callbacks.vc.vc_model.pipeline.vc.net_g.noise_scale = noise_scale
 
 def change_config(value, key, if_kwargs=False):
     global callbacks_kwargs
@@ -1116,7 +1083,10 @@ def realtime_stop():
         audio_manager.stop()
         running = False
 
-        if hasattr(callbacks, "latency"): del callbacks.latency
+        if hasattr(callbacks.audio, "performance"): del callbacks.audio.performance
+        if hasattr(callbacks.audio, "volume"): del callbacks.audio.volume
+
+        del callbacks.vc.vc_model.pipeline, callbacks.vc.vc_model
         del audio_manager, callbacks
 
         audio_manager = callbacks = None

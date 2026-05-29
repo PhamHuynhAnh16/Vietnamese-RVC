@@ -1,9 +1,10 @@
 import os
 import sys
 import torch
-import librosa
 
 sys.path.append(os.getcwd())
+
+from main.library.audio.features import mel
 
 def spectral_normalize_torch(magnitudes):
     return (magnitudes.clamp(min=1e-5) * 1.0).log()
@@ -62,7 +63,7 @@ def spectrogram_torch(
             return_complex=True
         )
 
-        spec = (spec.real.pow(2) + spec.imag.pow(2) + 1e-6).sqrt()
+        spec = spec.abs().clamp_min_(1e-6)
 
     return spec.to(y.device)
 
@@ -78,15 +79,15 @@ def spec_to_mel_torch(
 
     fmax_dtype_device = str(fmax) + "_" + str(spec.dtype) + "_" + str(spec.device)
     if fmax_dtype_device not in mel_basis: 
-        mel_basis[fmax_dtype_device] = torch.from_numpy(
-            librosa.filters.mel(
-                sr=sample_rate, 
-                n_fft=n_fft, 
-                n_mels=num_mels, 
-                fmin=fmin, 
-                fmax=fmax
-            )
-        ).to(dtype=spec.dtype, device=spec.device)
+        mel_basis[fmax_dtype_device] = mel(
+            sr=sample_rate, 
+            n_fft=n_fft, 
+            n_mels=num_mels, 
+            fmin=fmin, 
+            fmax=fmax,
+            dtype=spec.dtype, 
+            device=spec.device
+        )
     
     return spectral_normalize_torch(mel_basis[fmax_dtype_device] @ spec)
 
@@ -152,7 +153,7 @@ class MultiScaleMelSpectrogramLoss(torch.nn.Module):
                 return_complex=True
             )
 
-            magnitude = (stft.real.pow(2) + stft.imag.pow(2) + 1e-6).sqrt().to(wav.device, dtype=torch.float32)
+            magnitude = stft.abs().clamp_min_(1e-6).to(wav.device, dtype=torch.float32)
         else:
             stft = torch.stft(
                 wav, 
@@ -162,18 +163,18 @@ class MultiScaleMelSpectrogramLoss(torch.nn.Module):
                 return_complex=True
             )
 
-            magnitude = (stft.real.pow(2) + stft.imag.pow(2) + 1e-6).sqrt()
+            magnitude = stft.abs().clamp_min_(1e-6)
 
         if mel_dtype_device not in self.mel_banks: 
-            self.mel_banks[mel_dtype_device] = torch.from_numpy(
-                librosa.filters.mel(
-                    sr=self.sample_rate, 
-                    n_mels=n_mels, 
-                    n_fft=window_length, 
-                    fmin=0, 
-                    fmax=None
-                )
-            ).to(device=wav.device, dtype=torch.float32)
+            self.mel_banks[mel_dtype_device] = mel(
+                sr=self.sample_rate, 
+                n_mels=n_mels, 
+                n_fft=window_length, 
+                fmin=0, 
+                fmax=None,
+                device=wav.device, 
+                dtype=torch.float32
+            )
 
         return self.mel_banks[mel_dtype_device] @ magnitude
 

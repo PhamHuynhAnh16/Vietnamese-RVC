@@ -9,5 +9,8 @@ class HubertModelWithFinalProj(HubertModel):
             config.classifier_proj_size
         )
 
-    def extract_features(self, source, padding_mask = None, output_layer = None):
-        return self.forward(source)
+    def extract_features(self, source, output_layer=None):
+        outputs = self.forward(source, output_hidden_states=True, return_dict=True)
+        feats = outputs.last_hidden_state if output_layer is None else outputs.hidden_states[output_layer]
+
+        return [feats]

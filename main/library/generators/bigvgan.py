@@ -28,18 +28,6 @@ class AntiAliasActivation(nn.Module):
             self.act(self.up(x))
         )
 
-class Snake1(nn.Module):
-    def __init__(
-        self, 
-        channels
-    ):
-        super().__init__()
-        self.alpha = nn.Parameter(torch.zeros(1, channels, 1))
-
-    def forward(self, x):
-        alpha = self.alpha.exp()
-        return x + (1.0 / (alpha + 1e-9)) * (x * alpha).sin().pow(2)
-
 class SnakeBeta(nn.Module):
     def __init__(
         self, 

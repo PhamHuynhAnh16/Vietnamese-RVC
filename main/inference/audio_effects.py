@@ -26,9 +26,10 @@ from pedalboard import (
 
 sys.path.append(os.getcwd())
 
+from main.library.utils import strtobool
+from main.library.audio.audio import pydub_load
 from main.app.core.ui import replace_export_format
 from main.app.variables import translations, logger
-from main.library.utils import pydub_load, strtobool
 
 def parse_arguments():
     parser = argparse.ArgumentParser()

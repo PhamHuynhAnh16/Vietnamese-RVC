@@ -17,9 +17,10 @@ sys.path.append(os.getcwd())
 
 from main.app.core.ui import replace_export_format
 from main.inference.conversion.pipeline import Pipeline
+from main.library.audio.audio import load_audio, cut, restore
 from main.app.variables import config, logger, translations, file_types
-from main.inference.conversion.audio_processing import preprocess, postprocess
-from main.library.utils import check_assets, load_audio, load_embedders_model, cut, restore, clear_gpu_cache, load_model, strtobool
+from main.library.audio.audio_processing import preprocess, postprocess
+from main.library.utils import check_assets, check_upscaler, load_embedders_model, clear_gpu_cache, load_model, strtobool
 
 if not config.debug_mode:
     warnings.filterwarnings("ignore")
@@ -76,6 +77,8 @@ def parse_arguments():
     parser.add_argument("--embedders_mix_layers", type=int, default=9, required=False)
     parser.add_argument("--embedders_mix_ratio", type=float, default=0.5)
     parser.add_argument("--noise_scale", type=float, default=0.35)
+    parser.add_argument("--nprobe", type=int, default=1)
+    parser.add_argument("--audio_upscaler", type=lambda x: bool(strtobool(x)), default=False)
 
     return parser.parse_args()
 
@@ -117,7 +120,9 @@ def main():
         embedders_mix,
         embedders_mix_layers,
         embedders_mix_ratio,
-        noise_scale
+        noise_scale,
+        nprobe,
+        audio_upscaler
     ) = (
         args.pitch, 
         args.filter_radius, 
@@ -153,7 +158,9 @@ def main():
         args.embedders_mix,
         args.embedders_mix_layers,
         args.embedders_mix_ratio,
-        args.noise_scale
+        args.noise_scale,
+        args.nprobe,
+        args.audio_upscaler
     )
     
     run_convert_script(
@@ -191,7 +198,9 @@ def main():
         embedders_mix=embedders_mix, 
         embedders_mix_layers=embedders_mix_layers, 
         embedders_mix_ratio=embedders_mix_ratio,
-        noise_scale=noise_scale
+        noise_scale=noise_scale,
+        nprobe=nprobe,
+        audio_upscaler=audio_upscaler
     )
 
 def run_convert_script(
@@ -229,7 +238,9 @@ def run_convert_script(
     embedders_mix = False,
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5,
-    noise_scale = 0.35
+    noise_scale = 0.35,
+    nprobe = 1,
+    audio_upscaler = False
 ):
     check_assets(
         f0_method, 
@@ -271,7 +282,9 @@ def run_convert_script(
         translations["embedders_mix_ratio"]: embedders_mix_ratio,
         translations["formant_qfrency"]: formant_qfrency,
         translations["formant_timbre"]: formant_timbre,
-        translations["noise_scale"]: noise_scale
+        translations["noise_scale"]: noise_scale,
+        translations["nprobe"]: nprobe,
+        translations["audio_upscaler"]: audio_upscaler
     }
 
     for key, value in log_data.items():
@@ -281,8 +294,7 @@ def run_convert_script(
         logger.warning(translations["provide_file"].format(filename=translations["model"]))
         sys.exit(1)
 
-    cvt = VoiceConverter(pth_path, sid, noise_scale)
-    start_time = time.time()
+    cvt = VoiceConverter(pth_path, sid, noise_scale, checkpointing)
 
     pid_path = os.path.join("assets", "convert_pid.txt")
     with open(pid_path, "w") as pid_file:
@@ -307,8 +319,8 @@ def run_convert_script(
             export_format=export_format, 
             embedder_model=embedder_model, 
             resample_sr=resample_sr, 
-            checkpointing=checkpointing, 
-            f0_file=f0_file, predictor_onnx=predictor_onnx, 
+            f0_file=f0_file, 
+            predictor_onnx=predictor_onnx, 
             embedders_mode=embedders_mode, 
             formant_shifting=formant_shifting, 
             formant_qfrency=formant_qfrency, 
@@ -320,8 +332,12 @@ def run_convert_script(
             alpha=alpha,
             embedders_mix=embedders_mix, 
             embedders_mix_layers=embedders_mix_layers, 
-            embedders_mix_ratio=embedders_mix_ratio
+            embedders_mix_ratio=embedders_mix_ratio,
+            nprobe=nprobe,
+            audio_upscaler=audio_upscaler
         )
+    
+    start_time = time.time()
 
     if os.path.isdir(input_path):
         logger.info(translations["convert_batch"])
@@ -378,7 +394,8 @@ class VoiceConverter:
         self, 
         model_path, 
         sid = 0,
-        noise_scale = 0.35
+        noise_scale = 0.35,
+        checkpointing = False
     ):
         self.config = config
         self.device = config.device
@@ -392,7 +409,7 @@ class VoiceConverter:
         self.use_f0 = None  
         self.loaded_model = None
         self.vocoder = "Default"
-        self.checkpointing = False
+        self.checkpointing = checkpointing
         self.sample_rate = 16000
         self.sid = sid
         self.noise_scale = noise_scale
@@ -417,7 +434,6 @@ class VoiceConverter:
         clean_strength, 
         export_format, 
         resample_sr = 0, 
-        checkpointing = False, 
         f0_file = None, 
         predictor_onnx = False, 
         embedders_mode = "fairseq", 
@@ -431,15 +447,15 @@ class VoiceConverter:
         alpha = 0.5,
         embedders_mix = False,
         embedders_mix_layers = 9,
-        embedders_mix_ratio = 0.5
+        embedders_mix_ratio = 0.5,
+        nprobe = 1,
+        audio_upscaler = False
     ):
-        self.checkpointing = checkpointing
-
         try:
             with tqdm(total=10, desc=translations["convert_audio"], ncols=100, unit="a", leave=not split_audio) as pbar:
                 audio = load_audio(
                     audio_input_path, 
-                    self.sample_rate, 
+                    sample_rate=self.sample_rate, 
                     formant_shifting=formant_shifting, 
                     formant_qfrency=formant_qfrency, 
                     formant_timbre=formant_timbre
@@ -513,11 +529,11 @@ class VoiceConverter:
                             proposal_pitch=proposal_pitch,
                             proposal_pitch_threshold=proposal_pitch_threshold,
                             energy_use=self.energy,
-                            delete_predictor_onnx=not split_audio,
                             alpha=alpha,
                             embedders_mix=embedders_mix, 
                             embedders_mix_layers=embedders_mix_layers, 
-                            embedders_mix_ratio=embedders_mix_ratio
+                            embedders_mix_ratio=embedders_mix_ratio,
+                            nprobe=nprobe
                         )
                     ) 
                     for waveform, start, end in chunks
@@ -538,7 +554,7 @@ class VoiceConverter:
                     )
 
                 if clean_audio:
-                    from main.tools.noisereduce import TorchGate
+                    from main.library.audio.noisereduce import TorchGate
 
                     if not hasattr(self, "tg"): 
                         self.tg = TorchGate(
@@ -554,7 +570,30 @@ class VoiceConverter:
                 if len(audio_output) != target_len: audio_output = signal.resample_poly(audio_output, target_len, len(audio_output))
 
                 audio_output_resample = None
-                if self.tgt_sr != resample_sr and resample_sr > 0: 
+                
+                if audio_upscaler:
+                    from main.library.audio.upscaler import FlashSR, upscaler
+
+                    if not hasattr(self, "flash_sr"):
+                        check_upscaler()
+
+                        self.flash_sr = FlashSR(
+                            os.path.join("assets", "models", "upscalers", "upscalers.pth"),
+                            device=self.device,
+                            is_half=self.config.is_half
+                        )
+
+                    audio_output_resample = librosa.resample(
+                        audio_output, 
+                        orig_sr=self.tgt_sr, 
+                        target_sr=192000, 
+                        res_type="soxr_vhq"
+                    )
+
+                    audio_output_resample = upscaler(audio_output_resample, self.flash_sr, pbar, device=self.device)
+                    audio_output_resample = audio_output_resample.float().flatten().cpu().detach().numpy()
+                    self.tgt_sr = 192000
+                elif self.tgt_sr != resample_sr and resample_sr > 0: 
                     audio_output_resample = librosa.resample(
                         audio_output, 
                         orig_sr=self.tgt_sr, 

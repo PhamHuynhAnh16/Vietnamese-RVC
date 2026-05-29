@@ -12,10 +12,11 @@ class VADProcessor:
         if sample_rate not in [8000, 16000, 32000, 48000]: raise ValueError
         if frame_duration_ms not in [10, 20, 30]: raise ValueError
 
-        self.vad = webrtcvad.Vad(sensitivity_mode)
         self.sample_rate = sample_rate
-        self.frame_length = int(sample_rate * (frame_duration_ms / 1000.0))
         self.frame_duration_ms = frame_duration_ms
+
+        self.vad = webrtcvad.Vad(sensitivity_mode)
+        self.frame_length = int(sample_rate * (frame_duration_ms / 1000.0))
 
     def is_speech(self, audio_chunk):
         if audio_chunk.ndim > 1 and audio_chunk.shape[1] == 1: audio_chunk = audio_chunk.flatten()

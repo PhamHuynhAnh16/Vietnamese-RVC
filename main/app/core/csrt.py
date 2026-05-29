@@ -4,9 +4,9 @@ import sys
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import check_spk_diarization
 from main.app.core.ui import gr_info, gr_warning, process_output
 from main.app.variables import config, translations, configs, logger
+from main.library.utils import check_spk_diarization, clear_gpu_cache
 
 def whisper_process(
     model_size, 
@@ -41,6 +41,7 @@ def whisper_process(
     except Exception as e:
         out_queue.put(e)
     finally:
+        clear_gpu_cache()
         del segments
         gc.collect()
 
@@ -71,13 +72,10 @@ def create_srt(
     check_spk_diarization(model_size, speechbrain=False)
     gr_info(translations["csrt"])
 
-    try:
-        mp.set_start_method("spawn")
-    except:
-        pass
+    ctx = mp.get_context("spawn")
+    whisper_queue = ctx.Queue()
 
-    whisper_queue = mp.Queue()
-    whisperprocess = mp.Process(
+    whisperprocess = ctx.Process(
         target=whisper_process, 
         args=(
             model_size, 
@@ -91,6 +89,7 @@ def create_srt(
 
     whisperprocess.start()
     segments = whisper_queue.get()
+    whisperprocess.join()
 
     with open(output_file, "w", encoding="utf-8") as f:
         for i, segment in enumerate(segments):
@@ -118,6 +117,6 @@ def format_timestamp(seconds):
     minutes = int((seconds % 3600) // 60)
 
     seconds = int(seconds % 60)
-    miliseconds = int((seconds - int(seconds)) * 1000)
+    miliseconds = int(round((seconds % 1) * 1000))
 
     return f"{hours:02}:{minutes:02}:{seconds:02},{miliseconds:03}"

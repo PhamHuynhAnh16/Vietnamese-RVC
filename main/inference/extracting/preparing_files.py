@@ -16,7 +16,7 @@ def mute_file(
     mute_base_path, 
     rvc_version
 ):
-    if embedders_mode.startswith(("spin", "whisper")):
+    if embedders_mode.startswith("whisper"):
         mute_file = f"mute_{embedders_model}.npy"
     else:
         mute_file = {
@@ -26,7 +26,9 @@ def mute_file(
             "japanese_hubert_base": "mute_japanese.npy",
             "korean_hubert_base": "mute_korean.npy",
             "chinese_hubert_base": "mute_chinese.npy",
-            "portuguese_hubert_base": "mute_portuguese.npy"
+            "portuguese_hubert_base": "mute_portuguese.npy",
+            "spin-v1": "mute_spin-v1.npy",
+            "spin-v2": "mute_spin-v2.npy"
         }.get(embedders_model, None)
 
     if mute_file is None or not os.path.exists(os.path.join(mute_base_path, f"{rvc_version}_extracted", mute_file)):

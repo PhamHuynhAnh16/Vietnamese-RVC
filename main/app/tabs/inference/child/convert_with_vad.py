@@ -135,6 +135,17 @@ def convert_with_vad_tab():
                         visible=True
                     )
                 with gr.Row():
+                    nprobe_1 = gr.Slider(
+                        label=translations["nprobe"], 
+                        info=translations["nprobe_info"], 
+                        minimum=1, 
+                        maximum=64, 
+                        value=9, 
+                        step=1, 
+                        interactive=True,
+                        visible=True
+                    )
+                with gr.Row():
                     sid_dict_1, architecture_dict_1 = get_speakers_id_and_architecture(model_pth_1.value)
                     if sid_dict_1["visible"] == "hidden": sid_dict_1["visible"] = False
                     if architecture_dict_1["visible"] == "hidden": architecture_dict_1["visible"] = False
@@ -236,6 +247,17 @@ def convert_with_vad_tab():
                         value=0.5, 
                         step=0.01, 
                         interactive=True, 
+                        visible=True
+                    )
+                with gr.Row():
+                    nprobe_2 = gr.Slider(
+                        label=translations["nprobe"], 
+                        info=translations["nprobe_info"], 
+                        minimum=1, 
+                        maximum=64, 
+                        value=9, 
+                        step=1, 
+                        interactive=True,
                         visible=True
                     )
                 with gr.Row():
@@ -656,7 +678,8 @@ def convert_with_vad_tab():
                 model_index_1
             ], 
             outputs=[
-                index_strength_1
+                index_strength_1,
+                nprobe_1
             ]
         )
         model_index_2.change(
@@ -665,7 +688,8 @@ def convert_with_vad_tab():
                 model_index_2
             ], 
             outputs=[
-                index_strength_2
+                index_strength_2,
+                nprobe_2
             ]
         )
     with gr.Row():
@@ -775,7 +799,9 @@ def convert_with_vad_tab():
                 noise_scale_1,
                 noise_scale_2,
                 vad_sensitivity,
-                vad_frame_ms
+                vad_frame_ms,
+                nprobe_1,
+                nprobe_2
             ],
             outputs=[
                 play_output_audio

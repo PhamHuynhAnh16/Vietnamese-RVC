@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import math
@@ -13,22 +14,35 @@ import torch.nn.utils.parametrize as parametrize
 from torch import nn
 from omegaconf import DictConfig, open_dict
 
-class Dictionary:
-    def __init__(self, *args, **kwargs):
-        pass
-
-fairseq = types.ModuleType("fairseq")
-fairseq_data = types.ModuleType("fairseq.data")
-fairseq_data_dictionary = types.ModuleType("fairseq.data.dictionary")
-fairseq_data_dictionary.Dictionary = Dictionary
-fairseq.data = fairseq_data
-fairseq_data.dictionary = fairseq_data_dictionary
-sys.modules["fairseq"] = fairseq
-sys.modules["fairseq.data"] = fairseq_data
-sys.modules["fairseq.data.dictionary"] = fairseq_data_dictionary
+sys.path.append(os.getcwd())
 
 def load_model(filename):
-    state = torch.load(filename, map_location="cpu", weights_only=False)
+    try:
+        state = torch.load(filename, map_location="cpu", weights_only=True)
+    except:
+        from main.app.variables import logger, configs, translations
+
+        logger.warning(translations["hubert_warn_1"])
+        logger.warning(translations["hubert_warn_2"])
+
+        if configs.get("allow_unsafe_fairseq", False):
+            class Dictionary:
+                def __init__(self, *args, **kwargs):
+                    pass
+
+            fairseq = types.ModuleType("fairseq")
+            fairseq_data = types.ModuleType("fairseq.data")
+            fairseq_data_dictionary = types.ModuleType("fairseq.data.dictionary")
+            fairseq_data_dictionary.Dictionary = Dictionary
+            fairseq.data = fairseq_data
+            fairseq_data.dictionary = fairseq_data_dictionary
+            sys.modules["fairseq"] = fairseq
+            sys.modules["fairseq.data"] = fairseq_data
+            sys.modules["fairseq.data.dictionary"] = fairseq_data_dictionary
+
+            state = torch.load(filename, map_location="cpu", weights_only=False)
+        else:
+            sys.exit(0)
 
     model = HubertModel(
         HubertConfig(
@@ -1962,6 +1976,7 @@ class HubertModel(BaseFairseqModel):
         return {"logit_m_list": logit_m_list, "logit_u_list": logit_u_list, "padding_mask": padding_mask, "features_pen": features_pen}
 
     def extract_features(self, source, padding_mask = None, mask = False, ret_conv = False, output_layer = None):
+        if padding_mask is None: padding_mask = torch.BoolTensor(source.shape).fill_(False).to(source.device)
         res = self.forward(source, padding_mask=padding_mask, mask=mask, features_only=True, output_layer=output_layer)
         return res["features"] if ret_conv else res["x"], res["padding_mask"]
 

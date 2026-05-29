@@ -188,6 +188,16 @@ def convert_tab():
                         interactive=True, 
                         visible=True
                     )
+                    nprobe = gr.Slider(
+                        label=translations["nprobe"], 
+                        info=translations["nprobe_info"], 
+                        minimum=1, 
+                        maximum=64, 
+                        value=9, 
+                        step=1, 
+                        interactive=True,
+                        visible=True
+                    )
                 with gr.Row():
                     sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
                     if sid_dict["visible"] == "hidden": sid_dict["visible"] = False
@@ -473,6 +483,13 @@ def convert_tab():
                             audio_processing = gr.Checkbox(
                                 label=translations["audio_processing"], 
                                 value=False, 
+                                interactive=True
+                            )
+                        with gr.Row():
+                            audio_upscaler = gr.Checkbox(
+                                label=translations["audio_upscaler"],
+                                info=translations["audio_upscaler_info"],
+                                value=False,
                                 interactive=True
                             )
                     resample_sr = gr.Radio(
@@ -942,7 +959,8 @@ def convert_tab():
                 model_index
             ], 
             outputs=[
-                index_strength
+                index_strength,
+                nprobe
             ]
         )
     with gr.Row():
@@ -1047,7 +1065,9 @@ def convert_tab():
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             ],
             outputs=[
                 convert_select_audio, 
@@ -1106,7 +1126,9 @@ def convert_tab():
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             ],
             outputs=[
                 main_convert, 

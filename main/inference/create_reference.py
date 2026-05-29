@@ -12,8 +12,9 @@ from tqdm import tqdm
 
 sys.path.append(os.getcwd())
 
+from main.library.audio.audio import load_audio
 from main.app.variables import config, logger, translations, configs
-from main.library.utils import load_audio, load_embedders_model, extract_features, check_assets, strtobool
+from main.library.utils import load_embedders_model, extract_features, check_assets, strtobool
 
 warnings.filterwarnings("ignore")
 
@@ -38,6 +39,9 @@ def parse_arguments():
     parser.add_argument("--proposal_pitch", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--proposal_pitch_threshold", type=float, default=255.0)
     parser.add_argument("--alpha", type=float, default=0.5)
+    parser.add_argument("--embedders_mix", type=lambda x: bool(strtobool(x)), default=False)
+    parser.add_argument("--embedders_mix_layers", type=int, default=9, required=False)
+    parser.add_argument("--embedders_mix_ratio", type=float, default=0.5)
 
     return parser.parse_args()
 
@@ -207,7 +211,6 @@ def create_reference(
                 embedder, 
                 audio_pad.view(1, -1), 
                 version, 
-                device=device,
                 mix=embedders_mix, 
                 mix_layers=embedders_mix_layers, 
                 mix_ratio=embedders_mix_ratio
@@ -232,8 +235,7 @@ def create_reference(
                 alpha=alpha, 
                 is_half=is_half, 
                 device=device, 
-                predictor_onnx=predictor_onnx, 
-                delete_predictor_onnx=True
+                predictor_onnx=predictor_onnx
             )
 
             pitch, pitchf = generator.calculator(

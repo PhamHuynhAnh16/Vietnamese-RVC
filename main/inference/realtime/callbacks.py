@@ -8,13 +8,9 @@ sys.path.append(os.getcwd())
 
 from main.inference.realtime.audio import Audio
 from main.app.variables import logger, translations
-from main.inference.realtime.realtime import VoiceChanger, RVC_Realtime
+from main.inference.realtime.realtime import VoiceChanger
 
 class AudioCallbacks:
-    def emit_to(self, performance, volume):
-        self.latency = performance
-        self.volume = volume
-    
     def __init__(
         self, 
         pass_through = False, 
@@ -53,6 +49,7 @@ class AudioCallbacks:
         post_process = False, 
         sid = 0,
         noise_scale = 0.35,
+        nprobe = 1,
         record_audio = False,
         record_audio_path = None,
         export_format = "WAV",
@@ -61,8 +58,6 @@ class AudioCallbacks:
         embedders_mix_ratio = 0.5,
         **kwargs
     ):
-        self.latency = 0
-        self.volume = 0
         self.pass_through = pass_through
         self.input_sample_rate = input_sample_rate
         self.output_sample_rate = output_sample_rate
@@ -72,7 +67,29 @@ class AudioCallbacks:
             cross_fade_overlap_size, 
             input_sample_rate, 
             output_sample_rate,
-            extra_convert_size
+            extra_convert_size,
+            model_path, 
+            index_path, 
+            f0_method, 
+            predictor_onnx, 
+            embedder_model, 
+            embedders_mode, 
+            sample_rate, 
+            hop_length, 
+            silent_threshold,
+            vad_enabled,
+            vad_sensitivity,
+            vad_frame_ms,
+            clean_audio, 
+            clean_strength,
+            post_process, 
+            sid,
+            noise_scale,
+            nprobe,
+            record_audio,
+            record_audio_path,
+            export_format,
+            **kwargs
         )
         self.audio = Audio(
             self, 
@@ -92,81 +109,6 @@ class AudioCallbacks:
             embedders_mix,
             embedders_mix_layers,
             embedders_mix_ratio
-        )
-        self.initialize(
-            model_path, 
-            index_path, 
-            f0_method, 
-            predictor_onnx, 
-            embedder_model, 
-            embedders_mode, 
-            sample_rate, 
-            hop_length, 
-            silent_threshold,
-            vad_enabled,
-            vad_sensitivity,
-            vad_frame_ms,
-            clean_audio, 
-            clean_strength,
-            post_process, 
-            sid,
-            noise_scale,
-            record_audio,
-            record_audio_path,
-            export_format,
-            **kwargs
-        )
-
-    def initialize(
-        self, 
-        model_path, 
-        index_path = None, 
-        f0_method = "rmvpe", 
-        predictor_onnx = False, 
-        embedder_model = "hubert_base", 
-        embedders_mode = "fairseq", 
-        sample_rate = 16000, 
-        hop_length = 160, 
-        silent_threshold = -90, 
-        vad_enabled = False, 
-        vad_sensitivity = 3, 
-        vad_frame_ms = 30, 
-        clean_audio = False, 
-        clean_strength = 0.7, 
-        post_process = False, 
-        sid = 0,
-        noise_scale = 0.35,
-        record_audio = False,
-        record_audio_path = None,
-        export_format = "wav",
-        **kwargs
-    ):
-        self.vc.initialize(
-            RVC_Realtime(
-                model_path, 
-                index_path, 
-                f0_method, 
-                predictor_onnx, 
-                embedder_model, 
-                embedders_mode, 
-                sample_rate, 
-                hop_length, 
-                silent_threshold, 
-                self.input_sample_rate, 
-                self.output_sample_rate,
-                vad_enabled, 
-                vad_sensitivity,
-                vad_frame_ms,
-                clean_audio, 
-                clean_strength,
-                post_process,
-                sid,
-                noise_scale,
-                **kwargs
-            ),
-            record_audio,
-            record_audio_path,
-            export_format
         )
 
     def change_voice(

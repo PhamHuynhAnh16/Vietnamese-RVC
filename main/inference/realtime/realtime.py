@@ -10,10 +10,10 @@ import torchaudio.transforms as tat
 sys.path.append(os.getcwd())
 
 from main.app.variables import config, translations
+from main.inference.realtime.pipeline import Pipeline
 from main.library.utils import circular_write, check_assets
-from main.inference.realtime.pipeline import create_pipeline
 
-class RVC_Realtime:
+class Realtime:
     def __init__(
         self, 
         model_path, 
@@ -35,8 +35,16 @@ class RVC_Realtime:
         post_process = False, 
         sid = 0,
         noise_scale = 0.35,
+        nprobe=1,
         **kwargs
     ):
+        check_assets(
+            f0_method, 
+            embedder_model, 
+            predictor_onnx=predictor_onnx, 
+            embedders_mode=embedders_mode
+        )
+
         self.model_path = model_path
         self.index_path = index_path
         self.f0_method = f0_method
@@ -48,6 +56,7 @@ class RVC_Realtime:
         self.post_process = post_process
         self.sid = sid
         self.noise_scale = noise_scale
+        self.nprobe = nprobe
         self.kwargs = kwargs
         self.pipeline = None
         self.convert_buffer = None
@@ -71,14 +80,6 @@ class RVC_Realtime:
         self.window_size = sample_rate // 100
         self.dtype = torch.float16 if config.is_half else torch.float32
 
-    def initialize(self):
-        check_assets(
-            self.f0_method, 
-            self.embedder_model, 
-            predictor_onnx=self.predictor_onnx, 
-            embedders_mode=self.embedders_mode
-        )
-
         if self.vad_enabled:
             from main.inference.realtime.vad_utils import VADProcessor
 
@@ -91,21 +92,22 @@ class RVC_Realtime:
 
         self.board = self.setup_pedalboard(**self.kwargs) if self.post_process else None
 
-        self.pipeline = create_pipeline(
-            model_path=self.model_path, 
+        self.pipeline = Pipeline(
+            weight_root=self.model_path, 
             index_path=self.index_path, 
             f0_method=self.f0_method, 
             predictor_onnx=self.predictor_onnx, 
-            embedder_model=self.embedder_model, 
             embedders_mode=self.embedders_mode, 
+            embedder_model=self.embedder_model, 
+            noise_scale=self.noise_scale,
             sample_rate=self.sample_rate, 
             hop_length=self.hop_length, 
-            sid=self.sid,
-            noise_scale=self.noise_scale
+            nprobe=self.nprobe,
+            sid=self.sid
         )
 
         if self.clean_audio:
-            from main.tools.noisereduce import TorchGate
+            from main.library.audio.noisereduce import TorchGate
 
             self.tg = TorchGate(
                 self.pipeline.tgt_sr, 
@@ -338,7 +340,7 @@ class RVC_Realtime:
         board = self.board
 
         def inference_with_silent():
-            self.pipeline.execute(
+            self.pipeline.inference(
                 self.convert_buffer,
                 self.pitch_buffer,
                 self.pitchf_buffer,
@@ -377,7 +379,7 @@ class RVC_Realtime:
         if vol < self.input_sensitivity: return inference_with_silent()
         circular_write(audio_in_16k, self.convert_buffer)
 
-        audio_model = self.pipeline.execute(
+        audio_model = self.pipeline.inference(
             self.convert_buffer,
             self.pitch_buffer,
             self.pitchf_buffer,
@@ -412,7 +414,29 @@ class VoiceChanger:
         cross_fade_overlap_size, 
         input_sample_rate, 
         output_sample_rate,
-        extra_convert_size
+        extra_convert_size,
+        model_path, 
+        index_path, 
+        f0_method, 
+        predictor_onnx, 
+        embedder_model, 
+        embedders_mode, 
+        sample_rate, 
+        hop_length, 
+        silent_threshold,
+        vad_enabled,
+        vad_sensitivity,
+        vad_frame_ms,
+        clean_audio, 
+        clean_strength,
+        post_process, 
+        sid,
+        noise_scale,
+        nprobe,
+        record_audio,
+        record_audio_path,
+        export_format,
+        **kwargs
     ):
         self.input_sample_rate = input_sample_rate
         self.output_sample_rate = output_sample_rate
@@ -420,26 +444,42 @@ class VoiceChanger:
         self.crossfade_frame = int(cross_fade_overlap_size * input_sample_rate)
         self.extra_frame = int(extra_convert_size * input_sample_rate)
         self.sola_search_frame = input_sample_rate // 100
-        self.cor_den_ones = torch.ones(1, 1, self.crossfade_frame, device=config.device)
-        self.fade_linspace = torch.linspace(0.0, 1.0, steps=self.crossfade_frame, device=config.device, dtype=torch.float32)
-        self.vc_model = None
-        self.sola_buffer = None
-        self.generate_strength()
-
-    def initialize(self, vc_model, record_audio = False, record_audio_path = None, export_format = "wav"):
-        self.vc_model = vc_model
+        self.cor_den_ones = torch.ones(1, 1, self.crossfade_frame, device=config.device, dtype=torch.float32)
+        self.vc_model = Realtime(
+            model_path, 
+            index_path, 
+            f0_method, 
+            predictor_onnx, 
+            embedder_model, 
+            embedders_mode, 
+            sample_rate, 
+            hop_length, 
+            silent_threshold, 
+            self.input_sample_rate, 
+            self.output_sample_rate,
+            vad_enabled, 
+            vad_sensitivity,
+            vad_frame_ms,
+            clean_audio, 
+            clean_strength,
+            post_process,
+            sid,
+            noise_scale,
+            nprobe,
+            **kwargs
+        )
         self.record_audio = record_audio
         self.record_audio_path = record_audio_path
         self.export_format = export_format
-
+        self.sola_buffer = None
         self.vc_model.realloc(
             self.block_frame, 
             self.extra_frame, 
             self.crossfade_frame, 
             self.sola_search_frame
         )
-
-        self.vc_model.initialize()
+        self.generate_strength()
+        self.setup_soundfile_record()
 
     def setup_soundfile_record(self):
         import soundfile as sf
@@ -454,7 +494,7 @@ class VoiceChanger:
 
     def generate_strength(self):
         self.fade_in_window = (
-            0.5 * np.pi * self.fade_linspace
+            0.5 * np.pi * torch.linspace(0.0, 1.0, steps=self.crossfade_frame, device=config.device, dtype=torch.float32)
         ).sin() ** 2
         self.fade_out_window = 1 - self.fade_in_window
 
@@ -499,7 +539,9 @@ class VoiceChanger:
         )
 
         if audio is None: 
+            self.sola_buffer.zero_()
             audio = np.zeros(block_size, dtype=np.float32)
+
             if self.record_audio and self.soundfile is not None: self.soundfile.write(audio)
             return audio, vol
 
@@ -531,8 +573,7 @@ class VoiceChanger:
 
             audio[:onset_sample] = 0.0
             fade_len = min(block_size - onset_sample, self.crossfade_frame)
-
-            if fade_len > 0: audio[onset_sample : onset_sample + fade_len] *= ((0.5 * np.pi * torch.linspace(0.0, 1.0, steps=fade_len, device=config.device, dtype=torch.float32)).sin() ** 2)
+            if fade_len > 0: audio[onset_sample : onset_sample + fade_len] *= self.fade_in_window[:fade_len]
         else:
             audio[: self.crossfade_frame] *= self.fade_in_window
             audio[: self.crossfade_frame] += self.sola_buffer * self.fade_out_window

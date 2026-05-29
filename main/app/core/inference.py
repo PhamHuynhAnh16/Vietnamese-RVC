@@ -48,7 +48,9 @@ def convert(
     embedders_mix = False,
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5,
-    noise_scale = 0.35
+    noise_scale = 0.35,
+    nprobe = 1,
+    audio_upscaler = False
 ):    
     subprocess.run([
         python, 
@@ -87,7 +89,9 @@ def convert(
         "--embedders_mix", str(embedders_mix),
         "--embedders_mix_layers", str(embedders_mix_layers),
         "--embedders_mix_ratio", str(embedders_mix_ratio),
-        "--noise_scale", str(noise_scale)
+        "--noise_scale", str(noise_scale),
+        "--nprobe", str(nprobe),
+        "--audio_upscaler", str(audio_upscaler)
     ])
 
 def convert_audio(
@@ -133,7 +137,9 @@ def convert_audio(
     embedders_mix = False,
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5,
-    noise_scale = 0.35
+    noise_scale = 0.35,
+    nprobe = 1,
+    audio_upscaler = False
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
@@ -176,7 +182,7 @@ def convert_audio(
     if use_separate_audio:
         output_audio = os.path.join(configs["audios_path"], input_audio_name)
 
-        from main.library.utils import pydub_load
+        from main.library.audio.audio import pydub_load
         
         def get_audio_file(label):
             matching_files = [f for f in os.listdir(output_audio) if label in f]
@@ -260,7 +266,9 @@ def convert_audio(
             embedders_mix,
             embedders_mix_layers,
             embedders_mix_ratio,
-            noise_scale
+            noise_scale,
+            nprobe,
+            audio_upscaler
         )
 
         gr_info(translations["convert_success"])
@@ -304,7 +312,9 @@ def convert_audio(
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             )
 
             gr_info(translations["convert_backup_success"])
@@ -436,7 +446,9 @@ def convert_audio(
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             )
 
             gr_info(translations["batch_convert_success"])
@@ -485,7 +497,9 @@ def convert_audio(
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             )
 
             gr_info(translations["convert_success"])
@@ -535,7 +549,9 @@ def convert_selection(
     embedders_mix = False,
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5,
-    noise_scale = 0.35
+    noise_scale = 0.35,
+    nprobe = 1,
+    audio_upscaler = False
 ):
     if use_separate_audio:
         gr_info(translations["search_separate"])
@@ -623,7 +639,9 @@ def convert_selection(
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             )
 
             return [
@@ -715,7 +733,9 @@ def convert_selection(
             embedders_mix,
             embedders_mix_layers,
             embedders_mix_ratio,
-            noise_scale
+            noise_scale,
+            nprobe,
+            audio_upscaler
         )
 
         return [
@@ -787,19 +807,20 @@ def convert_with_vad(
     noise_scale_1 = 0.35,
     noise_scale_2 = 0.35,
     vad_sensitivity = 3,
-    vad_frame_ms = 30
+    vad_frame_ms = 30,
+    nprobe_1 = 1,
+    nprobe_2 = 1
 ):
-    import librosa
-
     from pydub import AudioSegment
     from sklearn.cluster import AgglomerativeClustering
 
     from main.library.utils import clear_gpu_cache
+    from main.library.utils import check_spk_diarization
     from main.library.speaker_diarization.audio import Audio
-    from main.library.speaker_diarization.segment import Segment
-    from main.library.utils import check_spk_diarization, pydub_load
-    from main.library.speaker_diarization.embedding import SpeechBrainPretrainedSpeakerEmbedding
     from main.inference.realtime.vad_utils import VADProcessor
+    from main.library.audio.audio import load_audio, pydub_load
+    from main.library.speaker_diarization.segment import Segment
+    from main.library.speaker_diarization.embedding import SpeechBrainPretrainedSpeakerEmbedding
     
     check_spk_diarization(model_size=None)
     model_pth_1, model_pth_2 = (
@@ -836,10 +857,10 @@ def convert_with_vad(
     gr_info(translations["start_vad"])
     
     try:
-        y, sr = librosa.load(input_audio, sr=48000)
+        y, sr = load_audio(input_audio, sample_rate=48000, return_sr=True)
 
         vad_processor = VADProcessor(sensitivity_mode=vad_sensitivity, frame_duration_ms=vad_frame_ms, sample_rate=sr)
-        segments = vad_processor.get_speech(librosa.util.normalize(y))
+        segments = vad_processor.get_speech(y)
 
         if not segments:
             gr_warning(translations["speech_not_in_segments"])
@@ -1031,7 +1052,9 @@ def convert_with_vad(
             embedders_mix,
             embedders_mix_layers,
             embedders_mix_ratio,
-            noise_scale_1
+            noise_scale_1,
+            nprobe_1,
+            False
         )
 
         convert(
@@ -1069,7 +1092,9 @@ def convert_with_vad(
             embedders_mix,
             embedders_mix_layers,
             embedders_mix_ratio,
-            noise_scale_2
+            noise_scale_2,
+            nprobe_2,
+            False
         )
 
         gr_info(translations["convert_success"])
@@ -1129,7 +1154,9 @@ def convert_tts(
     embedders_mix = False,
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5,
-    noise_scale = 0.35
+    noise_scale = 0.35,
+    nprobe = 1,
+    audio_upscaler = False
 ):
     model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
 
@@ -1212,7 +1239,9 @@ def convert_tts(
         embedders_mix,
         embedders_mix_layers,
         embedders_mix_ratio,
-        noise_scale
+        noise_scale,
+        nprobe,
+        audio_upscaler
     )
 
     gr_info(translations["convert_success"])

@@ -3,20 +3,16 @@ import re
 import gc
 import sys
 import torch
-import faiss
 import codecs
 import logging
 import warnings
-
-import numpy as np
-
-from pydub import AudioSegment
 
 sys.path.append(os.getcwd())
 
 from main.tools import huggingface
 from main.library.backends import directml, opencl
-from main.app.variables import translations, configs, config, logger, embedders_model, spin_model, whisper_model
+from main.library.algorithm.faisssearch import IndexWrapper
+from main.app.variables import translations, configs, config, logger, embedders_model, whisper_model
 
 if not config.debug_mode:
     warnings.filterwarnings("ignore")
@@ -32,8 +28,6 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
         "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/rzorqqref/", 
         "rot13"
     )
-
-    if embedders_mode == "spin": embedders_mode = "transformers"
 
     def download_predictor(predictor):
         model_path = os.path.join(configs["predictors_path"], predictor)
@@ -81,8 +75,6 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
                     model_path
                 )
         elif embedders_mode == "transformers":
-            url = "transformers/" if not hubert.startswith("spin") else "spin/"
-
             bin_file = os.path.join(model_path, "model.safetensors")
             config_file = os.path.join(model_path, "config.json")
 
@@ -90,13 +82,13 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
 
             if not os.path.exists(bin_file): 
                 huggingface.HF_download_file(
-                    "".join([embedders_url, url, hubert, "/model.safetensors"]), 
+                    "".join([embedders_url, "transformers/", hubert, "/model.safetensors"]), 
                     bin_file
                 )
 
             if not os.path.exists(config_file): 
                 huggingface.HF_download_file(
-                    "".join([embedders_url, url, hubert, "/config.json"]), 
+                    "".join([embedders_url, "transformers/", hubert, "/config.json"]), 
                     config_file
                 )
 
@@ -166,9 +158,8 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
                     download_predictor(modelname)
                 )
 
-        if hubert in embedders_model + spin_model + whisper_model:
-            if embedders_mode != "transformers": 
-                hubert += ".pt" if embedders_mode in ["fairseq", "whisper"] else ".onnx"
+        if hubert in embedders_model + whisper_model:
+            if embedders_mode != "transformers": hubert += ".pt" if embedders_mode in ["fairseq", "whisper"] else ".onnx"
 
             results.append(
                 download_embedder(
@@ -221,77 +212,35 @@ def check_spk_diarization(model_size, speechbrain=True):
                     speechbrain_model
                 )
 
-def load_audio(file, sample_rate=16000, formant_shifting=False, formant_qfrency=0.8, formant_timbre=0.8):
-    import librosa
-    import soundfile as sf
-
-    try:
-        file = file.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
-        if not os.path.isfile(file): raise FileNotFoundError(translations["not_found"].format(name=file))
-
-        try:
-            audio, sr = sf.read(file, dtype=np.float32)
-        except:
-            audio, sr = librosa.load(file, sr=None)
-
-        if len(audio.shape) > 1: audio = librosa.to_mono(audio.T)
-
-        if sr != sample_rate: 
-            audio = librosa.resample(
-                audio, 
-                orig_sr=sr, 
-                target_sr=sample_rate, 
-                res_type="soxr_vhq"
-            )
-
-        if formant_shifting:
-            from main.library.algorithm.stftpitchshift import StftPitchShift
-
-            pitchshifter = StftPitchShift(
-                1024, 
-                32, 
-                sample_rate
-            )
-
-            audio = pitchshifter.shiftpitch(
-                audio, 
-                factors=1, 
-                quefrency=formant_qfrency * 1e-3, 
-                distortion=formant_timbre
-            )
-    except Exception as e:
-        raise RuntimeError(f"{translations['errors_loading_audio']}: {e}")
-    
-    return audio.flatten()
-
-def pydub_load(input_path, volume = None):
-    try:
-        if input_path.endswith(".wav"): audio = AudioSegment.from_wav(input_path)
-        elif input_path.endswith(".mp3"): audio = AudioSegment.from_mp3(input_path)
-        elif input_path.endswith(".ogg"): audio = AudioSegment.from_ogg(input_path)
-        else: audio = AudioSegment.from_file(input_path)
-    except:
-        audio = AudioSegment.from_file(input_path)
-        
-    return audio if volume is None else (audio + volume)
+def check_upscaler():
+    upscaler_model = os.path.join("assets", "models", "upscalers", "upscalers.pth")
+    if not os.path.exists(upscaler_model):
+        huggingface.HF_download_file(
+            codecs.decode(
+                "uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/hcfpnyref/hcfpnyref.cgu",
+                "rot13"
+            ),
+            upscaler_model
+        )
 
 def load_embedders_model(embedder_model, embedders_mode="fairseq"):
-    if embedders_mode in ["fairseq", "whisper"]: embedder_model += ".pt"
-    elif embedders_mode == "onnx": embedder_model += ".onnx"
-    elif embedders_mode == "spin": embedders_mode = "transformers"
+    if embedders_mode in ["fairseq", "whisper"] and not embedder_model.endswith(".pt"): embedder_model += ".pt"
+    elif embedders_mode == "onnx" and not embedder_model.endswith(".onnx"): embedder_model += ".onnx"
 
-    embedder_model_path = (
-        os.path.join(
-            configs["speaker_diarization_path"], 
-            "models", 
-            embedder_model
+    if os.path.exists(embedder_model): embedder_model_path = embedder_model
+    else:
+        embedder_model_path = (
+            os.path.join(
+                configs["speaker_diarization_path"], 
+                "models", 
+                embedder_model
+            )
+        ) if embedders_mode == "whisper" else (
+            os.path.join(
+                configs["embedders_path"], 
+                embedder_model
+            )
         )
-    ) if embedders_mode == "whisper" else (
-        os.path.join(
-            configs["embedders_path"], 
-            embedder_model
-        )
-    )
     
     if not os.path.exists(embedder_model_path): 
         raise FileNotFoundError(
@@ -330,132 +279,38 @@ def load_embedders_model(embedder_model, embedders_mode="fairseq"):
 
     return hubert_model
 
-def cut(audio, sr, db_thresh=-60, min_interval=250):
-    from main.inference.preprocess.slicer2 import Slicer2
+def extract_features(model, feats, version, mix=False, mix_layers=9, mix_ratio=0.5):
+    if hasattr(model, "_finalproj"): model._finalproj = version == "v1"
 
-    slicer = Slicer2(
-        sr=sr, 
-        threshold=db_thresh, 
-        min_interval=min_interval
-    )
+    logits = model.extract_features(
+        **{
+            "source": feats, 
+            "output_layer": 9 if version == "v1" else 12
+        }
+    )[0]
 
-    return slicer.slice2(audio)
-
-def restore(segments, total_len, dtype=np.float32):
-    out = []
-    last_end = 0
-
-    for start, end, processed_seg in segments:
-        if start > last_end: 
-            out.append(
-                np.zeros(start - last_end, dtype=dtype)
-            )
-
-        out.append(processed_seg)
-        last_end = end
-
-    if last_end < total_len: 
-        out.append(
-            np.zeros(total_len - last_end, dtype=dtype)
-        )
-
-    return np.concatenate(out, axis=-1)
-
-def extract_features(model, feats, version, device="cpu", mix=False, mix_layers=9, mix_ratio=0.5):
-    with torch.no_grad():
-        logits = model.extract_features(
+    if mix:
+        mix_logits = model.extract_features(
             **{
                 "source": feats, 
-                "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), 
-                "output_layer": 9 if version == "v1" else 12
+                "output_layer": mix_layers
             }
         )[0]
 
-        if mix and isinstance(model, torch.nn.Module):
-            mix_logits = model.extract_features(
-                **{
-                    "source": feats, 
-                    "padding_mask": torch.BoolTensor(feats.shape).fill_(False).to(device), 
-                    "output_layer": mix_layers
-                }
-            )[0]
+        logits = mix_ratio * mix_logits + (1 - mix_ratio) * logits
 
-            logits = mix_ratio * mix_logits + (1 - mix_ratio) * logits
-
-        feats = model.final_proj(logits) if version == "v1" else logits
+    feats = model.final_proj(logits) if version == "v1" else logits
 
     return feats
-
-def autotune_f0(note_dict, f0, f0_autotune_strength):
-    autotuned_f0 = np.zeros_like(f0)
-
-    for i, freq in enumerate(f0):
-        autotuned_f0[i] = freq + (min(note_dict, key=lambda x: abs(x - freq)) - freq) * f0_autotune_strength
-
-    return autotuned_f0
-
-def change_rms(source_audio, source_rate, target_audio, target_rate, rate):
-    import librosa
-    import torch.nn.functional as F
-
-    rms2 = F.interpolate(
-        torch.from_numpy(
-            librosa.feature.rms(
-                y=target_audio, 
-                frame_length=target_rate // 2 * 2, 
-                hop_length=target_rate // 2
-            )
-        ).float().unsqueeze(0), 
-        size=target_audio.shape[0], 
-        mode="linear"
-    ).squeeze()
-
-    return target_audio * (
-        F.interpolate(
-            torch.from_numpy(
-                librosa.feature.rms(
-                    y=source_audio, 
-                    frame_length=source_rate // 2 * 2, 
-                    hop_length=source_rate // 2
-                )
-            ).float().unsqueeze(0), 
-            size=target_audio.shape[0], 
-            mode="linear"
-        ).squeeze().pow(1 - rate) * rms2.maximum(torch.zeros_like(rms2) + 1e-6).pow(rate - 1)
-    ).numpy()
 
 def clear_gpu_cache():
     gc.collect()
 
-    if torch.cuda.is_available(): torch.cuda.empty_cache()
-    elif hasattr(torch, "xpu") and torch.xpu.is_available(): torch.xpu.empty_cache()
-    elif torch.backends.mps.is_available(): torch.mps.empty_cache()
-    elif directml.is_available(): directml.empty_cache()
-    elif opencl.is_available(): opencl.pytorch_ocl.empty_cache()
-
-def extract_median_f0(f0):
-    f0 = np.where(f0 == 0, np.nan, f0)
-
-    return float(
-        np.median(
-            np.interp(
-                np.arange(len(f0)), 
-                np.where(~np.isnan(f0))[0], 
-                f0[~np.isnan(f0)]
-            )
-        )
-    )
-
-def proposal_f0_up_key(f0, target_f0 = 155.0, limit = 12):
-    try:
-        return max(
-            -limit, 
-            min(
-                limit, int(np.round(12 * np.log2(target_f0 / extract_median_f0(f0))))
-            )
-        )
-    except ValueError:
-        return 0
+    if config.device.startswith("cuda"): torch.cuda.empty_cache()
+    elif config.device.startswith("xpu"): torch.xpu.empty_cache()
+    elif config.device.startswith("mps"): torch.mps.empty_cache()
+    elif config.device.startswith("privateuseone"): directml.empty_cache()
+    elif config.device.startswith("ocl"): opencl.pytorch_ocl.empty_cache()
 
 def circular_write(new_data, target):
     offset = new_data.shape[0]
@@ -465,15 +320,9 @@ def circular_write(new_data, target):
 
     return target
 
-def load_faiss_index(index_path):
-    if index_path != "" and os.path.exists(index_path):
-        try:
-            index = faiss.read_index(index_path)
-            big_npy = index.reconstruct_n(0, index.ntotal)
-        except Exception as e:
-            logger.error(translations["read_faiss_index_error"].format(e=e))
-            index = big_npy = None
-    else: index = big_npy = None
+def load_faiss_index(index_path, nprobe=1):
+    index = IndexWrapper(index_path, nprobe=nprobe, device=config.device, is_half=config.is_half, faiss_cpu=configs.get("faiss_cpu", False) or config.device.startswith(("privateuseone", "ocl")))
+    big_npy, _ = index.read_index_tensor()
 
     return index, big_npy
 

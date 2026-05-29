@@ -5,9 +5,10 @@ import argparse
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import pydub_load, strtobool
+from main.library.utils import strtobool
+from main.library.audio.audio import pydub_load
 from main.library.uvr5_lib.separator import Separator
-from main.app.variables import config, logger, translations, vr_models, demucs_models, mdx_models, karaoke_models, reverb_models, denoise_models
+from main.app.variables import config, configs, logger, translations, vr_models, demucs_models, mdx_models, karaoke_models, reverb_models, denoise_models
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -550,7 +551,7 @@ def process_file(
         elif mode == "4stem":
             if "_(Vocals)_" in file: 
                 os.rename(file_path, original_audio)
-            elif "_(Drums)_" in file or "_(Bass)_" in file or "_(Other)_" in file: 
+            elif "_(Drums)_" in file or "_(Bass)_" in file or "_(Other)_" in file or "_(Guitar)_" in file or "_(Piano)_" in file: 
                 demucs_inst.append(file_path)
         elif mode == "reverb":
             filename = file.split("_(")[0]
@@ -585,8 +586,9 @@ def process_file(
 
         demucs_audio.export(instruments_audio, format=export_format)
 
-        for f in demucs_inst:
-            if os.path.exists(f): os.remove(f)
+        if configs.get("del4stem", True):
+            for f in demucs_inst:
+                if os.path.exists(f): os.remove(f)
 
     return original_audio, instruments_audio
 
@@ -600,18 +602,10 @@ def exists_file(input_path, output_dirs):
         sys.exit(1)
 
 def clean_file(output_dirs, export_format):
-    for f in [
-        "Original_Vocals.", 
-        "Original_Vocals_Reverb.",
-        "Original_Vocals_No_Reverb.", 
-        "Main_Vocals.",
-        "Main_Vocals_Reverb.", 
-        "Main_Vocals_No_Reverb.",
-        "Instruments.",
-        "Backing_Vocals."
-    ]:
-        file_path = os.path.join(output_dirs, f + export_format)
-        if os.path.exists(file_path): os.remove(file_path)
+    for f in os.listdir(output_dirs):
+        if f.endswith(export_format):
+            file_path = os.path.join(output_dirs, f)
+            if os.path.exists(file_path): os.remove(file_path)
 
 def separate_main(
     audio_file=None, 

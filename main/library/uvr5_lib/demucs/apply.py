@@ -39,41 +39,6 @@ class DummyPoolExecutor:
     def __exit__(self, exc_type, exc_value, exc_tb):
         return
 
-class BagOfModels(torch.nn.Module):
-    def __init__(
-        self, 
-        models, 
-        weights = None, 
-        segment = None
-    ):
-        super().__init__()
-        assert len(models) > 0
-        first = models[0]
-
-        for other in models:
-            assert other.sources == first.sources
-            assert other.samplerate == first.samplerate
-            assert other.audio_channels == first.audio_channels
-
-            if segment is not None: other.segment = segment
-
-        self.audio_channels = first.audio_channels
-        self.samplerate = first.samplerate
-        self.sources = first.sources
-        self.models = torch.nn.ModuleList(models)
-
-        if weights is None: weights = [[1.0 for _ in first.sources] for _ in models]
-        else:
-            assert len(weights) == len(models)
-
-            for weight in weights:
-                assert len(weight) == len(first.sources)
-
-        self.weights = weights
-
-    def forward(self, x):
-        pass
-
 class TensorChunk:
     def __init__(
         self, 
@@ -143,7 +108,9 @@ def apply_model(
     device=None, 
     progress=False, 
     num_workers=0, 
-    pool=None
+    pool=None,
+    hybrid = False,
+    weights = None
 ):
     global fut_length, bag_num, prog_bar
 
@@ -159,17 +126,17 @@ def apply_model(
         "device": device,
         "pool": pool,
         "set_progress_bar": set_progress_bar,
-        "static_shifts": static_shifts,
+        "static_shifts": static_shifts
     }
 
-    if isinstance(model, BagOfModels):
+    if hybrid:
         estimates, fut_length, prog_bar, current_model = 0, 0, 0, 0
-        totals = [0] * len(model.sources)
-        bag_num = len(model.models)
+        totals = [0] * len(model[0].sources)
+        bag_num = len(model)
 
-        for sub_model, weight in zip(model.models, model.weights):
+        for sub_model, weight in zip(model, weights):
             original_model_device = next(iter(sub_model.parameters())).device
-            sub_model.to(device)
+            sub_model.to(device).eval()
             fut_length += fut_length
             current_model += 1
             out = apply_model(sub_model, mix, **kwargs)
@@ -187,8 +154,6 @@ def apply_model(
 
         return estimates
 
-    model.to(device)
-    model.eval()
     assert transition_power >= 1
     batch, channels, length = mix.shape
 
@@ -252,34 +217,3 @@ def apply_model(
             out = model(padded_mix)
 
         return center_trim(out, length)
-
-def demucs_segments(demucs_segment, demucs_model):
-    if demucs_segment == "Default":
-        segment = None
-
-        if isinstance(demucs_model, BagOfModels):
-            if segment is not None:
-                for sub in demucs_model.models:
-                    sub.segment = segment
-        else:
-            if segment is not None: sub.segment = segment
-    else:
-        try:
-            segment = int(demucs_segment)
-            if isinstance(demucs_model, BagOfModels):
-                if segment is not None:
-                    for sub in demucs_model.models:
-                        sub.segment = segment
-            else:
-                if segment is not None: sub.segment = segment
-        except:
-            segment = None
-
-            if isinstance(demucs_model, BagOfModels):
-                if segment is not None:
-                    for sub in demucs_model.models:
-                        sub.segment = segment
-            else:
-                if segment is not None: sub.segment = segment
-
-    return demucs_model

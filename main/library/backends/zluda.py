@@ -1,6 +1,6 @@
 import torch
 
-if torch.cuda.is_available() and torch.cuda.get_device_name().endswith("[ZLUDA]"):
+def init_zluda():
     _torch_stft = torch.stft
     _torch_istft = torch.istft
 

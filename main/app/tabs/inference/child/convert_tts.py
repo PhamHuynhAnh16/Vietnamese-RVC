@@ -178,6 +178,16 @@ def convert_tts_tab():
                         interactive=True, 
                         visible=True
                     )
+                    nprobe = gr.Slider(
+                        label=translations["nprobe"], 
+                        info=translations["nprobe_info"], 
+                        minimum=1, 
+                        maximum=64, 
+                        value=9, 
+                        step=1, 
+                        interactive=True,
+                        visible=True
+                    )
                 with gr.Row():
                     sid_dict, architecture_dict = get_speakers_id_and_architecture(model_pth.value)
                     if sid_dict["visible"] == "hidden": sid_dict["visible"] = False
@@ -472,6 +482,13 @@ def convert_tts_tab():
                         proposal_pitch = gr.Checkbox(
                             label=translations["proposal_pitch"], 
                             value=False, 
+                            interactive=True
+                        )
+                    with gr.Row():
+                        audio_upscaler = gr.Checkbox(
+                            label=translations["audio_upscaler"],
+                            info=translations["audio_upscaler_info"],
+                            value=False,
                             interactive=True
                         )
                 with gr.Column():
@@ -837,7 +854,8 @@ def convert_tts_tab():
                 model_index
             ], 
             outputs=[
-                index_strength
+                index_strength,
+                nprobe
             ]
         )
         txt_input.upload(
@@ -950,7 +968,9 @@ def convert_tts_tab():
                 embedders_mix,
                 embedders_mix_layers,
                 embedders_mix_ratio,
-                noise_scale
+                noise_scale,
+                nprobe,
+                audio_upscaler
             ],
             outputs=[
                 tts_voice_convert

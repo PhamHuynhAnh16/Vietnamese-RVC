@@ -9,8 +9,9 @@ from scipy import signal
 
 sys.path.append(os.getcwd())
 
+from main.library.audio.features import change_rms
 from main.app.variables import translations, configs
-from main.library.utils import extract_features, change_rms, clear_gpu_cache, load_faiss_index
+from main.library.utils import extract_features, clear_gpu_cache, load_faiss_index
 
 bh, ah = signal.butter(
     N=5, 
@@ -62,8 +63,8 @@ class Pipeline:
         embedders_mix_layers = 9,
         embedders_mix_ratio = 0.5
     ):
-        pitch_guidance = pitch != None and pitchf != None
-        energy_use = energy != None
+        pitch_guidance = pitch is not None and pitchf is not None
+        energy_use = energy is not None
 
         feats = torch.from_numpy(audio0).to(self.device).to(self.dtype)
         feats = feats.mean(-1) if feats.dim() == 2 else feats
@@ -74,7 +75,6 @@ class Pipeline:
                 model, 
                 feats.view(1, -1), 
                 version, 
-                self.device, 
                 mix=embedders_mix, 
                 mix_layers=embedders_mix_layers, 
                 mix_ratio=embedders_mix_ratio
@@ -82,23 +82,11 @@ class Pipeline:
 
             feats0 = feats.clone() if protect < 0.5 and pitch_guidance else None
 
-            if (
-                not isinstance(index, type(None)) and 
-                not isinstance(big_npy, type(None)) and 
-                index_rate != 0
-            ):
-                npy = feats[0].cpu().numpy()
-                if self.is_half: npy = npy.astype(np.float32)
-
-                score, ix = index.search(npy, k=8)
-                weight = np.square(1 / score)
-
-                npy = np.sum(big_npy[ix] * np.expand_dims(weight / weight.sum(axis=1, keepdims=True), axis=2), axis=1)
-                if self.is_half: npy = npy.astype(np.float16)
-
-                feats = (
-                    torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate + (1 - index_rate) * feats
-                )
+            if index is not None and big_npy is not None and index_rate != 0:
+                score, ix = index.search(feats[0], k=8)
+                weight = (1 / score).square()
+                query = (big_npy[ix] * (weight / weight.sum(dim=1, keepdim=True)).unsqueeze(2)).sum(dim=1)
+                feats = query.unsqueeze(0) * index_rate + (1.0 - index_rate) * feats
 
             feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
             p_len = min(audio0.shape[0] // self.window, feats.shape[1])
@@ -166,14 +154,14 @@ class Pipeline:
         proposal_pitch=False, 
         proposal_pitch_threshold=255.0, 
         energy_use=False, 
-        delete_predictor_onnx=True, 
         alpha = 0.5,
         embedders_mix = False,
         embedders_mix_layers = 9,
-        embedders_mix_ratio = 0.5
+        embedders_mix_ratio = 0.5,
+        nprobe = 1
     ):
-        index, big_npy = load_faiss_index(file_index) if index_rate != 0 else None, None
-        if pbar: pbar.update(1)
+        index, big_npy = load_faiss_index(file_index, nprobe) if index_rate != 0 else (None, None)
+        pbar.update(1)
 
         opt_ts, audio_opt = [], []
         audio = signal.filtfilt(bh, ah, audio)
@@ -212,7 +200,7 @@ class Pipeline:
                 logger.error(translations["error_readfile"])
                 inp_f0 = None
 
-        if pbar: pbar.update(1)
+        pbar.update(1)
 
         if pitch_guidance:
             if not hasattr(self, "f0_generator"): 
@@ -226,8 +214,7 @@ class Pipeline:
                     alpha, 
                     self.is_half, 
                     self.device, 
-                    predictor_onnx, 
-                    delete_predictor_onnx
+                    predictor_onnx
                 )
 
             pitch, pitchf = self.f0_generator.calculator(
@@ -251,7 +238,7 @@ class Pipeline:
                 torch.tensor(pitchf[:p_len], device=self.device).unsqueeze(0).float()
             )
 
-        if pbar: pbar.update(1)
+        pbar.update(1)
 
         if energy_use:
             if not hasattr(self, "rms_extract"): 
@@ -268,7 +255,9 @@ class Pipeline:
                 torch.from_numpy(audio_pad).to(self.device).unsqueeze(0)
             )[:p_len].to(self.device).float()
 
-        if pbar: pbar.update(1)
+        pbar.update(1)
+        pbar.total = pbar.total + len(opt_ts)
+        pbar.refresh()
 
         for t in opt_ts:
             t = t // self.window * self.window
@@ -292,6 +281,7 @@ class Pipeline:
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )    
             s = t
+            pbar.update(1)
             
         audio_opt.append(
             self.voice_conversion(
@@ -313,7 +303,7 @@ class Pipeline:
             )[self.t_pad_tgt : -self.t_pad_tgt]
         )
 
-        if pbar: pbar.update(1)
+        pbar.update(1)
 
         audio_opt = np.concatenate(audio_opt)
         if rms_mix_rate != 1: 
@@ -322,8 +312,9 @@ class Pipeline:
                 self.sample_rate, 
                 audio_opt, 
                 self.tgt_sr, 
-                rms_mix_rate
-            )
+                rms_mix_rate,
+                device=self.device
+            ).cpu().numpy()
 
         audio_max = np.abs(audio_opt).max() / 0.99
         if audio_max > 1: audio_opt /= audio_max

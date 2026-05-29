@@ -7,6 +7,8 @@ import torch.nn as nn
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
+
 class Spectrogram(nn.Module):
     def __init__(
         self, 
@@ -21,37 +23,38 @@ class Spectrogram(nn.Module):
         self.win_length = win_length
         self.clamp = clamp
         self.register_buffer("window", torch.hann_window(win_length), persistent=False)
+        self.stftt = self._stft_other_backends if config.device.startswith(("ocl", "privateuseone")) else self._stft_torch
 
     def forward(self, audio, center=True):
         bs, c, segment_samples = audio.shape
+
         audio = audio.reshape(bs * c, segment_samples)
+        mag = self.stftt(audio, center).transpose(1, 2).clamp(self.clamp, np.inf)
 
-        if str(audio.device).startswith(("ocl", "privateuseone")):
-            if not hasattr(self, "stft"): 
-                from main.library.backends.utils import STFT
+        return mag.reshape(bs, c, mag.shape[1], mag.shape[2])
 
-                self.stft = STFT(
-                    filter_length=self.n_fft, 
-                    hop_length=self.hop_length, 
-                    win_length=self.win_length
-                ).to(audio.device)
+    def _stft_other_backends(self, audio, center=True):
+        if not hasattr(self, "stft"): 
+            from main.library.backends.utils import STFT
 
-            magnitude = self.stft.transform(audio, 1e-9)
-        else:
-            fft = torch.stft(
-                audio, 
-                n_fft=self.n_fft, 
+            self.stft = STFT(
+                filter_length=self.n_fft, 
                 hop_length=self.hop_length, 
-                win_length=self.win_length, 
-                window=self.window, 
-                center=center, 
-                pad_mode="reflect", 
-                return_complex=True
-            )
+                win_length=self.win_length,
+                center=center
+            ).to(audio.device)
 
-            magnitude = (fft.real.pow(2) + fft.imag.pow(2)).sqrt()
+        return self.stft.transform(audio, 1e-9)
 
-        mag = magnitude.transpose(1, 2).clamp(self.clamp, np.inf)
-        mag = mag.reshape(bs, c, mag.shape[1], mag.shape[2])
-
-        return mag
+    def _stft_torch(self, audio, center=True):
+        fft = torch.stft(
+            audio, 
+            n_fft=self.n_fft, 
+            hop_length=self.hop_length, 
+            win_length=self.win_length, 
+            window=self.window, 
+            center=center, 
+            pad_mode="reflect", 
+            return_complex=True
+        )
+        return fft.abs()

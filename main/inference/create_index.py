@@ -18,6 +18,7 @@ def parse_arguments():
     parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--rvc_version", type=str, default="v2")
     parser.add_argument("--index_algorithm", type=str, default="Auto")
+    parser.add_argument("--nprobe", type=int, default=1)
 
     return parser.parse_args()
 
@@ -25,13 +26,14 @@ def main():
     args = parse_arguments()
 
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
-    version, index_algorithm = args.rvc_version, args.index_algorithm
+    version, index_algorithm, nprobe = args.rvc_version, args.index_algorithm
 
     log_data = {
         translations['modelname']: args.model_name, 
         translations['model_path']: exp_dir, 
         translations['training_version']: version, 
-        translations['index_algorithm_info']: index_algorithm
+        translations['index_algorithm_info']: index_algorithm,
+        translations['nprobe']: nprobe
     }
 
     for key, value in log_data.items():
@@ -75,7 +77,7 @@ def main():
         )
 
         index_ivf_trained = faiss.extract_index_ivf(index_trained)
-        index_ivf_trained.nprobe = 1
+        index_ivf_trained.nprobe = nprobe
         index_trained.train(big_npy)
 
         faiss.write_index(
@@ -92,7 +94,7 @@ def main():
         )
 
         index_ivf_added = faiss.extract_index_ivf(index_added)
-        index_ivf_added.nprobe = 1
+        index_ivf_added.nprobe = nprobe
         index_added.train(big_npy)
 
         batch_size_add = 8192

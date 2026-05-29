@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
-from main.library.utils import load_audio
+from main.library.audio.audio import load_audio
 from main.inference.extracting.setup_path import setup_paths
 from main.app.variables import config, logger, translations, configs
 
@@ -47,8 +47,7 @@ class FeatureInput:
                 alpha, 
                 self.is_half, 
                 self.device, 
-                predictor_onnx, 
-                False
+                predictor_onnx
             )
 
         inp_path, opt_path1, opt_path2, file_inp = file_info
@@ -58,7 +57,7 @@ class FeatureInput:
             pitch, pitchf = self.f0_gen.calculator(
                 x_pad=config.x_pad, 
                 f0_method=f0_method, 
-                x=load_audio(file_inp, self.sample_rate), 
+                x=load_audio(file_inp, sample_rate=self.sample_rate), 
                 f0_up_key=0, 
                 p_len=None, 
                 filter_radius=3, 

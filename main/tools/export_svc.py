@@ -49,7 +49,7 @@ def svc_converter(model_path, config_path, output_path, is_half=False):
             config["data"]["sampling_rate"]
         ]
 
-        epoch = model["iteration"]
+        epoch = model.get("iteration", 0)
 
         try:
             step = (

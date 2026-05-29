@@ -92,7 +92,6 @@ def main():
 
     check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
-
     num_processes = max(1, num_processes)
 
     devices = ["cpu"] if gpus == "-" else [

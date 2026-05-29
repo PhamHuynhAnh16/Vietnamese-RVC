@@ -10,27 +10,25 @@ class PESTO:
         model_path, 
         step_size=10, 
         reduction="alwa", 
-        num_chunks=1, 
         sample_rate=16000, 
         device=None, 
         providers=None, 
         onnx=False,
         compile_model=False,
-        compile_mode=None
+        compile_mode=None,
+        chunk_size = None
     ):
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.step_size = step_size
-        self.reduction = reduction
-        self.num_chunks = num_chunks
         self.sample_rate = sample_rate
-        self.onnx = onnx
+        self.chunk_size = chunk_size
 
-        if self.onnx:
+        if onnx:
             import onnxruntime as ort
 
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
-            self.model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
+            model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
             from main.library.predictors.PESTO.model import PPESTO, Resnet1d
             from main.library.predictors.PESTO.preprocessor import Preprocessor
@@ -46,37 +44,42 @@ class PESTO:
                     **ckpt["hcqt_params"]
                 ), 
                 crop_kwargs=ckpt["hparams"]["pitch_shift"], 
-                reduction=ckpt["hparams"]["reduction"]
+                reduction=reduction or ckpt["hparams"]["reduction"]
             )
             model.load_state_dict(ckpt["state_dict"], strict=False)
             model.to(self.device).eval()
-            self.model = model
-            self.model.reduction = self.reduction
-            if compile_model: self.model = torch.compile(self.model, mode=compile_mode)
+            if compile_model: model = torch.compile(model, mode=compile_mode)
+        
+        self.model = model
+        self.infer = self._infer_onnx if onnx else self._infer_torch
 
     def compute_f0(self, x):
-        assert x.ndim <= 2
-
         with torch.inference_mode():
-            with torch.no_grad():
-                preds, confidence = [], []
+            assert x.ndim <= 2
 
-                for chunk in x.chunk(chunks=self.num_chunks):
-                    if self.onnx:
-                        model = self.model.run(
-                            [self.model.get_outputs()[0].name, self.model.get_outputs()[1].name], 
-                            {self.model.get_inputs()[0].name: chunk.cpu().numpy()}
-                        )
-                        pred, conf = torch.tensor(model[0], device=self.device), torch.tensor(model[1], device=self.device)
-                    else:
-                        pred, conf = self.model(
-                            chunk, 
-                            sr=self.sample_rate, 
-                            convert_to_freq=True, 
-                            return_activations=False
-                        )
+            preds, confidence = [], []
+            total_samples = x.shape[-1]
+            if total_samples <= self.chunk_size: return self.infer(x)
 
-                    preds.append(pred)
-                    confidence.append(conf)
+            for i in range(0, total_samples, self.chunk_size):
+                pred_chunk, conf_chunk = self.infer(x[i : i + self.chunk_size] if x.ndim == 1 else x[:, i : i + self.chunk_size])
+                
+                preds.append(pred_chunk)
+                confidence.append(conf_chunk)
 
-                return torch.cat(preds, dim=0), torch.cat(confidence, dim=0)
+            return torch.cat(preds, dim=-1), torch.cat(confidence, dim=-1)
+
+    def _infer_onnx(self, x):
+        model = self.model.run(
+            [self.model.get_outputs()[0].name, self.model.get_outputs()[1].name], 
+            {self.model.get_inputs()[0].name: x.cpu().numpy()}
+        )
+        return torch.tensor(model[0], device=self.device), torch.tensor(model[1], device=self.device)
+
+    def _infer_torch(self, x):
+        return self.model(
+            x, 
+            sr=self.sample_rate, 
+            convert_to_freq=True, 
+            return_activations=False
+        )

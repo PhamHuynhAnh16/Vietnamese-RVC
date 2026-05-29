@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import torch
+import functools
 
 from torch import nn
 from copy import deepcopy
@@ -10,8 +11,15 @@ from torch.nn import functional as F
 
 sys.path.append(os.getcwd())
 
-from main.library.uvr5_lib.demucs.states import capture_init
 from main.library.uvr5_lib.demucs.demucs import DConv, rescale_module
+
+def capture_init(init):
+    @functools.wraps(init)
+    def __init__(self, *args, **kwargs):
+        self._init_args_kwargs = (args, kwargs)
+        init(self, *args, **kwargs)
+
+    return __init__
 
 def spectro(x, n_fft=512, hop_length=None, pad=0):
     *other, length = x.shape
@@ -333,7 +341,7 @@ class ScaledEmbedding(nn.Module):
         )
 
         if smooth:
-            weight = torch.cumsum(self.embedding.weight.data, dim=0)
+            weight = self.embedding.weight.data.cumsum(dim=0)
             weight = weight / torch.arange(1, num_embeddings + 1).to(weight).sqrt()[:, None]
             self.embedding.weight.data[:] = weight
 
