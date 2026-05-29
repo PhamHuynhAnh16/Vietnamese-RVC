@@ -250,10 +250,12 @@ def is_empty_table(html):
 
 def fetch_models_data(search):
     all_table_data = [] 
-    page = 1 
+    models = set()
+    page = 0
 
     while 1:
         try:
+            url = codecs.decode("uggcf://ibvpr-zbqryf.pbz", "rot13")
             response = requests.post(
                 url=codecs.decode(
                     "uggcf://ibvpr-zbqryf.pbz/srgpu_qngn.cuc", 
@@ -262,6 +264,15 @@ def fetch_models_data(search):
                 data={
                     "page": page, 
                     "search": search
+                },
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/148.0.0.0 Safari/537.36"
+                    ),
+                    "Referer": url + "/",
+                    "Origin": url
                 }
             )
 
@@ -271,6 +282,13 @@ def fetch_models_data(search):
                 if not table_data.strip(): break
                 if is_empty_table(table_data): break
 
+                model_links = {a.get("href") for a in BeautifulSoup(table_data, "html.parser").select('a[href^="/model/"]')}
+                if not model_links: break
+
+                new_models = model_links - models
+                if not new_models: break
+
+                models.update(new_models)
                 all_table_data.append(table_data)
                 page += 1
             else:

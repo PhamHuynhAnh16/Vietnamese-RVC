@@ -21,6 +21,7 @@
 *.nbc
 *.nbi
 *.pem
+*.dll
 
 audios
 dataset
