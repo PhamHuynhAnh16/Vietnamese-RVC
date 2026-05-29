@@ -242,6 +242,7 @@ def run_convert_script(
     nprobe = 1,
     audio_upscaler = False
 ):
+    if audio_upscaler: check_upscaler()
     check_assets(
         f0_method, 
         embedder_model, 
@@ -575,8 +576,6 @@ class VoiceConverter:
                     from main.library.audio.upscaler import FlashSR, upscaler
 
                     if not hasattr(self, "flash_sr"):
-                        check_upscaler()
-
                         self.flash_sr = FlashSR(
                             os.path.join("assets", "models", "upscalers", "upscalers.pth"),
                             device=self.device,
