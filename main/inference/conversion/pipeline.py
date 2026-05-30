@@ -106,23 +106,14 @@ class Pipeline:
             p_len = torch.tensor([p_len], device=self.device).long()
             feats = feats.to(self.dtype) 
 
-            infer_params = (
+            audio1 = net_g.infer(
                 feats, 
                 p_len, 
                 pitch if pitch_guidance else None, 
                 pitchf.to(self.dtype) if pitch_guidance else None,
                 sid,
-            )
-
-            if energy_use: infer_params += (energy.to(self.dtype),)
-
-            audio1 = (
-                (
-                    net_g.infer(
-                        *infer_params
-                    )[0][0, 0]
-                ).data.cpu().float().numpy()
-            )
+                energy.to(self.dtype) if energy_use else None
+            )[0][0, 0].data.cpu().float().numpy()
 
         del feats, feats0, p_len
 

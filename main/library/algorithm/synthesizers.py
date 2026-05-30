@@ -177,7 +177,7 @@ class Synthesizer(torch.nn.Module):
 
         return o, x_mask, (z, z_p, m_p, logs_p)
 
-    def onnx_infer(self, phone, phone_lengths, pitch=None, nsff0=None, sid = None, energy = None):
+    def onnx_infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None, energy = None):
         g = self.emb_g(sid).unsqueeze(-1)
         m_p, logs_p, x_mask = self.enc_p(phone, pitch, phone_lengths, energy)
         z_p = (m_p + logs_p.exp() * torch.randn_like(m_p) * 0.66666) * x_mask
@@ -309,7 +309,7 @@ class SynthesizerSVC(torch.nn.Module):
         for module in [self.dec, self.flow, self.enc_q]:
             module.remove_weight_norm()
 
-    def forward(self, phone, phone_lengths, pitch = None, pitchf = None, spec = None, spec_lengths = None, ds = None):
+    def forward(self, phone, phone_lengths, pitch = None, pitchf = None, y = None, y_lengths = None, ds = None, energy = None):
         g = self.emb_g(ds.unsqueeze(0) if ds.dim() == 1 else ds).transpose(1, 2)
         phone = phone.transpose(1, 2)
 
@@ -317,10 +317,10 @@ class SynthesizerSVC(torch.nn.Module):
         x = self.pre(phone) * x_mask + self.emb_uv((pitchf > 0.0).long()).transpose(1, 2)
 
         _, m_p, logs_p, _ = self.enc_p(x, x_mask, f0=pitch)
-        z, m_q, logs_q, spec_mask = self.enc_q(spec, spec_lengths, g=g)
+        z, m_q, logs_q, spec_mask = self.enc_q(y, y_lengths, g=g)
 
         z_p = self.flow(z, spec_mask, g=g)
-        z_slice, ids_slice = rand_slice_segments(z, spec_lengths, self.segment_size)
+        z_slice, ids_slice = rand_slice_segments(z, y_lengths, self.segment_size)
 
         return (
             self.dec(
@@ -335,7 +335,7 @@ class SynthesizerSVC(torch.nn.Module):
         )
 
     @torch.no_grad()
-    def infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None):
+    def infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None, energy = None):
         g = self.emb_g(sid.unsqueeze(0) if sid.dim() == 1 else sid).transpose(1, 2)
         phone = phone.transpose(1, 2)
         
@@ -358,7 +358,7 @@ class SynthesizerSVC(torch.nn.Module):
         return o, x_mask, (z, z_p, m_p, logs_p)
 
     @torch.no_grad()
-    def onnx_infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None):
+    def onnx_infer(self, phone, phone_lengths, pitch = None, nsff0 = None, sid = None, energy = None):
         g = self.emb_g(sid.unsqueeze(0) if sid.dim() == 1 else sid).transpose(1, 2)
         phone = phone.transpose(1, 2)
         

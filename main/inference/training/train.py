@@ -695,18 +695,14 @@ def run(
             torch.LongTensor(np.load(os.path.join(reference_path, "pitch_coarse.npy"))[:-1]).unsqueeze(0).to(device) if pitch_guidance else None,
             torch.FloatTensor(np.load(os.path.join(reference_path, "pitch_fine.npy"))[:-1]).unsqueeze(0).to(device) if pitch_guidance else None,
             torch.LongTensor([0]).to(device),
+            torch.FloatTensor(np.load(os.path.join(reference_path, "energy.npy"))[:-1]).unsqueeze(0).to(device) if energy_use else None,
         )
-        if architecture != "SVC": reference += (torch.FloatTensor(np.load(os.path.join(reference_path, "energy.npy"))[:-1]).unsqueeze(0).to(device) if energy_use else None,)
     else:
         info = next(iter(train_loader))
         reference = (info[0].to(device), info[1].to(device))
 
-        if pitch_guidance:
-            reference += (info[2].to(device), info[3].to(device), info[8].to(device))
-            if architecture != "SVC": reference += (info[9].to(device),) if energy_use else (None,)
-        else:
-            reference += (None, None, info[6].to(device))
-            if architecture != "SVC": reference += (info[7].to(device),) if energy_use else (None,)
+        if pitch_guidance: reference += (info[2].to(device), info[3].to(device), info[8].to(device), info[9].to(device) if energy_use else None)
+        else: reference += (None, None, info[6].to(device), info[7].to(device) if energy_use else None)
 
     for epoch in range(epoch_str, total_epoch + 1):
         train_and_evaluate(
@@ -855,7 +851,7 @@ def train_and_evaluate(
                 energy = info[7] if energy_use else None
 
             with autocasts:
-                net_g_params = (
+                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(
                     phone, 
                     phone_lengths, 
                     pitch, 
@@ -863,12 +859,7 @@ def train_and_evaluate(
                     spec, 
                     spec_lengths, 
                     sid,
-                )
-
-                if energy_use: net_g_params += (energy,)
-
-                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(
-                    *net_g_params
+                    energy
                 )
 
                 wave = commons.slice_segments(

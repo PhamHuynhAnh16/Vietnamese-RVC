@@ -84,20 +84,14 @@ class RealtimeVoiceConverter:
         pitchf, 
         energy
     ):
-        infer_params = (
+        output = self.net_g.infer(
             feats, 
             p_len, 
             pitch, 
             pitchf,
             sid,
-        )
-        if energy is not None: infer_params += (energy,)
-
-        output = (
-            self.net_g.infer(
-                *infer_params
-            )[0][0, 0]
-        )
+            energy
+        )[0][0, 0]
 
         return torch.clip(
             output, 
