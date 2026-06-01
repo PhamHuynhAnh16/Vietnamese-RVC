@@ -82,10 +82,7 @@ class SineGen(torch.nn.Module):
         self.voiced_threshold = voiced_threshold
 
     def _f02uv(self, f0):
-        uv = torch.ones_like(f0) * (f0 > self.voiced_threshold)
-        if uv.device.type == "privateuseone": uv = uv.float()
-
-        return uv
+        return (f0 > self.voiced_threshold).float()
     
     def _f02sine(self, f0, upp):
         rad = f0 / self.sampling_rate * torch.arange(1, upp + 1, dtype=f0.dtype, device=f0.device)

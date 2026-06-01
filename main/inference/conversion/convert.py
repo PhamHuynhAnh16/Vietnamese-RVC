@@ -20,7 +20,7 @@ from main.inference.conversion.pipeline import Pipeline
 from main.library.audio.audio import load_audio, cut, restore
 from main.app.variables import config, logger, translations, file_types
 from main.library.audio.audio_processing import preprocess, postprocess
-from main.library.utils import check_assets, check_upscaler, load_embedders_model, clear_gpu_cache, load_model, strtobool
+from main.library.utils import check_assets, check_upscaler, load_embedders_model, clear_gpu_cache, load_model, strtobool, load_faiss_index
 
 if not config.debug_mode:
     warnings.filterwarnings("ignore")
@@ -409,6 +409,8 @@ class VoiceConverter:
         self.n_spk = None  
         self.use_f0 = None  
         self.loaded_model = None
+        self.index = None
+        self.big_tsr = None
         self.vocoder = "Default"
         self.checkpointing = checkpointing
         self.sample_rate = 16000
@@ -477,12 +479,15 @@ class VoiceConverter:
                     shutil.copy(audio_input_path, audio_output_path)
                     return
 
-                if not self.hubert_model:
+                if self.hubert_model is None:
                     models = load_embedders_model(embedder_model, embedders_mode)
                     if isinstance(models, torch.nn.Module): 
                         models = models.to(self.device).to(torch.float16 if self.config.is_half else torch.float32).eval()
                         if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=self.config.compile_mode)
                     self.hubert_model = models
+                
+                if index_rate != 0 and (self.index is None or self.big_tsr is None):
+                    self.index, self.big_tsr = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"), nprobe)   
 
                 pbar.update(1)
                 if split_audio:
@@ -512,9 +517,8 @@ class VoiceConverter:
                             audio=waveform, 
                             f0_up_key=pitch, 
                             f0_method=f0_method, 
-                            file_index=(
-                                index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added")
-                            ), 
+                            index=self.index,
+                            big_tsr=self.big_tsr, 
                             index_rate=index_rate, 
                             pitch_guidance=self.use_f0, 
                             filter_radius=filter_radius, 
@@ -534,7 +538,6 @@ class VoiceConverter:
                             embedders_mix=embedders_mix, 
                             embedders_mix_layers=embedders_mix_layers, 
                             embedders_mix_ratio=embedders_mix_ratio,
-                            nprobe=nprobe
                         )
                     ) 
                     for waveform, start, end in chunks
@@ -645,8 +648,8 @@ class VoiceConverter:
 
     def cleanup(self):
         if self.hubert_model is not None:
-            del self.net_g, self.n_spk, self.vc, self.hubert_model, self.tgt_sr
-            self.hubert_model = self.net_g = self.n_spk = self.vc = self.tgt_sr = None
+            del self.net_g, self.n_spk, self.vc, self.hubert_model, self.tgt_sr, self.index, self.big_tsr
+            self.hubert_model = self.net_g = self.n_spk = self.vc = self.tgt_sr = self.index = self.big_tsr = None
             clear_gpu_cache()
 
         del self.net_g, self.cpt

@@ -264,7 +264,7 @@ class Generator:
         return realtime_post_process(f0, pitch, pitchf, f0_up_key, self.f0_min, self.f0_max)
 
     def _resize_array_f0(self, x, target_len, resize = False):
-        if torch.is_tensor(x): x = x.cpu().numpy()
+        if torch.is_tensor(x): x = x.cpu().numpy().astype(np.float32)
         if not resize or len(x) == target_len: return x
 
         source = np.array(x)
@@ -553,7 +553,6 @@ class Generator:
             from main.library.predictors.FCPE.FCPE import FCPE
 
             self.fcpe = FCPE(
-                configs, 
                 os.path.join(
                     configs["predictors_path"], 
                     (
@@ -561,17 +560,9 @@ class Generator:
                         if legacy else 
                         ("fcpe" if previous else "ddsp_200k")
                     ) + (".onnx" if self.predictor_onnx else ".pt")
-                ), 
-                hop_length=self.hop_length, 
-                f0_min=self.f0_min, 
-                f0_max=self.f0_max, 
-                dtype=torch.float32, 
+                ),  
                 device=self.device, 
-                threshold=(
-                    filter_radius / 100
-                ) if legacy else (
-                    filter_radius / 1000 * 2
-                ), 
+                threshold=(filter_radius / 100) if legacy else (filter_radius / 1000 * 2), 
                 providers=self.providers, 
                 onnx=self.predictor_onnx, 
                 legacy=legacy,
@@ -579,7 +570,7 @@ class Generator:
                 compile_mode=self.compile_mode
             )
         
-        f0 = self.fcpe.compute_f0(x, p_len)
+        f0 = self.fcpe.compute_f0(x)
         return self._resize_f0(f0, p_len, self.resize)
     
     def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False):

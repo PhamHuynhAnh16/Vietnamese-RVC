@@ -29,7 +29,7 @@ def load_audio(
 
         try:
             if mode == "soundfile": audio, sr = sf.read(file, dtype=dtype)
-            elif mode == "librosa": audio, sr = librosa.load(file, sr=None, mono=False, dtype=dtype)
+            elif mode == "librosa": audio, sr = librosa.load(file, sr=None, dtype=dtype)
             elif mode == "ffmpeg":
                 from main.library.audio import ffmpeg
 
@@ -91,7 +91,7 @@ def load_audio(
                 distortion=formant_timbre
             )
         
-        audio = audio.flatten() if flatten and audio.ndim == 1 else audio
+        audio = audio.flatten() if flatten else audio
     except Exception as e:
         raise RuntimeError(f"{translations['errors_loading_audio']}: {e}")
     

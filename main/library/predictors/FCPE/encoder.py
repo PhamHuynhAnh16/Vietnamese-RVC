@@ -142,7 +142,7 @@ class ConformerNaiveEncoder(nn.Module):
         ])
 
     def forward(self, x, mask=None):
-        for (_, layer) in enumerate(self.encoder_layers):
+        for layer in self.encoder_layers:
             x = layer(x, mask)
 
         return x 

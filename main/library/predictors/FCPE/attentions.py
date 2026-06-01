@@ -440,7 +440,7 @@ class SelfAttention(nn.Module):
             attn_outs.append(out)
 
         if not empty(lq):
-            assert (not cross_attend), "not cross_attend"
+            assert not cross_attend
 
             out = self.local_attn(lq, lk, lv, input_mask=mask)
             attn_outs.append(out)

@@ -18,7 +18,7 @@ class Wav2Mel:
         self.dtype = dtype
         self.stft = STFT(16000, 128, 1024, 1024, 160, 0, 8000)
 
-    def extract_mel(self, audio):
+    def __call__(self, audio):
         audio = audio.to(self.dtype).to(self.device)
         mel = self.stft.get_mel(audio).transpose(1, 2)
 
@@ -26,6 +26,3 @@ class Wav2Mel:
         mel = (torch.cat((mel, mel[:, -1:, :]), 1) if n_frames > int(mel.shape[1]) else mel)
 
         return mel[:, :n_frames, :] if n_frames < int(mel.shape[1]) else mel
-
-    def __call__(self, audio):
-        return self.extract_mel(audio)

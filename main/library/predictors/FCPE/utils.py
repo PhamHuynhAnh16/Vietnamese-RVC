@@ -47,20 +47,6 @@ def torch_interp(x, xp, fp):
 
     return interp_vals
 
-def batch_interp_with_replacement_detach(uv, f0):
-    result = f0.clone()
-
-    for i in range(uv.shape[0]):
-        interp_vals = torch_interp(
-            torch.where(uv[i])[-1], 
-            torch.where(~uv[i])[-1], 
-            f0[i][~uv[i]]
-        ).detach()
-
-        result[i][uv[i]] = interp_vals
-
-    return result
-
 class DotDict(dict):
     def __getattr__(*args):
         val = dict.get(*args)
@@ -76,7 +62,7 @@ class Swish(nn.Module):
 class Transpose(nn.Module):
     def __init__(self, dims):
         super().__init__()
-        assert len(dims) == 2, "dims == 2"
+        assert len(dims) == 2
         self.dims = dims
 
     def forward(self, x):

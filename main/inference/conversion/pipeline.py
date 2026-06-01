@@ -11,7 +11,7 @@ sys.path.append(os.getcwd())
 
 from main.library.audio.features import change_rms
 from main.app.variables import translations, configs
-from main.library.utils import extract_features, clear_gpu_cache, load_faiss_index
+from main.library.utils import extract_features, clear_gpu_cache
 
 bh, ah = signal.butter(
     N=5, 
@@ -54,7 +54,7 @@ class Pipeline:
         pitch, 
         pitchf, 
         index, 
-        big_npy, 
+        big_tsr, 
         index_rate, 
         version, 
         protect, 
@@ -82,10 +82,10 @@ class Pipeline:
 
             feats0 = feats.clone() if protect < 0.5 and pitch_guidance else None
 
-            if index is not None and big_npy is not None and index_rate != 0:
+            if index is not None and big_tsr is not None and index_rate != 0:
                 score, ix = index.search(feats[0], k=8)
                 weight = (1 / score).square()
-                query = (big_npy[ix] * (weight / weight.sum(dim=1, keepdim=True)).unsqueeze(2)).sum(dim=1)
+                query = (big_tsr[ix] * (weight / weight.sum(dim=1, keepdim=True)).unsqueeze(2)).sum(dim=1)
                 feats = query.unsqueeze(0) * index_rate + (1.0 - index_rate) * feats
 
             feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
@@ -129,7 +129,8 @@ class Pipeline:
         audio, 
         f0_up_key, 
         f0_method, 
-        file_index, 
+        index,
+        big_tsr, 
         index_rate, 
         pitch_guidance, 
         filter_radius, 
@@ -149,11 +150,7 @@ class Pipeline:
         embedders_mix = False,
         embedders_mix_layers = 9,
         embedders_mix_ratio = 0.5,
-        nprobe = 1
     ):
-        index, big_npy = load_faiss_index(file_index, nprobe) if index_rate != 0 else (None, None)
-        pbar.update(1)
-
         opt_ts, audio_opt = [], []
         audio = signal.filtfilt(bh, ah, audio)
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
@@ -168,6 +165,8 @@ class Pipeline:
                 opt_ts.append(
                     t - self.t_query + np.where(np.abs(audio_sum[t - self.t_query : t + self.t_query]) == np.abs(audio_sum[t - self.t_query : t + self.t_query]).min())[0][0]
                 )
+
+        pbar.update(1)
 
         s = 0
         t, inp_f0 = None, None
@@ -261,7 +260,7 @@ class Pipeline:
                     pitch[:, s // self.window : (t + self.t_pad2) // self.window] if pitch_guidance else None, 
                     pitchf[:, s // self.window : (t + self.t_pad2) // self.window] if pitch_guidance else None, 
                     index, 
-                    big_npy, 
+                    big_tsr, 
                     index_rate, 
                     version, 
                     protect, 
@@ -283,7 +282,7 @@ class Pipeline:
                 (pitch[:, t // self.window :] if t is not None else pitch) if pitch_guidance else None, 
                 (pitchf[:, t // self.window :] if t is not None else pitchf) if pitch_guidance else None, 
                 index, 
-                big_npy, 
+                big_tsr, 
                 index_rate, 
                 version, 
                 protect, 

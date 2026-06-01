@@ -33,17 +33,16 @@ class RMVPE:
         self.f0_min = f0_min
         self.f0_max = f0_max
         self.device = device
-        self.is_half = is_half
         self.chunk_size = chunk_size
         self.dtype = torch.float16 if is_half else torch.float32
 
-        self.mel_extractor = MelSpectrogram(N_MELS, 16000, 1024, 160, 1024, 30, 8000).to(device)
         self.cents_mapping = np.pad(20 * np.arange(N_CLASS) + 1997.3794084376191, (4, 4))
+        self.mel_extractor = MelSpectrogram(N_MELS, 16000, 1024, 160, 1024, 30, 8000).to(device)
         if return_tensor: self.cents_mapping = torch.as_tensor(self.cents_mapping, dtype=self.dtype, device=device)
 
-        self.infer = self._infer_onnx if onnx else self._infer_torch
         self.mel2hidden = self._mel2hidden_chunk if enable_chunk else self._mel2hidden
         self.offsets = torch.arange(-4, 5, device=device) if return_tensor else np.arange(-4, 5)
+        self.infer = self._infer_onnx if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
         self.to_local_average_cents = self._to_local_average_cents_tensor if return_tensor else self._to_local_average_cents_array
 
     def decode(self, hidden, thred=0.03):
@@ -77,10 +76,12 @@ class RMVPE:
 
             return hidden[:, :n_frames]
 
-    def _infer_torch(self, mel):
-        if self.is_half: mel = mel.half()
+    def _infer_torch_fp32(self, mel):
         return self.model(mel)
     
+    def _infer_torch_fp16(self, mel):
+        return self.model(mel.half())
+
     def _infer_onnx(self, mel):
         mel = mel.cpu().numpy().astype(np.float32)
 

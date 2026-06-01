@@ -116,7 +116,6 @@ class ParallelResBlock(nn.Module):
         return torch.stack([block(x) for block in self.blocks], dim=0).mean(dim=0)
 
     def remove_weight_norm(self):
-        remove_weight_norm(self.input_conv)
         for block in self.blocks:
             block[1].remove_weight_norm()
 
@@ -139,10 +138,7 @@ class SineGen(nn.Module):
         self.merge = nn.Sequential(nn.Linear(self.dim, 1, bias=False), nn.Tanh())
 
     def _f02uv(self, f0):
-        uv = torch.ones_like(f0) * (f0 > self.voiced_threshold)
-        if uv.device.type == "privateuseone": uv = uv.float()
-
-        return uv
+        return (f0 > self.voiced_threshold).float()
 
     def _f02sine(self, f0_values):
         rad_values = (f0_values / self.sampling_rate) % 1

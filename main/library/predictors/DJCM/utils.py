@@ -82,8 +82,8 @@ class ResConvBlock(nn.Module):
             padding=(1, 1), 
             bias=False
         )
-        self.is_shortcut = False
 
+        self.is_shortcut = False
         if in_planes != out_planes:
             self.shortcut = nn.Conv2d(
                 in_planes, 
@@ -93,6 +93,7 @@ class ResConvBlock(nn.Module):
             self.is_shortcut = True
 
         self.init_weights()
+        self._return = self.return_shortcut if self.is_shortcut else self.return_non_shortcut
 
     def init_weights(self):
         init_bn(self.bn1)
@@ -102,6 +103,12 @@ class ResConvBlock(nn.Module):
         init_layer(self.conv2)
 
         if self.is_shortcut: init_layer(self.shortcut)
+    
+    def return_shortcut(self, x, out):
+        return self.shortcut(x) + out
+    
+    def return_non_shortcut(self, x, out):
+        return out + x
 
     def forward(self, x):
         out = self.conv1(
@@ -111,5 +118,4 @@ class ResConvBlock(nn.Module):
             self.act2(self.bn2(out))
         )
 
-        if self.is_shortcut: return self.shortcut(x) + out
-        else: return out + x
+        return self._return(x, out)

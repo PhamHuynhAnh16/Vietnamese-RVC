@@ -120,7 +120,7 @@ elif argv_help_is_allows[1] == argv:
             - `--noise_scale` (mặc định: `0.35`): Tùy chỉnh đặc biệt cho mô hình SVC gây ảnh hưởng trực tiếp đến chất lượng của âm thanh, bạn không nên điều chỉnh nó.
 
         2. Cấu hình F0:
-            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
+            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm-ac`, `pm-cc`, `pm-shs`, `dio`, `dio-stonemask`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `fcpe-previous`, `rmvpe`, `rmvpe-medfilt`, `rmvpe-mix`, `rmvpe-mix-medfilt`, `hpa-rmvpe`, `hpa-rmvpe-medfilt`, `hpa-rmvpe-previous`, `hpa-rmvpe-previous-medfilt`, `harvest`, `harvest-stonemask`, `yin`, `pyin`, `swipe`, `swipe-stonemask`, `piptrack`, `penn`, `mangio-penn`, `djcm`, `djcm-medfilt`, `djcm-svs`, `djcm-svs-medfilt`, `swift`, `pesto`).
             - `--f0_autotune` (mặc định: `False`): Có tự động điều chỉnh F0 hay không.
             - `--f0_autotune_strength` (mặc định: `1`): Cường độ hiệu chỉnh tự động F0.
             - `--f0_file` (mặc định: ``): Đường dẫn tệp F0 có sẵn.
@@ -215,7 +215,7 @@ elif argv_help_is_allows[4] == argv:
             - `--rvc_version` (mặc định: `v2`): Phiên bản mô hình (`v1`, `v2`).
 
         2. Cấu hình F0:
-            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
+            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm-ac`, `pm-cc`, `pm-shs`, `dio`, `dio-stonemask`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `fcpe-previous`, `rmvpe`, `rmvpe-medfilt`, `rmvpe-mix`, `rmvpe-mix-medfilt`, `hpa-rmvpe`, `hpa-rmvpe-medfilt`, `hpa-rmvpe-previous`, `hpa-rmvpe-previous-medfilt`, `harvest`, `harvest-stonemask`, `yin`, `pyin`, `swipe`, `swipe-stonemask`, `piptrack`, `penn`, `mangio-penn`, `djcm`, `djcm-medfilt`, `djcm-svs`, `djcm-svs-medfilt`, `swift`, `pesto`).
             - `--predictor_onnx` (mặc định: `False`): Có sử dụng chế độ tăng tốc bằng ONNX của trích xuất cao độ hay không.
             - `--pitch_guidance` (mặc định: `True`): Có sử dụng hướng dẫn cao độ hay không.
             - `--f0_autotune` (mặc định: `False`): Có tự động điều chỉnh F0 hay không.
@@ -362,7 +362,7 @@ elif argv_help_is_allows[8] == argv:
             - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
           
         4. Cấu hình F0:
-            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm`, `dio`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `rmvpe`, `rmvpe-legacy`, `harvest`, `yin`, `pyin`, `swipe`).
+            - `--f0_method` (mặc định: `rmvpe`): Phương pháp dự đoán F0 (`pm-ac`, `pm-cc`, `pm-shs`, `dio`, `dio-stonemask`, `mangio-crepe-tiny`, `mangio-crepe-small`, `mangio-crepe-medium`, `mangio-crepe-large`, `mangio-crepe-full`, `crepe-tiny`, `crepe-small`, `crepe-medium`, `crepe-large`, `crepe-full`, `fcpe`, `fcpe-legacy`, `fcpe-previous`, `rmvpe`, `rmvpe-medfilt`, `rmvpe-mix`, `rmvpe-mix-medfilt`, `hpa-rmvpe`, `hpa-rmvpe-medfilt`, `hpa-rmvpe-previous`, `hpa-rmvpe-previous-medfilt`, `harvest`, `harvest-stonemask`, `yin`, `pyin`, `swipe`, `swipe-stonemask`, `piptrack`, `penn`, `mangio-penn`, `djcm`, `djcm-medfilt`, `djcm-svs`, `djcm-svs-medfilt`, `swift`, `pesto`).
             - `--predictor_onnx` (mặc định: `False`): Có sử dụng chế độ tăng tốc bằng ONNX của trích xuất cao độ hay không.
             - `--f0_up_key` (mặc định: `0`): Điều chỉnh cao độ.
             - `--filter_radius` (mặc định: `3`): Độ mượt của đường F0.

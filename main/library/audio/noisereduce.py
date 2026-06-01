@@ -6,6 +6,8 @@ from torch.nn.functional import conv1d, conv2d
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
+
 @torch.no_grad()
 def temperature_sigmoid(x, x0, temp_coeff):
     return ((x - x0) / temp_coeff).sigmoid()
@@ -68,6 +70,7 @@ class TorchGate(torch.nn.Module):
         self.freq_mask_smooth_hz = freq_mask_smooth_hz
         self.time_mask_smooth_ms = time_mask_smooth_ms
         self.register_buffer("smoothing_filter", self._generate_mask_smoothing_filter())
+        self.forward = self._forward_other_backends if config.device.startswith(("ocl", "privateuseone")) else self._forward_torch
 
     @torch.no_grad()
     def _generate_mask_smoothing_filter(self):
@@ -117,37 +120,63 @@ class TorchGate(torch.nn.Module):
             self.temp_coeff_nonstationary
         )
 
-    def forward(self, x):
+    def _forward_torch(self, x):
         assert x.ndim == 2
         if x.shape[-1] < self.win_length * 2: raise Exception
 
-        if str(x.device).startswith(("ocl", "privateuseone")):
-            if not hasattr(self, "stft"): 
-                from main.library.backends.utils import STFT
+        X = torch.stft(
+            x, 
+            n_fft=self.n_fft, 
+            hop_length=self.hop_length, 
+            win_length=self.win_length, 
+            return_complex=True, 
+            pad_mode="constant", 
+            center=True, 
+            window=torch.hann_window(self.win_length).to(x.device)
+        )
+            
+        sig_mask = self._nonstationary_mask(X.abs()) if self.nonstationary else self._stationary_mask(amp_to_db(X.abs()))
+        sig_mask = self.prop_decrease * (sig_mask.float() * 1.0 - 1.0) + 1.0
 
-                self.stft = STFT(
-                    filter_length=self.n_fft, 
-                    hop_length=self.hop_length, 
-                    win_length=self.win_length, 
-                    pad_mode="constant"
-                ).to(x.device)
-
-            X, phase = self.stft.transform(
-                x, 
-                eps=1e-9, 
-                return_phase=True
+        if self.smoothing_filter is not None: 
+            sig_mask = conv2d(
+                sig_mask.unsqueeze(1), 
+                self.smoothing_filter.to(sig_mask.dtype), 
+                padding="same"
             )
-        else:
-            X = torch.stft(
-                x, 
+
+        Y = X * sig_mask.squeeze(1)
+
+        return (
+            torch.istft(
+                Y, 
                 n_fft=self.n_fft, 
                 hop_length=self.hop_length, 
                 win_length=self.win_length, 
-                return_complex=True, 
-                pad_mode="constant", 
                 center=True, 
-                window=torch.hann_window(self.win_length).to(x.device)
-            )
+                window=torch.hann_window(self.win_length).to(Y.device)
+            ).to(dtype=x.dtype)
+        )
+
+    def _forward_other_backends(self, x):
+        assert x.ndim == 2
+        if x.shape[-1] < self.win_length * 2: raise Exception
+
+        if not hasattr(self, "stft"): 
+            from main.library.backends.utils import STFT
+
+            self.stft = STFT(
+                filter_length=self.n_fft, 
+                hop_length=self.hop_length, 
+                win_length=self.win_length, 
+                pad_mode="constant"
+            ).to(x.device)
+
+        X, phase = self.stft.transform(
+            x, 
+            eps=1e-9, 
+            return_phase=True
+        )
             
         sig_mask = self._nonstationary_mask(X.abs()) if self.nonstationary else self._stationary_mask(amp_to_db(X.abs()))
         sig_mask = self.prop_decrease * (sig_mask.float() * 1.0 - 1.0) + 1.0
@@ -166,13 +195,4 @@ class TorchGate(torch.nn.Module):
                 Y, 
                 phase
             )
-        ) if hasattr(self, "stft") else (
-            torch.istft(
-                Y, 
-                n_fft=self.n_fft, 
-                hop_length=self.hop_length, 
-                win_length=self.win_length, 
-                center=True, 
-                window=torch.hann_window(self.win_length).to(Y.device)
-            ).to(dtype=x.dtype)
         )

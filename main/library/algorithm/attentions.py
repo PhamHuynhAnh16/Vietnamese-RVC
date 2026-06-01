@@ -33,13 +33,16 @@ class MultiHeadAttention(nn.Module):
         self.window_size = window_size
         self.block_length = block_length
         self.proximal_bias = proximal_bias
-        self.onnx = onnx
-        self.pad_fn = self.padding if onnx else F.pad
         self.conv_q = nn.Conv1d(channels, channels, 1)
         self.conv_k = nn.Conv1d(channels, channels, 1)
         self.conv_v = nn.Conv1d(channels, channels, 1)
         self.conv_o = nn.Conv1d(channels, out_channels, 1)
         self.drop = nn.Dropout(p_dropout)
+
+        self.pad_fn = self.padding if onnx else F.pad
+        self._get_relative_embeddings = self._get_relative_embeddings_onnx if onnx else self._get_relative_embeddings_torch
+        self._relative_position_to_absolute_position = self._relative_position_to_absolute_position_onnx if onnx else self._relative_position_to_absolute_position_torch
+        self._absolute_position_to_relative_position = self._absolute_position_to_relative_position_onnx if onnx else self._absolute_position_to_relative_position_torch
 
         if window_size is not None:
             n_heads_rel = 1 if heads_share else n_heads
@@ -121,15 +124,10 @@ class MultiHeadAttention(nn.Module):
     def _matmul_with_relative_keys(self, x, y):
         return x @ y.unsqueeze(0).transpose(-2, -1)
 
-    def _get_relative_embeddings(self, relative_embeddings, length):
-        if self.onnx:
-            pad_length = (length - (self.window_size + 1)).clamp(min=0)
-            slice_start_position = ((self.window_size + 1) - length).clamp(min=0)
-            pad_shape = [0, 0, pad_length, pad_length, 0, 0]
-        else:
-            pad_length = max(length - (self.window_size + 1), 0)
-            slice_start_position = max((self.window_size + 1) - length, 0)
-            pad_shape = convert_pad_shape([[0, 0], [pad_length, pad_length], [0, 0]])
+    def _get_relative_embeddings_onnx(self, relative_embeddings, length):
+        pad_length = (length - (self.window_size + 1)).clamp(min=0)
+        slice_start_position = ((self.window_size + 1) - length).clamp(min=0)
+        pad_shape = [0, 0, pad_length, pad_length, 0, 0]
 
         if pad_length > 0:
             relative_embeddings = self.pad_fn(
@@ -139,28 +137,51 @@ class MultiHeadAttention(nn.Module):
 
         return relative_embeddings[:, slice_start_position:(slice_start_position + 2 * length - 1)]  
 
-    def _relative_position_to_absolute_position(self, x):
+    def _get_relative_embeddings_torch(self, relative_embeddings, length):
+        pad_length = max(length - (self.window_size + 1), 0)
+        slice_start_position = max((self.window_size + 1) - length, 0)
+        pad_shape = convert_pad_shape([[0, 0], [pad_length, pad_length], [0, 0]])
+
+        if pad_length > 0:
+            relative_embeddings = self.pad_fn(
+                relative_embeddings, 
+                pad_shape
+            )
+
+        return relative_embeddings[:, slice_start_position:(slice_start_position + 2 * length - 1)]  
+
+    def _relative_position_to_absolute_position_onnx(self, x):
         batch, heads, length, _ = x.size()
 
-        if self.onnx:
-            pad = [0, 1] 
-            pad_shape = [0, length - 1]
-        else:
-            pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])
-            pad_shape = convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
+        pad = [0, 1] 
+        pad_shape = [0, length - 1]
 
         pad = self.pad_fn(x, pad).view([batch, heads, length * 2 * length])
         return self.pad_fn(pad, pad_shape).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
 
-    def _absolute_position_to_relative_position(self, x):
+    def _relative_position_to_absolute_position_torch(self, x):
         batch, heads, length, _ = x.size()
 
-        if self.onnx:
-            pad = [0, length - 1]
-            pad_shape = [length, 0]
-        else:
-            pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
-            pad_shape = convert_pad_shape([[0, 0], [0, 0], [length, 0]])
+        pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, 1]])
+        pad_shape = convert_pad_shape([[0, 0], [0, 0], [0, length - 1]])
+
+        pad = self.pad_fn(x, pad).view([batch, heads, length * 2 * length])
+        return self.pad_fn(pad, pad_shape).view([batch, heads, length + 1, 2 * length - 1])[:, :, :length, length - 1 :]
+
+    def _absolute_position_to_relative_position_onnx(self, x):
+        batch, heads, length, _ = x.size()
+
+        pad = [0, length - 1]
+        pad_shape = [length, 0]
+
+        pad = self.pad_fn(x, pad).view([batch, heads, length**2 + length * (length - 1)])
+        return self.pad_fn(pad,  pad_shape).view([batch, heads, length, 2 * length])[:, :, :, 1:]
+
+    def _absolute_position_to_relative_position_torch(self, x):
+        batch, heads, length, _ = x.size()
+
+        pad = convert_pad_shape([[0, 0], [0, 0], [0, 0], [0, length - 1]])
+        pad_shape = convert_pad_shape([[0, 0], [0, 0], [length, 0]])
 
         pad = self.pad_fn(x, pad).view([batch, heads, length**2 + length * (length - 1)])
         return self.pad_fn(pad,  pad_shape).view([batch, heads, length, 2 * length])[:, :, :, 1:]
@@ -244,12 +265,14 @@ class FFN(nn.Module):
         onnx=False
     ):
         super().__init__()
-        self.onnx = onnx
-        self.padding_fn = self._causal_padding if causal else self._same_padding
         self.conv_1 = nn.Conv1d(in_channels, filter_channels, kernel_size)
         self.conv_2 = nn.Conv1d(filter_channels, out_channels, kernel_size)
         self.drop = nn.Dropout(p_dropout)
         self.activation = activation
+
+        self._causal_padding = self._causal_padding_onnx if onnx else self._causal_padding_torch
+        self._same_padding = self._same_padding_onnx if onnx else self._same_padding_torch
+        self.padding_fn = self._causal_padding if causal else self._same_padding
 
     def forward(self, x, x_mask):
         x = self.conv_1(self.padding_fn(x * x_mask))
@@ -262,18 +285,34 @@ class FFN(nn.Module):
         if self.activation == "gelu": return x * (1.702 * x).sigmoid()
         return x.relu()
 
-    def _causal_padding(self, x):
+    def _causal_padding_onnx(self, x):
         pad_l, pad_r = self.conv_1.kernel_size[0] - 1, 0
 
         return F.pad(
             x, 
-            [pad_l, pad_r, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [pad_l, pad_r]])
+            [pad_l, pad_r, 0, 0, 0, 0]
         )
 
-    def _same_padding(self, x):
+    def _causal_padding_torch(self, x):
+        pad_l, pad_r = self.conv_1.kernel_size[0] - 1, 0
+
+        return F.pad(
+            x, 
+            convert_pad_shape([[0, 0], [0, 0], [pad_l, pad_r]])
+        )
+
+    def _same_padding_onnx(self, x):
         pad = (self.conv_1.kernel_size[0] - 1) // 2
 
         return F.pad(
             x, 
-            [pad, pad, 0, 0, 0, 0] if self.onnx else convert_pad_shape([[0, 0], [0, 0], [pad, pad]])
+            [pad, pad, 0, 0, 0, 0]
+        )
+
+    def _same_padding_torch(self, x):
+        pad = (self.conv_1.kernel_size[0] - 1) // 2
+
+        return F.pad(
+            x, 
+            convert_pad_shape([[0, 0], [0, 0], [pad, pad]])
         )

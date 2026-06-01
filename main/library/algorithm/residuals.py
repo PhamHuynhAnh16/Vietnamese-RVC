@@ -51,23 +51,17 @@ class ResBlock(torch.nn.Module):
 
         return layers
 
-    def forward(self, x, x_mask=None):
+    def forward(self, x):
         for conv1, conv2 in zip(self.convs1, self.convs2):
             y = conv1(
-                apply_mask(
-                    torch.nn.functional.leaky_relu(x, LRELU_SLOPE),  
-                    x_mask
-                )
+                torch.nn.functional.leaky_relu(x, LRELU_SLOPE),  
             )
 
             x = conv2(
-                apply_mask(
-                    torch.nn.functional.leaky_relu(y, LRELU_SLOPE), 
-                    x_mask
-                )
+                torch.nn.functional.leaky_relu(y, LRELU_SLOPE), 
             ) + x
 
-        return apply_mask(x, x_mask)
+        return x
 
     def remove_weight_norm(self):
         for conv in chain(self.convs1, self.convs2):
@@ -148,7 +142,7 @@ class ResidualCouplingLayer(torch.nn.Module):
         gin_channels=0, 
         mean_only=False
     ):
-        assert channels % 2 == 0, "Channels/2"
+        assert channels % 2 == 0
         super().__init__()
         self.channels = channels
         self.hidden_channels = hidden_channels

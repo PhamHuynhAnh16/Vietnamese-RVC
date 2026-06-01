@@ -21,17 +21,13 @@ class STFT:
         fmax=11025, 
         clip_val=1e-5
     ):
-        self.target_sr = sr
-        self.n_mels = n_mels
         self.n_fft = n_fft
+        self.clip_val = clip_val
         self.win_size = win_size
         self.hop_length = hop_length
-        self.fmin = fmin
-        self.fmax = fmax
-        self.clip_val = clip_val
         self.hann_window = torch.hann_window(self.win_size).to(config.device)
         self.stftt = self._stft_other_backends if config.device.startswith(("ocl", "privateuseone")) else self._stft_torch
-        self.mel_basis = mel(sr=self.target_sr, n_fft=self.n_fft, n_mels=self.n_mels, fmin=self.fmin, fmax=fmax, device=config.device)
+        self.mel_basis = mel(sr=sr, n_fft=self.n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax, device=config.device)
 
     def get_mel(self, y, center=False):
         pad_left = (self.win_size - self.hop_length) // 2
@@ -49,7 +45,7 @@ class STFT:
                 win_length=self.win_size,
             ).to(pad.device)
 
-        return self.stft.transform(pad, center=center, eps=1e-9)
+        return self.stft.transform(pad, center=center, eps=1e-5)
 
     def _stft_torch(self, pad, center=True):
         spec = torch.stft(

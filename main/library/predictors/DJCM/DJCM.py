@@ -50,18 +50,17 @@ class DJCM:
         self.f0_min = f0_min
         self.f0_max = f0_max
         self.device = device
-        self.is_half = is_half
         self.batch_size = batch_size
         self.seg_len = int(segment_len * SAMPLE_RATE)
-        self.seg_frames = int(self.seg_len // int(SAMPLE_RATE // 100))
         self.dtype = torch.float16 if is_half else torch.float32
+        self.seg_frames = int(self.seg_len // int(SAMPLE_RATE // 100))
 
-        self.spec_extractor = Spectrogram(int(SAMPLE_RATE // 100), window_length).to(device)
         self.cents_mapping = np.pad(20 * np.arange(N_CLASS) + 1997.3794084376191, (4, 4))
+        self.spec_extractor = Spectrogram(int(SAMPLE_RATE // 100), window_length).to(device)
         if return_tensor: self.cents_mapping = torch.as_tensor(self.cents_mapping, dtype=self.dtype, device=device)
 
-        self.infer = self._infer_onnx if onnx else self._infer_torch
         self.offsets = torch.arange(-4, 5, device=device) if return_tensor else np.arange(-4, 5)
+        self.infer = self._infer_onnx if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
         self.to_local_average_cents = self._to_local_average_cents_tensor if return_tensor else self._to_local_average_cents_array
 
     def infer_from_audio(self, audio, thred=0.03):
@@ -104,9 +103,11 @@ class DJCM:
             (left_pad, (((audio_len + seg_len - 1) // seg_len + 1) * seg_len + hop) - audio_len - left_pad)
         ).unfold(0, seg_len, hop).unsqueeze(1).contiguous()
 
-    def _infer_torch(self, spec):
-        if self.is_half: spec = spec.half()
+    def _infer_torch_fp32(self, spec):
         return self.model(spec)
+
+    def _infer_torchFfp16(self, spec):
+        return self.model(spec.half())
 
     def _infer_onnx(self, spec):
         spec = spec.cpu().numpy().astype(np.float32)

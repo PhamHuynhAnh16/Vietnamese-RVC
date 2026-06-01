@@ -46,17 +46,18 @@ class ConvBlockRes(nn.Module):
             nn.ReLU()
         )
 
+        self.is_shortcut = False
         if in_channels != out_channels:
             self.shortcut = nn.Conv2d(in_channels, out_channels, (1, 1))
             self.is_shortcut = True
-        else: self.is_shortcut = False
 
-    def forward(self, x):
-        return (
-            self.conv(x) + self.shortcut(x)
-        ) if self.is_shortcut else (
-            self.conv(x) + x
-        )
+        self.forward = self.forward_shortcut if self.is_shortcut else self.forward_non_shortcut
+    
+    def forward_shortcut(self, x):
+        return self.conv(x) + self.shortcut(x)
+    
+    def forward_non_shortcut(self, x):
+        return self.conv(x) + x
 
 class ResEncoderBlock(nn.Module):
     def __init__(

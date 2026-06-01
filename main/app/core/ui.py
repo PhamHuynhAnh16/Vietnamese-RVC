@@ -353,7 +353,6 @@ def hoplength_show(
 
     for m in [
         "mangio-crepe", 
-        "fcpe", 
         "yin", 
         "piptrack", 
         "mangio-penn"
