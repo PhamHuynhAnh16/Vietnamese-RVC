@@ -26,7 +26,7 @@ def main():
     args = parse_arguments()
 
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
-    version, index_algorithm, nprobe = args.rvc_version, args.index_algorithm
+    version, index_algorithm, nprobe = args.rvc_version, args.index_algorithm, args.nprobe
 
     log_data = {
         translations['modelname']: args.model_name, 
