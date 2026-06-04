@@ -648,8 +648,6 @@
     "post_process_threshold_info": "Mức độ xử lí hậu kỳ sau khi tách nhạc.",
     "denoise_model": "Mô hình khử nhiễu",
     "audio_processing": "Xử lí âm thanh đầu vào ra",
-    "create_pipeline_error": "Đã xảy ra lỗi khi tạo đường xử lí",
-    "voice_changer_selected_error": "Đã xảy ra lỗi khi chọn trình thay đổi giọng nói",
     "latency": "Độ trễ",
     "start_realtime": "Bắt đầu thời gian thực...",
     "provide_audio_device": "Vui lòng chọn thiết bị đầu vào và ra hợp lệ!",

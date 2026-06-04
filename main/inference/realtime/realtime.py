@@ -9,7 +9,7 @@ import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import config, translations
+from main.app.variables import config
 from main.inference.realtime.pipeline import Pipeline
 from main.library.utils import circular_write, check_assets
 
@@ -320,9 +320,6 @@ class Realtime:
         embedders_mix_layers = 9,
         embedders_mix_ratio = 0.5
     ):
-        if self.pipeline is None:
-            raise RuntimeError(translations["create_pipeline_error"])
-
         audio_in_16k = self.resample_in(
             torch.as_tensor(
                 audio_in, 
@@ -604,9 +601,6 @@ class VoiceChanger:
         embedders_mix_layers = 9,
         embedders_mix_ratio = 0.5
     ):
-        if self.vc_model is None:
-            raise RuntimeError(translations["voice_changer_selected_error"])
-
         start = time.perf_counter()
 
         result, vol = self.process_audio(

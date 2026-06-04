@@ -1465,4 +1465,4 @@ def upscaler(audio, model, pbar = None, device = "cpu", C = 245760, step = 12288
     final_output = (result / counter).squeeze(0)
     if audio.shape[1] > 2 * border and (border > 0): final_output = final_output[..., border:-border]
 
-    return final_output
+    return final_output.float().flatten().cpu().detach().numpy()

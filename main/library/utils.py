@@ -321,7 +321,7 @@ def circular_write(new_data, target):
     return target
 
 def load_faiss_index(index_path, nprobe=1):
-    index = IndexWrapper(index_path, nprobe=nprobe, device=config.device, is_half=config.is_half, faiss_cpu=configs.get("faiss_cpu", False) or config.device.startswith(("privateuseone", "ocl")))
+    index = IndexWrapper(index_path, nprobe=nprobe, device=config.device, is_half=config.is_half, faiss_cpu=configs.get("faiss_cpu", False) or config.device.startswith(("cpu", "privateuseone", "ocl")))
     big_npy, _ = index.read_index_tensor()
 
     return index, big_npy

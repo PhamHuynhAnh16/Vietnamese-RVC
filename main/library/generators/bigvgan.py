@@ -279,7 +279,7 @@ class SineGen(nn.Module):
             for idx in np.arange(self.harmonic_num):
                 f0_buf[:, :, idx + 1] = f0_buf[:, :, 0] * (idx + 2)
 
-            sine_waves = self._f02sine(f0_buf) * self.sine_amp
+            sine_waves = self._f02sine(f0_buf.float()) * self.sine_amp
             uv = self._f02uv(f0)
             sine_waves = sine_waves * uv + ((uv * self.noise_std + (1 - uv) * self.sine_amp / 3) * torch.randn_like(sine_waves))
 

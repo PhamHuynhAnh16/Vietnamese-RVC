@@ -243,12 +243,7 @@ def run_convert_script(
     audio_upscaler = False
 ):
     if audio_upscaler: check_upscaler()
-    check_assets(
-        f0_method, 
-        embedder_model, 
-        predictor_onnx=predictor_onnx, 
-        embedders_mode=embedders_mode
-    )
+    check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
 
     log_data = {
         translations["pitch"]: pitch, 
@@ -295,7 +290,7 @@ def run_convert_script(
         logger.warning(translations["provide_file"].format(filename=translations["model"]))
         sys.exit(1)
 
-    cvt = VoiceConverter(pth_path, sid, noise_scale, checkpointing)
+    cvt = VoiceConverter(pth_path, embedder_model, embedders_mode, sid, noise_scale, checkpointing)
 
     pid_path = os.path.join("assets", "convert_pid.txt")
     with open(pid_path, "w") as pid_file:
@@ -318,11 +313,9 @@ def run_convert_script(
             clean_audio=clean_audio, 
             clean_strength=clean_strength, 
             export_format=export_format, 
-            embedder_model=embedder_model, 
             resample_sr=resample_sr, 
             f0_file=f0_file, 
             predictor_onnx=predictor_onnx, 
-            embedders_mode=embedders_mode, 
             formant_shifting=formant_shifting, 
             formant_qfrency=formant_qfrency, 
             formant_timbre=formant_timbre, 
@@ -394,36 +387,35 @@ class VoiceConverter:
     def __init__(
         self, 
         model_path, 
+        embedder_model, 
+        embedders_mode,
         sid = 0,
         noise_scale = 0.35,
         checkpointing = False
     ):
-        self.config = config
-        self.device = config.device
-        self.hubert_model = None
-        self.tgt_sr = None 
-        self.net_g = None 
+        self.tg = None
         self.vc = None
-        self.cpt = None  
-        self.version = None 
-        self.n_spk = None  
-        self.use_f0 = None  
-        self.loaded_model = None
         self.index = None
+        self.net_g = None 
+        self.tgt_sr = None 
+        self.use_f0 = None  
+        self.version = None 
+        self.energy = False
         self.big_tsr = None
-        self.vocoder = "Default"
-        self.checkpointing = checkpointing
-        self.sample_rate = 16000
+        self.flash_sr = None
+        self.hubert_model = None
+
         self.sid = sid
-        self.noise_scale = noise_scale
-        self.get_vc(model_path, sid)
+        self.config = config
+        self.sample_rate = 16000
+        self.setup_hubert(embedder_model, embedders_mode)
+        self.setup_vc(model_path, checkpointing, noise_scale)
 
     def convert_audio(
         self, 
         audio_input_path, 
         audio_output_path, 
         index_path, 
-        embedder_model, 
         pitch, 
         f0_method, 
         index_rate, 
@@ -439,7 +431,6 @@ class VoiceConverter:
         resample_sr = 0, 
         f0_file = None, 
         predictor_onnx = False, 
-        embedders_mode = "fairseq", 
         formant_shifting = False, 
         formant_qfrency = 0.8, 
         formant_timbre = 0.8, 
@@ -478,16 +469,10 @@ class VoiceConverter:
 
                     shutil.copy(audio_input_path, audio_output_path)
                     return
-
-                if self.hubert_model is None:
-                    models = load_embedders_model(embedder_model, embedders_mode)
-                    if isinstance(models, torch.nn.Module): 
-                        models = models.to(self.device).to(torch.float16 if self.config.is_half else torch.float32).eval()
-                        if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=self.config.compile_mode)
-                    self.hubert_model = models
                 
                 if index_rate != 0 and (self.index is None or self.big_tsr is None):
-                    self.index, self.big_tsr = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"), nprobe)   
+                    self.index, self.big_tsr = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"), nprobe)
+                    if len(audio) > 10e6: self.index.search = self.index._search_cpu
 
                 pbar.update(1)
                 if split_audio:
@@ -560,14 +545,14 @@ class VoiceConverter:
                 if clean_audio:
                     from main.library.audio.noisereduce import TorchGate
 
-                    if not hasattr(self, "tg"): 
+                    if self.tg is None: 
                         self.tg = TorchGate(
                             self.tgt_sr, 
                             prop_decrease=clean_strength
-                        ).to(self.device)
+                        ).to(self.config.device)
 
                     audio_output = self.tg(
-                        torch.from_numpy(audio_output).unsqueeze(0).to(self.device).float()
+                        torch.from_numpy(audio_output).unsqueeze(0).to(self.config.device).float()
                     ).squeeze(0).cpu().detach().numpy()
 
                 target_len = int(np.round(len(audio) / self.sample_rate * self.tgt_sr))
@@ -578,22 +563,25 @@ class VoiceConverter:
                 if audio_upscaler:
                     from main.library.audio.upscaler import FlashSR, upscaler
 
-                    if not hasattr(self, "flash_sr"):
+                    if self.flash_sr is None:
                         self.flash_sr = FlashSR(
                             os.path.join("assets", "models", "upscalers", "upscalers.pth"),
-                            device=self.device,
+                            device=self.config.device,
                             is_half=self.config.is_half
                         )
 
-                    audio_output_resample = librosa.resample(
-                        audio_output, 
-                        orig_sr=self.tgt_sr, 
-                        target_sr=192000, 
-                        res_type="soxr_vhq"
+                    audio_output_resample = upscaler(
+                        librosa.resample(
+                            audio_output, 
+                            orig_sr=self.tgt_sr, 
+                            target_sr=192000, 
+                            res_type="soxr_vhq"
+                        ), 
+                        self.flash_sr, 
+                        pbar, 
+                        device=self.config.device
                     )
 
-                    audio_output_resample = upscaler(audio_output_resample, self.flash_sr, pbar, device=self.device)
-                    audio_output_resample = audio_output_resample.float().flatten().cpu().detach().numpy()
                     self.tgt_sr = 192000
                 elif self.tgt_sr != resample_sr and resample_sr > 0: 
                     audio_output_resample = librosa.resample(
@@ -635,75 +623,63 @@ class VoiceConverter:
 
             logger.debug(traceback.format_exc())
             logger.error(translations["error_convert"].format(e=e))
+    
+    def setup_hubert(self, embedder_model, embedders_mode):
+        models = load_embedders_model(embedder_model, embedders_mode)
 
-    def get_vc(self, weight_root, sid):
-        if sid == "" or sid == []:
-            self.cleanup()
-            clear_gpu_cache()
+        if isinstance(models, torch.nn.Module): 
+            models = models.to(self.config.device).to(torch.float16 if self.config.is_half else torch.float32).eval()
+            if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=self.config.compile_mode)
 
-        if not self.loaded_model or self.loaded_model != weight_root:
-            self.loaded_model = weight_root
-            self.cpt = load_model(weight_root)
-            if self.cpt is not None: self.setup()
+        self.hubert_model = models
 
-    def cleanup(self):
-        if self.hubert_model is not None:
-            del self.net_g, self.n_spk, self.vc, self.hubert_model, self.tgt_sr, self.index, self.big_tsr
-            self.hubert_model = self.net_g = self.n_spk = self.vc = self.tgt_sr = self.index = self.big_tsr = None
-            clear_gpu_cache()
+    def setup_vc(self, weight_root, checkpointing, noise_scale):
+        model = load_model(weight_root)
 
-        del self.net_g, self.cpt
-        clear_gpu_cache()
-        self.cpt = None
+        if weight_root.endswith(".pth"):
+            from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
-    def setup(self):
-        if self.cpt is not None:
-            if self.loaded_model.endswith(".pth"):
-                from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
+            self.tgt_sr = model["config"][-1]
+            model["config"][-3] = model["weight"]["emb_g.weight"].shape[0]
 
-                self.tgt_sr = self.cpt["config"][-1]
-                self.cpt["config"][-3] = self.cpt["weight"]["emb_g.weight"].shape[0]
+            self.use_f0 = model.get("f0", 1)
+            self.version = model.get("version", "v1")
+            self.energy = model.get("energy", False)
 
-                self.use_f0 = self.cpt.get("f0", 1)
-                self.version = self.cpt.get("version", "v1")
-                self.vocoder = self.cpt.get("vocoder", "Default")
-                self.energy = self.cpt.get("energy", False)
-                self.architecture = self.cpt.get("architecture", "RVC")
+            vocoder = model.get("vocoder", "Default")
+            hidden_dim = 768 if self.version == "v2" else 256
 
-                if self.vocoder != "Default": self.config.is_half = False
-
-                if self.architecture == "RVC":
-                    self.net_g = Synthesizer(
-                        *self.cpt["config"], 
-                        use_f0=self.use_f0, 
-                        text_enc_hidden_dim=768 if self.version == "v2" else 256, 
-                        vocoder=self.vocoder, 
-                        checkpointing=self.checkpointing, 
-                        energy=self.energy
-                    )
-                else:
-                    self.net_g = SynthesizerSVC(
-                        *self.cpt["config"], 
-                        text_enc_hidden_dim=768 if self.version == "v2" else 256, 
-                        vocoder=self.vocoder, 
-                        checkpointing=self.checkpointing, 
-                        noise_scale=self.noise_scale
-                    )
-
-                del self.net_g.enc_q
-
-                self.net_g.load_state_dict(self.cpt["weight"], strict=False)
-                self.net_g.eval().to(self.device)
-                self.net_g.to(torch.float16 if self.config.is_half else torch.float32)
-                if config.compile_all: self.net_g = torch.compile(self.net_g, mode=self.config.compile_mode)
-                self.n_spk = self.cpt["config"][-3]
+            if model.get("architecture", "RVC"):
+                self.net_g = Synthesizer(
+                    *model["config"], 
+                    use_f0=self.use_f0, 
+                    text_enc_hidden_dim=hidden_dim, 
+                    vocoder=vocoder, 
+                    checkpointing=checkpointing, 
+                    energy=self.energy
+                )
             else:
-                self.net_g = self.cpt.to(config.device)
-                self.tgt_sr = self.cpt.cpt.get("tgt_sr", 32000)
-                self.use_f0 = self.cpt.cpt.get("f0", 1)
-                self.version = self.cpt.cpt.get("version", "v1")
-                self.energy = self.cpt.cpt.get("energy", False)
+                self.net_g = SynthesizerSVC(
+                    *model["config"], 
+                    text_enc_hidden_dim=hidden_dim, 
+                    vocoder=vocoder, 
+                    checkpointing=checkpointing, 
+                    noise_scale=noise_scale
+                )
 
-            self.vc = Pipeline(self.tgt_sr, self.config)
+            del self.net_g.enc_q
+
+            self.net_g.load_state_dict(model["weight"], strict=False)
+            self.net_g.eval().to(self.config.device)
+            self.net_g.to(torch.float16 if self.config.is_half else torch.float32)
+            if config.compile_all: self.net_g = torch.compile(self.net_g, mode=self.config.compile_mode)
+        else:
+            self.net_g = model.to(config.device)
+            self.tgt_sr = model.cpt.get("tgt_sr", 32000)
+            self.use_f0 = model.cpt.get("f0", 1)
+            self.version = model.cpt.get("version", "v1")
+            self.energy = model.cpt.get("energy", False)
+
+        self.vc = Pipeline(self.tgt_sr, self.config)
 
 if __name__ == "__main__": main()

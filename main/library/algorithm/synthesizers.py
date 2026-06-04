@@ -136,9 +136,31 @@ class Synthesizer(torch.nn.Module):
         self.flow = ResidualCouplingBlock(inter_channels, hidden_channels, 5, 1, 3, gin_channels=gin_channels)
         self.emb_g = torch.nn.Embedding(spk_embed_dim, gin_channels)
 
+        self.train_dec = self.train_dec_nsff0 if use_f0 else self.train_dec_non_nsff0
+        self.infer_dec = self.infer_nsff0 if use_f0 else self.infer_non_nsff0
+
     def remove_weight_norm(self):
         for module in [self.dec, self.flow, self.enc_q]:
             module.remove_weight_norm()
+    
+    def train_dec_nsff0(self, z_slice, pitchf, ids_slice, g):
+        return self.dec(
+            z_slice, 
+            slice_segments(pitchf, ids_slice, self.segment_size, 2), 
+            g=g
+        )
+    
+    def train_dec_non_nsff0(self, z_slice, pitchf, ids_slice, g):
+        return self.dec(
+            z_slice, 
+            g=g
+        )
+    
+    def infer_nsff0(self, x, nsff0, g):
+        return self.dec(x, nsff0, g=g)
+
+    def infer_non_nsff0(self, x, nsff0, g):
+        return self.dec(x, g=g)
 
     @torch.jit.ignore
     def forward(self, phone, phone_lengths, pitch = None, pitchf = None, y = None, y_lengths = None, ds = None, energy = None):
@@ -151,14 +173,7 @@ class Synthesizer(torch.nn.Module):
             z_slice, ids_slice = rand_slice_segments(z, y_lengths, self.segment_size)
 
             return (
-                (self.dec(
-                    z_slice, 
-                    slice_segments(pitchf, ids_slice, self.segment_size, 2), 
-                    g=g
-                ) if self.use_f0 else self.dec(
-                    z_slice, 
-                    g=g
-                )), 
+                self.train_dec(z_slice, pitchf, ids_slice, g=g), 
                 ids_slice, 
                 x_mask, 
                 y_mask, 
@@ -173,7 +188,7 @@ class Synthesizer(torch.nn.Module):
         z_p = (m_p + logs_p.exp() * torch.randn_like(m_p) * 0.66666) * x_mask
 
         z = self.flow(z_p, x_mask, g=g, reverse=True)
-        o = self.dec(z * x_mask, nsff0, g=g) if self.use_f0 else self.dec(z * x_mask, g=g)
+        o = self.infer_dec(z * x_mask, nsff0, g=g)
 
         return o, x_mask, (z, z_p, m_p, logs_p)
 
@@ -183,14 +198,7 @@ class Synthesizer(torch.nn.Module):
         z_p = (m_p + logs_p.exp() * torch.randn_like(m_p) * 0.66666) * x_mask
         z = self.flow(z_p, x_mask, g=g, reverse=True)
 
-        return self.dec(
-            z * x_mask, 
-            nsff0, 
-            g=g
-        ) if self.use_f0 else self.dec(
-            z * x_mask, 
-            g=g
-        )
+        return self.infer_dec(z * x_mask, nsff0, g=g)
 
 class SynthesizerSVC(torch.nn.Module):
     def __init__(

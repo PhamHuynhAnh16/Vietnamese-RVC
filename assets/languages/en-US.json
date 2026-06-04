@@ -648,8 +648,6 @@
     "post_process_threshold_info": "The level of post-processing after the music is extracted.",
     "denoise_model": "Denoise model",
     "audio_processing": "Input/output processing",
-    "create_pipeline_error": "An error occurred while creating the pipeline",
-    "voice_changer_selected_error": "An error occurred while selecting voice changer",
     "latency": "Latency",
     "start_realtime": "Starting Realtime...",
     "provide_audio_device": "Please select valid input and output devices!",

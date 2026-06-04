@@ -102,12 +102,25 @@ class TextEncoder(torch.nn.Module):
         self.emb_energy = torch.nn.Linear(1, hidden_channels) if energy else None
         self.encoder = Encoder(hidden_channels, filter_channels, n_heads, n_layers, kernel_size, float(p_dropout), onnx=onnx)
         self.proj = torch.nn.Conv1d(hidden_channels, out_channels * 2, 1)
+        self.embedding_nsff0 = self._embedding_pitch if f0 else self._embedding_none
+        self.embedding_energy = self._embedding_energy if energy else self._embedding_none
+    
+    def _embedding_pitch(self, x, pitch):
+        x += self.emb_pitch(pitch)
+        return x
+    
+    def _embedding_energy(self, x, energy):
+        x += self.emb_energy(energy.unsqueeze(-1))
+        return x
+    
+    def _embedding_none(self, x, y):
+        return x
 
     def forward(self, phone, pitch, lengths, energy):
         x = self.emb_phone(phone)
 
-        if pitch is not None: x += self.emb_pitch(pitch)
-        if energy is not None: x += self.emb_energy(energy.unsqueeze(-1))
+        x = self.embedding_nsff0(x, pitch)
+        x = self.embedding_energy(x, energy)
 
         x = self.lrelu(x * math.sqrt(self.hidden_channels)).transpose(1, -1)
         x_mask = sequence_mask(lengths, x.size(2)).unsqueeze(1).to(x.dtype)

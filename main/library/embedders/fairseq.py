@@ -41,8 +41,7 @@ def load_model(filename):
             sys.modules["fairseq.data.dictionary"] = fairseq_data_dictionary
 
             state = torch.load(filename, map_location="cpu", weights_only=False)
-        else:
-            sys.exit(0)
+        else: sys.exit(0)
 
     model = HubertModel(
         HubertConfig(
@@ -712,109 +711,13 @@ def index_put(tensor, indices, value):
 
 def pad_to_multiple(x, multiple, dim=-1, value=0):
     if x is None: return None, 0
+
     tsz = x.size(dim)
     m = tsz / multiple
     remainder = math.ceil(m) * multiple - tsz
+
     if m.is_integer(): return x, 0
     return F.pad(x, (*((0,) * (-1 - dim) * 2), 0, remainder), value=value), remainder
-
-def compute_mask_indices(
-    shape, 
-    padding_mask, 
-    mask_prob, 
-    mask_length, 
-    mask_type = "static", 
-    mask_other = 0.0, 
-    min_masks = 0, 
-    no_overlap = False, 
-    min_space = 0, 
-    require_same_masks = True, 
-    mask_dropout = 0.0, 
-    add_masks = False, 
-    seed = None, 
-    epoch = None, 
-    indices = None, 
-    idc_select_ver = 1, 
-    num_mask_ver = 2
-):
-    bsz, all_sz = shape
-    mask = np.full((bsz, all_sz), False)
-    if num_mask_ver == 1: all_num_mask = max(min_masks, int(mask_prob * all_sz / float(mask_length) + np.random.rand()))
-    mask_idcs = []
-
-    for i in range(bsz):
-        seed_i = int(hash((seed, epoch, indices[i].item())) % 1e6) if seed is not None and epoch is not None and indices is not None else None
-        rng = np.random.default_rng(seed_i)
-
-        if padding_mask is not None:
-            sz = all_sz - padding_mask[i].long().sum().item()
-            assert sz >= 0, sz
-        else: sz = all_sz
-
-        if num_mask_ver == 1: num_mask = max(min_masks, int(mask_prob * sz / float(mask_length) + np.random.rand())) if padding_mask is not None else all_num_mask
-        elif num_mask_ver == 2: num_mask = max(min_masks, int(mask_prob * sz / float(mask_length) + rng.random()))
-        else: raise ValueError
-
-        if mask_type == "static": lengths = np.full(num_mask, mask_length)
-        elif mask_type == "uniform": lengths = rng.randint(mask_other, mask_length * 2 + 1, size=num_mask)
-        elif mask_type == "normal": lengths = [max(1, int(round(x))) for x in rng.normal(mask_length, mask_other, size=num_mask)]
-        elif mask_type == "poisson": lengths = [int(round(x)) for x in rng.poisson(mask_length, size=num_mask)]
-        else: raise Exception
-
-        if sum(lengths) == 0:
-            if mask_type == "static": raise ValueError
-            else: lengths = [min(mask_length, sz - 1)]
-
-        if no_overlap:
-            mask_idc = []
-
-            def arrange(s, e, length, keep_length):
-                span_start = rng.randint(s, e - length)
-                mask_idc.extend(span_start + i for i in range(length))
-                new_parts = []
-                if span_start - s - min_space >= keep_length: new_parts.append((s, span_start - min_space + 1))
-                if e - span_start - length - min_space > keep_length: new_parts.append((span_start + length + min_space, e))
-                return new_parts
-
-            parts = [(0, sz)]
-            min_length = min(lengths)
-            for length in sorted(lengths, reverse=True):
-                lens = np.fromiter((e - s if e - s >= length + min_space else 0 for s, e in parts), np.int32)
-                l_sum = np.sum(lens)
-                if l_sum == 0: break
-                s, e = parts.pop(rng.choice(len(parts), p=lens / np.sum(lens)))
-                parts.extend(arrange(s, e, length, min_length))
-            mask_idc = np.asarray(mask_idc)
-        else:
-            if idc_select_ver == 1:
-                min_len = min(lengths)
-                if sz - min_len <= num_mask: min_len = sz - num_mask - 1
-                mask_idc = rng.choice(sz - min_len, num_mask, replace=False)
-            elif idc_select_ver == 2: mask_idc = rng.choice(sz, num_mask, replace=False)
-            else: raise ValueError
-
-            mask_idc = np.asarray([mask_idc[j] + offset for j in range(len(mask_idc)) for offset in range(lengths[j])])
-
-        mask_idc = np.unique(mask_idc[mask_idc < sz])
-        if len(mask_idc) >= sz: raise ValueError
-        mask_idcs.append(mask_idc)
-
-    target_len = None
-    if require_same_masks: target_len = max([len(m) for m in mask_idcs]) if add_masks else min([len(m) for m in mask_idcs])
-
-    for i, mask_idc in enumerate(mask_idcs):
-        if target_len is not None and len(mask_idc) > target_len: mask_idc = rng.choice(mask_idc, target_len, replace=False)
-        mask[i, mask_idc] = True
-
-        if target_len is not None and len(mask_idc) < target_len:
-            to_mask = rng.choice(np.flatnonzero(~mask[i]), target_len - len(mask_idc), replace=False)
-            mask[i, to_mask] = True
-
-        if mask_dropout > 0:
-            masked = np.flatnonzero(mask[i])
-            mask[i, rng.choice(masked, np.rint(len(masked) * mask_dropout).astype(int), replace=False)] = False
-
-    return mask
 
 def LayerNorm(normalized_shape, eps=1e-5, elementwise_affine=True):
     return nn.LayerNorm(normalized_shape, eps, elementwise_affine)
@@ -920,33 +823,38 @@ class TransformerSentenceEncoderLayer(nn.Module):
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(self.activation_dropout)
         self.dropout3 = nn.Dropout(dropout)
-        self.layer_norm_first = layer_norm_first
         self.self_attn_layer_norm = LayerNorm(self.embedding_dim)
         self.fc1 = nn.Linear(self.embedding_dim, ffn_embedding_dim)
         self.fc2 = nn.Linear(ffn_embedding_dim, self.embedding_dim)
         self.final_layer_norm = LayerNorm(self.embedding_dim)
-
-    def forward(self, x, self_attn_mask=None, self_attn_padding_mask=None, need_weights=False, att_args=None):
+        self.forward = self.forward_layer_norm_first if layer_norm_first else self.forward_non_layer_norm_first
+    
+    def forward_layer_norm_first(self, x, self_attn_mask=None, self_attn_padding_mask=None, need_weights=False, att_args=None):
         residual = x
-        if self.layer_norm_first:
-            x = self.self_attn_layer_norm(x)
-            x, attn = self.self_attn(query=x, key=x, value=x, key_padding_mask=self_attn_padding_mask, attn_mask=self_attn_mask, need_weights=False)
-            x = residual + self.dropout1(x)
 
-            residual = x
-            x = self.fc2(self.dropout2(self.activation_fn(self.fc1(self.final_layer_norm(x)))))
+        x = self.self_attn_layer_norm(x)
+        x, attn = self.self_attn(query=x, key=x, value=x, key_padding_mask=self_attn_padding_mask, attn_mask=self_attn_mask, need_weights=False)
+        x = residual + self.dropout1(x)
 
-            layer_result = x
-            x = residual + self.dropout3(x)
-        else:
-            x, attn = self.self_attn(query=x, key=x, value=x, key_padding_mask=self_attn_padding_mask, need_weights=False)
-            x = self.self_attn_layer_norm(residual + self.dropout1(x))
+        residual = x
+        x = self.fc2(self.dropout2(self.activation_fn(self.fc1(self.final_layer_norm(x)))))
 
-            residual = x
-            x = self.fc2(self.dropout2(self.activation_fn(self.fc1(x))))
+        layer_result = x
+        x = residual + self.dropout3(x)
 
-            layer_result = x
-            x = self.final_layer_norm(residual + self.dropout3(x))
+        return x, (attn, layer_result)
+
+    def forward_non_layer_norm_first(self, x, self_attn_mask=None, self_attn_padding_mask=None, need_weights=False, att_args=None):
+        residual = x
+
+        x, attn = self.self_attn(query=x, key=x, value=x, key_padding_mask=self_attn_padding_mask, need_weights=False)
+        x = self.self_attn_layer_norm(residual + self.dropout1(x))
+
+        residual = x
+        x = self.fc2(self.dropout2(self.activation_fn(self.fc1(x))))
+
+        layer_result = x
+        x = self.final_layer_norm(residual + self.dropout3(x))
 
         return x, (attn, layer_result)
 
@@ -1098,10 +1006,13 @@ class RotaryPositionalEmbedding(nn.Module):
     def forward(self, x, seq_len = 0):
         if seq_len > self.seq_len_cached:
             self.seq_len_cached = seq_len
+
             freqs = torch.einsum("i,j->ij", torch.arange(seq_len, device=x.device).type_as(self.inv_freq), self.inv_freq)
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
+
             self.cos_cached = emb.cos().view(emb.size(0), 1, 1, emb.size(1))
             self.sin_cached = emb.sin().view(emb.size(0), 1, 1, emb.size(1))
+
         return self.cos_cached, self.sin_cached
 
 class ESPNETMultiHeadedAttention(nn.Module):
@@ -1146,9 +1057,8 @@ class ESPNETMultiHeadedAttention(nn.Module):
         return self.forward_attention(v, (q @ k.transpose(-2, -1)) / math.sqrt(self.d_k), key_padding_mask).transpose(0, 1), None
 
 class RelPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
-    def __init__(self, n_feat, n_head, dropout, zero_triu=False):
+    def __init__(self, n_feat, n_head, dropout):
         super().__init__(n_feat, n_head, dropout)
-        self.zero_triu = zero_triu
         self.linear_pos = nn.Linear(n_feat, n_feat, bias=False)
         self.pos_bias_u = nn.Parameter(torch.zeros(self.h, self.d_k))
         self.pos_bias_v = nn.Parameter(torch.zeros(self.h, self.d_k))
@@ -1168,7 +1078,6 @@ class RelPositionMultiHeadedAttention(ESPNETMultiHeadedAttention):
             dim=-1
         ).view(*x.size()[:2], x.size(3) + 1, x.size(2))[:, :, 1:].view_as(x)[:, :, :, : x.size(-1) // 2 + 1]
 
-        if self.zero_triu: x *= torch.ones((x.size(2), x.size(3)), device=x.device).tril(x.size(3) - x.size(2))[None, None, :, :]
         return x
 
     def forward(self, query, key, value, pos_emb, key_padding_mask=None, **kwargs):
@@ -1428,20 +1337,20 @@ class TransformerEncoder(nn.Module):
         self.layerdrop = args.encoder_layerdrop
         self.apply(init_bert_params)
 
-    def forward(self, x, padding_mask=None, layer=None, corpus_key=None):
-        x, layer_results = self.extract_features(x, padding_mask, layer, corpus_key=corpus_key)
+    def forward(self, x, padding_mask=None, layer=None):
+        x, layer_results = self.extract_features(x, padding_mask, layer)
         if self.layer_norm_first and layer is None: x = self.layer_norm(x)
         return x, layer_results
 
-    def extract_features(self, x, padding_mask=None, tgt_layer=None, min_layer=0, corpus_key=None):
-        if padding_mask is not None: x = index_put(x, padding_mask, 0)
-        x = x + self.pos_conv(x.transpose(1, 2)).transpose(1, 2)
+    def extract_features(self, x, padding_mask=None, tgt_layer=None):
+        x = index_put(x, padding_mask, 0)
+        x += self.pos_conv(x.transpose(1, 2)).transpose(1, 2)
+
         if not self.layer_norm_first: x = self.layer_norm(x)
+
         x, pad_length = pad_to_multiple(x, self.required_seq_len_multiple, dim=-2, value=0)
-        if pad_length > 0 and padding_mask is None:
-            padding_mask = x.new_zeros((x.size(0), x.size(1)), dtype=torch.bool)
-            padding_mask[:, -pad_length:] = True
-        else: padding_mask, _ = pad_to_multiple(padding_mask, self.required_seq_len_multiple, dim=-1, value=True)
+        padding_mask, _ = pad_to_multiple(padding_mask, self.required_seq_len_multiple, dim=-1, value=True)
+
         x = F.dropout(x, p=self.dropout, training=self.training).transpose(0, 1)
         layer_results = []
         r = None
@@ -1450,23 +1359,8 @@ class TransformerEncoder(nn.Module):
             dropout_probability = np.random.random() if self.layerdrop > 0 else 1
 
             if not self.training or (dropout_probability > self.layerdrop):
-                layer_check = layer
-
-                if (corpus_key is None) or (not isinstance(layer_check, (TransformerSentenceEncoderWithAdapterLayer))): 
-                    x, (z, lr) = layer(
-                        x, 
-                        self_attn_padding_mask=padding_mask, 
-                        need_weights=False
-                    )
-                else: 
-                    x, (z, lr) = layer(
-                        x, 
-                        self_attn_padding_mask=padding_mask, 
-                        need_weights=False, 
-                        corpus_key=corpus_key
-                    )
-
-                if i >= min_layer: layer_results.append((x, z, lr))
+                x, (z, lr) = layer(x, self_attn_padding_mask=padding_mask, need_weights=False)
+                if i >= 0: layer_results.append((x, z, lr))
 
             if i == tgt_layer:
                 r = x
@@ -1605,11 +1499,7 @@ class ConvFeatureExtractionModel(nn.Module):
 
 class GradMultiply(torch.autograd.Function):
     @staticmethod
-    def forward(
-        ctx, 
-        x, 
-        scale
-    ):
+    def forward(ctx, x, scale):
         ctx.scale = scale
         res = x.new(x)
         return res
@@ -1622,9 +1512,6 @@ class BaseFairseqModel(nn.Module):
     def __init__(self):
         super().__init__()
         self._is_generation_fast = False
-
-    def get_targets(self, sample, net_output):
-        return sample["target"]
 
     def extract_features(self, *args, **kwargs):
         return self(*args, **kwargs)
@@ -1793,97 +1680,23 @@ class HubertModel(BaseFairseqModel):
         feature_enc_layers = eval(cfg.conv_feature_layers)
         self.embed = feature_enc_layers[-1][0]
         self.feature_extractor = ConvFeatureExtractionModel(conv_layers=feature_enc_layers, dropout=0.0, mode=cfg.extractor_mode, conv_bias=cfg.conv_bias)
-        feature_ds_rate = np.prod([s for _, _, s in feature_enc_layers])
-        self.feat2tar_ratio = cfg.label_rate * feature_ds_rate / 16000
-        self.post_extract_proj = (nn.Linear(self.embed, cfg.encoder_embed_dim) if self.embed != cfg.encoder_embed_dim else None)
-        self.mask_prob = cfg.mask_prob
-        self.mask_selection = cfg.mask_selection
-        self.mask_other = cfg.mask_other
-        self.mask_length = cfg.mask_length
-        self.no_mask_overlap = cfg.no_mask_overlap
-        self.mask_min_space = cfg.mask_min_space
-        self.mask_channel_prob = cfg.mask_channel_prob
-        self.mask_channel_selection = cfg.mask_channel_selection
-        self.mask_channel_other = cfg.mask_channel_other
-        self.mask_channel_length = cfg.mask_channel_length
-        self.no_mask_channel_overlap = cfg.no_mask_channel_overlap
-        self.mask_channel_min_space = cfg.mask_channel_min_space
+        self.post_extract_proj = nn.Linear(self.embed, cfg.encoder_embed_dim) if self.embed != cfg.encoder_embed_dim else None
         self.dropout_input = nn.Dropout(cfg.dropout_input)
         self.dropout_features = nn.Dropout(cfg.dropout_features)
         self.feature_grad_mult = cfg.feature_grad_mult
-        self.logit_temp = cfg.logit_temp
-        self.skip_masked = cfg.skip_masked
-        self.skip_nomask = cfg.skip_nomask
         final_dim = cfg.final_dim if cfg.final_dim > 0 else cfg.encoder_embed_dim
         self.mask_emb = nn.Parameter(torch.FloatTensor(cfg.encoder_embed_dim).uniform_())
         self.encoder = TransformerEncoder(cfg)
         self.layer_norm = LayerNorm(self.embed)
         self.target_glu = None
         if cfg.target_glu: self.target_glu = nn.Sequential(nn.Linear(final_dim, final_dim * 2), nn.GLU())
-        self.untie_final_proj = cfg.untie_final_proj
         self.final_proj = nn.Linear(cfg.encoder_embed_dim, final_dim)
-        self.num_classes = [num_classes]
-        self.label_embs_concat = nn.Parameter(torch.FloatTensor(sum(self.num_classes), final_dim))
+        self.label_embs_concat = nn.Parameter(torch.FloatTensor(sum([num_classes]), final_dim))
         nn.init.uniform_(self.label_embs_concat)
 
     def upgrade_state_dict_named(self, state_dict, name):
         super().upgrade_state_dict_named(state_dict, name)
         return state_dict
-
-    def apply_mask(self, x, padding_mask, target_list):
-        B, T, C = x.shape
-
-        if self.mask_prob > 0:
-            mask_indices = torch.from_numpy(
-                compute_mask_indices(
-                    (B, T), 
-                    padding_mask, 
-                    self.mask_prob, 
-                    self.mask_length, 
-                    self.mask_selection, 
-                    self.mask_other, 
-                    min_masks=2, 
-                    no_overlap=self.no_mask_overlap, 
-                    min_space=self.mask_min_space
-                )
-            ).to(x.device)
-
-            x[mask_indices] = self.mask_emb
-        else: mask_indices = None
-
-        if self.mask_channel_prob > 0: 
-            x[(
-                torch.from_numpy(
-                    compute_mask_indices(
-                        (B, C), 
-                        None, 
-                        self.mask_channel_prob, 
-                        self.mask_channel_length, 
-                        self.mask_channel_selection, 
-                        self.mask_channel_other, 
-                        no_overlap=self.no_mask_channel_overlap, 
-                        min_space=self.mask_channel_min_space
-                    )
-                ).to(x.device).unsqueeze(1).expand(-1, T, -1)
-            )] = 0
-
-        return x, mask_indices
-
-    def compute_nce(self, x, pos, negs):
-        neg_is_pos = (pos == negs).all(-1)
-
-        logits = torch.cosine_similarity(
-            x.float(), 
-            torch.cat(
-                [pos.unsqueeze(0), negs], 
-                dim=0
-            ).float(), 
-            dim=-1
-        ).type_as(x)
-        logits /= self.logit_temp
-
-        if neg_is_pos.any(): logits[1:][neg_is_pos] = float("-inf")
-        return logits.transpose(0, 1)
 
     def forward_features(self, source):
         if self.feature_grad_mult > 0:
@@ -1892,108 +1705,32 @@ class HubertModel(BaseFairseqModel):
         else:
             with torch.no_grad():
                 features = self.feature_extractor(source)
+
         return features
-
-    def forward_targets(self, features, target_list):
-        feat_tsz = features.size(2)
-        targ_tsz = min([t.size(1) for t in target_list])
-        if self.feat2tar_ratio * feat_tsz > targ_tsz:
-            feat_tsz = int(targ_tsz / self.feat2tar_ratio)
-            features = features[..., :feat_tsz]
-
-        return features, [t[:, (torch.arange(feat_tsz).float() * self.feat2tar_ratio).long()] for t in target_list]
 
     def forward_padding_mask(self, features, padding_mask):
         extra = padding_mask.size(1) % features.size(1)
         if extra > 0: padding_mask = padding_mask[:, :-extra]
+
         return padding_mask.view(padding_mask.size(0), features.size(1), -1).all(-1)
 
-    def forward(self, source, target_list = None, padding_mask = None, mask = True, features_only = False, output_layer = None):
+    def forward(self, source, padding_mask = None, output_layer = None):
         features = self.forward_features(source)
-        if target_list is not None: features, target_list = self.forward_targets(features, target_list)
-
-        features_pen = features.float().pow(2).mean()
         features = self.layer_norm(features.transpose(1, 2))
-        unmasked_features = features.clone()
 
-        if padding_mask is not None: padding_mask = self.forward_padding_mask(features, padding_mask)
+        unmasked_features = features.clone()
+        padding_mask = self.forward_padding_mask(features, padding_mask)
+
         if self.post_extract_proj is not None: features = self.post_extract_proj(features)
 
         features = self.dropout_input(features)
         unmasked_features = self.dropout_features(unmasked_features)
 
-        if mask: x, mask_indices = self.apply_mask(features, padding_mask, target_list)
-        else: x, mask_indices = features, None
+        x, _ = self.encoder(features, padding_mask=padding_mask, layer=None if output_layer is None else output_layer - 1)
+        return {"x": x, "padding_mask": padding_mask, "features": features}
 
-        x, _ = self.encoder(x, padding_mask=padding_mask, layer=None if output_layer is None else output_layer - 1)
-        if features_only: return {"x": x, "padding_mask": padding_mask, "features": features}
+    def extract_features(self, source, ret_conv = False, output_layer = None):
+        padding_mask = torch.BoolTensor(source.shape).fill_(False).to(source.device)
 
-        def compute_pred(proj_x, target, label_embs):
-            y = torch.index_select(label_embs, 0, target.long())
-            negs = label_embs.unsqueeze(1).expand(-1, proj_x.size(0), -1)
-
-            if self.target_glu:
-                y = self.target_glu(y)
-                negs = self.target_glu(negs)
-
-            return self.compute_nce(proj_x, y, negs)
-
-        label_embs_list = self.label_embs_concat.split(self.num_classes, 0)
-        if not self.skip_masked:
-            masked_indices = torch.logical_and(~padding_mask, mask_indices)
-            proj_x_m = self.final_proj(x[masked_indices])
-
-            logit_m_list = [
-                compute_pred(
-                    proj_x_m, 
-                    t[masked_indices], 
-                    label_embs_list[i]
-                ) 
-                for i, (proj_x_m, t) in enumerate(zip(
-                    proj_x_m.chunk(len(target_list), dim=-1) if self.untie_final_proj else [proj_x_m for _ in range(len(target_list))], 
-                    target_list
-                ))
-            ]
-        else: logit_m_list = [None for _ in target_list]
-
-        if not self.skip_nomask:
-            nomask_indices = torch.logical_and(~padding_mask, ~mask_indices)
-            proj_x_u = self.final_proj(x[nomask_indices])
-
-            logit_u_list = [
-                compute_pred(
-                    proj_x_u, 
-                    t[nomask_indices], 
-                    label_embs_list[i]
-                ) 
-                for i, (proj_x_u, t) in enumerate(zip(
-                    proj_x_u.chunk(len(target_list), dim=-1) if self.untie_final_proj else [proj_x_u for _ in range(len(target_list))], 
-                    target_list
-                ))
-            ]
-        else: logit_u_list = [None for _ in target_list]
-
-        return {"logit_m_list": logit_m_list, "logit_u_list": logit_u_list, "padding_mask": padding_mask, "features_pen": features_pen}
-
-    def extract_features(self, source, padding_mask = None, mask = False, ret_conv = False, output_layer = None):
-        if padding_mask is None: padding_mask = torch.BoolTensor(source.shape).fill_(False).to(source.device)
-        res = self.forward(source, padding_mask=padding_mask, mask=mask, features_only=True, output_layer=output_layer)
+        res = self.forward(source, padding_mask=padding_mask, output_layer=output_layer)
         return res["features"] if ret_conv else res["x"], res["padding_mask"]
-
-    def get_logits(self, net_output, is_masked=True):
-        return [x.float() for x in (net_output["logit_m_list"] if is_masked else net_output["logit_u_list"]) if x is not None]
-
-    def get_targets(self, net_output, is_masked=True):
-        return [x.new_zeros(x.size(0), dtype=torch.long) for x in self.get_logits(net_output, is_masked)]
-
-    def get_extra_losses(self, net_output):
-        extra_losses, names = [], []
-        if "features_pen" in net_output:
-            extra_losses.append(net_output["features_pen"])
-            names.append("features_pen")
-
-        return extra_losses, names
-
-    def remove_pretraining_modules(self):
-        self.target_glu = None
-        self.final_proj = None

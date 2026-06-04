@@ -12,13 +12,14 @@ class IndexWrapper:
         self.index_path = index_path
         self.nprobe = nprobe
         self.device = device
-        self.is_half = is_half
-        self.faiss_cpu = faiss_cpu
         self.clamp = clamp
         self.index = None
         self.big_npy = None
         self.b_norms = None
         self.big_tensor = None
+
+        self.dtype = torch.float16 if is_half else torch.float32
+        self.search = self._search_cpu if faiss_cpu else self._search_gpu
     
     def read_index(self):
         if self.index_path != "" and os.path.exists(self.index_path):
@@ -41,27 +42,36 @@ class IndexWrapper:
 
         if self.index is None or self.big_npy is None: self.big_tensor, self.b_norms = None, None
         else:
-            self.big_tensor = torch.from_numpy(self.big_npy).to(self.device).to(torch.float16 if self.is_half else torch.float32).contiguous()
+            self.big_tensor = torch.from_numpy(self.big_npy).to(self.dtype).to(self.device).contiguous()
             self.b_norms = (self.big_tensor ** 2).sum(dim=-1, keepdim=True).T.contiguous()
 
         return self.big_tensor, self.b_norms
     
-    def search(self, query, k=8):
+    def setup_cpu(self, query, k=8):
+        logger.warning(translations["index_warn"])
+
+        self.search = self._search_cpu
+        self.b_norms = None
+
+        from main.library.utils import clear_gpu_cache
+        clear_gpu_cache()
+
+        return self._search_cpu(query, k)
+
+    def _search_gpu(self, query, k=8):
         with torch.inference_mode():
-            if not self.faiss_cpu:
-                try:
-                    q_norm = (query ** 2).sum(dim=-1, keepdim=True)
+            try:
+                q_norm = (query ** 2).sum(dim=-1, keepdim=True)
 
-                    distances = torch.addmm(self.b_norms, query, self.big_tensor.T, alpha=-2.0, beta=1.0) + q_norm
-                    distances = distances.clamp(min=self.clamp)
+                distances = torch.addmm(self.b_norms, query, self.big_tensor.T, alpha=-2.0, beta=1.0)
+                distances.add_(q_norm)
+                distances.clamp_(min=self.clamp)
 
-                    scores, indices = torch.topk(-distances, k=k, dim=-1)
-                    return -scores, indices
-                except (torch.OutOfMemoryError, RuntimeError):
-                    self.faiss_cpu = True
-                    logger.warning(translations["index_warn"])
-                    return self.search(query, k)
-            else:
-                npy = query.cpu().numpy()
-                score, ix = self.index.search(npy, k)
-                return torch.from_numpy(score).to(self.device).to(torch.float16 if self.is_half else torch.float32), torch.from_numpy(ix).to(self.device).long()
+                scores, indices = torch.topk(-distances, k=k, dim=-1)
+                return -scores, indices
+            except (torch.OutOfMemoryError, RuntimeError):
+                return self.setup_cpu(query, k)
+
+    def _search_cpu(self, query, k=8):
+        score, ix = self.index.search(query.cpu().numpy(), k)
+        return torch.from_numpy(score).to(self.dtype).to(self.device), torch.from_numpy(ix).to(self.device).long()

@@ -37,8 +37,6 @@ class RealtimeVoiceConverter:
             self.vocoder = model.get("vocoder", "Default")
             self.energy = model.get("energy", False)
             self.architecture = model.get("architecture", "RVC")
-
-            if self.vocoder != "Default": config.is_half = False
             
             if self.architecture == "RVC":
                 net_g = Synthesizer(
@@ -84,7 +82,7 @@ class RealtimeVoiceConverter:
         pitchf, 
         energy
     ):
-        output = self.net_g.infer(
+        return self.net_g.infer(
             feats, 
             p_len, 
             pitch, 
@@ -92,13 +90,6 @@ class RealtimeVoiceConverter:
             sid,
             energy
         )[0][0, 0]
-
-        return torch.clip(
-            output, 
-            -1.0, 
-            1.0, 
-            out=output
-        )
     
 class Pipeline:
     def __init__(
