@@ -207,7 +207,7 @@ class Pipeline:
             formant_length = int(np.ceil(return_length * 1.0))
             shift = (block_size_16k or skip_head * self.predictor.window) // self.predictor.window
 
-            f0_frame = (block_size_16k + 800 if block_size_16k else skip_head * self.window + 800)
+            f0_frame = (block_size_16k + 800 if block_size_16k else skip_head * self.predictor.window + 800)
             if "rmvpe" in self.f0_method: f0_frame = 5120 * ((f0_frame - 1) // 5120 + 1) - 160
 
             if self.use_f0:
