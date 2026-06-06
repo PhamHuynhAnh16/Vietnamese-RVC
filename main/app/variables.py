@@ -114,6 +114,8 @@ method_f0_full = [
     "hpa-rmvpe-medfilt", 
     "hpa-rmvpe-previous", 
     "hpa-rmvpe-previous-medfilt", 
+    "hpa-rmvpe-v4", 
+    "hpa-rmvpe-v4-medfilt",
     "rmvpe", 
     "rmvpe-medfilt",
     "djcm", 

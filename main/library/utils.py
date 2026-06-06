@@ -101,9 +101,11 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
 
         if "rmvpe" in f0_method:
             modelname = (
-                "hpa-rmvpe-76000" 
-                if "previous" in f0_method else 
-                "hpa-rmvpe-112000"
+                "hpa-v4" if "v4" in f0_method else (
+                    "hpa-rmvpe-76000" 
+                    if "previous" in f0_method else 
+                    "hpa-rmvpe-112000"
+                )
             ) if "hpa" in f0_method else (
                 "rmvpe-mix" 
                 if "mix" in f0_method else 

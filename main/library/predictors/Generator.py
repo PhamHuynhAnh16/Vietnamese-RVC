@@ -353,7 +353,8 @@ class Generator:
                 filter_radius=filter_radius, 
                 hpa="hpa" in self.cache_flags,
                 previous="previous" in self.cache_flags,
-                mix="mix" in self.cache_flags
+                mix="mix" in self.cache_flags,
+                v4="v4" in self.cache_flags
             )
         elif self.cache_args[0] in {"yin", "pyin", "piptrack"}:
             f0 = self.get_f0_librosa(
@@ -573,7 +574,7 @@ class Generator:
         f0 = self.fcpe.compute_f0(x)
         return self._resize_f0(f0, p_len, self.resize)
     
-    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False):
+    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False, v4=False):
         if not hasattr(self, "rmvpe"): 
             from main.library.predictors.RMVPE.RMVPE import RMVPE
 
@@ -582,10 +583,16 @@ class Generator:
                     configs["predictors_path"], 
                     (
                         (
-                            "hpa-rmvpe-76000" 
-                            if previous else 
-                            "hpa-rmvpe-112000"
-                        ) if hpa else ("rmvpe-mix" if mix else "rmvpe")
+                            "hpa-v4" if v4 else (
+                                "hpa-rmvpe-76000"
+                                if previous else
+                                "hpa-rmvpe-112000"
+                            )
+                        ) if hpa else (
+                            "rmvpe-mix"
+                            if mix else
+                            "rmvpe"
+                        )
                     ) + (".onnx" if self.predictor_onnx else ".pt")
                 ), 
                 is_half=self.is_half, 
