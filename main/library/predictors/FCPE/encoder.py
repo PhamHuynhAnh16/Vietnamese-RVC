@@ -112,7 +112,7 @@ class EncoderLayer(nn.Module):
         self.conformer = ConformerConvModule_LEGACY(parent.dim_model)
         self.norm = nn.LayerNorm(parent.dim_model)
         self.dropout = nn.Dropout(parent.residual_dropout)
-        self.attn = SelfAttention(dim=parent.dim_model, heads=parent.num_heads, causal=False)
+        self.attn = SelfAttention(dim=parent.dim_model, heads=parent.num_heads)
 
     def forward(self, phone, mask=None):
         phone = phone + (self.attn(self.norm(phone), mask=mask))
@@ -173,7 +173,6 @@ class CFNEncoderLayer(nn.Module):
         self.attn = SelfAttention(
             dim=dim_model, 
             heads=num_heads, 
-            causal=False, 
             use_norm=use_norm, 
             dropout=atten_dropout
         ) if not conv_only else None

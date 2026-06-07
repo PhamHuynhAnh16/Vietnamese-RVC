@@ -202,7 +202,7 @@ class Audio:
         indata = indata * self.input_audio_gain
         unpacked_data = np.mean(indata, axis=1) if indata.shape[1] > 1 else indata.flatten()
 
-        out_wav, vol, perf, _ = self.callbacks.change_voice(
+        out_wav, vol, perf = self.callbacks.change_voice(
             unpacked_data, 
             self.f0_up_key, 
             self.index_rate, 
@@ -218,7 +218,7 @@ class Audio:
             self.embedders_mix_ratio
         )
 
-        self.performance = perf[1]
+        self.performance = perf
         self.volume = vol
         return out_wav
     

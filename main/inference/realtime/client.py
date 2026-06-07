@@ -326,7 +326,7 @@ async def websocket_audio(ws: WebSocket):
                 embedders_mix_ratio=params["embedders_mix_ratio"],
             )
 
-            await ws.send_text(json.dumps({"type": "latency", "value": perf[1], "volume": vol}))
+            await ws.send_text(json.dumps({"type": "latency", "value": perf, "volume": vol}))
             await ws.send_bytes(audio_output.tobytes())
     except WebSocketDisconnect:
         logger.info(translations["ws_disconnected"])

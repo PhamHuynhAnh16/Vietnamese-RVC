@@ -149,11 +149,11 @@ class AudioCallbacks:
                     embedders_mix_ratio
                 )
 
-            return audio, vol, perf, None
+            return audio, vol, perf
         except RuntimeError as e:
             import traceback
 
             logger.debug(traceback.format_exc())
             logger.error(translations["error_occurred"].format(e=e))
 
-            return np.zeros(1, dtype=np.float32), 0, [0, 0, 0], None
+            return np.zeros(1, dtype=np.float32), 0, 0

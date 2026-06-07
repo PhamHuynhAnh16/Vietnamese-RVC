@@ -20,6 +20,12 @@ sys.path.append(os.getcwd())
 
 from main.library.audio.features import mel
 
+def get_window(window_size, fade_size):
+    window = torch.ones(window_size)
+    window[-fade_size:] *= torch.linspace(1, 0, fade_size)
+    window[:fade_size] *= torch.linspace(0, 1, fade_size)
+    return window
+
 def align_length(x, y):
     Lx = len(x)
     Ly = len(y)
@@ -1321,7 +1327,7 @@ class FlashSR:
         self.sr_vocoder.to(torch.float16 if is_half else torch.float32)
         self.autoencoder.to(torch.float16 if is_half else torch.float32)
 
-    def upscaler(self, lr_audio, num_steps = 1, lowpass_input = True, lowpass_cutoff_freq = None):
+    def _upscaler(self, lr_audio, num_steps = 1, lowpass_input = True, lowpass_cutoff_freq = None):
         if lowpass_input:
             if lowpass_cutoff_freq is None: lowpass_cutoff_freq = find_cutoff_freq(lr_audio)
 
@@ -1426,43 +1432,38 @@ class FlashSR:
             x = (1.0 / self.scale_factor_z) * z
             return self.autoencoder.decode(x.to(torch.float16 if self.is_half else torch.float32))
 
-def get_window(window_size, fade_size):
-    window = torch.ones(window_size)
-    window[-fade_size:] *= torch.linspace(1, 0, fade_size)
-    window[:fade_size] *= torch.linspace(0, 1, fade_size)
-    return window
+    def upscaler(self, audio, sample_rate = 48000, pbar = None, C = 245760, step = 122880, fade_size = 24576, border = 122880):
+        audio = librosa.resample(audio, orig_sr=sample_rate, target_sr=192000, res_type="soxr_vhq")
+        audio = torch.from_numpy(audio.flatten()).to(self.device).float()
 
-def upscaler(audio, model, pbar = None, device = "cpu", C = 245760, step = 122880, fade_size = 24576, border = 122880):
-    if not torch.is_tensor(audio): audio = torch.from_numpy(audio.flatten()).to(device).float()
+        if len(audio.shape) == 1: audio = audio.unsqueeze(0)
+        if audio.shape[1] > 2 * border and (border > 0): audio = F.pad(audio, (border, border), mode="reflect")
 
-    if len(audio.shape) == 1: audio = audio.unsqueeze(0)
-    if audio.shape[1] > 2 * border and (border > 0): audio = F.pad(audio, (border, border), mode="reflect")
+        result = torch.zeros((1,) + tuple(audio.shape), device=audio.device, dtype=torch.float32)
+        counter = torch.zeros((1,) + tuple(audio.shape), device=audio.device, dtype=torch.float32)
 
-    result = torch.zeros((1,) + tuple(audio.shape), device=audio.device, dtype=torch.float32)
-    counter = torch.zeros((1,) + tuple(audio.shape), device=audio.device, dtype=torch.float32)
+        i = 0
+        pbar.total = pbar.total + math.ceil(audio.size(1) / step)
+        pbar.refresh()
 
-    i = 0
-    pbar.total = pbar.total + math.ceil(audio.size(1) / step)
-    pbar.refresh()
+        while i < audio.shape[1]:
+            part = audio[:, i : i + C]
+            length = part.shape[-1]
+            if length < C: part = F.pad(part, pad=(0, C - length), mode="reflect") if length > C // 2 + 1 else F.pad(part, pad=(0, C - length, 0, 0), mode="constant", value=0.0)
 
-    while i < audio.shape[1]:
-        part = audio[:, i : i + C]
-        length = part.shape[-1]
-        if length < C: part = F.pad(part, pad=(0, C - length), mode="reflect") if length > C // 2 + 1 else F.pad(part, pad=(0, C - length, 0, 0), mode="constant", value=0.0)
+            out = self._upscaler(part, lowpass_input=True)
+            window = get_window(C, fade_size).to(audio.device)
 
-        out = model.upscaler(part, lowpass_input=True)
-        window = get_window(C, fade_size).to(audio.device)
+            if i == 0: window[:fade_size] = 1
+            elif i + C >= audio.shape[1]: window[-fade_size:] = 1
 
-        if i == 0: window[:fade_size] = 1
-        elif i + C >= audio.shape[1]: window[-fade_size:] = 1
+            result[..., i : i + length] += out[..., :length] * window[..., :length]
+            counter[..., i : i + length] += window[..., :length]
 
-        result[..., i : i + length] += out[..., :length] * window[..., :length]
-        counter[..., i : i + length] += window[..., :length]
+            i += step
+            pbar.update(1)
 
-        i += step
-        pbar.update(1)
+        final_output = (result / counter).squeeze(0)
+        if audio.shape[1] > 2 * border and (border > 0): final_output = final_output[..., border:-border]
 
-    final_output = (result / counter).squeeze(0)
-    if audio.shape[1] > 2 * border and (border > 0): final_output = final_output[..., border:-border]
-
-    return final_output.float().flatten().cpu().detach().numpy()
+        return final_output.float().flatten().cpu().detach().numpy()

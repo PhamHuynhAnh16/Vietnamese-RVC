@@ -126,16 +126,11 @@ class SinusoidalEmbeddings(nn.Module):
     def __init__(
         self, 
         dim, 
-        scale_base = None, 
-        use_xpos = False, 
         theta = 10000
     ):
         super().__init__()
         inv_freq = 1. / (theta ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer('inv_freq', inv_freq)
-        self.use_xpos = use_xpos
-        self.scale_base = scale_base
-        assert not (use_xpos and not exists(scale_base))
         scale = (torch.arange(0, dim, 2) + 0.4 * dim) / (1.4 * dim)
         self.register_buffer('scale', scale, persistent = False)
 
@@ -146,71 +141,52 @@ class SinusoidalEmbeddings(nn.Module):
         freqs = torch.einsum('i , j -> i j', t, self.inv_freq)
         freqs =  torch.cat((freqs, freqs), dim = -1)
 
-        if not self.use_xpos: return freqs, torch.ones(1, device = device)
-
-        power = (t - (seq_len // 2)) / self.scale_base
-        scale = self.scale ** rearrange(power, 'n -> n 1')
-
-        return freqs, torch.cat((scale, scale), dim = -1)
+        return freqs, torch.ones(1, device = device)
 
 class LocalAttention(nn.Module):
     def __init__(
         self, 
         window_size, 
-        causal = False, 
         look_backward = 1, 
         look_forward = None, 
         dropout = 0., 
         shared_qk = False, 
         rel_pos_emb_config = None, 
-        dim = None, 
-        autopad = False, 
-        exact_windowsize = False, 
+        dim = None,  
         scale = None, 
         use_rotary_pos_emb = True, 
-        use_xpos = False, 
-        xpos_scale_base = None
     ):
         super().__init__()
-        look_forward = default(look_forward, 0 if causal else 1)
-        assert not (causal and look_forward > 0)
+        look_forward = default(look_forward, 1)
         self.scale = scale
         self.window_size = window_size
-        self.autopad = autopad
-        self.exact_windowsize = exact_windowsize
-        self.causal = causal
         self.look_backward = look_backward
         self.look_forward = look_forward
         self.dropout = nn.Dropout(dropout)
         self.shared_qk = shared_qk
         self.rel_pos = None
-        self.use_xpos = use_xpos
         if use_rotary_pos_emb and (exists(rel_pos_emb_config) or exists(dim)): 
             if exists(rel_pos_emb_config): dim = rel_pos_emb_config[0]
-            self.rel_pos = SinusoidalEmbeddings(dim, use_xpos = use_xpos, scale_base = default(xpos_scale_base, window_size // 2))
+            self.rel_pos = SinusoidalEmbeddings(dim)
 
     def forward(self, q, k, v, mask = None, input_mask = None, attn_bias = None, window_size = None):
         mask = default(mask, input_mask)
-        assert not (exists(window_size) and not self.use_xpos)
+        assert not exists(window_size)
 
         (
             _, 
-            autopad, 
             pad_value, 
             window_size, 
-            causal, 
             look_backward, 
             look_forward, 
             shared_qk
         ) = (
             q.shape, 
-            self.autopad, 
             -1, 
             default(
                 window_size, 
                 self.window_size
             ), 
-            self.causal, 
             self.look_backward, 
             self.look_forward, 
             self.shared_qk
@@ -218,9 +194,8 @@ class LocalAttention(nn.Module):
 
         (q, packed_shape), (k, _), (v, _) = map(lambda t: pack([t], '* n d'), (q, k, v))
 
-        if autopad:
-            orig_seq_len = q.shape[1]
-            (_, q), (_, k), (_, v) = map(lambda t: pad_to_multiple(t, self.window_size, dim = -2), (q, k, v))
+        orig_seq_len = q.shape[1]
+        (_, q), (_, k), (_, v) = map(lambda t: pad_to_multiple(t, self.window_size, dim = -2), (q, k, v))
 
         b, n, dim_head, device, dtype = *q.shape, q.device, q.dtype
         scale = default(self.scale, dim_head ** -0.5)
@@ -265,26 +240,14 @@ class LocalAttention(nn.Module):
             sim = sim.masked_fill(self_mask, -5e4)
             del self_mask
 
-        if causal:
-            causal_mask = bq_t < bq_k
-            if self.exact_windowsize: causal_mask = causal_mask | (bq_t > (bq_k + (self.window_size * self.look_backward)))
-            sim = sim.masked_fill(causal_mask, mask_value)
-            del causal_mask
-
-        sim = sim.masked_fill(
-            ((bq_k - (self.window_size * self.look_forward)) > bq_t) | (bq_t > (bq_k + (self.window_size * self.look_backward))) | pad_mask, 
-            mask_value
-        ) if not causal and self.exact_windowsize else sim.masked_fill(
-            pad_mask, 
-            mask_value
-        )
+        sim = sim.masked_fill(pad_mask, mask_value)
 
         if exists(mask):
             batch = mask.shape[0]
             assert (b % batch) == 0
 
             h = b // mask.shape[0]
-            if autopad: _, mask = pad_to_multiple(mask, window_size, dim = -1, value = False)
+            _, mask = pad_to_multiple(mask, window_size, dim = -1, value = False)
 
             mask = repeat(
                 rearrange(
@@ -318,7 +281,7 @@ class LocalAttention(nn.Module):
             'b w n d -> b (w n) d'
         )
 
-        if autopad: out = out[:, :orig_seq_len, :]
+        out = out[:, :orig_seq_len, :]
         out, *_ = unpack(out, packed_shape, '* n d')
 
         return out
@@ -329,11 +292,9 @@ class FastAttention(nn.Module):
         dim_heads, 
         nb_features=None, 
         ortho_scaling=0, 
-        causal=False, 
         generalized_attention=False, 
         kernel_fn=nn.ReLU(), 
-        qr_uniform_q=False, 
-        no_projection=False
+        qr_uniform_q=False
     ):
         super().__init__()
         nb_features = default(nb_features, int(dim_heads * math.log(dim_heads)))
@@ -351,8 +312,6 @@ class FastAttention(nn.Module):
         self.register_buffer("projection_matrix", projection_matrix)
         self.generalized_attention = generalized_attention
         self.kernel_fn = kernel_fn
-        self.no_projection = no_projection
-        self.causal = causal
 
     @torch.no_grad()
     def redraw_projection_matrix(self):
@@ -361,19 +320,14 @@ class FastAttention(nn.Module):
         del projections
 
     def forward(self, q, k, v):
-        if self.no_projection: q, k = q.softmax(dim=-1), (k.exp() if self.causal else k.softmax(dim=-2)) 
-        else:
-            create_kernel = partial(softmax_kernel, projection_matrix=self.projection_matrix, device=q.device)
-            q, k = create_kernel(q, is_query=True), create_kernel(k, is_query=False)
-
-        attn_fn = linear_attention if not self.causal else self.causal_linear_fn
-        return attn_fn(q, k, None) if v is None else attn_fn(q, k, v)
+        create_kernel = partial(softmax_kernel, projection_matrix=self.projection_matrix, device=q.device)
+        q, k = create_kernel(q, is_query=True), create_kernel(k, is_query=False)
+        return linear_attention(q, k, None) if v is None else linear_attention(q, k, v)
 
 class SelfAttention(nn.Module):
     def __init__(
         self, 
         dim, 
-        causal=False, 
         heads=8, 
         dim_head=64, 
         local_heads=0, 
@@ -383,8 +337,7 @@ class SelfAttention(nn.Module):
         generalized_attention=False, 
         kernel_fn=nn.ReLU(), 
         qr_uniform_q=False, 
-        dropout=0.0, 
-        no_projection=False
+        dropout=0.0
     ):
         super().__init__()
         assert dim % heads == 0
@@ -393,21 +346,17 @@ class SelfAttention(nn.Module):
         self.fast_attention = FastAttention(
             dim_head, 
             nb_features, 
-            causal=causal, 
             generalized_attention=generalized_attention, 
             kernel_fn=kernel_fn, 
-            qr_uniform_q=qr_uniform_q, 
-            no_projection=no_projection
+            qr_uniform_q=qr_uniform_q
         )
         self.heads = heads
         self.global_heads = heads - local_heads
         self.local_attn = (
             LocalAttention(
                 window_size=local_window_size, 
-                causal=causal, 
-                autopad=True, 
                 dropout=dropout, 
-                look_forward=int(not causal), 
+                look_forward=1, 
                 rel_pos_emb_config=(dim_head, local_heads)
             ) if local_heads > 0 else None
         )

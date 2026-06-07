@@ -64,12 +64,12 @@ class RMVPE:
         return f0
 
     def _mel2hidden(self, mel):
-        with torch.no_grad():
+        with torch.inference_mode():
             n_frames = mel.shape[-1]
             return self.infer(F.pad(mel, (0, 32 * ((n_frames - 1) // 32 + 1) - n_frames), mode="reflect"))[:, :n_frames]
 
     def _mel2hidden_chunk(self, mel):
-        with torch.no_grad():
+        with torch.inference_mode():
             n_frames = mel.shape[-1]
             mel = F.pad(mel, (0, 32 * ((n_frames - 1) // 32 + 1) - n_frames), mode="reflect")
             hidden = torch.cat([self.infer(mel[..., start:min(start + self.chunk_size, mel.shape[-1])]) for start in range(0, mel.shape[-1], self.chunk_size)], dim=1)

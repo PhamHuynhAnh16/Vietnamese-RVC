@@ -43,6 +43,7 @@ class KwargReprNode(DagNode):
         self.kwargs = kwargs or {}
 
         self._hash = self._build_hash()
+
     def _get_upstream_hashes(self):
         hashes = []
 

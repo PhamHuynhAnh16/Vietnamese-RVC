@@ -44,7 +44,6 @@ def autotune_f0(note_dict, f0, f0_autotune_strength):
 
     return f0 + (nearest - f0) * f0_autotune_strength
 
-
 def extract_median_f0(f0):
     f0 = np.where(f0 == 0, np.nan, f0)
 

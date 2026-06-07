@@ -108,14 +108,13 @@ class PENN:
         return frames
 
     def postprocess(self, logits):
-        with torch.inference_mode():
-            logits[:, :self.f0_min_bin] = -float('inf')
-            logits[:, self.f0_max_bin:] = -float('inf')
+        logits[:, :self.f0_min_bin] = -float('inf')
+        logits[:, self.f0_max_bin:] = -float('inf')
 
-            pitch = self.decoder(logits)
-            periodicity = entropy(logits)
+        pitch = self.decoder(logits)
+        periodicity = entropy(logits)
 
-            return pitch.T, periodicity.T
+        return pitch.T, periodicity.T
     
     def compute_f0(self, audio):
         with torch.inference_mode():

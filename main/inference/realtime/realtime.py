@@ -621,4 +621,4 @@ class VoiceChanger:
 
         end = time.perf_counter()
 
-        return result, vol, [0, (end - start) * 1000, 0]
+        return result, vol, (end - start) * 1000

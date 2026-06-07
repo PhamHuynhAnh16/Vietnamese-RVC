@@ -15,12 +15,14 @@ from scipy import signal
 
 sys.path.append(os.getcwd())
 
+from main.library.audio.upscaler import FlashSR
 from main.app.core.ui import replace_export_format
+from main.library.audio.noisereduce import TorchGate
 from main.inference.conversion.pipeline import Pipeline
 from main.library.audio.audio import load_audio, cut, restore
 from main.app.variables import config, logger, translations, file_types
 from main.library.audio.audio_processing import preprocess, postprocess
-from main.library.utils import check_assets, check_upscaler, load_embedders_model, clear_gpu_cache, load_model, strtobool, load_faiss_index
+from main.library.utils import check_assets, check_upscaler, load_embedders_model, load_model, strtobool, load_faiss_index
 
 if not config.debug_mode:
     warnings.filterwarnings("ignore")
@@ -290,7 +292,7 @@ def run_convert_script(
         logger.warning(translations["provide_file"].format(filename=translations["model"]))
         sys.exit(1)
 
-    cvt = VoiceConverter(pth_path, embedder_model, embedders_mode, sid, noise_scale, checkpointing)
+    cvt = VoiceConverter(pth_path, embedder_model, embedders_mode, sid, noise_scale, checkpointing, hop_length, alpha, predictor_onnx, clean_audio, clean_strength, audio_upscaler)
 
     pid_path = os.path.join("assets", "convert_pid.txt")
     with open(pid_path, "w") as pid_file:
@@ -303,19 +305,15 @@ def run_convert_script(
             index_rate=index_rate, 
             rms_mix_rate=rms_mix_rate, 
             protect=protect, 
-            hop_length=hop_length, 
             f0_method=f0_method, 
             audio_input_path=audio_path, 
             audio_output_path=output_audio, 
             index_path=index_path, 
             f0_autotune=f0_autotune, 
             f0_autotune_strength=f0_autotune_strength, 
-            clean_audio=clean_audio, 
-            clean_strength=clean_strength, 
             export_format=export_format, 
             resample_sr=resample_sr, 
             f0_file=f0_file, 
-            predictor_onnx=predictor_onnx, 
             formant_shifting=formant_shifting, 
             formant_qfrency=formant_qfrency, 
             formant_timbre=formant_timbre, 
@@ -323,12 +321,10 @@ def run_convert_script(
             proposal_pitch=proposal_pitch, 
             proposal_pitch_threshold=proposal_pitch_threshold,
             audio_processing=audio_processing,
-            alpha=alpha,
             embedders_mix=embedders_mix, 
             embedders_mix_layers=embedders_mix_layers, 
             embedders_mix_ratio=embedders_mix_ratio,
-            nprobe=nprobe,
-            audio_upscaler=audio_upscaler
+            nprobe=nprobe
         )
     
     start_time = time.time()
@@ -391,25 +387,33 @@ class VoiceConverter:
         embedders_mode,
         sid = 0,
         noise_scale = 0.35,
-        checkpointing = False
+        checkpointing = False,
+        hop_length = 160,
+        alpha = 0.5,
+        predictor_onnx = False,
+        clean_audio = False,
+        clean_strength = 0.5,
+        audio_upscaler = False
     ):
-        self.tg = None
         self.vc = None
         self.index = None
         self.net_g = None 
         self.tgt_sr = None 
-        self.use_f0 = None  
-        self.version = None 
-        self.energy = False
         self.big_tsr = None
-        self.flash_sr = None
+        self.rms_extract = None
         self.hubert_model = None
+        self.f0_generator = None
 
-        self.sid = sid
-        self.config = config
+        self.alpha = alpha
         self.sample_rate = 16000
+        self.hop_length = hop_length
+        self.predictor_onnx = predictor_onnx
+        self.dtype = torch.float16 if config.is_half else torch.float32
+
         self.setup_hubert(embedder_model, embedders_mode)
-        self.setup_vc(model_path, checkpointing, noise_scale)
+        self.setup_vc(model_path, sid, checkpointing, noise_scale)
+        self.tg = TorchGate(self.tgt_sr, prop_decrease=clean_strength).to(config.device) if clean_audio else None
+        self.flash_sr = FlashSR(os.path.join("assets", "models", "upscalers", "upscalers.pth"), device=config.device, is_half=config.is_half) if audio_upscaler else None
 
     def convert_audio(
         self, 
@@ -420,17 +424,13 @@ class VoiceConverter:
         f0_method, 
         index_rate, 
         rms_mix_rate, 
-        protect, 
-        hop_length, 
+        protect,  
         f0_autotune, 
         f0_autotune_strength, 
         filter_radius, 
-        clean_audio, 
-        clean_strength, 
         export_format, 
         resample_sr = 0, 
         f0_file = None, 
-        predictor_onnx = False, 
         formant_shifting = False, 
         formant_qfrency = 0.8, 
         formant_timbre = 0.8, 
@@ -438,28 +438,15 @@ class VoiceConverter:
         proposal_pitch = False, 
         proposal_pitch_threshold = 0, 
         audio_processing = False, 
-        alpha = 0.5,
         embedders_mix = False,
         embedders_mix_layers = 9,
         embedders_mix_ratio = 0.5,
-        nprobe = 1,
-        audio_upscaler = False
+        nprobe = 1
     ):
         try:
             with tqdm(total=10, desc=translations["convert_audio"], ncols=100, unit="a", leave=not split_audio) as pbar:
-                audio = load_audio(
-                    audio_input_path, 
-                    sample_rate=self.sample_rate, 
-                    formant_shifting=formant_shifting, 
-                    formant_qfrency=formant_qfrency, 
-                    formant_timbre=formant_timbre
-                )
-
-                if audio_processing: 
-                    audio = preprocess(
-                        audio, 
-                        self.sample_rate
-                    )
+                audio = load_audio(audio_input_path, sample_rate=self.sample_rate, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre)
+                if audio_processing: audio = preprocess(audio, self.sample_rate)
 
                 try:
                     audio_max = np.abs(audio).max() / 0.95
@@ -477,13 +464,7 @@ class VoiceConverter:
                 pbar.update(1)
                 if split_audio:
                     pbar.close()
-
-                    chunks = cut(
-                        audio, 
-                        self.sample_rate, 
-                        db_thresh=-60, 
-                        min_interval=500
-                    )  
+                    chunks = cut(audio, self.sample_rate, db_thresh=-60, min_interval=500)
 
                     logger.info(f"{translations['split_total']}: {len(chunks)}")
                     pbar = tqdm(total=len(chunks) * 5 + 4, desc=translations["convert_audio"], ncols=100, unit="a", leave=True)
@@ -495,102 +476,45 @@ class VoiceConverter:
                         start, 
                         end, 
                         self.vc.pipeline(
-                            logger=logger, 
                             model=self.hubert_model, 
                             net_g=self.net_g, 
-                            sid=self.sid, 
                             audio=waveform, 
                             f0_up_key=pitch, 
                             f0_method=f0_method, 
                             index=self.index,
                             big_tsr=self.big_tsr, 
                             index_rate=index_rate, 
-                            pitch_guidance=self.use_f0, 
                             filter_radius=filter_radius, 
                             rms_mix_rate=rms_mix_rate, 
-                            version=self.version, 
                             protect=protect, 
-                            hop_length=hop_length, 
                             f0_autotune=f0_autotune, 
                             f0_autotune_strength=f0_autotune_strength, 
                             f0_file=f0_file, 
-                            predictor_onnx=predictor_onnx, 
                             pbar=pbar, 
                             proposal_pitch=proposal_pitch,
                             proposal_pitch_threshold=proposal_pitch_threshold,
-                            energy_use=self.energy,
-                            alpha=alpha,
                             embedders_mix=embedders_mix, 
                             embedders_mix_layers=embedders_mix_layers, 
                             embedders_mix_ratio=embedders_mix_ratio,
                         )
-                    ) 
-                    for waveform, start, end in chunks
+                    ) for waveform, start, end in chunks
                 ]
 
                 pbar.update(1)
+                audio_output = restore(converted_chunks, total_len=len(audio), dtype=converted_chunks[0][2].dtype) if split_audio else converted_chunks[0][2]
 
-                audio_output = restore(
-                    converted_chunks, 
-                    total_len=len(audio), 
-                    dtype=converted_chunks[0][2].dtype
-                ) if split_audio else converted_chunks[0][2]
-                
-                if audio_processing: 
-                    audio_output = postprocess(
-                        audio_output, 
-                        self.tgt_sr
-                    )
+                if audio_processing: audio_output = postprocess(audio_output, self.tgt_sr)
+                if self.tg is not None: audio_output = self.tg(torch.from_numpy(audio_output).unsqueeze(0).to(config.device).float()).squeeze(0).cpu().detach().numpy()
 
-                if clean_audio:
-                    from main.library.audio.noisereduce import TorchGate
-
-                    if self.tg is None: 
-                        self.tg = TorchGate(
-                            self.tgt_sr, 
-                            prop_decrease=clean_strength
-                        ).to(self.config.device)
-
-                    audio_output = self.tg(
-                        torch.from_numpy(audio_output).unsqueeze(0).to(self.config.device).float()
-                    ).squeeze(0).cpu().detach().numpy()
-
+                audio_output_resample = None
                 target_len = int(np.round(len(audio) / self.sample_rate * self.tgt_sr))
                 if len(audio_output) != target_len: audio_output = signal.resample_poly(audio_output, target_len, len(audio_output))
 
-                audio_output_resample = None
-                
-                if audio_upscaler:
-                    from main.library.audio.upscaler import FlashSR, upscaler
-
-                    if self.flash_sr is None:
-                        self.flash_sr = FlashSR(
-                            os.path.join("assets", "models", "upscalers", "upscalers.pth"),
-                            device=self.config.device,
-                            is_half=self.config.is_half
-                        )
-
-                    audio_output_resample = upscaler(
-                        librosa.resample(
-                            audio_output, 
-                            orig_sr=self.tgt_sr, 
-                            target_sr=192000, 
-                            res_type="soxr_vhq"
-                        ), 
-                        self.flash_sr, 
-                        pbar, 
-                        device=self.config.device
-                    )
-
+                if self.flash_sr is not None:
+                    audio_output_resample = self.flash_sr.upscaler(audio_output, sample_rate=self.tgt_sr, pbar=pbar)
                     self.tgt_sr = 192000
                 elif self.tgt_sr != resample_sr and resample_sr > 0: 
-                    audio_output_resample = librosa.resample(
-                        audio_output, 
-                        orig_sr=self.tgt_sr, 
-                        target_sr=resample_sr, 
-                        res_type="soxr_vhq"
-                    )
-
+                    audio_output_resample = librosa.resample(audio_output, orig_sr=self.tgt_sr, target_sr=resample_sr, res_type="soxr_vhq")
                     self.tgt_sr = resample_sr
 
                 pbar.update(1)
@@ -607,12 +531,7 @@ class VoiceConverter:
 
                     sf.write(
                         audio_output_path, 
-                        librosa.resample(
-                            audio_output, 
-                            orig_sr=self.tgt_sr, 
-                            target_sr=48000, 
-                            res_type="soxr_vhq"
-                        ), 
+                        librosa.resample(audio_output, orig_sr=self.tgt_sr, target_sr=48000, res_type="soxr_vhq"), 
                         48000, 
                         format=export_format
                     )
@@ -628,12 +547,36 @@ class VoiceConverter:
         models = load_embedders_model(embedder_model, embedders_mode)
 
         if isinstance(models, torch.nn.Module): 
-            models = models.to(self.config.device).to(torch.float16 if self.config.is_half else torch.float32).eval()
-            if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=self.config.compile_mode)
+            models = models.to(config.device).to(self.dtype).eval()
+            if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=config.compile_mode)
 
         self.hubert_model = models
+    
+    def setup_predictor(self):
+        from main.library.predictors.Generator import Generator
 
-    def setup_vc(self, weight_root, checkpointing, noise_scale):
+        self.f0_generator = Generator(
+            self.sample_rate, 
+            self.hop_length, 
+            config.configs.get("f0_min", 50), 
+            config.configs.get("f0_max", 1100), 
+            self.alpha, 
+            config.is_half, 
+            config.device, 
+            self.predictor_onnx
+        )
+    
+    def setup_rms(self):
+        from main.inference.extracting.rms import RMSEnergyExtractor
+
+        self.rms_extract = RMSEnergyExtractor(
+            frame_length=2048, 
+            hop_length=self.sample_rate // 100, 
+            center=True, 
+            pad_mode = "reflect"
+        ).to(config.device).eval()
+
+    def setup_vc(self, weight_root, sid, checkpointing, noise_scale):
         model = load_model(weight_root)
 
         if weight_root.endswith(".pth"):
@@ -642,21 +585,20 @@ class VoiceConverter:
             self.tgt_sr = model["config"][-1]
             model["config"][-3] = model["weight"]["emb_g.weight"].shape[0]
 
-            self.use_f0 = model.get("f0", 1)
-            self.version = model.get("version", "v1")
-            self.energy = model.get("energy", False)
-
+            use_f0 = model.get("f0", 1)
+            version = model.get("version", "v1")
+            energy = model.get("energy", False)
             vocoder = model.get("vocoder", "Default")
-            hidden_dim = 768 if self.version == "v2" else 256
+            hidden_dim = 768 if version == "v2" else 256
 
             if model.get("architecture", "RVC"):
                 self.net_g = Synthesizer(
                     *model["config"], 
-                    use_f0=self.use_f0, 
+                    use_f0=use_f0, 
                     text_enc_hidden_dim=hidden_dim, 
                     vocoder=vocoder, 
                     checkpointing=checkpointing, 
-                    energy=self.energy
+                    energy=energy
                 )
             else:
                 self.net_g = SynthesizerSVC(
@@ -668,18 +610,21 @@ class VoiceConverter:
                 )
 
             del self.net_g.enc_q
-
             self.net_g.load_state_dict(model["weight"], strict=False)
-            self.net_g.eval().to(self.config.device)
-            self.net_g.to(torch.float16 if self.config.is_half else torch.float32)
-            if config.compile_all: self.net_g = torch.compile(self.net_g, mode=self.config.compile_mode)
+            self.net_g.eval().to(config.device).to(self.dtype)
+            if config.compile_all: self.net_g = torch.compile(self.net_g, mode=config.compile_mode)
         else:
             self.net_g = model.to(config.device)
             self.tgt_sr = model.cpt.get("tgt_sr", 32000)
-            self.use_f0 = model.cpt.get("f0", 1)
-            self.version = model.cpt.get("version", "v1")
-            self.energy = model.cpt.get("energy", False)
 
-        self.vc = Pipeline(self.tgt_sr, self.config)
+            use_f0 = model.cpt.get("f0", 1)
+            version = model.cpt.get("version", "v1")
+            energy = model.cpt.get("energy", False)
+
+        if energy: self.setup_rms()
+        if use_f0: self.setup_predictor()
+
+        sid = torch.tensor(sid, device=config.device).unsqueeze(0).long()
+        self.vc = Pipeline(self.tgt_sr, config, self.f0_generator, self.rms_extract, version, sid, self.dtype)
 
 if __name__ == "__main__": main()

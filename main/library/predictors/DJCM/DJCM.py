@@ -106,7 +106,7 @@ class DJCM:
     def _infer_torch_fp32(self, spec):
         return self.model(spec)
 
-    def _infer_torchFfp16(self, spec):
+    def _infer_torch_fp16(self, spec):
         return self.model(spec.half())
 
     def _infer_onnx(self, spec):

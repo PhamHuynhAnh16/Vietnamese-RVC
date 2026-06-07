@@ -113,8 +113,6 @@ class Pipeline:
         self.tgt_sr = self.vc.tgt_sr
         self.energy = self.vc.energy
         self.version = self.vc.version
-        self.f0_min = configs.get("f0_min", 50)
-        self.f0_max = configs.get("f0_max", 1100)
 
         self.rms = self.setup_rms()
         self.embedder = self.setup_embedder(embedder_model, embedders_mode)
@@ -208,7 +206,7 @@ class Pipeline:
             shift = (block_size_16k or skip_head * self.predictor.window) // self.predictor.window
 
             f0_frame = (block_size_16k + 800 if block_size_16k else skip_head * self.predictor.window + 800)
-            if "rmvpe" in self.f0_method: f0_frame = 5120 * ((f0_frame - 1) // 5120 + 1) - 160
+            if "rmvpe" in self.f0_method: f0_frame = 5120 * ((f0_frame - 1) // 5120 + 1) - self.predictor.window
 
             if self.use_f0:
                 pitch_new, pitchf_new = self.predictor.realtime_calculator(
@@ -267,7 +265,7 @@ class Pipeline:
             feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)[:, :p_len, :]
 
             if self.use_f0: pitch, pitchf = pitch[-p_len:].unsqueeze(0), pitchf[-p_len:].unsqueeze(0) * (formant_length / return_length)
-            if self.energy: energy = energy[:p_len].unsqueeze(0)
+            if self.energy: energy = energy[:p_len].unsqueeze(0).to(self.dtype)
 
             if feats0 is not None:
                 pitchff = pitchf.detach().clone()
@@ -282,10 +280,8 @@ class Pipeline:
 
                 feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
+            if self.use_f0: pitchf = pitchf.to(self.dtype)
             feats = feats.to(self.dtype)
-            pitch = pitch if self.use_f0 else None
-            pitchf = pitchf.to(self.dtype) if self.use_f0 else None
-            energy = energy.to(self.dtype) if self.energy else None
             self.p_len.fill_(p_len)
 
             out_audio = self.vc.inference(

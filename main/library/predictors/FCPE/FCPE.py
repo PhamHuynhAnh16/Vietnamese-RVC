@@ -26,7 +26,7 @@ def f0_to_cent(f0):
     return 1200 * (f0 / 10).log2()
 
 @torch.no_grad()
-def latent2cents_local_decoder(cent_table, out_dims, y, threshold = 0.05, mask = True):
+def latent2cents_local_decoder(cent_table, out_dims, y, threshold = 0.05):
     B, N, _ = y.size()
     ci = cent_table[None, None, :].expand(B, N, -1)
     confident, max_index = y.max(dim=-1, keepdim=True)
@@ -38,64 +38,32 @@ def latent2cents_local_decoder(cent_table, out_dims, y, threshold = 0.05, mask =
     y_l = y.gather(-1, local_argmax_index)
     rtn = (ci.gather(-1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True) 
 
-    if mask:
-        confident_mask = torch.ones_like(confident)
-        confident_mask[confident <= threshold] = float("-INF")
-        rtn = rtn * confident_mask
+    confident_mask = torch.ones_like(confident)
+    confident_mask[confident <= threshold] = float("-INF")
+    rtn = rtn * confident_mask
 
     return rtn
 
-@torch.no_grad()
-def latent2cents_local_decoder_cpu(cent_table, out_dims, y, threshold = 0.05, mask = True):
-    cent_table, y = cent_table.cpu(), y.cpu()
-
-    B, N, _ = y.size()
-    ci = cent_table[None, None, :].expand(B, N, -1)
-    confident, max_index = y.max(dim=-1, keepdim=True)
-
-    local_argmax_index = torch.arange(0, 9).to(max_index.device) + (max_index - 4)
-    local_argmax_index[local_argmax_index < 0] = 0
-    local_argmax_index[local_argmax_index >= out_dims] = out_dims - 1
-
-    y_l = y.gather(-1, local_argmax_index)
-    rtn = (ci.gather(-1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True) 
-
-    if mask:
-        confident_mask = torch.ones_like(confident)
-        confident_mask[confident <= threshold] = float("-INF")
-        rtn = rtn * confident_mask
-
-    return rtn
-
-def cents_local_decoder(cent_table, y, n_out, confidence, threshold = 0.05, mask=True):
+def cents_local_decoder(cent_table, y, n_out, threshold = 0.05):
     B, N, _ = y.size()
     confident, max_index = y.max(dim=-1, keepdim=True)
     local_argmax_index = (torch.arange(0, 9).to(max_index.device) + (max_index - 4)).clamp(0, n_out - 1)
     y_l = y.gather(-1, local_argmax_index)
     rtn = (cent_table[None, None, :].expand(B, N, -1).gather(-1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True)
 
-    if mask:
-        confident_mask = torch.ones_like(confident)
-        confident_mask[confident <= threshold] = float("-INF")
-        rtn = rtn * confident_mask
+    confident_mask = torch.ones_like(confident)
+    confident_mask[confident <= threshold] = float("-INF")
+    rtn = rtn * confident_mask
 
-    return (rtn, confident) if confidence else rtn
+    return rtn
 
-def cents_local_decoder_cpu(cent_table, y, n_out, confidence, threshold = 0.05, mask=True):
+def latent2cents_local_decoder_cpu(cent_table, out_dims, y, threshold = 0.05):
     cent_table, y = cent_table.cpu(), y.cpu()
+    return latent2cents_local_decoder(cent_table, out_dims, y, threshold)
 
-    B, N, _ = y.size()
-    confident, max_index = y.max(dim=-1, keepdim=True)
-    local_argmax_index = (torch.arange(0, 9).to(max_index.device) + (max_index - 4)).clamp(0, n_out - 1)
-    y_l = y.gather(-1, local_argmax_index)
-    rtn = (cent_table[None, None, :].expand(B, N, -1).gather(-1, local_argmax_index) * y_l).sum(dim=-1, keepdim=True) / y_l.sum(dim=-1, keepdim=True)
-
-    if mask:
-        confident_mask = torch.ones_like(confident)
-        confident_mask[confident <= threshold] = float("-INF")
-        rtn = rtn * confident_mask
-
-    return (rtn, confident) if confidence else rtn
+def cents_local_decoder_cpu(cent_table, y, n_out, threshold = 0.05):
+    cent_table, y = cent_table.cpu(), y.cpu()
+    return cents_local_decoder(cent_table, y, n_out, threshold)
 
 class PCmer(nn.Module):
     def __init__(
@@ -223,12 +191,10 @@ class CFNaiveMelPE_LEGACY(nn.Module):
         input_channel=128, 
         out_dims=360, 
         n_layers=12, 
-        n_chans=512, 
-        confidence=False
+        n_chans=512
     ):
         super().__init__()
         self.n_out = out_dims
-        self.confidence = confidence
 
         self.cent_table_b = torch.Tensor(
             np.linspace(
@@ -288,9 +254,7 @@ class CFNaiveMelPE_LEGACY(nn.Module):
                 self.cent_table, 
                 x, 
                 self.n_out, 
-                self.confidence, 
-                threshold=threshold, 
-                mask=True
+                threshold=threshold
             )
         )
 
@@ -324,8 +288,7 @@ class FCPE:
                 input_channel=self.args.model.input_channel, 
                 out_dims=self.args.model.out_dims, 
                 n_layers=self.args.model.n_layers, 
-                n_chans=self.args.model.n_chans, 
-                confidence=self.args.model.confidence
+                n_chans=self.args.model.n_chans
             )
 
             model.load_state_dict(ckpt["model"])
@@ -355,7 +318,7 @@ class FCPE:
     def compute_f0(self, wav):
         if not torch.is_tensor(wav): wav = torch.from_numpy(wav).float().to(self.device)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             f0 = self.infer(self.wav2mel(audio=wav[None, :]), self.threshold)
             f0 = f0[:] if f0.dim() == 1 else f0[0, :, 0]
 
