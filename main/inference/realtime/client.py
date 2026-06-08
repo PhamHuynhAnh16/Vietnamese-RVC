@@ -110,11 +110,32 @@ async def change_config(ws: WebSocket):
     model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
 
     if model_pth and vc_instance.vc_model.model_path != model_pth:
+        import torch
+        import torchaudio.transforms as tat
+
         vc_instance.vc_model.model_path = model_pth
         vc_instance.vc_model.pipeline.vc.setup(model_pth, noise_scale)
+        vc_instance.vc_model.pipeline.use_f0 = vc_instance.vc_model.pipeline.vc.use_f0
+        vc_instance.vc_model.pipeline.tgt_sr = vc_instance.vc_model.pipeline.vc.tgt_sr
         vc_instance.vc_model.pipeline.version = vc_instance.vc_model.pipeline.vc.version
         vc_instance.vc_model.pipeline.energy = vc_instance.vc_model.pipeline.vc.energy
         vc_instance.vc_model.pipeline.rms = vc_instance.vc_model.pipeline.setup_rms() if vc_instance.vc_model.pipeline.vc.energy else None
+
+        vc_instance.vc_model.resample_out = tat.Resample(
+            orig_freq=vc_instance.vc_model.pipeline.tgt_sr,
+            new_freq=vc_instance.vc_model.output_sample_rate,
+            dtype=torch.float32
+        ).to(config.device)
+
+        if clean_audio:
+            from main.library.audio.noisereduce import TorchGate
+
+            vc_instance.vc_model.tg = (
+                TorchGate(
+                    vc_instance.vc_model.pipeline.tgt_sr,
+                    prop_decrease=clean_strength,
+                ).to(config.device)
+            )
 
     sid = params.get("sid", vc_instance.vc_model.pipeline.sid)
     if vc_instance.vc_model.pipeline.sid != sid:
@@ -170,7 +191,6 @@ async def change_config(ws: WebSocket):
         ):
             old_embedder = vc_instance.vc_model.pipeline.embedder
             del old_embedder
-
 
             vc_instance.vc_model.pipeline.embedder = vc_instance.vc_model.pipeline.setup_embedder(embedder_model, embedders_mode)
             vc_instance.vc_model.embedder_model = embedder_model

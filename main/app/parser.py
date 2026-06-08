@@ -341,6 +341,15 @@ elif argv_help_is_allows[7] == argv:
         9. Bộ tham chiếu:
             - `--use_custom_reference` (mặc định: `False`): Có tùy chỉnh bộ tham chiếu hay không.
             - `--reference_path` (mặc định: `False`): Đường dẫn đến bộ tham chiếu.
+        
+        10. Tùy chỉnh nâng cao:
+            - `--filelist_path` (mặc định: ""): Đường dẫn tệp chứa các đường dẫn tệp âm thanh, F0 và đặc tính âm thanh.
+            - `--config_save_path` (mặc định: ""): Đường dẫn tệp cấu hình huấn luyện.
+            - `--spec_dir` (mặc định: ""): Đường dẫn lưu trữ và tái sử dụng các tệp phổ.
+            - `--eval_dir` (mặc định: ""): Đường dẫn chứa tệp biểu đồ của Tensorboard.
+            - `--cache_spectrogram` (mặc định: `True`): Lưu các đoạn phổ âm thanh ra các tệp để sử dụng lại khi huấn luyện.
+            - `--save_the_pid` (mặc định: `True`): Lưu lại giá trị pid ra tệp cấu hình.
+            - `--custom_training` (mặc định: `False`): Sử dụng tùy chỉnh nâng cao. Thay đổi các đường dẫn tệp gốc.
     """)
     sys.exit()
 elif argv_help_is_allows[8] == argv:

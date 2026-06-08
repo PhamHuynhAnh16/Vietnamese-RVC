@@ -991,11 +991,32 @@ def change_callbacks_config():
         model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
 
         if model_pth and callbacks.vc.vc_model.model_path != model_pth:
+            import torch
+            import torchaudio.transforms as tat
+
             callbacks.vc.vc_model.model_path = model_pth
             callbacks.vc.vc_model.pipeline.vc.setup(model_pth, noise_scale)
+            callbacks.vc.vc_model.pipeline.use_f0 = callbacks.vc.vc_model.pipeline.vc.use_f0
+            callbacks.vc.vc_model.pipeline.tgt_sr = callbacks.vc.vc_model.pipeline.vc.tgt_sr
             callbacks.vc.vc_model.pipeline.version = callbacks.vc.vc_model.pipeline.vc.version
             callbacks.vc.vc_model.pipeline.energy = callbacks.vc.vc_model.pipeline.vc.energy
             callbacks.vc.vc_model.pipeline.rms = callbacks.vc.vc_model.pipeline.setup_rms() if callbacks.vc.vc_model.pipeline.vc.energy else None
+
+            callbacks.vc.vc_model.resample_out = tat.Resample(
+                orig_freq=callbacks.vc.vc_model.pipeline.tgt_sr,
+                new_freq=callbacks.vc.vc_model.output_sample_rate,
+                dtype=torch.float32
+            ).to(config.device)
+
+            if clean_audio:
+                from main.library.audio.noisereduce import TorchGate
+
+                callbacks.vc.vc_model.tg = (
+                    TorchGate(
+                        callbacks.vc.vc_model.pipeline.tgt_sr,
+                        prop_decrease=clean_strength,
+                    ).to(config.device)
+                )
 
         sid = callbacks_kwargs.get("sid", callbacks.vc.vc_model.pipeline.sid)
         if callbacks.vc.vc_model.pipeline.sid != sid:

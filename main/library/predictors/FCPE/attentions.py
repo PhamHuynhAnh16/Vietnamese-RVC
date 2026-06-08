@@ -1,9 +1,10 @@
 import math
 import torch
 
+import torch.nn as nn
 import torch.nn.functional as F
 
-from torch import nn, einsum
+from torch import einsum
 from functools import partial
 from einops import rearrange, repeat, pack, unpack
 

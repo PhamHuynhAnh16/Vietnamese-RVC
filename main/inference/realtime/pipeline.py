@@ -4,7 +4,6 @@ import torch
 
 import numpy as np
 import torch.nn.functional as F
-import torchaudio.transforms as tat
 
 sys.path.append(os.getcwd())
 
@@ -82,7 +81,7 @@ class RealtimeVoiceConverter:
         pitchf, 
         energy
     ):
-        return self.net_g.infer(
+        output = self.net_g.infer(
             feats, 
             p_len, 
             pitch, 
@@ -90,6 +89,8 @@ class RealtimeVoiceConverter:
             sid,
             energy
         )[0][0, 0]
+        
+        return torch.clip(output, -1.0, 1.0, out=output)
     
 class Pipeline:
     def __init__(
@@ -122,10 +123,8 @@ class Pipeline:
         self.sid = sid
         self.device = config.device
         self.is_half = config.is_half
-        self.model_window = self.tgt_sr // 100
         self.dtype = torch.float16 if self.is_half else torch.float32
 
-        self.resamplers = {}
         self.p_len = torch.zeros(1, device=self.device, dtype=torch.int64)
         self.torch_sid = torch.tensor([sid], device=self.device, dtype=torch.int64)
     
@@ -307,18 +306,6 @@ class Pipeline:
                 out_audio = torchgate(
                     out_audio.unsqueeze(0)
                 ).squeeze(0)
-
-            scaled_window = int(np.floor(1.0 * self.model_window))
-        
-            if scaled_window != self.model_window:
-                if scaled_window not in self.resamplers: 
-                    self.resamplers[scaled_window] = tat.Resample(
-                        orig_freq=scaled_window, 
-                        new_freq=self.model_window, 
-                        dtype=torch.float32
-                    ).to(self.device)
-
-                out_audio = self.resamplers[scaled_window](out_audio[: return_length * scaled_window])
 
             if board is not None: 
                 out_audio = torch.as_tensor(

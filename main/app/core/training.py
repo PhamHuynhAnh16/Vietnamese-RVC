@@ -571,7 +571,14 @@ def training(
         "--reference_path", str(reference_path),
         "--multiscale_mel_loss", str(multiscale_mel_loss),
         "--use_cosine_annealing_lr", str(cosine_annealing_lr),
-        "--architecture", architecture
+        "--architecture", architecture,
+        "--filelist_path", "None",
+        "--config_save_path", "None",
+        "--spec_dir", "None",
+        "--eval_dir", "None",
+        "--cache_spectrogram", str(True),
+        "--save_the_pid", str(True),
+        "--custom_training", str(False)
     ])
 
     done = [False]

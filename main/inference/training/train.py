@@ -88,6 +88,13 @@ def parse_arguments():
     parser.add_argument("--multiscale_mel_loss", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--use_cosine_annealing_lr", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--architecture", type=str, default="RVC")
+    parser.add_argument("--filelist_path", type=str, default="")
+    parser.add_argument("--config_save_path", type=str, default="")
+    parser.add_argument("--spec_dir", type=str, default="")
+    parser.add_argument("--eval_dir", type=str, default="")
+    parser.add_argument("--cache_spectrogram", type=lambda x: bool(strtobool(x)), default=True)
+    parser.add_argument("--save_the_pid", type=lambda x: bool(strtobool(x)), default=True)
+    parser.add_argument("--custom_training", type=lambda x: bool(strtobool(x)), default=False)
 
     return parser.parse_args()
 
@@ -118,7 +125,14 @@ args = parse_arguments()
     reference_path, 
     multiscale_mel_loss,
     use_cosine_annealing_lr,
-    architecture
+    architecture,
+    filelist_path,
+    config_save_path,
+    spec_dir,
+    eval_dir,
+    cache_spectrogram,
+    save_the_pid,
+    custom_training
 ) = (
     args.model_name, 
     args.save_every_epoch, 
@@ -144,7 +158,14 @@ args = parse_arguments()
     args.reference_path, 
     args.multiscale_mel_loss,
     args.use_cosine_annealing_lr,
-    args.architecture
+    args.architecture,
+    args.filelist_path,
+    args.config_save_path,
+    args.spec_dir,
+    args.eval_dir,
+    args.cache_spectrogram,
+    args.save_the_pid,
+    args.custom_training
 )
 
 disc_version = version if vocoder not in ["RefineGAN", "BigVGAN"] else "v3"
@@ -168,19 +189,16 @@ else:
     custom_save_checkpoint_path = weights_path
 
 checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
-
 training_file_path = os.path.join(experiment_dir, "training_data.json")
-config_save_path = os.path.join(experiment_dir, "config.json")
-filelist_path = os.path.join(experiment_dir, "filelist.txt")
-eval_dir = os.path.join(experiment_dir, "eval")
-spec_dirs = None
+
+config_save_path = config_save_path if custom_training else os.path.join(experiment_dir, "config.json")
+filelist_path = filelist_path if custom_training else os.path.join(experiment_dir, "filelist.txt")
+eval_dir = eval_dir if custom_training else os.path.join(experiment_dir, "eval")
+spec_dir = spec_dir if custom_training else None
 
 d_lr_coeff = 1.0
 g_lr_coeff = 1.0
 d_step_per_g_step = 1
-
-save_the_pid = True
-cache_spectrogram = True
 use_clip_grad_value = False
 
 torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
@@ -442,7 +460,7 @@ def run(
 
     train_dataset = TextAudioLoader(
         config.data, 
-        spec_dirs=spec_dirs,
+        spec_dirs=spec_dir,
         cache_spectrogram=cache_spectrogram,
         pitch_guidance=pitch_guidance, 
         energy=energy_use
@@ -1128,7 +1146,7 @@ def train_and_evaluate(
     done = False
     
     if rank == 0:
-        if epoch % save_every_epoch == False:
+        if epoch % save_every_epoch == 0:
             checkpoint_suffix = f"{'latest' if save_only_latest else global_step}.pth"
 
             save_checkpoint(
