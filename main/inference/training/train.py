@@ -238,7 +238,7 @@ config = HParams(**config)
 config.data.training_files = filelist_path
 
 def main():
-    global smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history
+    global smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, gpus
 
     log_data = {
         translations["modelname"]: model_name, 
