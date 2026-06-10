@@ -9,6 +9,7 @@ from scipy import signal
 
 sys.path.append(os.getcwd())
 
+from main.library.audio.features import change_rms
 from main.app.variables import translations, logger
 from main.library.utils import extract_features, clear_gpu_cache
 
@@ -72,7 +73,7 @@ class Pipeline:
         feats = feats.mean(-1) if feats.dim() == 2 else feats
         assert feats.dim() == 1, feats.dim()
 
-        with torch.no_grad():
+        with torch.inference_mode():
             feats = extract_features(
                 model, 
                 feats.view(1, -1), 
@@ -266,8 +267,6 @@ class Pipeline:
         audio_opt = np.concatenate(audio_opt)
 
         if rms_mix_rate != 1:
-            from main.library.audio.features import change_rms
- 
             audio_opt = change_rms(
                 audio, 
                 self.sample_rate, 

@@ -39,6 +39,9 @@ def generator_loss(disc_outputs):
     return loss, gen_losses
 
 def kl_loss(z_p, logs_q, m_p, logs_p, z_mask):
+    if z_p.device.type == "privateuseone":
+        return kl_loss_cpu(z_p, logs_q, m_p, logs_p, z_mask)
+
     z_p = z_p.float()
     logs_q = logs_q.float()
     m_p = m_p.float()
@@ -49,3 +52,17 @@ def kl_loss(z_p, logs_q, m_p, logs_p, z_mask):
     kl += 0.5 * ((z_p - m_p) ** 2) * (-2.0 * logs_p).exp()
 
     return (kl * z_mask).sum() / z_mask.sum()
+
+def kl_loss_cpu(z_p, logs_q, m_p, logs_p, z_mask):
+    orig_device = z_p.device
+
+    z_p = z_p.detach().cpu().float()
+    logs_q = logs_q.detach().cpu().float()
+    m_p = m_p.detach().cpu().float()
+    logs_p = logs_p.detach().cpu().float()
+    z_mask = z_mask.detach().cpu().float()
+
+    kl = logs_p - logs_q - 0.5
+    kl += 0.5 * ((z_p - m_p) ** 2) * (-2.0 * logs_p).exp()
+
+    return ((kl * z_mask).sum() / z_mask.sum()).to(orig_device)

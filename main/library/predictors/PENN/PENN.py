@@ -22,15 +22,16 @@ class Viterbi:
         max_octaves_per_second=32, 
         cents_per_bin=5
     ):
+        self.transition = None
         self.pitch_bins = pitch_bins
         self.hop_length = hop_length
         self.sample_rate = sample_rate
+        self.cents_per_bin = cents_per_bin
         self.window_size = local_pitch_window_size
         self.max_octaves_per_second = max_octaves_per_second
-        self.cents_per_bin = cents_per_bin
 
     def __call__(self, logits):
-        if not hasattr(self, 'transition'):
+        if self.transition is None:
             idx = torch.arange(self.pitch_bins, device=logits.device, dtype=logits.dtype)
             transition = (-0.5 * ((idx[:, None] - idx[None, :]).abs() / ((self.max_octaves_per_second * 1200 * (self.hop_length / self.sample_rate)) / self.cents_per_bin)) ** 2).exp()
             self.transition = transition / transition.sum(dim=1, keepdim=True)

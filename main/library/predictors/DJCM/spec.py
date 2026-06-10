@@ -22,6 +22,7 @@ class Spectrogram(nn.Module):
         self.hop_length = hop_length
         self.win_length = win_length
         self.clamp = clamp
+        self.stft = None
         self.register_buffer("window", torch.hann_window(win_length), persistent=False)
         self.stftt = self._stft_other_backends if config.device.startswith(("ocl", "privateuseone")) else self._stft_torch
 
@@ -34,7 +35,7 @@ class Spectrogram(nn.Module):
         return mag.reshape(bs, c, mag.shape[1], mag.shape[2])
 
     def _stft_other_backends(self, audio, center=True):
-        if not hasattr(self, "stft"): 
+        if self.stft is None: 
             from main.library.backends.utils import STFT
 
             self.stft = STFT(

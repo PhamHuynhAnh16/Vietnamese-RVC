@@ -21,6 +21,7 @@ class STFT:
         fmax=11025, 
         clip_val=1e-5
     ):
+        self.stft = None
         self.n_fft = n_fft
         self.clip_val = clip_val
         self.win_size = win_size
@@ -36,7 +37,7 @@ class STFT:
         return (self.mel_basis @ self.stftt(F.pad(y.unsqueeze(1), (pad_left, pad_right), mode="reflect" if pad_right < y.size(-1) else "constant").squeeze(1), center)).clamp(min=self.clip_val).log()
     
     def _stft_other_backends(self, pad, center=True):
-        if not hasattr(self, "stft"): 
+        if self.stft is None: 
             from main.library.backends.utils import STFT as _STFT
 
             self.stft = _STFT(

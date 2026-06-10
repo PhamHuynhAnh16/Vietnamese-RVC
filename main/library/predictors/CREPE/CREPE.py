@@ -36,6 +36,7 @@ class CREPE:
         self.f0_min_bin = (((1200 * torch.tensor(f0_min / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).floor().int()
         self.f0_max_bin = (((1200 * torch.tensor(f0_max / 10).log2()) - 1997.3794084376191) / CENTS_PER_BIN).ceil().int()
         self.eps = torch.tensor(1e-10, device=device)
+        self.transition = None
 
         if onnx:
             import onnxruntime as ort
@@ -72,7 +73,7 @@ class CREPE:
         return 10 * 2 ** cents
 
     def viterbi(self, logits):
-        if not hasattr(self, 'transition'):
+        if self.transition is None:
             idx = torch.arange(360, device=logits.device, dtype=logits.dtype)
             transition = (12 - (idx[:, None] - idx[None, :]).abs()).clamp(min=0)
             self.transition = transition / transition.sum(dim=1, keepdim=True)

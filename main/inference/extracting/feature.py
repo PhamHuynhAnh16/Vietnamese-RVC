@@ -23,8 +23,9 @@ class FeatureInput:
         self.sample_rate = 16000
         self.f0_min = configs.get("f0_min", 50)
         self.f0_max = configs.get("f0_max", 1100)
-        self.device = device
         self.is_half = is_half
+        self.device = device
+        self.f0_gen = None
 
     def process_file(
         self, 
@@ -36,7 +37,7 @@ class FeatureInput:
         f0_autotune_strength, 
         alpha
     ):
-        if not hasattr(self, "f0_gen"): 
+        if self.f0_gen is None: 
             from main.library.predictors.Generator import Generator
 
             self.f0_gen = Generator(

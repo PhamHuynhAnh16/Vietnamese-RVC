@@ -1,6 +1,5 @@
 import os
 import re
-import gc
 import sys
 import torch
 import codecs
@@ -306,8 +305,6 @@ def extract_features(model, feats, version, mix=False, mix_layers=9, mix_ratio=0
     return feats
 
 def clear_gpu_cache():
-    gc.collect()
-
     if config.device.startswith("cuda"): torch.cuda.empty_cache()
     elif config.device.startswith("xpu"): torch.xpu.empty_cache()
     elif config.device.startswith("mps"): torch.mps.empty_cache()

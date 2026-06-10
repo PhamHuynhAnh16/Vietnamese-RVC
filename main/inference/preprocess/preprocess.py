@@ -68,9 +68,10 @@ class PreProcess:
             fs=sr
         )
         self.sr = sr
+        self.tg = None
         self.per = per
         self.exp_dir = exp_dir
-        self.device = config.device
+        self.device = config.device if not config.device.startswith(("ocl", "privateuseone")) else "cpu"
         self.gt_wavs_dir = os.path.join(exp_dir, "sliced_audios")
         self.wavs16k_dir = os.path.join(exp_dir, "sliced_audios_16k")
         os.makedirs(self.gt_wavs_dir, exist_ok=True)
@@ -165,7 +166,7 @@ class PreProcess:
             if normalization_mode == "pre": audio = self._normalize_audio(audio)
 
             if clean_dataset: 
-                if not hasattr(self, "tg"): 
+                if self.tg is None: 
                     from main.library.audio.noisereduce import TorchGate
 
                     self.tg = TorchGate(

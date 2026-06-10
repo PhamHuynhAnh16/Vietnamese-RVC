@@ -57,18 +57,19 @@ class TorchGate(torch.nn.Module):
     ):
         super().__init__()
         self.sr = sr
-        self.nonstationary = nonstationary
-        assert 0.0 <= prop_decrease <= 1.0
-        self.prop_decrease = prop_decrease
         self.n_fft = n_fft
-        self.win_length = self.n_fft if win_length is None else win_length
-        self.hop_length = self.win_length // 4 if hop_length is None else hop_length
+        self.nonstationary = nonstationary
+        self.prop_decrease = prop_decrease
+        self.time_mask_smooth_ms = time_mask_smooth_ms
+        self.freq_mask_smooth_hz = freq_mask_smooth_hz
+        self.n_thresh_nonstationary = n_thresh_nonstationary
         self.n_std_thresh_stationary = n_std_thresh_stationary
         self.temp_coeff_nonstationary = temp_coeff_nonstationary
         self.n_movemean_nonstationary = n_movemean_nonstationary
-        self.n_thresh_nonstationary = n_thresh_nonstationary
-        self.freq_mask_smooth_hz = freq_mask_smooth_hz
-        self.time_mask_smooth_ms = time_mask_smooth_ms
+        assert 0.0 <= prop_decrease <= 1.0
+        self.stft = None
+        self.win_length = self.n_fft if win_length is None else win_length
+        self.hop_length = self.win_length // 4 if hop_length is None else hop_length
         self.register_buffer("smoothing_filter", self._generate_mask_smoothing_filter())
         self.forward = self._forward_other_backends if config.device.startswith(("ocl", "privateuseone")) else self._forward_torch
 
@@ -162,7 +163,7 @@ class TorchGate(torch.nn.Module):
         assert x.ndim == 2
         if x.shape[-1] < self.win_length * 2: raise Exception
 
-        if not hasattr(self, "stft"): 
+        if self.stft is None: 
             from main.library.backends.utils import STFT
 
             self.stft = STFT(

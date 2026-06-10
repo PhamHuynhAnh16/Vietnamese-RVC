@@ -29,6 +29,8 @@ class MelSpectrogram(nn.Module):
         self.sample_rate = sample_rate
         self.n_mel_channels = n_mel_channels
         self.hann_window = torch.hann_window(win_length).to(config.device)
+
+        self.stft = None
         self.stftt = self._stft_other_backends if config.device.startswith(("ocl", "privateuseone")) else self._stft_torch
         self.register_buffer("mel_basis", mel(sr=sample_rate, n_fft=n_fft, n_mels=n_mel_channels, fmin=mel_fmin, fmax=mel_fmax, htk=True, device=config.device))
 
@@ -37,7 +39,7 @@ class MelSpectrogram(nn.Module):
         return mel_output.clamp(min=self.clamp).log()
     
     def _stft_other_backends(self, audio, center=True):
-        if not hasattr(self, "stft"): 
+        if self.stft is None: 
             from main.library.backends.utils import STFT
 
             self.stft = STFT(

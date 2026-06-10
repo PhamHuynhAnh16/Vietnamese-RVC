@@ -161,17 +161,29 @@ class Generator:
         self.frame_period = self.window / self.sample_rate * 1000
         self.time_step = self.frame_period / 1000
 
+        self.device = device
+        self.is_half = is_half
+        self.providers = config.providers
+
+        self.pw = None
+        self.fcpe = None
+        self.djcm = None
+        self.penn = None
+        self.pesto = None
+        self.swift = None
+        self.rmvpe = None
+        self.crepe = None
+        self.mangio_penn = None
+        self.mangio_crepe = None
+
         self.cache_args = None
         self.cache_flags = None
         self.cache_f0_method = None
-        self.providers = config.providers
-        self.is_half = is_half
-        self.device = device
 
+        self.return_tensor = return_tensor
+        self.predictor_onnx = predictor_onnx
         self.compile_model = config.compile_all
         self.compile_mode = config.compile_mode
-        self.predictor_onnx = predictor_onnx
-        self.return_tensor = return_tensor
 
         self.resize = configs.get("turn_on_resize_f0_for_all", False)
         self._resize_f0 = self._resize_tensor_f0 if self.return_tensor else self._resize_array_f0
@@ -484,7 +496,7 @@ class Generator:
         return self._resize_f0(f0, p_len, self.resize)
     
     def get_f0_mangio_crepe(self, x, p_len, model="full"):
-        if not hasattr(self, "mangio_crepe"):
+        if self.mangio_crepe is None:
             from main.library.predictors.CREPE.CREPE import CREPE
 
             self.mangio_crepe = CREPE(
@@ -518,7 +530,7 @@ class Generator:
         return self._resize_f0(f0, p_len, True)
     
     def get_f0_crepe(self, x, p_len, model="full", filter_radius=3):
-        if not hasattr(self, "crepe"):
+        if self.crepe is None:
             from main.library.predictors.CREPE.CREPE import CREPE
 
             self.crepe = CREPE(
@@ -549,7 +561,7 @@ class Generator:
         return self._resize_f0(f0[0], p_len, self.resize)
     
     def get_f0_fcpe(self, x, p_len, legacy=False, previous=False, filter_radius=3):
-        if not hasattr(self, "fcpe"): 
+        if self.fcpe is None:
             from main.library.predictors.FCPE.FCPE import FCPE
 
             self.fcpe = FCPE(
@@ -574,7 +586,7 @@ class Generator:
         return self._resize_f0(f0, p_len, self.resize)
     
     def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False, v4=False):
-        if not hasattr(self, "rmvpe"): 
+        if self.rmvpe is None:
             from main.library.predictors.RMVPE.RMVPE import RMVPE
 
             self.rmvpe = RMVPE(
@@ -613,7 +625,7 @@ class Generator:
         return self._resize_f0(f0, p_len, self.resize)
     
     def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest", use_stonemask=True):
-        if not hasattr(self, "pw"): 
+        if self.pw is None:
             from main.library.predictors.WORLD.WORLD import PYWORLD
 
             self.pw = PYWORLD(
@@ -701,7 +713,7 @@ class Generator:
         return self._resize_f0(f0, p_len, True)
 
     def get_f0_penn(self, x, p_len, filter_radius=3):
-        if not hasattr(self, "penn"):
+        if self.penn is None:
             from main.library.predictors.PENN.PENN import PENN
 
             self.penn = PENN(
@@ -730,7 +742,7 @@ class Generator:
         return self._resize_f0(f0, p_len, True)
 
     def get_f0_mangio_penn(self, x, p_len):
-        if not hasattr(self, "mangio_penn"):
+        if self.mangio_penn is None:
             from main.library.predictors.PENN.PENN import PENN
 
             self.mangio_penn = PENN(
@@ -763,7 +775,7 @@ class Generator:
         return self._resize_f0(f0, p_len, True)
 
     def get_f0_djcm(self, x, p_len, clipping=False, svs=False, filter_radius=3):
-        if not hasattr(self, "djcm"): 
+        if self.djcm is None:
             from main.library.predictors.DJCM.DJCM import DJCM
             
             self.djcm = DJCM(
@@ -792,7 +804,7 @@ class Generator:
         return self._resize_f0(f0, p_len, self.resize)
     
     def get_f0_swift(self, x, p_len, filter_radius=3):
-        if not hasattr(self, "swift"): 
+        if self.swift is None:
             from main.library.predictors.SWIFT.SWIFT import SWIFT
 
             self.swift = SWIFT(
@@ -811,7 +823,7 @@ class Generator:
         return self._resize_f0(pitch_hz, p_len, self.resize)
 
     def get_f0_pesto(self, x, p_len):
-        if not hasattr(self, "pesto"):
+        if self.pesto is None:
             from main.library.predictors.PESTO.PESTO import PESTO
 
             self.pesto = PESTO(

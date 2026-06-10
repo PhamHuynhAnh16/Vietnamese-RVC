@@ -7,11 +7,12 @@ import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
 
+from random import shuffle
 from collections import OrderedDict
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import config, translations
+from main.app.variables import config, translations, logger
 
 MATPLOTLIB_FLAG = False
 
@@ -39,7 +40,7 @@ def replace_keys_in_dict(d, old_key_part, new_key_part):
     
     return updated_dict
 
-def load_checkpoint(logger, checkpoint_path, model, optimizer=None, load_opt=1):
+def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
     assert os.path.isfile(checkpoint_path), translations["not_found_checkpoint"].format(checkpoint_path=checkpoint_path)
 
     checkpoint_dict = replace_keys_in_dict(
@@ -69,7 +70,7 @@ def load_checkpoint(logger, checkpoint_path, model, optimizer=None, load_opt=1):
         checkpoint_dict.get("scaler", {})
     )
 
-def save_checkpoint(logger, model, optimizer, learning_rate, iteration, checkpoint_path, scaler):
+def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path, scaler):
     state_dict = (model.module.state_dict() if hasattr(model, "module") else model.state_dict())
 
     if config.device.startswith("privateuseone"):
@@ -194,3 +195,158 @@ class HParams:
     
     def __repr__(self):
         return repr(self.__dict__)
+
+
+def get_device(gpus):
+    if gpus == "-":
+        device, gpus = torch.device("cpu"), [0]
+        n_gpus = 1
+        logger.warning(translations["not_gpu"])
+    elif config.device.startswith("cuda"):
+        device, gpus = torch.device("cuda"), [int(item) for item in gpus.split("-")]
+        n_gpus = len(gpus)
+    elif config.device.startswith("xpu"):
+        device, gpus = torch.device("xpu"), [int(item) for item in gpus.split("-")]
+        n_gpus = len(gpus)
+    elif config.device.startswith("ocl"):
+        device, gpus = torch.device("ocl"), [int(item) for item in gpus.split("-")]
+        n_gpus = len(gpus)
+    elif config.device.startswith("privateuseone"):
+        device, gpus = torch.device("privateuseone"), [int(item) for item in gpus.split("-")]
+        n_gpus = len(gpus)
+    elif config.device.startswith("mps"):
+        device, gpus = torch.device("mps"), [0]
+        n_gpus = 1
+    else:
+        device, gpus = torch.device("cpu"), [0]
+        n_gpus = 1
+        logger.warning(translations["not_gpu"])
+
+    return device, gpus, n_gpus
+
+def get_optimizer(optimizer_choice):
+    if optimizer_choice == "AnyPrecisionAdamW" and config.brain:
+        from main.library.optimizers.anyprecision_optimizer import AnyPrecisionAdamW
+
+        optimizer_optim = AnyPrecisionAdamW
+        scheduler_optim = None
+    elif optimizer_choice == "RAdam":
+        from torch.optim import RAdam
+
+        optimizer_optim = RAdam
+        scheduler_optim = None
+    elif optimizer_choice == "AdaBelief":
+        from main.library.optimizers.adabelief import AdaBelief
+
+        optimizer_optim = AdaBelief
+        scheduler_optim = None
+    elif optimizer_choice == "AdaBeliefV2":
+        from main.library.optimizers.adabeliefv2 import AdaBeliefV2, get_inverse_sqrt_scheduler
+
+        optimizer_optim = AdaBeliefV2
+        scheduler_optim = get_inverse_sqrt_scheduler
+    else:
+        from torch.optim import AdamW
+
+        optimizer_optim = AdamW
+        scheduler_optim = None
+    
+    return optimizer_optim, scheduler_optim
+
+def cleanup_training(experiment_dir):
+    for root, dirs, files in os.walk(experiment_dir, topdown=False):
+        for name in files:
+            if name.endswith((".0", ".pth", ".index")): os.remove(os.path.join(root, name))
+
+        for name in dirs:
+            if name == "eval":
+                folder_path = os.path.join(root, name)
+
+                for item in os.listdir(folder_path):
+                    item_path = os.path.join(folder_path, item)
+                    if os.path.isfile(item_path): os.remove(item_path)
+
+                os.rmdir(folder_path)
+
+def get_training_data(info, pitch_guidance, energy_use):
+    phone, phone_lengths = info[0], info[1]
+
+    if pitch_guidance:
+        pitch, pitchf = info[2], info[3]
+        spec, spec_lengths, wave, sid = info[4], info[5], info[6], info[8]
+        energy = info[9] if energy_use else None
+    else:
+        pitch = pitchf = None
+        spec, spec_lengths, wave, sid = info[2], info[3], info[4], info[6]
+        energy = info[7] if energy_use else None
+    
+    return phone, phone_lengths, pitch, pitchf, spec, spec_lengths, wave, sid, energy
+
+def transform_tensor_into_cache(device, device_id, cache_data_in_gpu, cache, train_loader):
+    if device.type == "cuda" and cache_data_in_gpu:
+        data_iterator = cache
+
+        if cache == []:
+            for batch_idx, info in enumerate(train_loader):
+                cache.append(
+                    (batch_idx, [
+                        tensor.cuda(device_id, non_blocking=True) 
+                        for tensor in info
+                    ])
+                )
+        else: 
+            shuffle(cache)
+    elif device.type == "xpu" and cache_data_in_gpu:
+        data_iterator = cache
+
+        if cache == []:
+            for batch_idx, info in enumerate(train_loader):
+                cache.append(
+                    (batch_idx, [
+                        tensor.xpu(device_id, non_blocking=True) 
+                        for tensor in info
+                    ])
+                )
+        else: 
+            shuffle(cache)
+    elif device.type in ["privateuseone", "ocl"] and cache_data_in_gpu:
+        data_iterator = cache
+
+        if cache == []:
+            for batch_idx, info in enumerate(train_loader):
+                cache.append(
+                    (batch_idx, [
+                        tensor.to(device_id if device.type == "ocl" else device, non_blocking=True) 
+                        for tensor in info
+                    ])
+                )
+        else: 
+            shuffle(cache)
+    else: 
+        data_iterator = enumerate(train_loader)
+    
+    return data_iterator, cache
+
+def transforming_computing_devices(info, device, device_id, cache_data_in_gpu):
+    if device.type == "cuda" and not cache_data_in_gpu: 
+        info = [
+            tensor.cuda(device_id, non_blocking=True) 
+            for tensor in info
+        ]  
+    elif device.type == "xpu" and not cache_data_in_gpu: 
+        info = [
+            tensor.xpu(device_id, non_blocking=True) 
+            for tensor in info
+        ]  
+    elif device.type in ["privateuseone", "ocl"] and not cache_data_in_gpu: 
+        info = [
+            tensor.to(device_id if device.type == "ocl" else device, non_blocking=True) 
+            for tensor in info
+        ]  
+    else: 
+        info = [
+            tensor.to(device) 
+            for tensor in info
+        ]
+    
+    return info
