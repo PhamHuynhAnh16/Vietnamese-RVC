@@ -868,7 +868,9 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
                 current_loss_disc, 
                 smoothed_loss_gen_history, 
                 current_loss_gen, 
-                overtraining_threshold
+                overtraining_threshold,
+                consecutive_increases_disc,
+                consecutive_increases_gen
             )
 
             if epoch % save_every_epoch == 0: detector.save_to_json(training_file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history)

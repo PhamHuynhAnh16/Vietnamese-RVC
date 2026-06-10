@@ -59,7 +59,9 @@ def overtraining_detector(
     current_loss_disc, 
     smoothed_loss_gen_history, 
     current_loss_gen, 
-    overtraining_threshold
+    overtraining_threshold,
+    consecutive_increases_disc,
+    consecutive_increases_gen
 ):
     smoothed_value_disc = update_exponential_moving_average(
         smoothed_loss_disc_history, 
