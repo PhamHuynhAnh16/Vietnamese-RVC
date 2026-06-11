@@ -196,7 +196,6 @@ class HParams:
     def __repr__(self):
         return repr(self.__dict__)
 
-
 def get_device(gpus):
     if gpus == "-":
         device, gpus = torch.device("cpu"), [0]
