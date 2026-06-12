@@ -443,6 +443,28 @@ class VoiceConverter:
         embedders_mix_ratio = 0.5,
         nprobe = 1
     ):
+        def inference(audio, index, big_tsr, f0_file, pbar):
+            return self.vc.pipeline(
+                audio=audio, 
+                f0_up_key=pitch, 
+                f0_method=f0_method, 
+                index=index,
+                big_tsr=big_tsr, 
+                index_rate=index_rate, 
+                filter_radius=filter_radius, 
+                rms_mix_rate=rms_mix_rate, 
+                protect=protect, 
+                f0_autotune=f0_autotune, 
+                f0_autotune_strength=f0_autotune_strength, 
+                f0_file=f0_file, 
+                pbar=pbar, 
+                proposal_pitch=proposal_pitch,
+                proposal_pitch_threshold=proposal_pitch_threshold,
+                embedders_mix=embedders_mix, 
+                embedders_mix_layers=embedders_mix_layers, 
+                embedders_mix_ratio=embedders_mix_ratio,
+            )
+
         try:
             with tqdm(total=10, desc=translations["convert_audio"], ncols=100, unit="a", leave=not split_audio) as pbar:
                 audio = load_audio(audio_input_path, sample_rate=self.sample_rate, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre)
@@ -468,40 +490,15 @@ class VoiceConverter:
 
                     logger.info(f"{translations['split_total']}: {len(chunks)}")
                     pbar = tqdm(total=len(chunks) * 5 + 4, desc=translations["convert_audio"], ncols=100, unit="a", leave=True)
-                else: chunks = [(audio, 0, 0)]
 
                 pbar.update(1)
-                converted_chunks = [
-                    (
-                        start, 
-                        end, 
-                        self.vc.pipeline(
-                            model=self.hubert_model, 
-                            net_g=self.net_g, 
-                            audio=waveform, 
-                            f0_up_key=pitch, 
-                            f0_method=f0_method, 
-                            index=self.index,
-                            big_tsr=self.big_tsr, 
-                            index_rate=index_rate, 
-                            filter_radius=filter_radius, 
-                            rms_mix_rate=rms_mix_rate, 
-                            protect=protect, 
-                            f0_autotune=f0_autotune, 
-                            f0_autotune_strength=f0_autotune_strength, 
-                            f0_file=f0_file, 
-                            pbar=pbar, 
-                            proposal_pitch=proposal_pitch,
-                            proposal_pitch_threshold=proposal_pitch_threshold,
-                            embedders_mix=embedders_mix, 
-                            embedders_mix_layers=embedders_mix_layers, 
-                            embedders_mix_ratio=embedders_mix_ratio,
-                        )
-                    ) for waveform, start, end in chunks
-                ]
+
+                if split_audio:
+                    converted_chunks = [(start, end, inference(waveform, index=self.index, big_tsr=self.big_tsr, f0_file=None, pbar=pbar)) for waveform, start, end in chunks]
+                    audio_output = restore(converted_chunks, total_len=len(audio), dtype=converted_chunks[0][2].dtype)
+                else: audio_output = inference(audio, index=self.index, big_tsr=self.big_tsr, f0_file=f0_file, pbar=pbar)
 
                 pbar.update(1)
-                audio_output = restore(converted_chunks, total_len=len(audio), dtype=converted_chunks[0][2].dtype) if split_audio else converted_chunks[0][2]
 
                 if audio_processing: audio_output = postprocess(audio_output, self.tgt_sr)
                 if self.tg is not None: audio_output = self.tg(torch.from_numpy(audio_output).unsqueeze(0).to(config.device).float()).squeeze(0).cpu().detach().numpy()
@@ -625,6 +622,6 @@ class VoiceConverter:
         if use_f0: self.setup_predictor()
 
         sid = torch.tensor(sid, device=config.device).unsqueeze(0).long()
-        self.vc = Pipeline(self.tgt_sr, config, self.f0_generator, self.rms_extract, version, sid, self.dtype)
+        self.vc = Pipeline(self.tgt_sr, config, self.net_g, self.hubert_model, self.f0_generator, self.rms_extract, version, sid, self.dtype)
 
 if __name__ == "__main__": main()

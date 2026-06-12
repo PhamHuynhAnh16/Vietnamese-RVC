@@ -25,6 +25,8 @@ class Pipeline:
         self, 
         tgt_sr, 
         config, 
+        net_g,
+        hubert_model,
         f0_generator, 
         rms_extract, 
         version,
@@ -45,18 +47,18 @@ class Pipeline:
 
         self.sid = sid
         self.dtype = dtype
+        self.net_g = net_g
         self.tgt_sr = tgt_sr
         self.version = version
         self.device = config.device
         self.rms_extract = rms_extract
         self.f0_generator = f0_generator
+        self.hubert_model = hubert_model
         self.energy_use = rms_extract is not None
         self.pitch_guidance = f0_generator is not None
 
     def voice_conversion(
         self, 
-        model, 
-        net_g, 
         audio0, 
         pitch, 
         pitchf, 
@@ -75,7 +77,7 @@ class Pipeline:
 
         with torch.inference_mode():
             feats = extract_features(
-                model, 
+                self.hubert_model, 
                 feats.view(1, -1), 
                 self.version, 
                 mix=embedders_mix, 
@@ -110,7 +112,7 @@ class Pipeline:
             if self.pitch_guidance: pitchf.to(self.dtype)
             feats = feats.to(self.dtype) 
 
-            audio1 = net_g.infer(
+            audio1 = self.net_g.infer(
                 feats, 
                 p_len, 
                 pitch, 
@@ -125,8 +127,6 @@ class Pipeline:
     
     def pipeline(
         self, 
-        model, 
-        net_g, 
         audio, 
         f0_up_key, 
         f0_method, 
@@ -225,8 +225,6 @@ class Pipeline:
 
             audio_opt.append(
                 self.voice_conversion(
-                    model, 
-                    net_g, 
                     audio_pad[s : t + self.t_pad2 + self.window], 
                     pitch[:, start:end] if self.pitch_guidance else None, 
                     pitchf[:, start:end] if self.pitch_guidance else None, 
@@ -247,8 +245,6 @@ class Pipeline:
         start_opt = (t // self.window) if t is not None else 0
         audio_opt.append(
             self.voice_conversion(
-                model, 
-                net_g, 
                 audio_pad[t:], 
                 pitch[:, start_opt:] if self.pitch_guidance else None, 
                 pitchf[:, start_opt:] if self.pitch_guidance else None, 
