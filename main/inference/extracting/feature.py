@@ -138,7 +138,8 @@ def run_pitch_extraction(
         "fcpe" in f0_method or 
         "rmvpe" in f0_method or 
         "penn" in f0_method or 
-        "swift" in f0_method
+        "swift" in f0_method or
+        "pesto" in f0_method
     ):
         num_processes = 1
 
