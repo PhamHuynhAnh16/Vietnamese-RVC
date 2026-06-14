@@ -56,7 +56,7 @@ def create_2d_sin_embedding(
     device="cpu", 
     max_period=10000
 ):
-    if d_model % 4 != 0: raise ValueError(translations["dims"].format(dims=d_model))
+    if d_model % 4 != 0: raise ValueError
 
     pe = torch.zeros(d_model, height, width)
     d_model = int(d_model / 2)

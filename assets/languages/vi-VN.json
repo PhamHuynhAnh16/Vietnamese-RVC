@@ -464,7 +464,6 @@
     "starting_separator": "Bắt đầu quá trình tách cho đường dẫn tập tin âm thanh",
     "separator_success_3": "Quá trình tách hoàn tất.",
     "separator_duration": "Thời gian tách",
-    "dims": "Không thể sử dụng mã hóa vị trí sin/cos với thứ nguyên lẻ (có dim={dims})",
     "activation": "kích hoạt phải là relu/gelu, không phải {activation}",
     "length_or_training_length": "Độ dài cho trước {length} dài hơn thời lượng huấn luyện {training_length}",
     "convert_shape": "Hình dạng hỗn hợp chuyển đổi: {shape}",
