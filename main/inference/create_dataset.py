@@ -293,6 +293,7 @@ def create_dataset(
                 ).squeeze(0).cpu().detach().numpy()
 
             sf.write(audio, data, sr)
+            os.makedirs(output_dirs, exist_ok=True)
             output_path = os.path.join(output_dirs, os.path.basename(audio))
 
             if os.path.exists(output_path): os.remove(output_path)
