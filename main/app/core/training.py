@@ -13,9 +13,6 @@ from main.tools import huggingface
 from main.app.core.ui import gr_info, gr_warning
 from main.app.variables import python, translations, configs, file_types, logger
 
-def getname(path):
-    return os.path.basename(path).replace(".py", "")
-
 def if_done(done, p):
     while 1:
         if p.poll() is None: time.sleep(0.5)
@@ -32,11 +29,12 @@ def log_read(done, name, start_time):
         with open(log_file, "r", encoding="utf-8") as f:
             for line in f:
                 try:
-                    if ("DEBUG" in line or name not in line or line.strip() == ""): continue
+                    if ("DEBUG" in line or not any(n in line for n in name) or line.strip() == ""): continue
                     timestamp = datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
                     if timestamp >= start_time: logs.append(line)
                 except ValueError:
                     continue
+
         return "".join(logs)
 
     while 1:
@@ -113,7 +111,7 @@ def create_dataset(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, getname(configs["create_dataset_path"]), start_time):
+    for log in log_read(done, ["create_dataset", "separate_music", "separator"], start_time):
         yield log
 
 def create_reference(
@@ -168,7 +166,7 @@ def create_reference(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, getname(configs["create_reference_path"]), start_time):
+    for log in log_read(done, ["create_reference"], start_time):
         yield log
 
 def preprocess(
@@ -230,7 +228,7 @@ def preprocess(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, getname(configs["preprocess_path"]), start_time):
+    for log in log_read(done, ["preprocess"], start_time):
         yield log
 
 def extract(
@@ -312,7 +310,7 @@ def extract(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, getname(configs["extract_path"]), start_time):
+    for log in log_read(done, ["extract", "embedding", "feature", "rms"], start_time):
         yield log
 
 def create_index(
@@ -350,7 +348,7 @@ def create_index(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, getname(configs["create_index_path"]), start_time):
+    for log in log_read(done, ["create_index"], start_time):
         yield log
 
 def training(
@@ -588,7 +586,7 @@ def training(
 
     threading.Thread(target=if_done, args=(done, p)).start()
 
-    for log in log_read(done, getname(configs["train_path"]), start_time):
+    for log in log_read(done, ["train", "synthesizers", "extract_model", "utils"], start_time):
         lines = log.splitlines()
 
         if len(lines) > 50: 

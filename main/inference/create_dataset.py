@@ -239,6 +239,8 @@ def create_dataset(
                         skip_end_audios
                     )
                 ]
+        
+        audio_path = merge_audios(audio_path, sample_rate)
                     
         if separate:
             audio_path = [
@@ -446,5 +448,46 @@ def skip_end(
         sf.write(input_file, data[:-int(seconds * sr)], sr)
 
         logger.info(translations["skip_end_audio"].format(input_file=input_file))
+
+def merge_audios(audio_paths, sample_rate=48000):
+    current_duration = 0
+    chunks, current_audio = [], []
+
+    for audio in audio_paths:
+        data, sr = read_file(audio)
+
+        if len(data.shape) > 1:
+            data = librosa.to_mono(data.T)
+
+        if sr != sample_rate:
+            data = librosa.resample(
+                data,
+                orig_sr=sr,
+                target_sr=sample_rate,
+                res_type="soxr_vhq"
+            )
+
+        duration = len(data) / sample_rate
+        if current_duration + duration > 600:
+            merged = np.concatenate(current_audio)
+            output = os.path.join(dataset_temp, f"merged_{len(chunks)}.wav")
+
+            sf.write(output, merged, sample_rate)
+            chunks.append(output)
+
+            current_audio = []
+            current_duration = 0
+
+        current_audio.append(data)
+        current_duration += duration
+
+    if current_audio:
+        merged = np.concatenate(current_audio)
+        output = os.path.join(dataset_temp, f"merged_{len(chunks)}.wav")
+
+        sf.write(output, merged, sample_rate)
+        chunks.append(output)
+
+    return chunks
 
 if __name__ == "__main__": main()

@@ -43,7 +43,7 @@ class VRSeparator(CommonSeparator):
             "split_bin": self.model_params.param["band"]["1"]["crop_stop"], 
             "aggr_correction": self.model_params.param.get("aggr_correction")
         }
-        self.model_samplerate = self.model_params.param["sr"]
+        self.model_samplerate = self.sample_rate = self.model_params.param["sr"]
         self.wav_subtype = "PCM_16"
 
     def separate(self, audio_file_path):
