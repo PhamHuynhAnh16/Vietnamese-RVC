@@ -153,9 +153,9 @@ Cách 2. Tải trực tiếp trên github:
 <details>
 <summary style="font-size: 20px;"> Đối Với Hệ Điều Hành Windows </summary>
 
-- Cần cài đặt bộ [Visual C++ Redistributable Runtimes](https://www.techpowerup.com/download/visual-c-redistributable-runtime-package-all-in-one/) trước khi tiến hành tiếp.
+Cần cài đặt bộ [Visual C++ Redistributable Runtimes](https://www.techpowerup.com/download/visual-c-redistributable-runtime-package-all-in-one/) trước khi tiến hành tiếp.
 
-- Bạn có thể chạy trực tiếp tệp `run_install.bat` để cài đặt hoặc làm theo các bước bên dưới.
+Cách 1: Bạn có thể chạy trực tiếp tệp `run_install.bat` để cài đặt hoặc làm theo các bước bên dưới.
 
 - Khi chạy `run_install.bat` và bạn sử dụng CUDA thì sẽ được hỏi có cài TensorRT hay không, nếu chọn có bạn sẽ cần cài thêm [TensorRT](https://developer.nvidia.com/tensorrt) từ Nvidia, giải nén và thêm đường dẫn thư mục bin của nó vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
 
@@ -163,9 +163,9 @@ Cách 2. Tải trực tiếp trên github:
 
 - Khi sử dụng ONNXRUNTIME OPENVINO, bạn cần cài đặt [OpenVino Toolkit](https://storage.openvinotoolkit.org/repositories/openvino/packages/2025.4.1/windows/openvino_toolkit_windows_2025.4.1.20426.82bbf0292c5_x86_64.zip) giải nén và thêm Release từ \runtime\bin\intel64\Release vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
 
-- Hãy chuẩn bị và cài đặt PYTHON phiên bản 3.10.x, 3.11.x hoặc 3.12.x và tạo môi trường ảo.
-
 - Sau quá trình cài đặt, bạn có thể xóa thư mục .uv bên trong thư mục assets để giảm nhẹ dung lượng.
+
+Cách 2: Hãy chuẩn bị và cài đặt PYTHON phiên bản 3.10.x, 3.11.x hoặc 3.12.x và tạo môi trường ảo.
 
 **1. Tạo Môi Trường Ảo:**
 
