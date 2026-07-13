@@ -9,15 +9,35 @@ from functools import partial
 from einops import rearrange, repeat, pack, unpack
 
 def exists(val):
+    """Check if a value is not None."""
+
     return val is not None
 
 def default(value, d):
+    """Return the value if it exists, otherwise return a default value."""
+
     return value if exists(value) else d
 
 def empty(tensor):
+    """Check if a given tensor contains zero elements."""
+
     return tensor.numel() == 0
 
 def pad_to_multiple(tensor, multiple, dim=-1, value=0):
+    """
+    Pad a tensor's specified dimension to be a clean multiple of a target integer.
+
+    Args:
+        tensor (torch.Tensor): Input sequence tensor.
+        multiple (int): Target factor requirement (e.g., window size).
+        dim (int, optional): Dimensional axis to apply padding. Defaults to -1.
+        value (float, optional): Scalar pad value filler. Defaults to 0.0.
+
+    Returns:
+        Tuple[bool, torch.Tensor]: A tuple containing a boolean flag indicating if padding 
+            was applied, and the resulting padded tensor.
+    """
+
     seqlen = tensor.shape[dim]
     m = seqlen / multiple
 
@@ -25,41 +45,82 @@ def pad_to_multiple(tensor, multiple, dim=-1, value=0):
     return True, F.pad(tensor, (*((0,) * (-1 - dim) * 2), 0, (math.ceil(m) * multiple - seqlen)), value = value)
 
 def look_around(x, backward = 1, forward = 0, pad_value = -1, dim = 2):
+    """
+    Creates overlapping temporal context blocks by gathering frames across a local window.
+
+    Used to perform sliding window block partitions for localized self-attention layers.
+
+    Args:
+        x (torch.Tensor): Padded chunked windows tensor, shape (B, W, N, D).
+        backward (int, optional): Number of preceding blocks to look into. Defaults to 1.
+        forward (int, optional): Number of succeeding blocks to look into. Defaults to 0.
+        pad_value (float, optional): Out-of-bounds constant mask representation. Defaults to -1.0.
+        dim (int, optional): Focus target concatenating axis. Defaults to 2.
+    """
+
     t = x.shape[1]
     dims = (len(x.shape) - dim) * (0, 0)
     padded_x = F.pad(x, (*dims, backward, forward), value = pad_value)
 
+    # Slice overlapping context sections and concatenate them across the target axis
     return torch.cat([padded_x[:, ind:(ind + t), ...] for ind in range(forward + backward + 1)], dim = dim)
 
 def rotate_half(x):
+    """
+    Rotates the feature dimensions of the input tensor by splitting and swapping halves.
+
+    Helper function used for applying Rotary Position Embeddings (RoPE).
+    """
+
     x1, x2 = rearrange(x, 'b ... (r d) -> b ... r d', r = 2).unbind(dim = -2)
     return torch.cat((-x2, x1), dim = -1)
 
 def apply_rotary_pos_emb(q, k, freqs, scale = 1):
+    """
+    Applies Rotary Position Embeddings (RoPE) to Query and Key tensors.
+
+    Args:
+        q (torch.Tensor): Query states tensor.
+        k (torch.Tensor): Key states tensor.
+        freqs (torch.Tensor): Trigonometric frequency tensor values.
+        scale (float | torch.Tensor, optional): Adaptive feature scaling values. Defaults to 1.0.
+    """
+
     q_len = q.shape[-2]
+    # Slice the frequencies to match the specific query length context
     q_freqs = freqs[..., -q_len:, :]
 
     inv_scale = scale ** -1
     if scale.ndim == 2: scale = scale[-q_len:, :]
 
+    # Rotate states using the trigonometric Euler formula identity expansion
     q = (q * q_freqs.cos() * scale) + (rotate_half(q) * q_freqs.sin() * scale)
     k = (k * freqs.cos() * inv_scale) + (rotate_half(k) * freqs.sin() * inv_scale)
 
     return q, k
 
 def orthogonal_matrix_chunk(cols, qr_uniform_q=False, device=None):
-    unstructured_block = torch.randn((cols, cols), device=device)
+    """Generates a square random orthogonal matrix using QR decomposition."""
 
+    unstructured_block = torch.randn((cols, cols), device=device)
+    # Compute QR decomposition on CPU for stability reasons
     q, r = torch.linalg.qr(unstructured_block.cpu(), mode="reduced")
     q, r = map(lambda t: t.to(device), (q, r))
 
     if qr_uniform_q:
+        # Enforce statistical uniformity over the distribution
         d = r.diag(0)
         q *= d.sign()
 
     return q.t()
 
 def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform_q=False, device=None):
+    """
+    Constructs a Gaussian Orthogonal Random Matrix for kernel projection blocks.
+
+    Used by Performer/FastAttention architectures to map states into lower-rank features.
+    """
+
     nb_full_blocks = int(nb_rows / nb_columns)
     block_list = []
 
@@ -76,6 +137,8 @@ def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform
                 device=device
             )[:remaining_rows]
         )
+
+    # Scale variables according to specific variance choices
     if scaling == 0: 
         multiplier = torch.randn(
             (nb_rows, nb_columns), 
@@ -88,16 +151,25 @@ def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform
             (nb_rows,), 
             device=device
         )
-    else: raise ValueError(f"{scaling} != 0, 1")
+    else: raise ValueError(f"Unsupported scaling factor parameter: {scaling} != 0, 1")
 
     return multiplier.diag() @ torch.cat(block_list)
 
 def linear_attention(q, k, v):
-    return einsum(
+    """
+    Computes kernelized linear attention without materializing the full attention matrix.
+
+    After replacing the softmax similarity with a positive kernel feature map,
+    the associative matrix multiplication can be reordered from
+    (QKᵀ)V to Q(KᵀV), reducing the complexity from quadratic to linear
+    with respect to sequence length.
+    """
+
+    return einsum( # Compute kernel feature interactions.
         "...ed,...nd->...ne", 
         k, 
         q
-    ) if v is None else einsum(
+    ) if v is None else einsum( # Compute normalized linear attention output.
         "...de,...nd,...n->...ne", 
         einsum(
             "...nd,...ne->...de", 
@@ -112,18 +184,29 @@ def linear_attention(q, k, v):
         ) + 1e-8)
     )
 
-def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4, device=None):
+def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4):
+    """
+    Approximates the standard Softmax Attention matrix using random Fourier features.
+
+    Implements the positive random feature (ORF) mapping method described in the 
+    Performer architecture paper.
+    """
+
     b, h, *_ = data.shape
     
     data_normalizer = (data.shape[-1] ** -0.25) if normalize_data else 1.0
     ratio = projection_matrix.shape[0] ** -0.5
 
+    # Project raw data onto the random orthogonal matrix basis space
     data_dash = torch.einsum("...id,...jd->...ij", (data_normalizer * data), repeat(projection_matrix, "j d -> b h j d", b=b, h=h).type_as(data))
+    # Compute the squared-norm correction term required by the softmax kernel feature map.
     diag_data = (((data**2).sum(dim=-1) / 2.0) * (data_normalizer**2)).unsqueeze(dim=-1)
 
     return (ratio * ((data_dash - diag_data - data_dash.max(dim=-1, keepdim=True).values).exp() + eps) if is_query else ratio * ((data_dash - diag_data + eps).exp())).type_as(data)
 
 class SinusoidalEmbeddings(nn.Module):
+    """Generates continuous sinusoidal and frequency scalar values for position encoding."""
+
     def __init__(
         self, 
         dim, 
@@ -136,6 +219,8 @@ class SinusoidalEmbeddings(nn.Module):
         self.register_buffer('scale', scale, persistent = False)
 
     def forward(self, x):
+        """Generates raw sinusoidal frequency vectors mapping positions."""
+
         seq_len, device = x.shape[-2], x.device
         t = torch.arange(seq_len, device = x.device).type_as(self.inv_freq)
 
@@ -145,6 +230,13 @@ class SinusoidalEmbeddings(nn.Module):
         return freqs, torch.ones(1, device = device)
 
 class LocalAttention(nn.Module):
+    """
+    Sliding Window Local Attention Block.
+
+    Restricts memory computation overhead costs by containing attention calculation fields
+    within localized adjacent block neighborhoods.
+    """
+
     def __init__(
         self, 
         window_size, 
@@ -166,11 +258,14 @@ class LocalAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.shared_qk = shared_qk
         self.rel_pos = None
+        # Instantiate rotary structural embeddings if parameters are provided
         if use_rotary_pos_emb and (exists(rel_pos_emb_config) or exists(dim)): 
             if exists(rel_pos_emb_config): dim = rel_pos_emb_config[0]
             self.rel_pos = SinusoidalEmbeddings(dim)
 
     def forward(self, q, k, v, mask = None, input_mask = None, attn_bias = None, window_size = None):
+        """Executes window-partitioned localized self-attention steps."""
+
         mask = default(mask, input_mask)
         assert not exists(window_size)
 
@@ -193,9 +288,11 @@ class LocalAttention(nn.Module):
             self.shared_qk
         )
 
+        # Flatten variable shapes into combined uniform tracking sequences
         (q, packed_shape), (k, _), (v, _) = map(lambda t: pack([t], '* n d'), (q, k, v))
 
         orig_seq_len = q.shape[1]
+        # Pad sequence lengths to fit exact window boundary conditions
         (_, q), (_, k), (_, v) = map(lambda t: pad_to_multiple(t, self.window_size, dim = -2), (q, k, v))
 
         b, n, dim_head, device, dtype = *q.shape, q.device, q.dtype
@@ -206,13 +303,15 @@ class LocalAttention(nn.Module):
 
         if shared_qk: k = F.normalize(k, dim = -1).type(k.dtype)
 
+        # Reshape vectors from sequential tracks into chunked window spaces
         seq = torch.arange(n, device = device)
         b_t = rearrange(seq, '(w n) -> 1 w n', w = windows, n = window_size)
         bq, bk, bv = map(lambda t: rearrange(t, 'b (w n) d -> b w n d', w = windows), (q, k, v))
 
         bq = bq * scale
-        look_around_kwargs = dict(backward =  look_backward, forward =  look_forward, pad_value = pad_value)
+        look_around_kwargs = dict(backward=look_backward, forward=look_forward, pad_value=pad_value)
 
+        # Gather context blocks using overlapping window looks
         bk = look_around(bk, **look_around_kwargs)
         bv = look_around(bv, **look_around_kwargs)
 
@@ -244,6 +343,7 @@ class LocalAttention(nn.Module):
         sim = sim.masked_fill(pad_mask, mask_value)
 
         if exists(mask):
+            # Parse custom padding masks over grouped sliding segments
             batch = mask.shape[0]
             assert (b % batch) == 0
 
@@ -273,6 +373,7 @@ class LocalAttention(nn.Module):
             sim = sim.masked_fill(~mask, mask_value)
             del mask
 
+        # Map scores using Softmax activation, apply dropout, and combine values
         out = rearrange(
             einsum(
                 'b h i j, b h j e -> b h i e', 
@@ -282,12 +383,20 @@ class LocalAttention(nn.Module):
             'b w n d -> b (w n) d'
         )
 
+        # Unpad output states to restore original sequence length parameters
         out = out[:, :orig_seq_len, :]
         out, *_ = unpack(out, packed_shape, '* n d')
 
         return out
     
 class FastAttention(nn.Module):
+    """
+    Fast Attention Module (Performer Implementation).
+
+    Approximates standard kernel attention computations via randomized orthogonal matrix projections
+    to bypass quadratic memory consumption locks.
+    """
+
     def __init__(
         self, 
         dim_heads, 
@@ -298,6 +407,7 @@ class FastAttention(nn.Module):
         qr_uniform_q=False
     ):
         super().__init__()
+        # Calculate random feature projection dimensions using recommended default heuristics
         nb_features = default(nb_features, int(dim_heads * math.log(dim_heads)))
         self.dim_heads = dim_heads
         self.nb_features = nb_features
@@ -316,16 +426,29 @@ class FastAttention(nn.Module):
 
     @torch.no_grad()
     def redraw_projection_matrix(self):
+        """Regenerates a fresh random orthogonal basis to preserve kernel approximation variance quality."""
+
         projections = self.create_projection()
         self.projection_matrix.copy_(projections)
         del projections
 
     def forward(self, q, k, v):
-        create_kernel = partial(softmax_kernel, projection_matrix=self.projection_matrix, device=q.device)
-        q, k = create_kernel(q, is_query=True), create_kernel(k, is_query=False)
-        return linear_attention(q, k, None) if v is None else linear_attention(q, k, v)
+        """Forward pass executing generalized linear matrix attention."""
+        q_dtype = q.dtype
+        if v is not None: v = v.float()
+    
+        # Map continuous multi-head features into linearized feature representations
+        q, k = softmax_kernel(q.float(), is_query=True, projection_matrix=self.projection_matrix), softmax_kernel(k.float(), is_query=False, projection_matrix=self.projection_matrix)
+        return linear_attention(q, k, v).to(q_dtype)
 
 class SelfAttention(nn.Module):
+    """
+    Hybrid Attention Layer combining Fast (Global) and Local (Sliding Window) strategies.
+
+    Splits processing heads into two paths: a localized attention track for fine-grained spatial dependencies 
+    and a linear global Performer attention track for long-range context.
+    """
+
     def __init__(
         self, 
         dim, 
@@ -353,6 +476,7 @@ class SelfAttention(nn.Module):
         )
         self.heads = heads
         self.global_heads = heads - local_heads
+        # Instantiate local attention routing only if local heads are explicitly allocated
         self.local_attn = (
             LocalAttention(
                 window_size=local_window_size, 
@@ -369,19 +493,25 @@ class SelfAttention(nn.Module):
 
     @torch.no_grad()
     def redraw_projection_matrix(self):
+        """Triggers random feature resampling across the underlying fast global estimator module."""
+
         self.fast_attention.redraw_projection_matrix()
 
     def forward(self, x, context=None, mask=None, context_mask=None, name=None, inference=False, **kwargs):
+        """Executes hybrid combined context attention passes."""
+
         _, _, _, h, gh = *x.shape, self.heads, self.global_heads
         cross_attend = exists(context)
         context = default(context, x)
         context_mask = default(context_mask, mask) if not cross_attend else context_mask
 
+        # Linearly project and split values into multi-head tensor representations
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=h), (self.to_q(x), self.to_k(context), self.to_v(context)))
+        # Segment heads between global linear processing streams and local sliding streams
         (q, lq), (k, lk), (v, lv) = map(lambda t: (t[:, :gh], t[:, gh:]), (q, k, v))
 
         attn_outs = []
-
+        # 1. Process Global Attention Track
         if not empty(q):
             if exists(context_mask): v.masked_fill_(~context_mask[:, None, :, None], 0.0)
             if cross_attend: pass  
@@ -389,10 +519,12 @@ class SelfAttention(nn.Module):
 
             attn_outs.append(out)
 
+        # 2. Process Local Window Attention Track
         if not empty(lq):
             assert not cross_attend
 
             out = self.local_attn(lq, lk, lv, input_mask=mask)
             attn_outs.append(out)
 
+        # Recombine outputs from both paths and project back to original model dimension
         return self.dropout(self.to_out(rearrange(torch.cat(attn_outs, dim=1), "b h n d -> b n (h d)")))

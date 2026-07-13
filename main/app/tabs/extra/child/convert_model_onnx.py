@@ -23,6 +23,17 @@ def convert_onnx_model_tab():
     with gr.Row():
         gr.Markdown(translations["pytorch2onnx_markdown"])
     with gr.Row():
+        is_half_weight = gr.Checkbox(
+            label=translations["is_half_weight"],
+            value=False,
+            interactive=True
+        )
+        int8_mode = gr.Checkbox(
+            label=translations["int8_mode"],
+            value=False,
+            interactive=True
+        )
+    with gr.Row():
         model_pth_upload = gr.File(
             label=translations["drop_model"], 
             file_types=[".pth"]
@@ -77,7 +88,9 @@ def convert_onnx_model_tab():
         convert_onnx_button.click(
             fn=onnx_export,
             inputs=[
-                model_pth_path
+                model_pth_path,
+                is_half_weight, 
+                int8_mode
             ],
             outputs=[
                 output_model_file

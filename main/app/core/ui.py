@@ -11,7 +11,6 @@ sys.path.append(os.getcwd())
 
 import main.library.audio.sounddevice as sd
 
-from main.library.backends import directml, opencl
 from main.inference.realtime.audio import audio_device
 
 from main.app.variables import (
@@ -25,99 +24,49 @@ from main.app.variables import (
     file_types, 
     configs_json, 
     translations, 
-    whisper_model, 
     demucs_models, 
     method_f0_full, 
     gradio_version, 
-    embedders_model, 
     google_tts_voice 
 )
 
+# Initialize GPU and audio device maps from configuration settings
+ngpu, gpu_infos = config.get_gpu_list()
 input_channels_map, output_channels_map = audio_device()
 
-def gr_info(message):
+def gr_info(message=""):
+    """Displays an information message in the Gradio UI and logs it."""
+
     gr.Info(message, duration=2)
     logger.info(message)
 
-def gr_warning(message):
+def gr_warning(message=""):
+    """Displays a warning message in the Gradio UI and logs it."""
+
     gr.Warning(message, duration=2)
     logger.warning(message)
 
-def gr_error(message):
+def gr_error(message=""):
+    """Displays an error message in the Gradio UI and logs it."""
+
     gr.Error(message=message, duration=6)
     logger.error(message)
 
 def get_gpu_info():
-    ngpu = torch.cuda.device_count()
-    gpu_infos = [
-        (
-            f"{i}: {torch.cuda.get_device_name(i)} " + 
-            f"({int(torch.cuda.get_device_properties(i).total_memory / (1024**3) + 0.4)} GB)"
-        ) 
-        for i in range(ngpu) 
-        if config.device.startswith("cuda") or ngpu != 0
-    ]
+    """Retrieves formatted GPU info string and total GPU count based on system status."""
 
-    if len(gpu_infos) == 0 and config.device.startswith("xpu"):
-        ngpu = torch.xpu.device_count()
-        gpu_infos = [
-            (
-                f"{i}: {torch.xpu.get_device_name(i)} " + 
-                f"({int(torch.xpu.get_device_properties(i).total_memory / (1024**3) + 0.4)} GB)"
-            ) 
-            for i in range(ngpu) 
-            if config.device.startswith("xpu") or ngpu != 0
-        ]
-
-    if len(gpu_infos) == 0:
-        if config.device.startswith("privateuseone"):
-            ngpu = directml.device_count()
-
-            gpu_infos = [
-                f"{i}: {directml.device_name(i)}" 
-                for i in range(ngpu) 
-                if config.device.startswith("privateuseone") or ngpu != 0
-            ]
-        elif config.device.startswith("ocl"):
-            ngpu = opencl.device_count()
-
-            gpu_infos = [
-                f"{i}: {opencl.device_name(i)}" 
-                for i in range(ngpu) 
-                if config.device.startswith("ocl") or ngpu != 0
-            ]
-        else:
-            ngpu = 0
-            gpu_infos = []
-
-    return (
-        (
-            "\n".join(gpu_infos) 
-            if len(gpu_infos) > 0 and not config.cpu_mode else 
-            translations["no_support_gpu"]
-        ),
-        ngpu
-    )
+    return (("\n".join(gpu_infos) if len(gpu_infos) > 0 and not config.cpu_mode else translations["no_support_gpu"]), ngpu)
 
 def gpu_number_str():
+    """Generates a string representation of available GPU indices or fallback states."""
+
     if config.cpu_mode: return "-"
-    ngpu = torch.cuda.device_count()
-
-    if ngpu == 0 and config.device.startswith("xpu"):
-        ngpu = torch.xpu.device_count()
-        if ngpu != 0: return "0"
-
-    if ngpu == 0: 
-        ngpu = (
-            directml.device_count() 
-            if config.device.startswith("privateuseone") else 
-            opencl.device_count()
-        )
-        if ngpu != 0: return "0"
-
-    return str("-".join(map(str, range(ngpu))) if config.device.startswith(("cuda", "xpu", "privateuseone", "ocl")) else "-")
+    return str("-".join(map(str, range(ngpu)))) if config.device.startswith("cuda") else str(config.pytorch_device_idx)
 
 def change_f0_choices(): 
+    """Scans the designated f0 directory to update available text choices in the UI."""
+
+    # Find all absolute paths of .txt files recursively inside the F0 path
     f0_file = sorted([
         os.path.abspath(os.path.join(root, f)) 
         for root, _, files in os.walk(configs["f0_path"]) 
@@ -131,7 +80,10 @@ def change_f0_choices():
         "__type__": "update"
     }
 
-def change_audios_choices(input_audio): 
+def change_audios_choices(input_audio=""): 
+    """Scans the audios directory to dynamically populate audio file choices in the UI."""
+
+    # Fetch all files matching supported extension formats excluding output tags
     audios = sorted([
         os.path.abspath(os.path.join(root, f)) 
         for root, _, files in os.walk(configs["audios_path"]) 
@@ -144,9 +96,12 @@ def change_audios_choices(input_audio):
         "__type__": "update"
     }
 
-def change_reference_choices(): 
+def change_reference_choices():
+    """Scans the reference directory and clean up folder names using regex patterns."""
+
+    # Filter directories and remove suffix tracking tags like _v1_hubert_base_True 
     reference = sorted([
-        re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', name) 
+        re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)$', '', name) 
         for name in os.listdir(configs["reference_path"]) 
         if (
             os.path.exists(os.path.join(configs["reference_path"], name)) and 
@@ -161,6 +116,8 @@ def change_reference_choices():
     }
 
 def change_models_choices():
+    """Gathers available weight files (.pth/.onnx) and index files from the logs folder."""
+
     model, index = (
         sorted([
             model 
@@ -188,6 +145,8 @@ def change_models_choices():
     ]
 
 def change_pretrained_choices():
+    """Separates custom pretrained models into discriminator (D) and generator (G) sets."""
+
     pretrainD = sorted([
         model for model in os.listdir(configs["pretrained_custom_path"]) 
         if model.endswith(".pth") and "D" in model
@@ -212,6 +171,8 @@ def change_pretrained_choices():
     ]
 
 def change_preset_choices():
+    """Fetches preset configuration files dedicated to file conversion."""
+
     return {
         "value": "", 
         "choices": sorted([
@@ -222,6 +183,8 @@ def change_preset_choices():
     }
 
 def change_effect_preset_choices():
+    """Fetches preset configuration files dedicated to post-processing effects."""
+
     return {
         "value": "", 
         "choices": sorted([
@@ -232,6 +195,8 @@ def change_effect_preset_choices():
     }
 
 def change_realtime_preset_choices():
+    """Fetches preset configuration files dedicated to realtime execution."""
+
     return {
         "value": "", 
         "choices": sorted([
@@ -241,7 +206,9 @@ def change_realtime_preset_choices():
         "__type__": "update"
     }
 
-def change_tts_voice_choices(google):
+def change_tts_voice_choices(google=False):
+    """Updates Voice choices depending on whether Google TTS or Edge TTS is chosen."""
+
     return {
         "choices": google_tts_voice if google else edgetts, 
         "value": google_tts_voice[0] if google else edgetts[0], 
@@ -249,16 +216,18 @@ def change_tts_voice_choices(google):
     }
 
 def change_backing_choices(
-    backing, 
-    merge
+    backing=False, 
+    not_merge=False
 ):
-    if backing or merge: 
+    """Controls interactive permissions of sub-elements based on merge and backing configurations."""
+
+    if backing or not_merge: 
         return {
             "value": False, 
             "interactive": False, 
             "__type__": "update"
         }
-    elif not backing or not merge: 
+    elif not backing or not not_merge: 
         return  {
             "interactive": True, 
             "__type__": "update"
@@ -266,9 +235,12 @@ def change_backing_choices(
     else: 
         gr_warning(translations["option_not_valid"])
 
-def change_download_choices(select):
+def change_download_choices(select = translations["download_url"]):
+    """Toggles visible interface boxes inside the main downloading tab depending on the source selected."""
+
     selects = [False]*10
 
+    # Index mapping definitions for visibility flags
     if select == translations["download_url"]: 
         selects[0] = selects[1] = selects[2] = True
     elif select == translations["download_from_csv"]:  
@@ -288,7 +260,9 @@ def change_download_choices(select):
         for i in range(len(selects))
     ]
 
-def change_download_pretrained_choices(select):
+def change_download_pretrained_choices(select = translations["download_url"]):
+    """Toggles visibility parameters inside the pretrained model downloading panel section."""
+
     selects = [False]*7
 
     if select == translations["download_url"]: 
@@ -308,7 +282,9 @@ def change_download_pretrained_choices(select):
         for i in range(len(selects))
     ]
 
-def get_index(model):
+def get_index(model = ""):
+    """Auto-detects and matches the correct retrieval index file path belonging to a chosen model name."""
+
     model = os.path.basename(model).split("_")[0]
 
     return {
@@ -324,7 +300,9 @@ def get_index(model):
         "__type__": "update"
     } if model else None
 
-def index_strength_show(index):
+def index_strength_show(index = ""):
+    """Reveals or masks Index processing intensity adjustments if a valid file target is allocated."""
+
     index_strength_visible = (
         index != "" and 
         index != None and 
@@ -346,11 +324,13 @@ def index_strength_show(index):
     ]
 
 def hoplength_show(
-    method, 
+    method="rmvpe", 
     hybrid_method=None
 ):
-    visible = False
+    """Determines whether the Hop Length parameter control needs to be visible based on pitch tracking methods."""
 
+    visible = False
+    # Hop length adjustment is necessary only for specific pitch estimation backends
     for m in [
         "mangio-crepe", 
         "yin", 
@@ -373,47 +353,61 @@ def hoplength_show(
         "__type__": "update"
     }
 
-def visible(value):
+def visible(value=False):
+    """Generates direct layout display flag mappings based on component status."""
+
     return {
         "visible": value if gradio_version else (value or "hidden"), 
         "__type__": "update"
     }
 
-def visibleFalse(value):
+def visibleFalse(value=False):
+    """Sets component visibility property alongside a forced initialization value of False."""
+
     return {
         "visible": value if gradio_version else (value or "hidden"), 
         "value": False, 
         "__type__": "update"
     }
 
-def valueFalse_interactive(value): 
+def valueFalse_interactive(value=False): 
+    """Enforces active component interactivity permissions accompanied with a cleared selection flag."""
+
     return {
         "value": False, 
         "interactive": value, 
         "__type__": "update"
     }
 
-def interactive(value): 
+def interactive(value=False): 
+    """Sets a component's interactive status."""
+
     return {
         "interactive": value, 
         "__type__": "update"
     }
 
-def valueEmpty_visible1(value): 
+def valueEmpty_visible1(value=False): 
+    """Clears value contents to empty text strings while managing overall item display parameters."""
+
     return {
         "value": "", 
         "visible": value if gradio_version else (value or "hidden"), 
         "__type__": "update"
     }
 
-def pitch_guidance_lock(vocoders):
+def pitch_guidance_lock(vocoders = "Default"):
+    """Locks pitch guidance to True and restricts interactive changes if using non-default vocoders."""
+
     return {
         "value": True, 
         "interactive": vocoders == "Default", 
         "__type__": "update"
     }
 
-def vocoders_lock(pitch):
+def vocoders_lock(pitch=True):
+    """Blocks vocoder optimization configuration fields if Pitch calculation parameters are omitted."""
+
     if pitch:
         return gr.update(interactive=True)
 
@@ -422,56 +416,33 @@ def vocoders_lock(pitch):
         interactive=False
     )
 
-def unlock_f0(value):
+def unlock_f0(value=False):
+    """Dynamically fills pitch processing selection choices based on expanded algorithm capabilities."""
+
     return {
         "choices": method_f0_full if value else method_f0, 
         "value": "rmvpe", 
         "__type__": "update"
     } 
 
-def unlock_vocoder(value, vocoder):
-    return {
-        "value": vocoder if value == "v2" else "Default", 
-        "interactive": value == "v2", 
-        "__type__": "update"
-    } 
+def change_fp(fp="fp32", bf16=False, tf32=False, int8=False):
+    """Validates hardware support and updates runtime compute tensor precision parameters in configs_json."""
 
-def unlock_version(value, vocoder):
-    return {
-        "value": "v2" if vocoder == "Default" else value, 
-        "interactive": vocoder == "Default", 
-        "__type__": "update"
-    }
-
-def change_embedders_mode(value):
-    if value == "whisper":
-        return {
-            "value": whisper_model[0], 
-            "choices": whisper_model, 
-            "__type__": "update"
-        }
-    else:
-        return {
-            "value": embedders_model[0], 
-            "choices": embedders_model, 
-            "__type__": "update"
-        }
-
-def change_fp(fp, bf16, tf32):
     global config
 
     fp16 = fp == "fp16"
-
+    # Abort tracking state adjustments if target architecture does not support FP16 operations
     if fp16 and not config.allow_is_half: 
         gr_warning(translations["fp16_not_support"])
         return "fp32"
     else:
         gr_info(translations["start_update_precision"])
-
+        # Safely overwrite local states and dump serialized data structures back to file
         configs = json.load(open(configs_json, "r"))
         configs["fp16"] = config.is_half = fp16
         configs["brain"] = config.brain = bf16
         configs["tf32"] = config.tf32 = tf32
+        configs["int8"] = config.int8 = int8
 
         with open(configs_json, "w") as f:
             json.dump(configs, f, indent=4)
@@ -479,11 +450,15 @@ def change_fp(fp, bf16, tf32):
         gr_info(translations["success"])
         return "fp16" if fp16 else "fp32"
     
-def process_output(file_path):
+def process_output(file_path = ""):
+    """Manages output tracking filenames by clearing existing items or appending indexing strings."""
+
     if config.configs.get("delete_exists_file", True):
+        # Delete existing target files directly if overwriting is permitted
         if os.path.exists(file_path) and os.path.isfile(file_path): os.remove(file_path)
         return file_path
     else:
+        # Append incremented indexing values sequentially until finding a safe path destination location
         if not os.path.exists(file_path): return file_path
         file = os.path.splitext(os.path.basename(file_path))
 
@@ -497,7 +472,9 @@ def process_output(file_path):
             if not os.path.exists(file_path): return file_path
             index += 1
 
-def shutil_move(input_path, output_path):
+def shutil_move(input_path = "", output_path = ""):
+    """Safely relocates files across local directories using atomic collision checking hooks."""
+
     output_path = (
         os.path.join(output_path, os.path.basename(input_path)) 
         if os.path.isdir(output_path) else 
@@ -511,14 +488,17 @@ def shutil_move(input_path, output_path):
     )
 
 def separate_change(
-    model_name, 
-    karaoke_model, 
-    reverb_model, 
-    enable_post_process, 
-    separate_backing, 
-    separate_reverb, 
-    enable_denoise
+    model_name = "HT-Tuned", 
+    karaoke_model = "MDX-Version-2", 
+    reverb_model = "MDX-Reverb", 
+    enable_post_process = False, 
+    separate_backing = False, 
+    separate_reverb = False, 
+    enable_denoise = False
 ):
+    """Evaluates user-selected stem separation model classes to dynamically configure visible UI sliders."""
+
+    # Detect algorithmic source framework variants
     model_type = (
         "vr" if model_name in list(vr_models.keys()) else "mdx" 
         if model_name in list(mdx_models.keys()) else "demucs" 
@@ -534,6 +514,7 @@ def separate_change(
     is_mdx = "mdx" in all_types
     is_demucs = "demucs" in all_types
 
+    # Returns an array mapped to expected Gradio component tracking behaviors sequentially
     return [
         visible(separate_backing),
         visible(separate_reverb),
@@ -552,12 +533,14 @@ def separate_change(
     ]
 
 def create_dataset_change(
-    model_name, 
-    reverb_model, 
-    enable_post_process, 
-    separate_reverb, 
-    enable_denoise
+    model_name = "HT-Tuned", 
+    reverb_model = "MDX-Reverb", 
+    enable_post_process = False, 
+    separate_reverb = False, 
+    enable_denoise = False
 ):
+    """Adapts dataset processing workflow variables dynamically based on running separation backends."""
+
     model_type = (
         "vr" if model_name in list(vr_models.keys()) else "mdx" 
         if model_name in list(mdx_models.keys()) else "demucs" 
@@ -587,11 +570,14 @@ def create_dataset_change(
         interactive(is_vr) if is_vr else valueFalse_interactive(is_vr)
     ]
 
-def update_audio_device(input_device, output_device, monitor_device, monitor):
+def update_audio_device(input_device = "", output_device = "", monitor_device = "", monitor = False):
+    """Initializes ASIO device channels layout mappings or falls back to traditional stereo sound rules."""
+
     input_is_asio = "ASIO" in input_device if input_device else (False if gradio_version else "hidden")
     output_is_asio = "ASIO" in output_device if output_device else (False if gradio_version else "hidden")
     monitor_is_asio = "ASIO" in monitor_device if monitor_device else (False if gradio_version else "hidden")
 
+    # Reset structural sounddevice core drivers properties safely if ASIO is discovered
     if input_is_asio or output_is_asio or monitor_is_asio:
         sd.terminate()
         sd.initialize()
@@ -643,8 +629,11 @@ def update_audio_device(input_device, output_device, monitor_device, monitor):
     ]
 
 def change_audio_device_choices():
+    """Rescans host audio drivers to update input/output device options in Gradio selectors."""
+
     global input_channels_map, output_channels_map
 
+    # Safely cycle operational status loops inside audio subsystems
     sd.terminate()
     sd.initialize()
 
@@ -669,7 +658,9 @@ def change_audio_device_choices():
         }
     ]
 
-def resolve_sample_rate(input_device_id):
+def resolve_sample_rate(input_device_id = 0):
+    """Queries hardware drivers to extract default internal operational sample rates values."""
+
     if configs.get("asio_enabled", False): return 48000
 
     try:
@@ -678,18 +669,26 @@ def resolve_sample_rate(input_device_id):
     except Exception:
         return 48000
 
-def replace_punctuation(filename):
+def replace_punctuation(filename = ""):
+    """Sanitizes file titles by purging illegal operational symbols with safe underscore placeholders."""
+
     return re.sub(r"_+", "_", re.sub(r"[ \-|]+", "_", filename.translate(str.maketrans("", "", '()[],"\'{}<>?*:/\\')))).strip("_")
 
-def replace_url(url):
+def replace_url(url = ""):
+    """Formats huggingface storage pathways links into direct execution links formats."""
+
     return url.replace("/blob/", "/resolve/").replace("?download=true", "").strip()
 
-def replace_modelname(modelname):
+def replace_modelname(modelname = ""):
+    """Strips extension suffixes from common AI models to reveal pure speaker tracking titles."""
+
     return replace_punctuation(
         modelname.replace(".onnx", "").replace(".pth", "").replace(".index", "").replace(".zip", "")
     )
 
-def replace_export_format(audio_path, export_format = "wav"):
+def replace_export_format(audio_path = "", export_format = "wav"):
+    """Alters structural configuration extensions targets mapped to specific encoding files parameters."""
+
     export_format = f".{export_format}"
 
     return (
@@ -698,7 +697,8 @@ def replace_export_format(audio_path, export_format = "wav"):
         audio_path.replace(f".{os.path.basename(audio_path).split('.')[-1]}", export_format)
     )
 
-def update_dropdowns_from_json(data):
+def update_dropdowns_from_json(data = {}):
+    """Parses JSON data received from frontend JavaScript to dynamically update the choices and values of three audio device dropdowns."""
     if not data:
         return [
             gr.update(choices=[], value=None), 
@@ -724,7 +724,8 @@ def update_dropdowns_from_json(data):
         ),
     ]
 
-def update_button_from_json(data):
+def update_button_from_json(data = {}):
+    """Updates the interactivity states (enabled/disabled) of workflow buttons based on the control state flags passed from the frontend JavaScript."""
     if not data:
         return [
             gr.update(interactive=True), 
@@ -736,7 +737,9 @@ def update_button_from_json(data):
         gr.update(interactive=data.get("stop_button", False))
     ]
 
-def update_value_from_json(data):
+def update_value_from_json(data = {}):
+    """Updates UI text labels and destination paths dynamically using the tracking information generated by the frontend JavaScript execution."""
+
     if not data:
         return [
             gr.update(), 
@@ -748,9 +751,11 @@ def update_value_from_json(data):
         data.get("path", None),
     ]
 
-def get_speakers_id_and_architecture(model):
-    model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
+def get_speakers_id_and_architecture(model = ""):
+    """Reads structural internal tensors data parameters fields inside saved model weights to parse capabilities."""
 
+    model_path = os.path.join(configs["weights_path"], model) if not os.path.exists(model) else model
+    # Validate file integrity conditions before performing serialization inspections steps
     if not model or not os.path.exists(model_path) or os.path.isdir(model_path) or not model.endswith((".pth", ".onnx")): 
         return [
             {
@@ -768,19 +773,26 @@ def get_speakers_id_and_architecture(model):
 
     try:
         if model_path.endswith(".pth"):
+            # Inspect metadata fields from PyTorch checkpoints safely using cpu isolation configurations
             model_data = torch.load(model_path, map_location="cpu", weights_only=True)
         else:
             import onnx
 
             model_data = None
-            for prop in onnx.load(model_path).metadata_props:
+            # Scan structural attributes lists within ONNX metadata wrappers pipelines structures
+            model = onnx.load(model_path)
+
+            for prop in model.metadata_props:
                 if prop.key == "model_info":
                     model_data = json.loads(prop.value)
                     break
+            
+            del model
 
         speakers_id = model_data.get("speakers_id", 1)
         speakers_id_visible = speakers_id and speakers_id != 1
         noise_scale_visible = model_data.get("architecture", "RVC") == "SVC"
+        del model_data
 
         return [
             {
@@ -796,6 +808,7 @@ def get_speakers_id_and_architecture(model):
             }
         ]
     except Exception:
+        # Gracefully fall back to standard RVC configuration properties if internal validation parsing errors occur
         return [
             {
                 "visible": False if gradio_version else "hidden", 
@@ -809,6 +822,3 @@ def get_speakers_id_and_architecture(model):
                 "__type__": "update"
             }
         ]
- 
-def run_commands(cmd):
-    os.system(cmd)

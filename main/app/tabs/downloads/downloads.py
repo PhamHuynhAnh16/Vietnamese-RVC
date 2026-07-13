@@ -97,7 +97,7 @@ def download_tab():
                         visible=False
                     )
                     search_button = gr.Button(
-                        translations["search_2"], 
+                        translations["search"], 
                         scale=2, 
                         visible=False
                     )

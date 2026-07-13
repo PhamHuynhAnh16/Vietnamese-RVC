@@ -42,6 +42,13 @@ if not config.debug_mode:
         logging.getLogger(l).setLevel(logging.ERROR)
 
 def parse_arguments():
+    """
+    Parses command-line arguments for the voice conversion pipeline.
+
+    Returns:
+        argparse.Namespace: The parsed command-line arguments.
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--convert", action='store_true')
     parser.add_argument("--pitch", type=int, default=0)
@@ -85,8 +92,14 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
+    """
+    Main entry point function. Unpacks command line arguments and hands over execution 
+    to the conversion controller.
+    """
+
     args = parse_arguments()
 
+    # Unpack parsed arguments safely into a local tuple structure
     (
         pitch, 
         filter_radius, 
@@ -165,6 +178,7 @@ def main():
         args.audio_upscaler
     )
     
+    # Run the compiled configurations in the pipeline controller
     run_convert_script(
         pitch=pitch, 
         filter_radius=filter_radius, 
@@ -244,9 +258,55 @@ def run_convert_script(
     nprobe = 1,
     audio_upscaler = False
 ):
+    """
+    Validates components, coordinates IO batching/single files, and maps runtime configurations 
+    to execute the conversion pipeline.
+
+    Args:
+        pitch (int): Semitone pitch shift value. Defaults to 0.
+        filter_radius (int): Median filter radius for pitch smoothing. Defaults to 3.
+        index_rate (float): FAISS index feature blend ratio. Defaults to 0.5.
+        rms_mix_rate (float): Volume envelope blend ratio. Defaults to 1.
+        protect (float): Consonant protection factor threshold. Defaults to 0.5.
+        hop_length (int): Frame step size for pitch tracking components. Defaults to 64.
+        f0_method (str): Core pitch extraction methodology name. Defaults to "rmvpe".
+        input_path (str): Target file system directory or single audio file location. Defaults to None.
+        output_path (str): Path where processed audio will be saved. Defaults to "./output.wav".
+        pth_path (str): Path to weights file (.pth or .onnx formats). Defaults to None.
+        index_path (str): Path to matching .index file tracker. Defaults to None.
+        f0_autotune (bool): Enable snapping the F0 pitch sequence to the nearest musical notes.
+        f0_autotune_strength (float): Blend factor for autotune (0.0 = raw pitch, 1.0 = fully snapped).
+        clean_audio (bool): Applies background noise gating blocks. Defaults to False.
+        clean_strength (float): Suppression ratio for noise reduction gate. Defaults to 0.7.
+        export_format (str): Outbound audio encoding identifier (e.g., 'wav', 'mp3'). Defaults to "wav".
+        embedder_model (str): Acoustic feature model identification. Defaults to "hubert_base".
+        resample_sr (int): Forced target resample sampling rate. Defaults to 0.
+        split_audio (bool): Segments long files by silence thresholds. Defaults to False.
+        checkpointing (bool): Toggles PyTorch gradient checkpointing blocks. Defaults to False.
+        f0_file (str): Input external manual pitch data matrix track. Defaults to None.
+        predictor_onnx (bool): Switches F0 tracking to accelerated ONNX backend. Defaults to False.
+        embedders_mode (str): Framework source indicator for speech embedding models. Defaults to "fairseq".
+        formant_shifting (bool): Modulates vocal format frequencies early on. Defaults to False.
+        formant_qfrency (float): Formant queuing factor filter width. Defaults to 0.8.
+        formant_timbre (float): Formant frequency transposition scalar ratio. Defaults to 0.8.
+        proposal_pitch (bool): Enable automatic pitch key shifting calculation based on median F0 alignment.
+        proposal_pitch_threshold (float): The maximum allowed semitone boundary limit (floor/ceiling) for the proposed pitch shift calculation.
+        audio_processing (bool): Evaluates early/late acoustic stage equalization treatments. Defaults to False.
+        alpha (float): Feature blending weighting for underlying components. Defaults to 0.5.
+        sid (int): Target speaker index for multi-speaker networks. Defaults to 0.
+        embedders_mix (bool): Combines multiple internal layer hidden states. Defaults to False.
+        embedders_mix_layers (int): Number of embedding layers to slice. Defaults to 9.
+        embedders_mix_ratio (float): Proportional weighting for embedding layers blending. Defaults to 0.5.
+        noise_scale (float): Control scalar scaling flow variance. Defaults to 0.35.
+        nprobe (int): IVF FAISS space search accuracy parameter. Defaults to 1.
+        audio_upscaler (bool): Enforces super-resolution upscaling pipelines. Defaults to False.
+    """
+
+    # Verify presence of dependent external assets and upscaler weights
     if audio_upscaler: check_upscaler()
     check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
 
+    # Dictionary construction for debugging logs containing human-readable localizations
     log_data = {
         translations["pitch"]: pitch, 
         translations["filter_radius"]: filter_radius, 
@@ -288,17 +348,22 @@ def run_convert_script(
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}")
     
+    # Model sanity validation check
     if not pth_path or not os.path.exists(pth_path) or os.path.isdir(pth_path) or not pth_path.endswith((".pth", ".onnx")):
-        logger.warning(translations["provide_file"].format(filename=translations["model"]))
+        logger.warning(translations["provide_model"])
         sys.exit(1)
 
+    # Instantiate the wrapper converter architecture
     cvt = VoiceConverter(pth_path, embedder_model, embedders_mode, sid, noise_scale, checkpointing, hop_length, alpha, predictor_onnx, clean_audio, clean_strength, audio_upscaler)
 
+    # Write current Process ID (PID) to disk so other sub-processes or GUIs can track/cancel this task
     pid_path = os.path.join("assets", "convert_pid.txt")
     with open(pid_path, "w") as pid_file:
         pid_file.write(str(os.getpid()))
 
     def convert_audio(audio_path, output_audio):
+        """Helper inner function wrapping the conversion pipeline parameters invocation."""
+
         cvt.convert_audio(
             pitch=pitch, 
             filter_radius=filter_radius, 
@@ -330,8 +395,10 @@ def run_convert_script(
     start_time = time.time()
 
     if os.path.isdir(input_path):
-        logger.info(translations["convert_batch"])
+        # Case A: Batch Processing if the input path points to a Directory
 
+        logger.info(translations["convert_batch"])
+        # Filter and extract compatible audio items from target path
         audio_files = [
             f 
             for f in os.listdir(input_path) 
@@ -343,7 +410,7 @@ def run_convert_script(
             sys.exit(1)
 
         logger.info(translations["found_audio"].format(audio_files=len(audio_files)))
-
+        # Loop through valid audio filenames and initiate conversions
         for audio in audio_files:
             audio_path = os.path.join(input_path, audio)
             output_audio = os.path.join(input_path, os.path.splitext(audio)[0] + f"_output.{export_format}")
@@ -360,6 +427,8 @@ def run_convert_script(
             )
         )
     else:
+        # Case B: Standard single audio file processing
+
         if not os.path.exists(input_path):
             logger.warning(translations["not_found_audio"])
             sys.exit(1)
@@ -377,9 +446,15 @@ def run_convert_script(
             )
         )
 
+    # Cleanup the PID file after execution finishes successfully
     if os.path.exists(pid_path): os.remove(pid_path)
 
 class VoiceConverter:
+    """
+    Handles initialization of neural networks (Vocoders, Embedders, Synthesisers) 
+    and drives the overall inference sequence.
+    """
+
     def __init__(
         self, 
         model_path, 
@@ -395,12 +470,29 @@ class VoiceConverter:
         clean_strength = 0.5,
         audio_upscaler = False
     ):
+        """
+        Initializes sub-components, handles tensor dimensions, and configures hardware mapping.
+
+        Args:
+            model_path (str): File system path to the generator target weights file (.pth or .onnx).
+            embedder_model (str): Name string identifier for the target speech representation embedder model.
+            embedders_mode (str): Backend selection framework flag (e.g., 'fairseq').
+            sid (int): Source/Target speaker unique identifier integer index. Defaults to 0.
+            noise_scale (float): Ground truth flow-matching distribution scale variance. Defaults to 0.35.
+            checkpointing (bool): Reduces peak memory consumption footprints at the cost of processing speed. Defaults to False.
+            hop_length (int): Resolution frame configuration window stride length. Defaults to 160.
+            alpha (float): Balancing parameter ratio across underlying modules. Defaults to 0.5.
+            predictor_onnx (bool): Routes frequency extraction modules into ONNX runtime engine. Defaults to False.
+            clean_audio (bool): Activates noise reduction threshold filter profiles. Defaults to False.
+            clean_strength (float): Suppression gain level factor for the acoustic noise gate. Defaults to 0.5.
+            audio_upscaler (bool): Flags ultra-high super-resolution networks execution. Defaults to False.
+        """
+
         self.vc = None
         self.index = None
         self.net_g = None 
         self.tgt_sr = None 
         self.big_tsr = None
-        self.rms_extract = None
         self.hubert_model = None
         self.f0_generator = None
 
@@ -408,11 +500,16 @@ class VoiceConverter:
         self.sample_rate = 16000
         self.hop_length = hop_length
         self.predictor_onnx = predictor_onnx
+        # Decide floating point mode based on configuration settings (FP16 or FP32)
         self.dtype = torch.float16 if config.is_half else torch.float32
 
+        # Step 1: Initialize the acoustic embedder model (HuBERT/ContentVec)
         self.setup_hubert(embedder_model, embedders_mode)
+        # Step 2: Initialize generator weights (RVC/SVC Synthesizer backbone)
         self.setup_vc(model_path, sid, checkpointing, noise_scale)
+        # Step 3: Conditional setup for noise gating modules
         self.tg = TorchGate(self.tgt_sr, prop_decrease=clean_strength).to(config.device) if clean_audio else None
+        # Step 4: Conditional setup for audio super-resolution models
         self.flash_sr = FlashSR(os.path.join("assets", "models", "upscalers", "upscalers.pth"), device=config.device, is_half=config.is_half) if audio_upscaler else None
 
     def convert_audio(
@@ -443,7 +540,41 @@ class VoiceConverter:
         embedders_mix_ratio = 0.5,
         nprobe = 1
     ):
+        """
+        Executes internal pipeline logic on loaded numpy waveforms to yield the 
+        timbre-converted audio output.
+
+        Args:
+            audio_input_path (str): File path pointing to the original source audio sample.
+            audio_output_path (str): Path indicating where the final synthetic file will sit.
+            index_path (str): Matching feature indexing database vector path file (.index).
+            pitch (int): Transposition factor interval shifts in semitone quantities.
+            f0_method (str): Algorithm method name chosen to construct pitch tracks.
+            index_rate (float): Distance blending contribution ratio scale from FAISS query vectors.
+            rms_mix_rate (float): Volume dynamic envelope mixing factor scaling coefficient.
+            protect (float): Structural unvoiced phonemes and breath protect boundary threshold.
+            f0_autotune (bool): Enable snapping the F0 pitch sequence to the nearest musical notes.
+            f0_autotune_strength (float): Blend factor for autotune (0.0 = raw pitch, 1.0 = fully snapped).
+            filter_radius (int): Window width used to compute median filter smoothing on tracking logs.
+            export_format (str): Audio output wrapper container metadata encoding format type.
+            resample_sr (int): Secondary forced outbound sample rate adjustment stage. Defaults to 0.
+            f0_file (str): Overriding custom timeline array values text file source. Defaults to None.
+            formant_shifting (bool): Pre-adjusts speech format structure early in the loading block. Defaults to False.
+            formant_qfrency (float): Shape resonance quality bandwidth adjustments mapping. Defaults to 0.8.
+            formant_timbre (float): Vowel structure timbre placement shift multiplier values. Defaults to 0.8.
+            split_audio (bool): Cuts dense sound files at low silence nodes into smaller batches. Defaults to False.
+            proposal_pitch (bool): Enable automatic pitch key shifting calculation based on median F0 alignment.
+            proposal_pitch_threshold (float): The maximum allowed semitone boundary limit (floor/ceiling) for the proposed pitch shift calculation.
+            audio_processing (bool): Activates signal equalization enhancement steps. Defaults to False.
+            embedders_mix (bool): Accumulates discrete deep layered representation layers together. Defaults to False.
+            embedders_mix_layers (int): Upper layer range constraint target slicing amount. Defaults to 9.
+            embedders_mix_ratio (float): Blending step coefficient ratio for the mixed representation values. Defaults to 0.5.
+            nprobe (int): Search depth parameter applied inside indexed space buckets. Defaults to 1.
+        """
+
         def inference(audio, index, big_tsr, f0_file, pbar):
+            """Executes inner pipeline process flow call."""
+
             return self.vc.pipeline(
                 audio=audio, 
                 f0_up_key=pitch, 
@@ -467,55 +598,67 @@ class VoiceConverter:
 
         try:
             with tqdm(total=10, desc=translations["convert_audio"], ncols=100, unit="a", leave=not split_audio) as pbar:
+                # Load input audio with optional early formant-shifting augmentations
                 audio = load_audio(audio_input_path, sample_rate=self.sample_rate, formant_shifting=formant_shifting, formant_qfrency=formant_qfrency, formant_timbre=formant_timbre)
                 if audio_processing: audio = preprocess(audio, self.sample_rate)
 
+                # Peak volume normalization safeguard block
                 try:
                     audio_max = np.abs(audio).max() / 0.95
                     if audio_max > 1: audio /= audio_max
                 except:
+                    # In case of numeric failures, copy source file directly as a fallback measure
                     import shutil
 
                     shutil.copy(audio_input_path, audio_output_path)
                     return
                 
+                # Dynamically load FAISS indices if vectors are required but absent
                 if index_rate != 0 and (self.index is None or self.big_tsr is None):
-                    self.index, self.big_tsr = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"), nprobe)
-                    if len(audio) > 10e6: self.index.search = self.index._search_cpu
+                    self.index, self.big_tsr = load_faiss_index(index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"), nprobe, cpu_mode=True)
 
                 pbar.update(1)
+                # Chunk splitting strategy for long or intensive files
                 if split_audio:
                     pbar.close()
+                    # Segment audio files based on -60dB silence thresholds
                     chunks = cut(audio, self.sample_rate, db_thresh=-60, min_interval=500)
 
                     logger.info(f"{translations['split_total']}: {len(chunks)}")
+                    # Instantiate recalculated chunk-length progress tracker bars
                     pbar = tqdm(total=len(chunks) * 5 + 4, desc=translations["convert_audio"], ncols=100, unit="a", leave=True)
 
                 pbar.update(1)
 
+                # Perform the underlying voice inference operations
                 if split_audio:
                     converted_chunks = [(start, end, inference(waveform, index=self.index, big_tsr=self.big_tsr, f0_file=None, pbar=pbar)) for waveform, start, end in chunks]
+                    # Stitch converted audio pieces back together seamlessly
                     audio_output = restore(converted_chunks, total_len=len(audio), dtype=converted_chunks[0][2].dtype)
                 else: audio_output = inference(audio, index=self.index, big_tsr=self.big_tsr, f0_file=f0_file, pbar=pbar)
 
                 pbar.update(1)
 
+                # Acoustic post-processing filtering & Noise reduction gate evaluation
                 if audio_processing: audio_output = postprocess(audio_output, self.tgt_sr)
                 if self.tg is not None: audio_output = self.tg(torch.from_numpy(audio_output).unsqueeze(0).to(config.device).float()).squeeze(0).cpu().detach().numpy()
 
                 audio_output_resample = None
                 target_len = int(np.round(len(audio) / self.sample_rate * self.tgt_sr))
+                # Polyphase resampling filter alignment if length mismatches are observed
                 if len(audio_output) != target_len: audio_output = signal.resample_poly(audio_output, target_len, len(audio_output))
 
+                # Handle upscaling super-resolution routines or standard resampling
                 if self.flash_sr is not None:
                     audio_output_resample = self.flash_sr.upscaler(audio_output, sample_rate=self.tgt_sr, pbar=pbar)
-                    self.tgt_sr = 192000
+                    self.tgt_sr = 192000 # FlashSR outputs ultra-high fidelity audio
                 elif self.tgt_sr != resample_sr and resample_sr > 0: 
                     audio_output_resample = librosa.resample(audio_output, orig_sr=self.tgt_sr, target_sr=resample_sr, res_type="soxr_vhq")
                     self.tgt_sr = resample_sr
 
                 pbar.update(1)
 
+                # Export audio array block back into a physical file on disk
                 try:
                     sf.write(
                         audio_output_path, 
@@ -524,6 +667,7 @@ class VoiceConverter:
                         format=export_format
                     )
                 except:
+                    # Secondary fallback to highly compatible standard 48kHz sampling rate if hardware/drivers object
                     logger.info(translations["sr_not_support"])
 
                     sf.write(
@@ -541,15 +685,20 @@ class VoiceConverter:
             logger.error(translations["error_convert"].format(e=e))
     
     def setup_hubert(self, embedder_model, embedders_mode):
+        """Loads and optimizes the discrete feature representation model."""
+
         models = load_embedders_model(embedder_model, embedders_mode)
 
         if isinstance(models, torch.nn.Module): 
             models = models.to(config.device).to(self.dtype).eval()
-            if config.compile_all and embedders_mode != "whisper": models = torch.compile(models, mode=config.compile_mode)
+            # Compile model via TorchInductor if requested for accelerated graph execution
+            if config.compile_all: models = torch.compile(models, mode=config.compile_mode)
 
         self.hubert_model = models
     
     def setup_predictor(self):
+        """Prepares the fundamental frequency (F0) tracking generator module."""
+
         from main.library.predictors.Generator import Generator
 
         self.f0_generator = Generator(
@@ -562,21 +711,14 @@ class VoiceConverter:
             config.device, 
             self.predictor_onnx
         )
-    
-    def setup_rms(self):
-        from main.inference.extracting.rms import RMSEnergyExtractor
-
-        self.rms_extract = RMSEnergyExtractor(
-            frame_length=2048, 
-            hop_length=self.sample_rate // 100, 
-            center=True, 
-            pad_mode = "reflect"
-        ).to(config.device).eval()
 
     def setup_vc(self, weight_root, sid, checkpointing, noise_scale):
+        """Loads and configures the target voice synthesizer architectures."""
+    
         model = load_model(weight_root)
 
         if weight_root.endswith(".pth"):
+            # Standard .pth PyTorch model pipeline
             from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
             self.tgt_sr = model["config"][-1]
@@ -584,18 +726,17 @@ class VoiceConverter:
 
             use_f0 = model.get("f0", 1)
             version = model.get("version", "v1")
-            energy = model.get("energy", False)
             vocoder = model.get("vocoder", "Default")
             hidden_dim = 768 if version == "v2" else 256
 
+            # Differentiate RVC vs SVC model architectures
             if model.get("architecture", "RVC"):
                 self.net_g = Synthesizer(
                     *model["config"], 
                     use_f0=use_f0, 
                     text_enc_hidden_dim=hidden_dim, 
                     vocoder=vocoder, 
-                    checkpointing=checkpointing, 
-                    energy=energy
+                    checkpointing=checkpointing
                 )
             else:
                 self.net_g = SynthesizerSVC(
@@ -606,22 +747,23 @@ class VoiceConverter:
                     noise_scale=noise_scale
                 )
 
-            del self.net_g.enc_q
+            # Inject weights into neural network state dictionary architectures
             self.net_g.load_state_dict(model["weight"], strict=False)
             self.net_g.eval().to(config.device).to(self.dtype)
+            self.net_g.remove_weight_norm()
+            del self.net_g.enc_q
+
             if config.compile_all: self.net_g = torch.compile(self.net_g, mode=config.compile_mode)
-        else:
+        else: # ONNX model fallback graph parsing routes
             self.net_g = model.to(config.device)
             self.tgt_sr = model.cpt.get("tgt_sr", 32000)
-
             use_f0 = model.cpt.get("f0", 1)
             version = model.cpt.get("version", "v1")
-            energy = model.cpt.get("energy", False)
 
-        if energy: self.setup_rms()
+        # Initialize tracking predictors if pitch computation is flagged
         if use_f0: self.setup_predictor()
-
+        # Wrap configurations directly into runtime Pipeline components
         sid = torch.tensor(sid, device=config.device).unsqueeze(0).long()
-        self.vc = Pipeline(self.tgt_sr, config, self.net_g, self.hubert_model, self.f0_generator, self.rms_extract, version, sid, self.dtype)
+        self.vc = Pipeline(self.tgt_sr, config, self.net_g, self.hubert_model, self.f0_generator, version, sid, self.dtype)
 
 if __name__ == "__main__": main()

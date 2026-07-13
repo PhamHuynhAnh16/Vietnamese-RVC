@@ -51,7 +51,7 @@ def f0_extract_tab():
                     with gr.Row():
                         predictor_onnx = gr.Checkbox(
                             label=translations["predictor_onnx"], 
-                            value=False, 
+                            value=configs.get("int8", False), 
                             interactive=True
                         )
                         unlock_full_method = gr.Checkbox(

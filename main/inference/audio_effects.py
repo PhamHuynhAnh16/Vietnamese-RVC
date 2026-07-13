@@ -32,6 +32,13 @@ from main.app.core.ui import replace_export_format
 from main.app.variables import translations, logger
 
 def parse_arguments():
+    """
+    Parses command-line arguments for the audio effects pipeline.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments containing configuration parameters for all audio effects and file paths.
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--audio_effects", action='store_true')
     parser.add_argument("--input_path", type=str, required=True)
@@ -155,44 +162,76 @@ def process_audio(
     main_volume, 
     combination_volume
 ):
+    """
+    Core audio processing engine that loads an audio file, pipelines multiple 
+    DSP effects using Pedalboard, handles manual filtering/fading, and handles output storage.
+
+    Returns:
+        str: Path to the generated output audio file.
+
+    Raises:
+        RuntimeError: If audio loading or processing fails.
+    """
+
     def _filtfilt(b, a, audio):
+        """
+        Applies a zero-phase forward-backward digital filter with dynamic padding 
+        to avoid boundary artifacts on short signals.
+        """
+
         padlen = 3 * max(len(a), len(b))
         original_len = len(audio)
 
+        # Pad the audio data if it's too short for the filter requirements
         if original_len <= padlen:
             pad_width = padlen - original_len + 1
             audio = np.pad(audio, (pad_width, 0), mode='reflect')
 
+        # Run forward-backward linear filtering
         filtered = filtfilt(b, a, audio, padlen=0)
-        return filtered[-original_len:]
+        return filtered[-original_len:] # Crop out the added padding
     
     def bass_boost(audio, gain_db, frequency, sample_rate):
+        """Applies a low-pass Butterworth filter to boost low frequencies (bass)."""
+
         if gain_db >= 1:
+            # Design a 4th-order low-pass Butterworth filter
             b, a = butter(4, frequency / (0.5 * sample_rate), btype='low')
             boosted = _filtfilt(b, a, audio)
+            # Apply linear scale gain conversion to boosted components
             return boosted * (10 ** (gain_db / 20))
         return audio
 
     def treble_boost(audio, gain_db, frequency, sample_rate):
+        """Applies a high-pass Butterworth filter to boost high frequencies (treble)."""
+
         if gain_db >= 1:
+            # Design a 4th-order high-pass Butterworth filter
             b, a = butter(4, frequency / (0.5 * sample_rate), btype='high')
             boosted = _filtfilt(b, a, audio)
+            # Apply linear scale gain conversion to boosted components
             return boosted * (10 ** (gain_db / 20))
         return audio
 
     def fade_out_effect(audio, sr, duration=3.0):
+        """Applies a linear fade-out attenuation envelope to the end of the track."""
+
         length = int(duration * sr)
         end = audio.shape[0]
         if length > end: length = end  
         start = end - length
+        # Multiply audio signal with a linear vector dropping from 1.0 down to 0.0
         audio[start:end] = audio[start:end] * np.linspace(1.0, 0.0, length)
         return audio
 
     def fade_in_effect(audio, sr, duration=3.0):
+        """Applies a linear fade-in attenuation envelope to the beginning of the track."""
+
         length = int(duration * sr)
         start = 0
         if length > audio.shape[0]: length = audio.shape[0]  
         end = length
+        # Multiply audio signal with a linear vector growing from 0.0 up to 1.0
         audio[start:end] = audio[start:end] * np.linspace(0.0, 1.0, length)
         return audio
 
@@ -204,19 +243,25 @@ def process_audio(
         logger.warning(translations["output_not_valid"])
         sys.exit(1)
     
+    # Overwrite protection: Clear existing target file before rewriting
     if os.path.exists(output_path): os.remove(output_path)
     
     try:
-        input_path = input_path.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
+        # Sanitize path formatting strings
+        input_path = input_path.strip().strip('"').strip("\n").strip('"').strip()
+
         try:
-            audio, sample_rate = sf.read(input_path, dtype=np.float32)
+            # Primary choice: Use Soundfile for fast high-precision reading
+            audio, sample_rate = sf.read(input_path, dtype=np.float64)
         except:
+            # Fallback choice: Use Librosa if format is unsupported by Soundfile
             audio, sample_rate = librosa.load(input_path, sr=None)
     except Exception as e:
-        logger.debug(f"{translations['errors_loading_audio']}: {e}")
-        raise RuntimeError(f"{translations['errors_loading_audio']}: {e}")
+        logger.debug(e)
+        raise RuntimeError(translations['errors_loading_audio'])
 
     try:
+        # Initialize Pedalboard structure starting with a clean highpass filter baseline
         board = Pedalboard([HighpassFilter()])
 
         if chorus: 
@@ -314,8 +359,10 @@ def process_audio(
             )
         )
 
+        # Process the raw waveform through our pedalboard chain configuration
         processed_audio = board(audio, sample_rate)
 
+        # Apply manual EQ Filters if enabled
         if treble_bass_boost:
             processed_audio = bass_boost(
                 processed_audio, 
@@ -331,19 +378,22 @@ def process_audio(
                 sample_rate
             )
 
+        # Apply millisecond fade transitions if enabled
         if fade_in_out:
+            # Convert millisecond parameter durations to relative time ratios
             processed_audio = fade_in_effect(
                 processed_audio, 
                 sample_rate, 
-                fade_in_duration
+                fade_in_duration / 1000
             )
 
             processed_audio = fade_out_effect(
                 processed_audio, 
                 sample_rate, 
-                fade_out_duration
+                fade_out_duration / 1000
             )
             
+        # Handle audio resampling adjustments
         if resample and resample_sr != sample_rate and resample_sr > 0:
             processed_audio = librosa.resample(
                 processed_audio, 
@@ -354,6 +404,7 @@ def process_audio(
 
             sample_rate = resample_sr
 
+        # Save primary outputs out to system file systems
         sf.write(
             replace_export_format(output_path, export_format), 
             processed_audio, 
@@ -362,6 +413,7 @@ def process_audio(
         )
 
         if audio_combination: 
+            # Load overlay tracks, apply volume changes, blend them together, and re-export
             pydub_load(
                 audio_combination_input, 
                 combination_volume
@@ -381,6 +433,11 @@ def process_audio(
     return output_path
 
 def main():
+    """
+    Main execution entry point. Parses runtime parameters and passes them 
+    directly into the audio processing suite.
+    """
+
     args = parse_arguments()
 
     process_audio(

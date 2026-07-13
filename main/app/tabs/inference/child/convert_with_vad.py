@@ -16,7 +16,6 @@ from main.app.core.ui import (
     index_strength_show, 
     change_audios_choices, 
     change_models_choices, 
-    change_embedders_mode, 
     get_speakers_id_and_architecture
 )
 
@@ -297,7 +296,7 @@ def convert_with_vad_tab():
                             predictor_onnx = gr.Checkbox(
                                 label=translations["predictor_onnx"], 
                                 info=translations["predictor_onnx_info"], 
-                                value=False, 
+                                value=configs.get("int8", False), 
                                 interactive=True
                             )
                             unlock_full_method = gr.Checkbox(
@@ -355,7 +354,7 @@ def convert_with_vad_tab():
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
-                        value="fairseq", 
+                        value="onnx" if configs.get("int8", False) else "fairseq", 
                         choices=embedders_mode, 
                         interactive=True, 
                         visible=True
@@ -455,7 +454,7 @@ def convert_with_vad_tab():
                         maximum=1, 
                         label=translations["protect"], 
                         info=translations["protect_info"], 
-                        value=0.5, 
+                        value=0.33, 
                         step=0.01, 
                         interactive=True
                     )
@@ -468,7 +467,7 @@ def convert_with_vad_tab():
                         value=3, 
                         step=1, 
                         interactive=True, 
-                        visible=False
+                        visible=True
                     )
                     vad_frame_ms = gr.Slider(
                         minimum=10, 
@@ -478,7 +477,7 @@ def convert_with_vad_tab():
                         value=30, 
                         step=10, 
                         interactive=True, 
-                        visible=False
+                        visible=True
                     )
                 with gr.Row():
                     formant_qfrency = gr.Slider(
@@ -700,15 +699,6 @@ def convert_with_vad_tab():
             ], 
             outputs=[
                 f0_method
-            ]
-        )
-        embedder_mode.change(
-            fn=change_embedders_mode, 
-            inputs=[
-                embedder_mode
-            ], 
-            outputs=[
-                embedders
             ]
         )
         proposal_pitch.change(

@@ -43,7 +43,6 @@ from main.app.core.ui import (
     index_strength_show, 
     change_models_choices, 
     change_preset_choices, 
-    change_embedders_mode, 
     change_tts_voice_choices, 
     get_speakers_id_and_architecture
 )
@@ -239,7 +238,7 @@ def convert_tts_tab():
                             predictor_onnx = gr.Checkbox(
                                 label=translations["predictor_onnx"], 
                                 info=translations["predictor_onnx_info"], 
-                                value=False, 
+                                value=configs.get("int8", False), 
                                 interactive=True
                             )
                             unlock_full_method = gr.Checkbox(
@@ -315,7 +314,7 @@ def convert_tts_tab():
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
-                        value="fairseq", 
+                        value="onnx" if configs.get("int8", False) else "fairseq", 
                         choices=embedders_mode, 
                         interactive=True, 
                         visible=True
@@ -552,7 +551,7 @@ def convert_tts_tab():
                         maximum=1, 
                         label=translations["protect"], 
                         info=translations["protect_info"], 
-                        value=0.5, 
+                        value=0.33, 
                         step=0.01, 
                         interactive=True
                     )
@@ -753,15 +752,6 @@ def convert_tts_tab():
             ]
         )
     with gr.Row():
-        embedder_mode.change(
-            fn=change_embedders_mode, 
-            inputs=[
-                embedder_mode
-            ], 
-            outputs=[
-                embedders
-            ]
-        )
         autotune.change(
             fn=visible, 
             inputs=[

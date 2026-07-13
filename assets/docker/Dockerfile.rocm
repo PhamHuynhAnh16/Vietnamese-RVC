@@ -12,7 +12,7 @@ RUN python3 -m venv /app/.venv && \
     . /app/.venv/bin/activate && \
     python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()" && \
     pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir six packaging python-dateutil platformdirs pywin32 && \
+    pip install --no-cache-dir six packaging python-dateutil platformdirs && \
     pip install --no-cache-dir torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm7.2 && \
     pip install --no-cache-dir onnxruntime-rocm && \
     pip install --no-cache-dir -r requirements.txt && \

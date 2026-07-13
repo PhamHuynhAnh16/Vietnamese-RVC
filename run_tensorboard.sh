@@ -1,11 +1,7 @@
-#!/usr/bin/env bash
-
-set -e
+#!/bin/bash
+clear
 echo "Vietnamese RVC Tensorboard"
 
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
-
+source venv/bin/activate
 python main/app/run_tensorboard.py --open
+deactivate

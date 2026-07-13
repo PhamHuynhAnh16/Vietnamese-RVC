@@ -67,6 +67,71 @@ def audio_effects(
     main_vol, 
     combine_vol
 ):
+    """Applies multiple professional audio DSP effects by invoking an external Python backend script.
+
+    Args:
+        input_path (str): Path to the input audio file.
+        output_path (str): Target path or directory for the output audio file.
+        resample (bool): Toggle to resample the audio.
+        resample_sr (int): Target sample rate for resampling.
+        chorus_depth (float): Depth parameter for the chorus effect.
+        chorus_rate (float): LFO modulation speed for chorus.
+        chorus_mix (float): Dry/wet mix ratio for chorus.
+        chorus_delay (int): Base delay time for chorus in milliseconds.
+        chorus_feedback (float): Feedback amount for the chorus loop.
+        distortion_drive (int): Input gain drive for saturation/distortion.
+        reverb_room_size (float): Simulated room dimension size for reverb.
+        reverb_damping (float): High-frequency absorption factor for reverb.
+        reverb_wet_level (float): Wet (processed) signal level for reverb.
+        reverb_dry_level (float): Dry (unprocessed) signal level for reverb.
+        reverb_width (float): Stereo width representation for reverb.
+        reverb_freeze_mode (bool): Reverb tail infinite sustain freeze toggle.
+        pitch_shift (int): Number of semitones to shift the pitch.
+        delay_seconds (float): Time interval between echo repeats in seconds.
+        delay_feedback (float): Feedback gain decay loop for delay.
+        delay_mix (float): Dry/wet mix percentage for delay.
+        compressor_threshold (int): Decibel level above which compression activates.
+        compressor_ratio (float): Input-to-output gain attenuation ratio.
+        compressor_attack_ms (float): Reaction speed of compression onset in ms.
+        compressor_release_ms (int): Recovery speed after signal drops in ms.
+        limiter_threshold (int): Hard ceiling cap limit for output signal.
+        limiter_release (int): Hard limiter release envelope time.
+        gain_db (int): Master volume adjustment factor in decibels.
+        bitcrush_bit_depth (int): Bit-depth reduction target for bitcrushing.
+        clipping_threshold (int): Threshold ceiling for hard distortion clipping.
+        phaser_rate_hz (float): LFO frequency rate for phaser sweeps.
+        phaser_depth (float): Modulation sweep range depth for phaser.
+        phaser_centre_frequency_hz (int): Center frequency of phaser notch filters.
+        phaser_feedback (float): Resonance feedback value loop for phaser.
+        phaser_mix (float): Blend ratio of original and phased signal.
+        bass_boost_db (int): Low shelf equalizer filter boost value in dB.
+        bass_boost_frequency (int): Cutoff frequency limit for low shelf filter.
+        treble_boost_db (int): High shelf equalizer filter boost value in dB.
+        treble_boost_frequency (int): Cutoff frequency limit for high shelf filter.
+        fade_in_duration (float): Length of volume fade-in at start in seconds.
+        fade_out_duration (float): Length of volume fade-out at end in seconds.
+        export_format (str): Targeted extension container for audio output.
+        chorus (bool): Master switch for chorus module activation.
+        distortion (bool): Master switch for distortion module activation.
+        reverb (bool): Master switch for reverb module activation.
+        delay (bool): Master switch for delay module activation.
+        compressor (bool): Master switch for dynamic compressor activation.
+        limiter (bool): Master switch for peak limiter activation.
+        gain (bool): Master switch for absolute gain volume scaling.
+        bitcrush (bool): Master switch for bitcrush audio degradation effect.
+        clipping (bool): Master switch for hard signal clipping distortion.
+        phaser (bool): Master switch for multi-stage phaser filter effect.
+        treble_bass_boost (bool): Master switch for dual shelf equalizer controls.
+        fade_in_out (bool): Master switch for linear boundary volume fading.
+        audio_combination (bool): Toggle to mix/merge two distinct audio streams.
+        audio_combination_input (str): Path to the secondary audio file to blend.
+        main_vol (int): Mix volume ratio multiplier for the primary stream.
+        combine_vol (int): Mix volume ratio multiplier for the secondary stream.
+
+    Returns:
+        Optional[str]: Verified path pointing to the processed output file, or None if validation fails.
+    """
+
     if not input_path or not os.path.exists(input_path) or os.path.isdir(input_path): 
         gr_warning(translations["input_not_valid"])
         return None
@@ -75,14 +140,15 @@ def audio_effects(
         gr_warning(translations["output_not_valid"])
         return None
     
+    # Handle implicit directory inputs by assigning a default filename configuration
     if os.path.isdir(output_path): output_path = os.path.join(output_path, f"audio_effects.{export_format}")
     output_dir = os.path.dirname(output_path) or output_path
 
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     output_path = process_output(output_path)
     
-    gr_info(translations["start"].format(start=translations["apply_effect"]))
-
+    gr_info(translations["start_apply_effect"])
+    # Construct subprocess parameters dynamically to isolate core audio processing
     subprocess.run([
         python, 
         configs["audio_effects_path"], 
@@ -154,6 +220,19 @@ def apply_voice_quirk(
     output_path, 
     export_format
 ):
+    """
+    Applies various fun/creative audio voice quirks and modifications natively using NumPy and Librosa.
+
+    Args:
+        audio_path (str): Source path of the input file.
+        mode (str): Quirks dictionary key label string or matching mode index.
+        output_path (str): Target filename destination template path.
+        export_format (str): Desired final target file container type extension (e.g., 'wav', 'mp3').
+
+    Returns:
+        Optional[str]: Path pointing directly to the written audio artifact file, or None if validation fails.
+    """
+
     if not audio_path or not os.path.exists(audio_path) or os.path.isdir(audio_path): 
         gr_warning(translations["input_not_valid"])
         return None
@@ -170,32 +249,27 @@ def apply_voice_quirk(
     if not os.path.exists(output_dir): os.makedirs(output_dir, exist_ok=True)
     output_path = process_output(output_path)
     
-    gr_info(translations["start"].format(start=translations["apply_effect"]))
-
+    gr_info(translations["start_apply_effect"])
+    # Lazy imports to optimize framework initialization overhead
     import librosa
     import numpy as np
     import soundfile as sf
 
     def vibrato(y, sr, freq=5, depth=0.003):
-        return y[
-            np.clip(
-                (np.arange(
-                    len(y)) + (
-                        depth * np.sin(
-                            2 * np.pi * freq * (np.arange(len(y)) / sr)
-                        )
-                    ) * sr
-                ).astype(int), 
-                0, 
-                len(y) - 1
-            )
-        ]
+        """Applies a frequency modulation (Vibrato) effect to the sound waveform array using a variable delay line."""
 
+        # Calculate periodic sinus delay mapping allocations
+        delay_modulation = depth * np.sin(2 * np.pi * freq * (np.arange(len(y)) / sr))
+        # Interpolate spatial sampling lookup mappings securely
+        return y[np.clip((np.arange(len(y)) + delay_modulation * sr).astype(int), 0, len(y) - 1)]
+
+    # Load file with dynamic source target native sample rates representation intact
     y, sr = librosa.load(audio_path, sr=None)
     output_path = replace_export_format(output_path, export_format)
 
+    # Convert named linguistic UI selections safely into explicit technical control integers
     mode = translations["quirk_choice"][mode]
-    if mode == 0: mode = random.randint(1, 16)
+    if mode == 0: mode = random.randint(1, 16) # Pick a random quirk
 
     if mode == 1: 
         y *= np.random.uniform(
@@ -253,7 +327,7 @@ def apply_voice_quirk(
             rate=0.85
         )
     elif mode == 8: 
-        y *= 0.6 + np.pad(y, (sr // 2, 0), mode='constant')[:len(y)] * 0.4
+        y = (y * 0.6) + np.pad(y, (sr // 2, 0), mode='constant')[:len(y)] * 0.4
     elif mode == 9: 
         y = librosa.effects.pitch_shift(
             y=y, 
@@ -305,6 +379,7 @@ def apply_voice_quirk(
             y[i:i+frame] = y[i:i+frame][::-1]
 
     sf.write(output_path, y, sr, format=export_format)
-    gr_info(translations["success"])
+    del y, sr # Active garbage clearing to protect performance from large matrix leaks
 
+    gr_info(translations["success"])
     return output_path

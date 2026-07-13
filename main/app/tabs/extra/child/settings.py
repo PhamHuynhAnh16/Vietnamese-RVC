@@ -6,7 +6,7 @@ import gradio as gr
 sys.path.append(os.getcwd())
 
 from main.app.core.utils import stop_pid
-from main.app.core.ui import change_fp, run_commands
+from main.app.core.ui import change_fp, gpu_infos
 
 from main.app.core.restart import restart
 
@@ -16,27 +16,10 @@ from main.app.variables import (
     config, 
     configs, 
     language, 
+    reload_js,
     translations 
 )
 
-reload_js = """
-() => {
-    function Checking() {
-        fetch(window.location.origin)
-            .then(response => {
-                if (response.ok) {
-                    location.reload();
-                } else {
-                    setTimeout(Checking, 3000);
-                }
-            })
-            .catch(err => {
-                setTimeout(Checking, 3000);
-            });
-    }
-    setTimeout(Checking, 10000);
-}
-"""
 
 def settings_tab(app):
     with gr.Row():
@@ -73,6 +56,14 @@ def settings_tab(app):
                 interactive=True
             )
     with gr.Row():
+        gpu_idx = gr.Dropdown(
+            label=translations["gpu_idx"],
+            interactive=len(gpu_infos) > 0,
+            info=translations["gpu_idx_info"],
+            choices=gpu_infos if len(gpu_infos) > 0 else ["CPU"],
+            value=gpu_infos[config.pytorch_device_idx] if len(gpu_infos) > 0 else "CPU"
+        )
+    with gr.Row():
         restart_button = gr.Button(
             translations["restart_button"]
         )
@@ -82,16 +73,21 @@ def settings_tab(app):
                 with gr.Row():
                     bf16_checkbox = gr.Checkbox(
                         label=translations["bf16"], 
-                        value=False, 
+                        value=config.brain, 
                         interactive=config.device.startswith(("cuda", "xpu")) and config.bf16_support
                     )
                     tf32_checkbox = gr.Checkbox(
                         label=translations["tf32"],
-                        value=False, 
+                        value=config.tf32, 
                         interactive=config.device.startswith("cuda") and config.tf32_support
                     )
+                    int8_checkbox = gr.Checkbox(
+                        label=translations["int8_mode"],
+                        value=config.int8, 
+                        interactive=True
+                    )
                 fp_choice = gr.Radio(
-                    choices=["fp16","fp32"], 
+                    choices=["fp16", "fp32"], 
                     value="fp16" if configs.get("fp16", False) else "fp32", 
                     label=translations["precision"], 
                     info=translations["precision_info"], 
@@ -152,14 +148,15 @@ def settings_tab(app):
             inputs=[
                 fp_choice, 
                 bf16_checkbox,
-                tf32_checkbox
+                tf32_checkbox,
+                int8_checkbox
             ], 
             outputs=[
                 fp_choice
             ]
         )
         run_commands_button.click(
-            fn=run_commands,
+            fn=os.system,
             inputs=[
                 commands
             ],
@@ -167,8 +164,8 @@ def settings_tab(app):
         )
     with gr.Row():
         restart_button.click(
-            fn=lambda lang, theme, font: restart(lang, theme, font, app), 
-            inputs=[language_dropdown, theme_dropdown, font_choice], 
+            fn=lambda lang, theme, font, gpu: restart(lang, theme, font, gpu, app), 
+            inputs=[language_dropdown, theme_dropdown, font_choice, gpu_idx], 
             outputs=[]
         )
         restart_button.click(

@@ -3,11 +3,13 @@ import sys
 
 sys.path.append(os.getcwd())
 
+# Safely extract the primary command-line argument
 try:
     argv = sys.argv[1]
 except IndexError:
     argv = None
 
+# List of supported help flags for user guidance
 argv_help_is_allows = [
     "--help_audio_effects", 
     "--help_convert", 
@@ -21,6 +23,7 @@ argv_help_is_allows = [
     "--help"
 ]
 
+# Mapping of execution flags to their corresponding internal module paths
 COMMANDS = {
     "--audio_effects": "main.inference.audio_effects",
     "--convert": "main.inference.conversion.convert",
@@ -33,6 +36,7 @@ COMMANDS = {
     "--create_reference": "main.inference.create_reference",
 }
 
+# Base validation: Exit if no argument is provided, or if the argument is unrecognized and lacks a help flag
 if argv is None or argv not in list(COMMANDS) and "--help" not in argv:
     print("Cú pháp không hợp lệ! Sử dụng --help để biết thêm")
     sys.exit()
@@ -131,7 +135,7 @@ elif argv_help_is_allows[1] == argv:
 
         3. Mô hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Mô hình nhúng sử dụng.
-            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
+            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`).
             - `--embedders_mix` (mặc định: `False`): Hòa trộn tầng.
             - `--embedders_mix_layers` (mặc định: `9`): Tầng hòa trộn.
             - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
@@ -231,13 +235,10 @@ elif argv_help_is_allows[4] == argv:
 
         4. Cấu hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.
-            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
+            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`).
             - `--embedders_mix` (mặc định: `False`): Hòa trộn tầng.
             - `--embedders_mix_layers` (mặc định: `9`): Tầng hòa trộn.
             - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
-          
-        4. RMS:
-            - `--rms_extract` (mặc định: False): Trích xuất thêm năng lượng rms.
     """)
     sys.exit()
 elif argv_help_is_allows[5] == argv:
@@ -320,7 +321,6 @@ elif argv_help_is_allows[7] == argv:
             - `--g_pretrained_path` (mặc định: ``): Đường dẫn đến trọng số G đã huấn luyện trước.
             - `--d_pretrained_path` (mặc định: ``): Đường dẫn đến trọng số D đã huấn luyện trước.
             - `--vocoder` (mặc định: `Default`): Bộ mã hóa được sử dụng (`Default`, `MRF-HiFi-GAN`, `RefineGAN`).
-            - `--energy_use` (mặc định: `False`): Sử dụng năng lượng rms.
             - `--architecture` (mặc định: `RVC`): Kiến trúc của mô hình giọng nói (`RVC`, `SVC`).
 
         6. Phát hiện huấn luyện quá mức:
@@ -334,7 +334,7 @@ elif argv_help_is_allows[7] == argv:
             - `--checkpointing` (mặc định: `False`): Bật/tắt checkpointing để tiết kiệm RAM.
             - `--deterministic` (mặc định: `False`): Khi bật sẽ sử dụng các thuật toán có tính xác định cao, đảm bảo rằng mỗi lần chạy cùng một dữ liệu đầu vào sẽ cho kết quả giống nhau.
             - `--benchmark` (mặc định: `False`): Khi bật sẽ thử nghiệm và chọn thuật toán tối ưu nhất cho phần cứng và kích thước cụ thể.
-            - `--optimizer` (mặc định: `AdamW`): Trình tối ưu hóa được sử dụng (`AdamW`, `RAdam`, `AnyPrecisionAdamW`, `AdaBelief`, `AdaBeliefV2`).
+            - `--optimizer` (mặc định: `AdamW`): Trình tối ưu hóa được sử dụng (`AdamW`, `RAdam`, `AnyPrecisionAdamW`, `AdaBelief`).
             - `--multiscale_mel_loss` (mặc định: `False`): So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra.
             - `--use_cosine_annealing_lr` (mặc định: `False`): Sử dụng phương pháp giảm LR bằng Cosine Annealing có thể giúp cải thiện chất lượng phát âm.
           
@@ -360,12 +360,11 @@ elif argv_help_is_allows[8] == argv:
           
         2. Cấu hình bộ tham chiếu:
             - `--pitch_guidance` (mặc định: `True`): Sử dụng hướng dẫn cao độ.
-            - `--energy_use` (mặc định: `False`): Sử dụng năng lượng rms.
             - `--version` (mặc định: `v2`): Phiên bản mô hình (`v1`, `v2`).
 
         3. Cấu hình nhúng:
             - `--embedder_model` (mặc định: `hubert_base`): Tên mô hình nhúng.
-            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`, `whisper`).
+            - `--embedders_mode` (mặc định: `fairseq`): Chế độ nhúng (`fairseq`, `transformers`, `onnx`).
             - `--embedders_mix` (mặc định: `False`): Hòa trộn tầng.
             - `--embedders_mix_layers` (mặc định: `9`): Tầng hòa trộn.
             - `--embedders_mix_ratio` (mặc định: `0.5`): Tỉ lệ hòa trộn.
@@ -399,18 +398,25 @@ elif argv_help_is_allows[9] == argv:
 elif argv in COMMANDS:
     import importlib
 
+    # Dynamically import the target module mapping to the execution flag
     module = importlib.import_module(COMMANDS[argv])
+    # Fetch the main executable callable from the imported module
     main = module.main
 else:
+    # Fallback closure to prevent execution if an edge case bypasses the initial validation
     main = lambda: print("Cú pháp không hợp lệ!"); sys.exit()
 
 if __name__ == "__main__":
     import torch.multiprocessing as mp
 
     try:
+        # Configure multiprocessing context based on execution requirements.
+        # RVC/SVC training and extraction tasks require the 'spawn' method for safe GPU/CUDA initialization.
         if "--train" in argv: mp.set_start_method("spawn")
         if "--preprocess" in argv or "--extract" in argv: mp.set_start_method("spawn", force=True)
     except:
+        # Catch RuntimeError if the multiprocessing start method has already been set elsewhere
         pass
 
+    # Fire the selected sub-module function
     main()

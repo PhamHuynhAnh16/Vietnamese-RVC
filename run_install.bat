@@ -2,7 +2,7 @@
 chcp 65001 > nul
 
 setlocal
-title Vietnamese RVC Install
+title Vietnamese RVC Install (Windows)
 
 set ZIP_PATH=%~dp0assets\runtime.zip
 set DEST_PATH=%~dp0

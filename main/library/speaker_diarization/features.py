@@ -18,6 +18,17 @@ KEYS_MAPPING = {
 }
 
 def map_old_state_dict_weights(state_dict, mapping):
+    """
+    Updates outdated or typo-ridden state_dict keys with modern equivalents.
+
+    Args:
+        state_dict (Dict[str, torch.Tensor]): Model checkpoint parameters state dictionary.
+        mapping (Dict[str, str]): Key substitution configuration patterns.
+
+    Returns:
+        Dict[str, torch.Tensor]: Remapped configuration weights matrix.
+    """
+
     for replacement_old, replacement_new in mapping.items():
         for old_key in list(state_dict.keys()):
             if replacement_old in old_key: 
@@ -28,12 +39,25 @@ def map_old_state_dict_weights(state_dict, mapping):
     return state_dict
 
 def hook_on_loading_state_dict_checkpoint(state_dict):
+    """Callback wrapper ensuring state_dict complies with updated key mappings before structural binding."""
+
     return map_old_state_dict_weights(
         state_dict, 
         KEYS_MAPPING
     )
 
 def torch_patched_state_dict_load(path, device="cpu"):
+    """
+    Loads a PyTorch state dict securely using safe-weights filtering and applies key patches.
+
+    Args:
+        path (str): File path location of the checkpoint tensor file.
+        device (Union[str, torch.device]): Device targeting map locations. Defaults to "cpu".
+
+    Returns:
+        Dict[str, torch.Tensor]: Patched state dictionary.
+    """
+
     return hook_on_loading_state_dict_checkpoint(
         torch.load(
             path, 
@@ -44,10 +68,21 @@ def torch_patched_state_dict_load(path, device="cpu"):
 
 @main_process_only
 def torch_save(obj, path):
+    """Saves object state parameters to a disk archive from the main process thread only."""
+
     state_dict = obj.state_dict()
     torch.save(state_dict, path)
 
 def torch_recovery(obj, path, end_of_epoch):
+    """
+    Restores saved dictionary parameters into target working modules safely.
+
+    Args:
+        obj (Any): Target object or module instance (e.g., nn.Module, Optimizer).
+        path (str): Checkpoint file path source.
+        end_of_epoch (bool): Indicates if the trigger occurred exactly on an epoch boundary loop.
+    """
+
     del end_of_epoch  
 
     state_dict = torch_patched_state_dict_load(path, "cpu")
@@ -55,26 +90,33 @@ def torch_recovery(obj, path, end_of_epoch):
     try:
         obj.load_state_dict(state_dict, strict=True)
     except TypeError:
+        # Fallback mechanism if the module's load_state_dict doesn't explicitly accept the strict parameter
         obj.load_state_dict(state_dict)
 
 def torch_parameter_transfer(obj, path):
+    """Performs a non-strict warm-start parameters transfer between models with partially matching layouts."""
+
     incompatible_keys = obj.load_state_dict(
         torch_patched_state_dict_load(path, "cpu"), 
         strict=False
     )
-
+    # Hooks to handle shape deviations can be appended safely below
     for missing_key in incompatible_keys.missing_keys:
         pass
     for unexpected_key in incompatible_keys.unexpected_keys:
         pass
 
 def _cycliclrsaver(obj, path):
+    """Serializes CyclicLR scheduler state while severing weak references to prevent garbage collection errors."""
+
     state_dict = obj.state_dict()
     if state_dict.get("_scale_fn_ref") is not None: state_dict["_scale_fn_ref"] = WEAKREF_MARKER
 
     torch.save(state_dict, path)
 
 def _cycliclrloader(obj, path, end_of_epoch):
+    """Restores CyclicLR schedulers parameters safely."""
+
     del end_of_epoch  
 
     try:
@@ -87,6 +129,7 @@ def _cycliclrloader(obj, path, end_of_epoch):
             torch.load(path, map_location="cpu", weights_only=True)
         )
 
+# Mapping of standard handlers for PyTorch system objects
 DEFAULT_LOAD_HOOKS = {
     torch.nn.Module: torch_recovery, 
     torch.optim.Optimizer: torch_recovery, 
@@ -101,6 +144,7 @@ DEFAULT_SAVE_HOOKS = {
     torch.cuda.amp.grad_scaler.GradScaler: torch_save
 }
 
+# Attach standard hooks for general LRSchedulers
 DEFAULT_LOAD_HOOKS[
     torch.optim.lr_scheduler.LRScheduler
 ] = torch_recovery
@@ -113,6 +157,7 @@ DEFAULT_TRANSFER_HOOKS = {
     torch.nn.Module: torch_parameter_transfer
 }
 
+# Attach custom handlers for CyclicLR schedulers
 DEFAULT_SAVE_HOOKS[
     torch.optim.lr_scheduler.CyclicLR
 ] = _cycliclrsaver
@@ -122,6 +167,18 @@ DEFAULT_LOAD_HOOKS[
 ] = _cycliclrloader
 
 def register_checkpoint_hooks(cls, save_on_main_only=True):
+    """
+    Class decorator to auto-discover and register custom SpeechBrain saver/loader hooks.
+
+    Args:
+        cls (Any): Target class being modified.
+        save_on_main_only (bool, optional): Wraps saving logic to limit disk writes to the main process thread. 
+            Defaults to True.
+
+    Returns:
+        Any: Modified class containing global serialization hook definitions.
+    """
+
     global DEFAULT_LOAD_HOOKS, DEFAULT_SAVE_HOOKS, DEFAULT_TRANSFER_HOOKS
 
     for name, method in cls.__dict__.items():
@@ -132,47 +189,72 @@ def register_checkpoint_hooks(cls, save_on_main_only=True):
     return cls
 
 def mark_as_saver(method):
+    """Marks a class method as the primary checkpoint serialization routine."""
+
     sig = inspect.signature(method)
 
     try:
         sig.bind(object(), "testpath")
     except TypeError:
-        raise TypeError
+        raise TypeError("Saver function must match signature pattern: method(self, path)")
     
     method._speechbrain_saver = True
     return method
 
 def mark_as_transfer(method):
+    """Marks a class method as a valid target for partial parameter weight migration transfers."""
+
     sig = inspect.signature(method)
     
     try:
         sig.bind(object(), "testpath")
     except TypeError:
-        raise TypeError
+        raise TypeError("Transfer function must match signature pattern: method(self, path)")
     
     method._speechbrain_transfer = True
     return method
 
 def mark_as_loader(method):
+    """Marks a class method as the target deserializer decoder routine."""
+
     sig = inspect.signature(method)
 
     try:
         sig.bind(object(), "testpath", True)
     except TypeError:
-        raise TypeError
+        raise TypeError("Loader function must match signature pattern: method(self, path, end_of_epoch)")
     
     method._speechbrain_loader = True
     return method
 
 def ddp_all_reduce(communication_object, reduce_op):
+    """
+    Gathers and performs collective reduction calculations across elements distributed on worker clusters.
+
+    Args:
+        communication_object (torch.Tensor): Metric tensor values requiring multi-GPU sync.
+        reduce_op (Any): PyTorch distributed reduction operation behavior (e.g., SUM, AVG).
+
+    Returns:
+        torch.Tensor: Evaluated tensor value synchronized across distributed processes.
+    """
+
     if MAIN_PROC_ONLY >= 1 or not is_distributed_initialized(): return communication_object
     torch.distributed.all_reduce(communication_object, op=reduce_op)
 
     return communication_object
 
 def fwd_default_precision(fwd = None, cast_inputs = torch.float32):
-    if fwd is None: return functools.partial(fwd_default_precision, cast_inputs=cast_inputs)
+    """
+    Decorator ensuring forward operations execute under uniform, predictable floating-point precision levels.
 
+    Args:
+        fwd (Optional[Callable]): Target execution routine block. Defaults to None.
+        cast_inputs (torch.dtype): Target floating precision requirement. Defaults to torch.float32.
+    """
+
+    if fwd is None: return functools.partial(fwd_default_precision, cast_inputs=cast_inputs)
+    # Resolve execution target environment to bind appropriate accelerator backend
     wrapped_fwd = torch.amp.custom_fwd(fwd, cast_inputs=cast_inputs, device_type=config.device if config.device.startswith(("cuda", "xpu")) else "cpu")
 
     @functools.wraps(fwd)
@@ -182,6 +264,16 @@ def fwd_default_precision(fwd = None, cast_inputs = torch.float32):
     return wrapper
 
 def spectral_magnitude(stft, power = 1, log = False, eps = 1e-14):
+    """
+    Computes the magnitude or power spectrogram from STFT complex tensors.
+
+    Args:
+        stft (torch.Tensor): Multi-channel complex STFT tensor array outputs.
+        power (float): Scaling factor exponent for the magnitude matrix. Defaults to 1.
+        log (bool): Converts the signal representation into the logarithmic spectrum domain when True. Defaults to False.
+        eps (float): Small epsilon value to avoid log(0) numerical instabilities. Defaults to 1e-14.
+    """
+
     spectr = stft.pow(2).sum(-1)
 
     if power < 1: spectr = spectr + eps
@@ -191,6 +283,8 @@ def spectral_magnitude(stft, power = 1, log = False, eps = 1e-14):
     return spectr
 
 class Filterbank(torch.nn.Module):
+    """Generates custom parametric Mel-scale filterbanks supporting trainable and dynamic initialization."""
+
     def __init__(
         self, 
         n_mels=40, 
@@ -208,6 +302,8 @@ class Filterbank(torch.nn.Module):
         param_rand_factor=0.0, 
         freeze=True
     ):
+        """Initializes filterbank geometry and mapping spaces."""
+
         super().__init__()
         self.n_mels = n_mels
         self.log_mel = log_mel
@@ -227,7 +323,7 @@ class Filterbank(torch.nn.Module):
         self.param_change_factor = param_change_factor
         self.param_rand_factor = param_rand_factor
         self.multiplier = 10 if self.power_spectrogram == 2 else 20
-
+        # Uniformly segment standard Mel space grid matrices
         hz = self._to_hz(torch.linspace(self._to_mel(self.f_min), self._to_mel(self.f_max), self.n_mels + 2))
 
         band = hz[1:] - hz[:-1]
@@ -235,12 +331,20 @@ class Filterbank(torch.nn.Module):
         self.f_central = hz[1:-1]
 
         if not self.freeze:
+            # Map values into fractional learnable parameters
             self.f_central = torch.nn.Parameter(self.f_central / (self.sample_rate * self.param_change_factor))
             self.band = torch.nn.Parameter(self.band / (self.sample_rate * self.param_change_factor))
 
         self.all_freqs_mat = torch.linspace(0, self.sample_rate // 2, self.n_stft).repeat(self.f_central.shape[0], 1)
 
     def forward(self, spectrogram):
+        """
+        Applies filterbank analysis matrices to input spectrograms.
+
+        Args:
+            spectrogram (torch.Tensor): Tensor matrix shape (batch, time, frequencies) or 4D channel variants.
+        """
+
         f_central_mat = self.f_central.repeat(self.all_freqs_mat.shape[1], 1).transpose(0, 1)
         band_mat = self.band.repeat(self.all_freqs_mat.shape[1], 1).transpose(0, 1)
 
@@ -267,26 +371,38 @@ class Filterbank(torch.nn.Module):
 
     @staticmethod
     def _to_mel(hz):
+        """Converts Hertz frequency values into Mel frequency values."""
+
         return 2595 * math.log10(1 + hz / 700)
 
     @staticmethod
     def _to_hz(mel):
+        """Converts Mel scale arrays directly back to standard Hertz metrics."""
+
         return 700 * (10 ** (mel / 2595) - 1)
 
     def _triangular_filters(self, all_freqs, f_central, band):
+        """Constructs standard triangular overlap filtering layouts."""
+
         slope = (all_freqs - f_central) / band
         return torch.zeros(1, device=self.device_inp).max((slope + 1.0).min(-slope + 1.0)).transpose(0, 1)
 
     def _rectangular_filters(self, all_freqs, f_central, band):
+        """Constructs standard sharp boxcar rectangular mask arrays."""
+
         left_side = right_size = all_freqs.ge(f_central - band)
         right_size = all_freqs.le(f_central + band)
 
         return (left_side * right_size).float().transpose(0, 1)
 
     def _gaussian_filters(self, all_freqs, f_central, band, smooth_factor=torch.tensor(2)):
+        """Constructs radial Gaussian curve filtering layouts."""
+
         return (-0.5 * ((all_freqs - f_central) / (band / smooth_factor)) ** 2).exp().transpose(0, 1)
 
     def _create_fbank_matrix(self, f_central_mat, band_mat):
+        """Factory dispatcher resolving intended structural shapes into numeric matrix masks."""
+
         if self.filter_shape == "triangular": fbank_matrix = self._triangular_filters(self.all_freqs_mat, f_central_mat, band_mat)
         elif self.filter_shape == "rectangular": fbank_matrix = self._rectangular_filters(self.all_freqs_mat, f_central_mat, band_mat)
         else: fbank_matrix = self._gaussian_filters(self.all_freqs_mat, f_central_mat, band_mat)
@@ -294,17 +410,23 @@ class Filterbank(torch.nn.Module):
         return fbank_matrix
 
     def _amplitude_to_DB(self, x):
+        """Converts standard linear filter energy values directly into logarithmic Decibel power metrics."""
+
         x_db = self.multiplier * x.clamp(min=self.amin).log10()
         x_db -= self.multiplier * self.db_multiplier
 
         return x_db.max((x_db.amax(dim=(-2, -1)) - self.top_db).view(x_db.shape[0], 1, 1))
 
 class ContextWindow(torch.nn.Module):
+    """Applies temporal context splicing stacking windows over acoustic frames via localized 1D Convolutions."""
+
     def __init__(
         self, 
         left_frames=0, 
         right_frames=0
     ):
+        """Initializes convolutional kernel configurations to stack temporal frames."""
+
         super().__init__()
         self.left_frames = left_frames
         self.right_frames = right_frames
@@ -316,6 +438,8 @@ class ContextWindow(torch.nn.Module):
         self.first_call = True
 
     def forward(self, x):
+        """Stacks context frames over feature channels sequentially."""
+
         x = x.transpose(1, 2)
         if self.first_call:
             self.first_call = False
@@ -335,31 +459,45 @@ class ContextWindow(torch.nn.Module):
         return cw_x.transpose(1, 2)
 
 class FilterProperties:
+    """Calculates operational properties (effective receptive fields, padding offsets) for stacked filters."""
+
     def __init__(self, window_size = 0, stride = 1, dilation = 1, causal = False):
+        """Initializes physical structural properties."""
+
         self.window_size = window_size
         self.stride = stride
         self.dilation = dilation
         self.causal = causal
         
     def __post_init__(self):
+        """Validates filter configurations."""
+
         assert self.window_size > 0
         assert self.stride > 0
         assert (self.dilation > 0)
 
     @staticmethod
     def pointwise_filter():
+        """Generates properties for a basic 1x1 pointwise filtering window layer."""
+
         return FilterProperties(window_size=1, stride=1)
 
     def get_effective_size(self):
+        """Returns the calculated virtual receptive field footprint considering active dilation properties."""
+
         return 1 + ((self.window_size - 1) * self.dilation)
 
     def get_convolution_padding(self):
-        if self.window_size % 2 == 0: raise ValueError
+        """Computes symmetric padding requirements."""
+
+        if self.window_size % 2 == 0: raise ValueError("Asymmetric padding evaluation for even window boundaries is unsupported.")
         if self.causal: return self.get_effective_size() - 1
 
         return (self.get_effective_size() - 1) // 2
 
     def get_noncausal_equivalent(self):
+        """Transforms properties into standard symmetric bidirectional equivalents."""
+
         if not self.causal: return self
 
         return FilterProperties(
@@ -370,20 +508,24 @@ class FilterProperties:
         )
 
     def with_on_top(self, other, allow_approximate=True):
+        """Calculates structural composite property behaviors when stacking layers together."""
+
         self_size = self.window_size
 
         if other.window_size % 2 == 0:
             if allow_approximate: other_size = other.window_size + 1
-            else: raise ValueError
+            else: raise ValueError("Even structural layer shapes require approximation permissions enabled.")
         else: other_size = other.window_size
 
         if (self.causal or other.causal) and not (self.causal and other.causal):
             if allow_approximate: return self.get_noncausal_equivalent().with_on_top(other.get_noncausal_equivalent())
-            else: raise ValueError
+            else: raise ValueError("Mixed causal settings require approximation permissions enabled.")
 
         return FilterProperties(self_size + (self.stride * (other_size - 1)), self.stride * other.stride, self.dilation * other.dilation, self.causal)
 
 class STFT(torch.nn.Module):
+    """Computes Short-Time Fourier Transform (STFT) frames from raw 1D digital audio streams."""
+
     def __init__(
         self, 
         sample_rate, 
@@ -396,6 +538,8 @@ class STFT(torch.nn.Module):
         pad_mode="constant", 
         onesided=True
     ):
+        """Initializes STFT parameter windows converting millisecond metrics directly to discrete audio sample frames."""
+
         super().__init__()
         self.sample_rate = sample_rate
         self.win_length = win_length
@@ -405,11 +549,14 @@ class STFT(torch.nn.Module):
         self.center = center
         self.pad_mode = pad_mode
         self.onesided = onesided
+        # Transform duration metrics from milliseconds to physical sample frames counts
         self.win_length = int(round((self.sample_rate / 1000.0) * self.win_length))
         self.hop_length = int(round((self.sample_rate / 1000.0) * self.hop_length))
         self.window = window_fn(self.win_length)
 
     def forward(self, x):
+        """Transforms digital waveforms directly into multi-channel frequency spectrum maps."""
+
         or_shape = x.shape
         if len(or_shape) == 3: x = x.transpose(1, 2).reshape(or_shape[0] * or_shape[2], or_shape[1])
         
@@ -446,7 +593,9 @@ class STFT(torch.nn.Module):
         return stft.to(device)
 
     def get_filter_properties(self):
-        if not self.center: raise ValueError
+        """Exposes operational framing properties."""
+
+        if not self.center: raise ValueError("Framing metadata requires center configuration setting parameters set to True.")
 
         return FilterProperties(
             window_size=self.win_length, 
@@ -454,17 +603,23 @@ class STFT(torch.nn.Module):
         )
 
 class Deltas(torch.nn.Module):
+    """Computes dynamic delta trajectories (derivatives) across localized temporal spaces."""
+
     def __init__(
         self, 
         input_size, 
         window_length=5
     ):
+        """Initializes delta calculation kernel buffers."""
+
         super().__init__()
         self.n = (window_length - 1) // 2
         self.denom = self.n * (self.n + 1) * (2 * self.n + 1) / 3
         self.register_buffer("kernel", torch.arange(-self.n, self.n + 1, dtype=torch.float32).repeat(input_size, 1, 1))
 
     def forward(self, x):
+        """Applies derivative tracking filters over target features arrays streams."""
+
         x = x.transpose(1, 2).transpose(2, -1)
         or_shape = x.shape
 
@@ -500,6 +655,8 @@ class Deltas(torch.nn.Module):
         return delta_coeff.transpose(1, -1).transpose(2, -1)
 
 class Fbank(torch.nn.Module):
+    """Composite module tracking pipeline extraction of Mel-Filterbank energy configurations from waveforms."""
+
     def __init__(
         self, 
         deltas=False, 
@@ -518,6 +675,8 @@ class Fbank(torch.nn.Module):
         win_length=25, 
         hop_length=10
     ):
+        """Initializes underlying submodules (STFT, Filterbank, Deltas, ContextWindow)."""
+
         super().__init__()
         self.deltas = deltas
         self.context = context
@@ -551,6 +710,8 @@ class Fbank(torch.nn.Module):
 
     @fwd_default_precision(cast_inputs=torch.float32)
     def forward(self, wav):
+        """Executes full pipeline processing converting raw waveforms into context-aware mel features fields."""
+
         fbanks = self.compute_fbanks(
             spectral_magnitude(
                 self.compute_STFT(wav)
@@ -568,10 +729,14 @@ class Fbank(torch.nn.Module):
         return fbanks
 
     def get_filter_properties(self):
+        """Returns filter property descriptions."""
+
         return self.compute_STFT.get_filter_properties()
 
 @register_checkpoint_hooks
 class InputNormalization(torch.nn.Module):
+    """Normalizes input acoustic feature maps across Sentence, Batch, Speaker, or Global tracks distributions."""
+
     def __init__(
         self, 
         mean_norm=True, 
@@ -581,6 +746,8 @@ class InputNormalization(torch.nn.Module):
         requires_grad=False, 
         update_until_epoch=3
     ):
+        """Initializes storage maps to hold mean and standard deviation properties."""
+
         super().__init__()
         self.mean_norm = mean_norm
         self.std_norm = std_norm
@@ -598,6 +765,8 @@ class InputNormalization(torch.nn.Module):
         self.update_until_epoch = update_until_epoch
 
     def forward(self, x, lengths, spk_ids = torch.tensor([]), epoch=0):
+        """Applies normalization scaling adjustments following specific distribution mode criteria rules."""
+
         N_batches = x.shape[0]
         current_means, current_stds = [], []
 
@@ -677,6 +846,8 @@ class InputNormalization(torch.nn.Module):
         return out
 
     def _compute_current_stats(self, x):
+        """Calculates detached localized variance mean metrics elements targets structures."""
+
         current_std = x.std(dim=0).detach().data if self.std_norm else torch.tensor([1.0], device=x.device)
         return (
             x.mean(dim=0).detach().data if self.mean_norm else torch.tensor([0.0], device=x.device), 
@@ -684,6 +855,8 @@ class InputNormalization(torch.nn.Module):
         )
 
     def _statistics_dict(self):
+        """Bundles statistical mapping arrays for custom metadata exports."""
+
         state = {}
         state["count"] = self.count
         state["glob_mean"] = self.glob_mean
@@ -695,6 +868,8 @@ class InputNormalization(torch.nn.Module):
         return state
 
     def _load_statistics_dict(self, state):
+        """Reconstructs state trackers tracking dictionary configurations logs objects."""
+
         self.count = state["count"]
 
         if isinstance(state["glob_mean"], int):
@@ -716,6 +891,8 @@ class InputNormalization(torch.nn.Module):
         return state
 
     def to(self, device):
+        """Migrates state tracks and mapping buffers directly onto target backend execution hardware."""
+
         self = super(InputNormalization, self).to(device)
         self.glob_mean = self.glob_mean.to(device)
         self.glob_std = self.glob_std.to(device)
@@ -728,11 +905,15 @@ class InputNormalization(torch.nn.Module):
 
     @mark_as_saver
     def _save(self, path):
+        """Checkpoint hook callback saving operational parameter maps arrays."""
+
         torch.save(self._statistics_dict(), path)
 
     @mark_as_transfer
     @mark_as_loader
     def _load(self, path, end_of_epoch=False):
+        """Checkpoint hook callback loading tracked mean parameter archives maps entries."""
+
         del end_of_epoch  
         stats = torch.load(path, map_location="cpu", weights_only=True)
         self._load_statistics_dict(stats)

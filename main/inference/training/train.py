@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import glob
 import json
@@ -16,7 +15,6 @@ from tqdm import tqdm
 from random import randint
 from collections import deque
 from contextlib import nullcontext
-from torch.utils.data import DataLoader
 from torch.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 
@@ -24,12 +22,16 @@ from time import time as ttime
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 sys.path.append(os.getcwd())
+
+# Optimize multi-threading backends based on operating system
+# Use standard system threads (libuv) on POSIX/Linux, fall back to native threads on Windows
 os.environ["USE_LIBUV"] = "0" if sys.platform == "win32" else "1"
 
 from main.library.backends import opencl, xpu
 from main.app.variables import logger, translations
 from main.library.utils import clear_gpu_cache, strtobool
 from main.inference.training.extract_model import extract_model
+from main.inference.training.data_utils import get_training_dataloader
 from main.inference.training.mel_processing import MultiScaleMelSpectrogramLoss, mel_spectrogram_torch, spec_to_mel_torch
 
 from main.library.algorithm import commons
@@ -43,6 +45,14 @@ if not main_config.debug_mode:
     logging.getLogger("torch").setLevel(logging.ERROR)
 
 def parse_arguments():
+    """
+    Parses CLI configuration parameters for the training workspace, hardware routing, 
+    loss function adjustments, and model architecture definitions.
+    
+    Returns:
+        argparse.Namespace: Validated command-line argument object.
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", action='store_true')
     parser.add_argument("--model_name", type=str, required=True)
@@ -66,7 +76,6 @@ def parse_arguments():
     parser.add_argument("--deterministic", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--benchmark", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--optimizer", type=str, default="AdamW")
-    parser.add_argument("--energy_use", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--use_custom_reference", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--reference_path", type=str, default="")
     parser.add_argument("--multiscale_mel_loss", type=lambda x: bool(strtobool(x)), default=False)
@@ -82,6 +91,7 @@ def parse_arguments():
 
     return parser.parse_args()
 
+# Global argument instantiation and tuple unpacking
 args = parse_arguments()
 
 (
@@ -104,7 +114,6 @@ args = parse_arguments()
     vocoder, 
     checkpointing, 
     optimizer_choice, 
-    energy_use, 
     use_custom_reference, 
     reference_path, 
     multiscale_mel_loss,
@@ -137,7 +146,6 @@ args = parse_arguments()
     args.vocoder, 
     args.checkpointing, 
     args.optimizer, 
-    args.energy_use, 
     args.use_custom_reference, 
     args.reference_path, 
     args.multiscale_mel_loss,
@@ -152,25 +160,30 @@ args = parse_arguments()
     args.custom_training
 )
 
+# Determine global mixed precision strategies
 is_half = main_config.is_half
-if main_config.brain: is_half = True
+if main_config.brain: is_half = True # Enforce mixed precision flags automatically if BF16 acceleration is available
+
+# Setup appropriate discriminator target versions based on the chosen architecture and synthesis tools
 disc_version = version if vocoder not in ["RefineGAN", "BigVGAN"] else "v3"
 
 if architecture == "SVC":
     disc_version = version if vocoder != "Default" else "v0"
-    pitch_guidance = True
-    energy_use = False
+    pitch_guidance = True # SVC processes always depend on explicit source audio pitch tracking patterns
 
 weights_path = main_configs["weights_path"]
 logs_path = main_configs["logs_path"]
 custom_save_checkpoint_path = None
 
+# Configure file storage contexts. If target identity points to an isolated model name, construct logs path.
 if not os.path.exists(model_name): experiment_dir = os.path.join(logs_path, model_name)
 else:
+    # Explicit absolute workspace paths detected
     experiment_dir = model_name
     model_name = os.path.basename(model_name)
     custom_save_checkpoint_path = weights_path
 
+# Bind execution file structures based on routing priorities
 training_file_path = os.path.join(experiment_dir, "training_data.json")
 checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
 config_save_path = config_save_path if custom_training else os.path.join(experiment_dir, "config.json")
@@ -178,21 +191,26 @@ filelist_path = filelist_path if custom_training else os.path.join(experiment_di
 eval_dir = eval_dir if custom_training else os.path.join(experiment_dir, "eval")
 spec_dir = spec_dir if custom_training else None
 
+# Gradient balancing and norm calculation constants
 d_lr_coeff = 1.0
 g_lr_coeff = 1.0
 d_step_per_g_step = 1
 use_clip_grad_value = False
 grad_norm_optim = commons.clip_grad_value if use_clip_grad_value else commons.grad_norm
 
-torch.backends.cudnn.deterministic = args.deterministic if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
-torch.backends.cudnn.benchmark = args.benchmark if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
-torch.backends.cuda.matmul.allow_tf32 = main_config.tf32 if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
-torch.backends.cudnn.allow_tf32 = main_config.tf32 if not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda else False
+# Enable hardware acceleration optimizations depending on backend availability
+backend_supported = not main_config.device.startswith(("ocl", "privateuseone")) and not main_config.is_zluda
+torch.backends.cudnn.deterministic = args.deterministic if backend_supported else False
+torch.backends.cudnn.benchmark = args.benchmark if backend_supported else False
+torch.backends.cuda.matmul.allow_tf32 = main_config.tf32 if backend_supported else False
+torch.backends.cudnn.allow_tf32 = main_config.tf32 if backend_supported else False
 
+# Tracker initialization parameters
 global_step = 0
 lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
 loss_gen_history, smoothed_loss_gen_history, loss_disc_history, smoothed_loss_disc_history = [], [], [], []
 
+# Use historical deques to safely track rolling metric configurations
 avg_losses = {
     "grad_d_50": deque(maxlen=50), 
     "grad_g_50": deque(maxlen=50), 
@@ -204,6 +222,7 @@ avg_losses = {
     "gen_loss_50": deque(maxlen=50)
 }
 
+# Load hyperparameters from file configuration profiles
 with open(config_save_path, "r", encoding="utf-8") as f:
     config = json.load(f)
 
@@ -211,8 +230,14 @@ config = utils.HParams(**config)
 config.data.training_files = filelist_path
 
 def main():
+    """
+    Orchestrates infrastructure verification, cross-process messaging networks (DDP),
+    dataset sample rate validation, and launches parallel sub-process pools.
+    """
+
     global smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, gpus
 
+    # Formulate log dictionary mapped against localized string definitions
     log_data = {
         translations["modelname"]: model_name, 
         translations["save_every_epoch"]: save_every_epoch, 
@@ -230,7 +255,6 @@ def main():
         translations["cleanup_training"]: cleanup, 
         translations["memory_efficient_training"]: checkpointing, 
         translations["optimizer"]: optimizer_choice, 
-        translations["train&energy"]: energy_use,
         translations["multiscale_mel_loss"]: multiscale_mel_loss,
         translations["model_author"].format(model_author=model_author): "",
         translations["vocoder"]: vocoder,
@@ -242,9 +266,11 @@ def main():
         logger.debug(f"{key}: {value}" if value != "" else f"{key} {value}")
 
     try:
+        # Establish localized networking values for multi-GPU process communication
         os.environ["MASTER_ADDR"] = "localhost"
         os.environ["MASTER_PORT"] = str(randint(20000, 55555))
 
+        # Perform critical verification on dataset sample rate mappings
         wavs = glob.glob(os.path.join(os.path.join(experiment_dir, "sliced_audios"), "*.wav"))
         if wavs:
             _, sr = utils.load_wav_to_torch(wavs[0])
@@ -255,16 +281,21 @@ def main():
             logger.warning(translations["not_found_dataset"])
             sys.exit(1)
 
+        # Map active runtime hardware device profiles
         device, gpus, n_gpus = utils.get_device(gpus)
         logger.info(translations["use_precision"].format(fp=("BF16" if main_config.brain else "FP16") if is_half else "FP32"))
 
+        # Clear historical states if requested
         if cleanup: utils.cleanup_training(experiment_dir)
+        # Restore rolling historical states for early stopping evaluation
         if overtraining_detector and os.path.exists(training_file_path): smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history = detector.continue_overtrain_detector(training_file_path)
 
         def start():
+            """Spawns parallel training processes across designated target hardware devices."""
+
             children = []
             pid_data = {"process_pids": []}
-
+            # Retrieve existing structural configurations if tracking execution PIDs
             if save_the_pid:
                 with open(config_save_path, "r", encoding="utf-8") as f:
                     try:
@@ -272,16 +303,19 @@ def main():
                     except json.JSONDecodeError:
                         pass
 
+            # Fork individual sub-processes allocated across independent devices
             for rank, device_id in enumerate(gpus):
-                subproc = mp.Process(target=run, args=(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, total_epoch, save_every_weights, config, device, device_id, vocoder, checkpointing, energy_use))
+                subproc = mp.Process(target=run, args=(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, total_epoch, save_every_weights, config, device, device_id, vocoder, checkpointing))
                 children.append(subproc)
                 subproc.start()
                 pid_data["process_pids"].append(subproc.pid)
 
+            # Update the configuration file with the active process IDs
             if save_the_pid: 
                 with open(config_save_path, "w", encoding="utf-8") as f:
                     json.dump(pid_data, f, indent=4)
 
+            # Synchronize threads by waiting for all child processes to complete
             for i in range(n_gpus):
                 children[i].join()
 
@@ -292,21 +326,35 @@ def main():
         logger.debug(traceback.format_exc())
 
 class EpochRecorder:
+    """Calculates and formats execution performance speeds and durations across epoch bounds."""
+
     def __init__(self):
         self.last_time = ttime()
 
     def record(self):
+        """
+        Calculates time elapsed since the last checkpoint and returns a formatted timestamp.
+        
+        Returns:
+            str: Log-scannable runtime breakdown statement.
+        """
+
         now_time = ttime()
         elapsed_time = now_time - self.last_time
         self.last_time = now_time
 
         return translations["time_or_speed_training"].format(current_time=datetime.datetime.now().strftime("%H:%M:%S"), elapsed_time_str=str(datetime.timedelta(seconds=int(round(elapsed_time, 1)))))
 
-def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, device_id, vocoder, checkpointing, energy_use):
+def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, custom_save_every_weights, config, device, device_id, vocoder, checkpointing):
+    """
+    Initializes distributed communication backends, instantiates neural model modules,
+    restores checkpoints, and manages the training loop across epochs.
+    """
+
     global global_step, smoothed_value_gen, smoothed_value_disc
 
     smoothed_value_gen, smoothed_value_disc = 0, 0
-
+    # Initialize PyTorch Distributed Process Groups
     dist.init_process_group(
         backend="gloo" if sys.platform == "win32" or device.type not in ["cuda", "xpu"] else ("xccl" if device.type == "xpu" else "nccl"), 
         init_method="env://", 
@@ -314,74 +362,34 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
         rank=rank if device.type in ["cuda", "xpu"] else 0
     )
 
+    # Enforce global pseudo-random seed criteria across active hardware targets
     torch.manual_seed(config.train.seed)
     if device.type == "cuda": torch.cuda.manual_seed(config.train.seed)
     elif device.type == "xpu": torch.xpu.manual_seed(config.train.seed)
     elif device.type == "ocl": opencl.pytorch_ocl.manual_seed_all(config.train.seed)
 
+    # Bind active device visibility scopes per thread
     if device.type == "cuda": torch.cuda.set_device(device_id)
     elif device.type == "xpu": torch.xpu.set_device(device_id)
 
+    # Establish localized logging tools exclusively on the primary rank
     writer_eval = SummaryWriter(log_dir=eval_dir) if rank == 0 else None
-
-    from main.inference.training.data_utils import (
-        DistributedBucketSampler,
-        TextAudioCollate,
-        TextAudioLoader
-    )
-
-    train_dataset = TextAudioLoader(config.data, spec_dirs=spec_dir, cache_spectrogram=cache_spectrogram, pitch_guidance=pitch_guidance, energy=energy_use)
-
-    train_loader = DataLoader(
-        train_dataset, 
-        num_workers=4, 
-        shuffle=False, 
-        pin_memory=True, 
-        batch_size=1 if architecture != "SVC" else batch_size,
-        collate_fn=TextAudioCollate(
-            pitch_guidance=pitch_guidance, 
-            energy=energy_use
-        ), 
-        batch_sampler=DistributedBucketSampler(
-            train_dataset, 
-            batch_size, 
-            [50, 100, 200, 300, 400, 500, 600, 700, 800, 900], 
-            num_replicas=n_gpus, 
-            rank=rank, 
-            shuffle=True
-        ) if architecture != "SVC" else None, 
-        persistent_workers=True, 
-        prefetch_factor=8
-    )
+    # Instantiate the data pipeline loader
+    train_loader = get_training_dataloader(config, spec_dir, cache_spectrogram, pitch_guidance, architecture, batch_size, n_gpus, rank)
 
     if len(train_loader) < 3:
         logger.warning(translations["not_enough_data"])
         sys.exit(1)
 
-    spk_dim = config.model.spk_embed_dim
-
-    try:
-        spk_dim = config.sid
-    except Exception as e:
-        logger.debug(e)
-
-    try:
-        g_path = os.path.join(checkpoint_path, "G_latest.pth")
-        last_g = g_path if save_only_latest and os.path.exists(g_path) else utils.latest_checkpoint_path(checkpoint_path, "G_*.pth")
-        chk_path = (last_g if last_g else (pretrainG if pretrainG not in ["", "None"] else None))
-
-        if chk_path:
-            ckpt = torch.load(chk_path, map_location="cpu", weights_only=True)
-            spk_dim = ckpt["model"]["emb_g.weight"].shape[0]
-            del ckpt
-    except Exception as e:
-        logger.debug(e)
-
+    # Validate speaker dimension metrics
+    spk_dim = utils.check_speaker_dim(config, checkpoint_path, save_only_latest, pretrainG)
     config.model.spk_embed_dim = spk_dim
 
+    # Import target structural model blueprints dynamically
     from main.library.algorithm.discriminators import MultiPeriodDiscriminator
     from main.library.algorithm.synthesizers import Synthesizer, SynthesizerSVC
 
+    # Select and initialize model architectures
     net_g, net_d = (
         (
             Synthesizer(
@@ -391,8 +399,7 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
                 use_f0=pitch_guidance, 
                 sr=config.data.sample_rate, 
                 vocoder=vocoder, 
-                checkpointing=checkpointing, 
-                energy=energy_use
+                checkpointing=checkpointing
             )
         ) if architecture == "RVC" else (
             SynthesizerSVC(
@@ -411,23 +418,25 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
         )
     )
 
+    # Migrate models to target hardware acceleration spaces
     net_g, net_d = (net_g.cuda(device_id), net_d.cuda(device_id)) if device.type == "cuda" else (net_g.xpu(device_id), net_d.xpu(device_id)) if device.type == "xpu" else (net_g.to(device), net_d.to(device))
-    optimizer_optim, scheduler_optim = utils.get_optimizer(optimizer_choice)
+    # Instantiate optimization models
+    optim_g, optim_d = utils.get_optimizer(net_g, net_d, optimizer_choice, learning_rate=config.train.learning_rate, betas=config.train.betas, eps=config.train.eps, g_lr_coeff=g_lr_coeff, d_lr_coeff=d_lr_coeff)
 
-    optim_g = optimizer_optim(net_g.parameters(), config.train.learning_rate * g_lr_coeff, betas=config.train.betas if not optimizer_choice.startswith("AdaBelief") else 1e-8, eps=config.train.eps)
-    optim_d = optimizer_optim(net_d.parameters(), config.train.learning_rate * d_lr_coeff, betas=config.train.betas if not optimizer_choice.startswith("AdaBelief") else 1e-8, eps=config.train.eps)
-
+    # Bind loss configurations based on configuration criteria
     fn_mel_loss = MultiScaleMelSpectrogramLoss(sample_rate=config.data.sample_rate) if multiscale_mel_loss else torch.nn.L1Loss()
-    if not device.type.startswith(("privateuseone", "ocl", "mps", "xpu")): 
-        net_g, net_d = (DDP(net_g, device_ids=[device_id]), DDP(net_d, device_ids=[device_id])) if device.type.startswith("cuda") else (DDP(net_g), DDP(net_d))
+    # Wrap model modules with Distributed Data Parallel handlers
+    if device.type.startswith(("cuda", "cpu")): net_g, net_d = (DDP(net_g, device_ids=[device_id]), DDP(net_d, device_ids=[device_id])) if device.type.startswith("cuda") else (DDP(net_g), DDP(net_d))
 
     scaler_dict = {}
     try:
         if rank == 0: logger.info(translations["start_training"])
 
+        # Locate target checkpoint state paths
         d_path = os.path.join(checkpoint_path, "D_latest.pth") if save_only_latest else utils.latest_checkpoint_path(checkpoint_path, "D_*.pth")
         g_path = os.path.join(checkpoint_path, "G_latest.pth") if save_only_latest else utils.latest_checkpoint_path(checkpoint_path, "G_*.pth")
 
+        # Attempt to load target parameters
         _, _, _, epoch_str, scaler_dict = utils.load_checkpoint(d_path, net_d, optim_d)
         _, _, _, epoch_str, scaler_dict = utils.load_checkpoint(g_path, net_g, optim_g)
         
@@ -436,6 +445,7 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
         epoch_str += 1
         global_step = (epoch_str - 1) * len(train_loader)
     except:
+        # Fall back to base foundation files if active checkpoint instances are not found
         check = ["", "None"]
         epoch_str, global_step = 1, 0
         strict = main_configs.get("pretrain_strict", True)
@@ -445,6 +455,7 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
                 if rank == 0: logger.info(translations["import_pretrain"].format(dg="G", pretrain=pretrainG))
 
                 ckptG = torch.load(pretrainG, map_location="cpu", weights_only=True)["model"]
+                # Handle SVC speaker embed logic
                 if architecture == "SVC" and "emb_g.weight" not in ckptG: ckptG["emb_g.weight"] = net_g.module.emb_g.weight if hasattr(net_g, "module") else net_g.emb_g.weight
                 net_g.module.load_state_dict(ckptG, strict=strict) if hasattr(net_g, "module") else net_g.load_state_dict(ckptG, strict=strict)
                 del ckptG
@@ -460,63 +471,42 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
             logger.debug(e)
             sys.exit(1)
 
-    if optimizer_choice == "AdaBelief" or use_cosine_annealing_lr:
-        scheduler_g = torch.optim.lr_scheduler.CosineAnnealingLR(optim_g, T_max=total_epoch, eta_min=1e-6, last_epoch=epoch_str - 2)
-        scheduler_d = torch.optim.lr_scheduler.CosineAnnealingLR(optim_d, T_max=total_epoch, eta_min=1e-6, last_epoch=epoch_str - 2)
-    elif optimizer_choice == "AdaBeliefV2":
-        scheduler_g = scheduler_optim(optim_g, warmup_epochs=10, last_epoch=epoch_str - 2)
-        scheduler_d = scheduler_optim(optim_d, warmup_epochs=10, last_epoch=epoch_str - 2)
-    else:
-        scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=config.train.lr_decay, last_epoch=epoch_str - 2)
-        scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=config.train.lr_decay, last_epoch=epoch_str - 2)
+    # Initialize learning rate decay schedulers
+    scheduler_g, scheduler_d = utils.get_scheduler(optim_g, optim_d, optimizer_choice, total_epoch=total_epoch, epoch_str=epoch_str, use_cosine_annealing_lr=use_cosine_annealing_lr, lr_decay=config.train.lr_decay)
 
+    # Initialize hardware gradient scalers for half-precision modes
     if device.type == "xpu" and is_half: xpu.setup_gradscaler()
     scaler = GradScaler(device=device, enabled=is_half and device.type in ["cuda", "xpu"])
     cache = []
 
+    # Restore scaling states if continuing from a saved state
     if len(scaler_dict) > 0: scaler.load_state_dict(scaler_dict)
+    # Generate anchor audios for validation tracing
+    reference = utils.get_reference(train_loader, reference_path, use_custom_reference=use_custom_reference, pitch_guidance=pitch_guidance, rank=rank, device=device)
 
-    if use_custom_reference and os.path.isfile(os.path.join(reference_path, "feats.npy")):
-        import numpy as np
-
-        if rank == 0: logger.info(translations["using_reference"].format(reference_name=re.sub(r'_v\d+_(?:[A-Za-z0-9_]+?)_(True|False)_(True|False)$', '', os.path.basename(reference_path))))
-        phone = np.repeat(np.load(os.path.join(reference_path, "feats.npy")), 2, axis=0)
-
-        reference = (
-            torch.FloatTensor(phone).unsqueeze(0).to(device),
-            torch.LongTensor([phone.shape[0]]).to(device),
-            torch.LongTensor(np.load(os.path.join(reference_path, "pitch_coarse.npy"))[:-1]).unsqueeze(0).to(device) if pitch_guidance else None,
-            torch.FloatTensor(np.load(os.path.join(reference_path, "pitch_fine.npy"))[:-1]).unsqueeze(0).to(device) if pitch_guidance else None,
-            torch.LongTensor([0]).to(device),
-            torch.FloatTensor(np.load(os.path.join(reference_path, "energy.npy"))[:-1]).unsqueeze(0).to(device) if energy_use else None,
-        )
-    else:
-        info = next(iter(train_loader))
-        reference = (info[0].to(device), info[1].to(device))
-
-        if pitch_guidance: reference += (info[2].to(device), info[3].to(device), info[8].to(device), info[9].to(device) if energy_use else None)
-        else: reference += (None, None, info[6].to(device), info[7].to(device) if energy_use else None)
-
+    # Execute main epoch processing blocks
     for epoch in range(epoch_str, total_epoch + 1):
-        train_and_evaluate(rank, epoch, config, [net_g, net_d], [optim_g, optim_d], scaler, train_loader, writer_eval, cache, custom_save_every_weights, custom_total_epoch, device, device_id, reference, fn_mel_loss)
+        train_and_evaluate(rank, epoch, config, net_g, net_d, optim_g, optim_d, scaler, train_loader, writer_eval, cache, custom_save_every_weights, custom_total_epoch, device, device_id, reference, fn_mel_loss)
         scheduler_g.step(); scheduler_d.step()
 
-def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, writer, cache, custom_save_every_weights, custom_total_epoch, device, device_id, reference, fn_mel_loss):
+def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler, train_loader, writer, cache, custom_save_every_weights, custom_total_epoch, device, device_id, reference, fn_mel_loss):
+    """Executes step optimizations for both Generator and Discriminator components within an epoch."""
+
     global global_step, lowest_value, loss_disc, consecutive_increases_gen, consecutive_increases_disc, smoothed_value_gen, smoothed_value_disc
 
     if epoch == 1:
         lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
         consecutive_increases_gen, consecutive_increases_disc = 0, 0
 
-    net_g, net_d = nets
-    optim_g, optim_d = optims
-
+    # Align dataloader shuffling tracking with epoch counts for standard setups
     if architecture != "SVC": train_loader.batch_sampler.set_epoch(epoch)
     net_g.train(); net_d.train()
 
+    # Streamline tensor data pipeline allocations
     data_iterator, cache = utils.transform_tensor_into_cache(device, device_id, cache_data_in_gpu, cache, train_loader)
     epoch_recorder = EpochRecorder()
 
+    # Configure mixed precision execution scopes
     autocast_enabled = is_half and device.type in ["cuda", "xpu"]
     autocast_dtype = torch.float32 if not autocast_enabled else torch.bfloat16 if main_config.brain else torch.float16
     autocasts = autocast(device.type, enabled=autocast_enabled, dtype=autocast_dtype) if not device.type.startswith(("ocl", "privateuseone")) else nullcontext()
@@ -524,17 +514,19 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
     with tqdm(total=len(train_loader), leave=False) as pbar:
         for _, info in data_iterator:
             info = utils.transforming_computing_devices(info, device, device_id, cache_data_in_gpu)
-            phone, phone_lengths, pitch, pitchf, spec, spec_lengths, wave, sid, energy = utils.get_training_data(info, pitch_guidance, energy_use)
+            phone, phone_lengths, pitch, pitchf, spec, spec_lengths, wave, sid = utils.get_training_data(info, pitch_guidance)
 
+            # GENERATOR FORWARD PASS
             with autocasts:
-                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid, energy)
+                y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
                 wave = commons.slice_segments(wave, ids_slice * config.data.hop_length, config.train.segment_size, dim=3)
 
+            # DISCRIMINATOR OPTIMIZATION STEP
             for _ in range(d_step_per_g_step):
                 with autocasts:
                     y_d_hat_r, y_d_hat_g, _, _ = net_d(wave, y_hat.detach())
-                    loss_disc, losses_disc_r, losses_disc_g = losses.discriminator_loss(y_d_hat_r, y_d_hat_g)
 
+                loss_disc, losses_disc_r, losses_disc_g = losses.discriminator_loss(y_d_hat_r, y_d_hat_g)
                 optim_d.zero_grad()
 
                 if autocast_enabled:
@@ -547,41 +539,23 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
                     grad_norm_d = grad_norm_optim(net_d.parameters())
                     optim_d.step()
 
+            # GENERATOR BACKWARD & LOSSES OPTIMIZATION STEP
             with autocasts:
                 y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(wave, y_hat)
 
-            y_hat_mel = mel_spectrogram_torch(
-                y_hat.float().squeeze(1), 
-                config.data.filter_length, 
-                config.data.n_mel_channels, 
-                config.data.sample_rate, 
-                config.data.hop_length, 
-                config.data.win_length, 
-                config.data.mel_fmin, 
-                config.data.mel_fmax
-            )
+            y_hat_mel = mel_spectrogram_torch(y_hat.float().squeeze(1), config)
 
+            # Route calculation path using targeted error criteria definitions
             if multiscale_mel_loss: loss_mel = fn_mel_loss(wave, y_hat) * config.train.c_mel / 3.0
-            else:
-                loss_mel = fn_mel_loss(
-                    mel_spectrogram_torch(
-                        wave.float().squeeze(1), 
-                        config.data.filter_length, 
-                        config.data.n_mel_channels, 
-                        config.data.sample_rate, 
-                        config.data.hop_length, 
-                        config.data.win_length, 
-                        config.data.mel_fmin, 
-                        config.data.mel_fmax
-                    ), 
-                    y_hat_mel
-                ) * config.train.c_mel
+            else: loss_mel = fn_mel_loss(mel_spectrogram_torch(wave.float().squeeze(1), config), y_hat_mel) * config.train.c_mel
 
+            # Aggregate total components for multi-task loss calculation
             loss_kl = losses.kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * config.train.c_kl
             loss_fm = losses.feature_loss(fmap_r, fmap_g)
             loss_gen, losses_gen = losses.generator_loss(y_d_hat_g)
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
 
+            # Update historical global low bounds
             if loss_gen_all < lowest_value["value"]:  lowest_value = {"step": global_step, "value": loss_gen_all, "epoch": epoch}
 
             optim_g.zero_grad()
@@ -597,7 +571,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
                 optim_g.step()
 
             global_step += 1
-
+            # Append calculated step parameters to history tracking arrays
             avg_losses["grad_d_50"].append(grad_norm_d)
             avg_losses["grad_g_50"].append(grad_norm_g)
             avg_losses["disc_loss_50"].append(loss_disc.detach())
@@ -607,6 +581,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
             avg_losses["mel_loss_50"].append(loss_mel.detach())
             avg_losses["gen_loss_50"].append(loss_gen_all.detach())
 
+            # Export rolling status charts onto summary board records at standard logging boundaries
             if rank == 0 and global_step % 50 == 0:
                 scalar_dict = {
                     "grad_avg_50/norm_d": sum(avg_losses["grad_d_50"]) / len(avg_losses["grad_d_50"]),
@@ -623,11 +598,13 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
 
             pbar.update(1)
 
+    # Flush active VRAM memory caches safely
     with torch.no_grad():
         clear_gpu_cache()
 
+    # EVALUATION, LOGGING, & EXTRACTION CHECKS
     if rank == 0:
-        mel = spec_to_mel_torch(spec, config.data.filter_length, config.data.n_mel_channels, config.data.sample_rate, config.data.mel_fmin, config.data.mel_fmax)
+        mel = spec_to_mel_torch(spec, config)
         y_mel = commons.slice_segments(mel, ids_slice, config.train.segment_size // config.data.hop_length, dim=3)
 
         scalar_dict = {
@@ -642,6 +619,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
             "loss/g/kl": loss_kl
         }
 
+        # Expand data maps with nested sub-loss arrays dynamically
         scalar_dict.update({f"loss/g/{i}": v for i, v in enumerate(losses_gen)})
         scalar_dict.update({f"loss/d_r/{i}": v for i, v in enumerate(losses_disc_r)})
         scalar_dict.update({f"loss/d_g/{i}": v for i, v in enumerate(losses_disc_g)})
@@ -652,10 +630,11 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
             "all/mel": utils.plot_spectrogram_to_numpy(mel[0].data.cpu().numpy()),
         }
 
+        # Handle full model saving and validation sample audio synthesis cycles
         if epoch % save_every_epoch == 0:
             with autocasts:
                 with torch.no_grad():
-                    o, *_ = net_g.module.infer(*reference) if hasattr(net_g, "module") else net_g.infer(*reference)
+                    o = net_g.module.infer(*reference) if hasattr(net_g, "module") else net_g.infer(*reference)
 
             utils.summarize(writer=writer, global_step=global_step, images=image_dict, scalars=scalar_dict, audios={f"gen/audio_{global_step:07d}": o[0, :, :]}, audio_sample_rate=config.data.sample_rate)
         else:  utils.summarize(writer=writer, global_step=global_step, images=image_dict, scalars=scalar_dict)
@@ -664,6 +643,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
     done = False
     
     if rank == 0:
+        # Save structural weights when passing interval checkpoints
         if epoch % save_every_epoch == 0:
             checkpoint_suffix = f"{'latest' if save_only_latest else global_step}.pth"
 
@@ -672,6 +652,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
 
             if custom_save_every_weights: model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth"))
 
+        # Monitor divergence characteristics via Automated Early Stopping Checks
         if overtraining_detector and epoch > 1:
             current_loss_disc, current_loss_gen = float(loss_disc), float(lowest_value["value"])
             loss_disc_history.append(current_loss_disc)
@@ -695,26 +676,30 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
             )
 
             if epoch % save_every_epoch == 0: detector.save_to_json(training_file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history)
+            # Check early termination flags based on trend thresholds
             if is_overtraining_gen and consecutive_increases_gen == overtraining_threshold or is_overtraining_disc and consecutive_increases_disc == (overtraining_threshold * 2):
                 logger.info(translations["overtraining_find"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
                 done = True
             else:
                 logger.info(translations["best_epoch"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
-
+                # Maintain a clean workspace by purging outdated intermediate weight paths
                 for file in glob.glob(os.path.join(weights_path, f"{model_name}_*e_*s_best_epoch.pth")):
                     model_del.append(file)
 
                 model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth"))
         
+        # Standard workflow completion criteria check
         if epoch >= custom_total_epoch:
             logger.info(translations["success_training"].format(epoch=epoch, global_step=global_step, loss_gen_all=round(loss_gen_all.item(), 3)))
             logger.info(translations["training_info"].format(lowest_value_rounded=round(float(lowest_value["value"]), 3), lowest_value_epoch=lowest_value['epoch'], lowest_value_step=lowest_value['step']))
             model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth"))
             done = True
             
+        # Clean up stale inference models from disk
         for m in model_del:
             os.remove(m)
         
+        # Extract targeted production-ready inference weights (.pth)
         if model_add:
             ckpt = (net_g.module.state_dict() if hasattr(net_g, "module") else net_g.state_dict())
             for m in model_add:
@@ -730,13 +715,12 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
                     hps=hps, 
                     model_author=model_author, 
                     vocoder=vocoder, 
-                    energy_use=energy_use,
                     speakers_id=config.sid,
                     architecture=architecture
                 )
 
         lowest_value_rounded = round(float(lowest_value["value"]), 3)
-
+        # Output generalized execution summary statistics depending on tracking contexts
         if epoch > 1 and overtraining_detector: 
             logger.info(
                 translations["model_training_info"].format(
@@ -769,6 +753,7 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
 
         logger.debug(f"loss_gen_all: {loss_gen_all} loss_gen: {loss_gen} loss_fm: {loss_fm} loss_mel: {loss_mel} loss_kl: {loss_kl}")
 
+        # Post-training cleanup routine upon triggering termination flags
         if done: 
             if save_the_pid:
                 with open(config_save_path, "r", encoding="utf-8") as pid_file:
@@ -786,5 +771,6 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, scaler, train_loader, wri
             clear_gpu_cache()
 
 if __name__ == "__main__": 
+    # Enforce spawn multiprocessing method for thread-safe cross-GPU allocation bounds
     mp.set_start_method("spawn")
     main()

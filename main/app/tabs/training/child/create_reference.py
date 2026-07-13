@@ -11,8 +11,7 @@ from main.app.core.ui import (
     visible, 
     unlock_f0, 
     shutil_move, 
-    change_audios_choices, 
-    change_embedders_mode
+    change_audios_choices
 )
 
 from main.app.variables import (
@@ -34,11 +33,6 @@ def create_reference_tab():
         pitch_guidance = gr.Checkbox(
             label=translations["training_pitch"], 
             value=True, 
-            interactive=True
-        )
-        use_energy = gr.Checkbox(
-            label=translations["train&energy"], 
-            value=False, 
             interactive=True
         )
         f0_autotune = gr.Checkbox(
@@ -142,7 +136,7 @@ def create_reference_tab():
                     with gr.Row():
                         predictor_onnx = gr.Checkbox(
                             label=translations["predictor_onnx"], 
-                            value=False, 
+                            value=configs.get("int8", False), 
                             interactive=True
                         )
                         unlock_full_method = gr.Checkbox(
@@ -203,7 +197,7 @@ def create_reference_tab():
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
-                        value="fairseq", 
+                        value="onnx" if configs.get("int8", False) else "fairseq", 
                         choices=embedders_mode, 
                         interactive=True, 
                         visible=True
@@ -323,15 +317,6 @@ def create_reference_tab():
                 input_audio
             ]
         )
-        embedder_mode.change(
-            fn=change_embedders_mode, 
-            inputs=[
-                embedder_mode
-            ], 
-            outputs=[
-                embedders
-            ]
-        )
         embedders.change(
             fn=lambda embedders: visible(embedders == "custom"), 
             inputs=[
@@ -366,7 +351,6 @@ def create_reference_tab():
                 input_audio, 
                 reference_name, 
                 pitch_guidance, 
-                use_energy, 
                 version, 
                 embedders, 
                 embedder_mode, 

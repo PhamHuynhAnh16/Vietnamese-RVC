@@ -31,19 +31,42 @@ def separate_music(
     separate_backing,
     separate_reverb
 ):
+    """
+    Executes the music separation process by invoking an external source separation script.
+
+    This function performs initial validation on input file paths and output directories,
+    triggers an asynchronous or blocking subprocess execution with comprehensive processing 
+    parameters (such as models, audio configurations, and processing toggles), and finally 
+    maps out the predicted file paths of the generated audio stems (Vocals, Instruments, etc.).
+
+    Returns:
+        list: A list containing exactly 4 elements representing paths to output audio files:
+              [0] -> Original Vocals path (with or without reverb).
+              [1] -> Isolated Instruments track path.
+              [2] -> Main Vocals path (or None if separate_backing is disabled).
+              [3] -> Backing Vocals path (or None if separate_backing is disabled).
+              Returns [None, None, None, None] if any path validation step fails.
+    """
+
+    # Normalize the output directory by resolving its parent directory context if applicable
     output_dirs = os.path.dirname(output_dirs) or output_dirs
 
+    # Validate input: must exist, must not be empty, and cannot be a directory itself
     if not input_path or not os.path.exists(input_path) or os.path.isdir(input_path): 
         gr_warning(translations["input_not_valid"])
         return [None]*4
     
+    # Validate destination directory presence
     if not os.path.exists(output_dirs): 
         gr_warning(translations["output_not_valid"])
         return [None]*4
 
+    # Redundant backup check ensuring the output tree structure exists safely
     if not os.path.exists(output_dirs): os.makedirs(output_dirs)
-    gr_info(translations["start"].format(start=translations["separator_music"]))
+    # Send an initial UI status message indicating the processing engine has started
+    gr_info(translations["start_separator_music"])
 
+    # Build argument array and execute the core separation script via subprocess
     subprocess.run([
         python, 
         configs["separate_path"], 
@@ -71,11 +94,14 @@ def separate_music(
         "--separate_reverb", str(separate_reverb),
     ])
 
+    # Notify user via UI upon successful execution of the separation process
     gr_info(translations["success"])
 
+    # Extract the original filename without extension to map the target subdirectory structure
     filename, _ = os.path.splitext(os.path.basename(input_path))
     output_dirs = os.path.join(output_dirs, filename)
 
+    # Re-verify if input is a file before mapping dynamic strings into the output structure
     return [
         os.path.join(
             output_dirs, 

@@ -12,10 +12,25 @@ from main.library.algorithm.commons import get_padding
 from main.library.algorithm.residuals import LRELU_SLOPE
 
 class MultiPeriodDiscriminator(torch.nn.Module):
+    """
+    Multi-Period Discriminator (MPD) architecture that wraps multiple sub-discriminators 
+    including Scale (DiscriminatorS), Period (DiscriminatorP), and Resolution/Multi-Scale 
+    Mel-Spectrogram (DiscriminatorR) variants. Used widely in adversarial audio synthesis (e.g., HiFi-GAN).
+    """
+
     def __init__(self, version, use_spectral_norm=False, checkpointing=False):
+        """
+        Initializes the MultiPeriodDiscriminator ensemble based on a predefined configuration version.
+
+        Args:
+            version (str): Configuration version ("v0", "v1", "v2", or "v3").
+            use_spectral_norm (bool): If True, applies spectral normalization instead of weight normalization. Defaults to False.
+            checkpointing (bool): If True, utilizes gradient checkpointing to save memory during training. Defaults to False.
+        """
+
         super(MultiPeriodDiscriminator, self).__init__()
         self.checkpointing = checkpointing
-
+        # Configure periods and resolutions based on version criteria
         if version == "v0":
             periods = [2, 3, 5, 7, 11]
             resolutions = []
@@ -28,7 +43,10 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         elif version == "v3":
             periods = [2, 3, 5, 7, 11]
             resolutions = [[1024, 120, 600], [2048, 240, 1200], [512, 50, 240]]
+        else:
+            raise ValueError(f"Unknown MultiPeriodDiscriminator version: {version}")
 
+        # Construct sub-discriminators list dynamically
         self.discriminators = torch.nn.ModuleList(
             [DiscriminatorS(use_spectral_norm=use_spectral_norm)] + 
             [DiscriminatorP(p, use_spectral_norm=use_spectral_norm) for p in periods] + 
@@ -36,9 +54,25 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         )
 
     def forward(self, y, y_hat):
+        """
+        Evaluates both real ground-truth audio and generated audio across all sub-discriminators.
+
+        Args:
+            y (torch.Tensor): Real audio waveform tensor.
+            y_hat (torch.Tensor): Generated/Synthetic audio waveform tensor.
+
+        Returns:
+            Tuple containing:
+                - y_d_rs (List[torch.Tensor]): Real validation scores from each discriminator.
+                - y_d_gs (List[torch.Tensor]): Fake validation scores from each discriminator.
+                - fmap_rs (List[List[torch.Tensor]]): Feature maps extracted from real audio inputs.
+                - fmap_gs (List[List[torch.Tensor]]): Feature maps extracted from generated audio inputs.
+        """
+
         y_d_rs, y_d_gs, fmap_rs, fmap_gs = [], [], [], []
 
         for d in self.discriminators:
+            # Conditional routing to leverage activation checkpointing during backpropagation memory optimization
             if self.training and self.checkpointing:
                 y_d_r, fmap_r = checkpoint(d, y, use_reentrant=False)
                 y_d_g, fmap_g = checkpoint(d, y_hat, use_reentrant=False)
@@ -52,9 +86,21 @@ class MultiPeriodDiscriminator(torch.nn.Module):
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
 class DiscriminatorS(torch.nn.Module):
+    """
+    Multi-Scale / Sub-Scale Discriminator (MSD) variant acting on raw 1D audio sequences at full-scale.
+    """
+
     def __init__(self, use_spectral_norm=False):
+        """
+        Initializes 1D convolutional layers with group configurations for localized pattern matching.
+
+        Args:
+            use_spectral_norm (bool): Normalization technique flag switch.
+        """
+
         super(DiscriminatorS, self).__init__()
         norm_f = spectral_norm if use_spectral_norm else weight_norm
+        # 1D Convolutional blocks with varying kernel lengths and grouped architectures
         self.convs = torch.nn.ModuleList([
             norm_f(torch.nn.Conv1d(1, 16, 15, 1, padding=7)), 
             norm_f(torch.nn.Conv1d(16, 64, 41, 4, groups=4, padding=20)), 
@@ -67,6 +113,14 @@ class DiscriminatorS(torch.nn.Module):
         self.lrelu = torch.nn.LeakyReLU(LRELU_SLOPE)
 
     def forward(self, x):
+        """
+        Args:
+            x (torch.Tensor): Audio waveform input tensor.
+
+        Returns:
+            Tuple[torch.Tensor, List[torch.Tensor]]: Flattened validity matrix score and intermediate feature map list.
+        """
+
         fmap = []
         for conv in self.convs:
             x = self.lrelu(conv(x))
@@ -75,13 +129,27 @@ class DiscriminatorS(torch.nn.Module):
         x = self.conv_post(x)
         fmap.append(x)
 
+        # Flatten features from dimension 1 to the end for categorical classification loss evaluation
         return x.flatten(1, -1), fmap
 
 class DiscriminatorP(torch.nn.Module):
+    """
+    Period Discriminator that reshapes 1D audio signals into structural 2D planes 
+    based on a defined period interval to evaluate periodic patterns.
+    """
+
     def __init__(self, period, kernel_size=5, use_spectral_norm=False):
+        """
+        Args:
+            period (int): Periodic interval slicing window step.
+            kernel_size (int): Height dimension kernel size. Defaults to 5.
+            use_spectral_norm (bool): Normalization switch indicator.
+        """
+
         super(DiscriminatorP, self).__init__()
         self.period = period
         norm_f = spectral_norm if use_spectral_norm else weight_norm
+        # 2D Convolutions utilizing a vertical strip kernel to treat periodic frames as image columns
         self.convs = torch.nn.ModuleList([
             norm_f(
                 torch.nn.Conv2d(
@@ -102,9 +170,19 @@ class DiscriminatorP(torch.nn.Module):
         self.lrelu = torch.nn.LeakyReLU(LRELU_SLOPE)
 
     def forward(self, x):
+        """
+        Args:
+            x (torch.Tensor): Audio tensor.
+
+        Returns:
+            Tuple[torch.Tensor, List[torch.Tensor]]: Validated classification tensor and accumulated feature maps.
+        """
+
         fmap = []
         b, c, t = x.shape
+        # Pad sequence length to be perfectly divisible by the target period before 2D transformation
         if t % self.period != 0: x = F.pad(x, (0, (self.period - (t % self.period))), "reflect")
+        # Reshape 1D data sequence to 2D image matrix
         x = x.view(b, c, -1, self.period)
 
         for conv in self.convs:
@@ -116,11 +194,24 @@ class DiscriminatorP(torch.nn.Module):
         return x.flatten(1, -1), fmap
 
 class DiscriminatorR(torch.nn.Module):
+    """
+    Resolution Discriminator that processes transformed spectrogram magnitudes 
+    instead of raw raw time-domain audio sequences.
+    """
+
     def __init__(self, resolution, use_spectral_norm=False):
+        """
+        Args:
+            resolution (List[int]): STFT configuration constants [n_fft, hop_length, win_length].
+            use_spectral_norm (bool): Normalization technique selection flag.
+        """
+
         super().__init__()
         self.resolution = resolution
-        self.lrelu_slope = 0.1
+        self.lrelu_slope = LRELU_SLOPE # Specific localized slope modifier for LeakyReLU in Resolution domain
         norm_f = spectral_norm if use_spectral_norm else weight_norm
+
+        # 2D Convolutions utilizing horizontal contextual kernels for time-frequency feature extraction
         self.convs = torch.nn.ModuleList([
             norm_f(torch.nn.Conv2d( 1, 32, (3, 9), padding=(1, 4))), 
             norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
@@ -131,7 +222,16 @@ class DiscriminatorR(torch.nn.Module):
         self.conv_post = norm_f(torch.nn.Conv2d(32, 1, (3, 3), padding=(1, 1)))
 
     def forward(self, x):
+        """
+        Args:
+            x (torch.Tensor): Waveform audio signal.
+
+        Returns:
+            Tuple[torch.Tensor, List[torch.Tensor]]: Flattened evaluation result matrix and spectral feature tracking logs.
+        """
+
         fmap = []
+        # Calculate Magnitude Spectrogram and append a dummy channel index
         x = self.spectrogram(x).unsqueeze(1)
         
         for layer in self.convs:
@@ -144,12 +244,25 @@ class DiscriminatorR(torch.nn.Module):
         return x.flatten(1, -1), fmap
 
     def spectrogram(self, x):
+        """
+        Helper method computing the short-time Fourier transform (STFT) magnitude map.
+        Handles alternative hardware devices (like OpenCL / privateuseone backends) by falling back safely to CPU.
+
+        Args:
+            x (torch.Tensor): Raw time-series sequence data tensor.
+
+        Returns:
+            torch.Tensor: Linear amplitude spectrogram representation tensor.
+        """
+
         n_fft, hop_length, win_length = self.resolution
         pad = int((n_fft - hop_length) / 2)
 
+        # Detect non-standard backends to safeguard STFT compatibility errors
         is_not_cuda = x.device.type in ["privateuseone", "ocl"]
+        # Execute Short-Time Fourier Transform
         stft = torch.stft(
-            F.pad(
+            F.pad( # Apply structured reflection boundaries and squeeze out the single channel
                 x.cpu() if is_not_cuda else x, 
                 (pad, pad), 
                 mode="reflect"
@@ -162,4 +275,5 @@ class DiscriminatorR(torch.nn.Module):
             return_complex=True
         )
 
+        # Extract Euclidean norm magnitude from complex projections and cast back to the native input execution device
         return torch.view_as_real(stft).norm(p=2, dim=-1).to(x.device)

@@ -28,6 +28,11 @@ def convert_svc_model_tab():
             value=True,
             interactive=True
         )
+        is_half_weight = gr.Checkbox(
+            label=translations["is_half_weight"],
+            value=False,
+            interactive=True
+        )
     with gr.Row():
         model_pth_upload = gr.File(
             label=translations["drop_model"], 
@@ -112,7 +117,8 @@ def convert_svc_model_tab():
                 model_pth_path,
                 config_path,
                 modelname,
-                delete_when_success
+                delete_when_success,
+                is_half_weight
             ],
             outputs=[
                 output_model_file

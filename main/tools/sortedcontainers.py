@@ -14,6 +14,12 @@ sys.path.append(os.getcwd())
 from main.app.variables import logger
 
 def recursive_repr(func):
+    """
+    Decorator to prevent infinite recursion in __repr__ methods.
+    
+    If a container references itself, this replaces the recursive call with '...'.
+    """
+
     repr_running = set()
 
     @wraps(func)
@@ -31,12 +37,24 @@ def recursive_repr(func):
     return wrapper
 
 class SortedList(collections.abc.MutableSequence):
+    """A mutable sequence that automatically maintains its elements in sorted order."""
+
     def __init__(self, iterable=None, load=1000):
+        """
+        Initialize the SortedList.
+
+        Args:
+            iterable: An optional iterable of items to initialize the list with.
+            load: The load factor controlling the maximum sublist size before splitting.
+        """
+
         self._len, self._maxes, self._lists, self._index = 0, [], [], []
         self._load, self._twice, self._half = load, load * 2, load >> 1
         if iterable is not None: self.update(iterable)
 
     def clear(self):
+        """Remove all elements from the SortedList."""
+
         self._len = 0
 
         del self._maxes[:]
@@ -44,40 +62,59 @@ class SortedList(collections.abc.MutableSequence):
         del self._index[:]
 
     def add(self, val):
+        """
+        Insert a new element into the SortedList maintaining the sorted order.
+
+        Args:
+            val: The value to be added.
+        """
+
         _maxes, _lists = self._maxes, self._lists
 
         if _maxes:
+            # Find the appropriate sublist index based on maximum sublist values
             pos = bisect.bisect_right(_maxes, val)
 
             if pos == len(_maxes):
+                # Element is larger than all current elements; append to the last sublist
                 pos -= 1
                 _maxes[pos] = val
                 _lists[pos].append(val)
             else:
+                # Insert inside the designated sublist maintaining order
                 bisect.insort(_lists[pos], val)
 
             self._expand(pos)
         else:
+            # First element initialization
             _maxes.append(val)
             _lists.append([val])
 
         self._len += 1
 
     def _expand(self, pos):
-        _lists, _index = self._lists, self._index
+        """
+        Split a sublist if it exceeds the load limit threshold.
 
+        Args:
+            pos: Position index of the sublist to balance.
+        """
+
+        _lists, _index = self._lists, self._index
+        # Check if the sublist size violates the load factor ceiling
         if len(_lists[pos]) > self._twice:
             _maxes, _load = self._maxes, self._load
             half = _lists[pos][_load:]
-    
+            # Split the heavy sublist into two equal halves
             _lists[pos] = _lists[pos][:_load]
             _maxes[pos] = _lists[pos][-1]
 
             _maxes.insert(pos + 1, half[-1])
             _lists.insert(pos + 1, half)
-
+            # Invalidate index tree since structure changed
             del _index[:]
         else:
+            # Update positional index counters if tree index is active
             if len(_index) > 0:
                 child = self._offset + pos
 
@@ -88,15 +125,24 @@ class SortedList(collections.abc.MutableSequence):
                 _index[0] += 1
 
     def update(self, iterable):
+        """
+        Batch insert multiple values from an iterable into the SortedList.
+
+        Args:
+            iterable: Collection of elements to be merged.
+        """
+
         _maxes, _lists = self._maxes, self._lists
         values = sorted(iterable)
 
         if _maxes:
+            # If incoming dataset is large, merge entirely and rebuild to minimize overhead
             if len(values) * 4 >= self._len:
                 values.extend(chain.from_iterable(_lists))
                 values.sort()
                 self.clear()
             else:
+                # Step-by-step element injection for smaller datasets
                 _add = self.add
 
                 for val in values:
@@ -104,6 +150,7 @@ class SortedList(collections.abc.MutableSequence):
 
                 return
 
+        # Distribute sorted items into fresh sublists based on load factor chunking
         _load, _index = self._load, self._index
         _lists.extend(values[pos:(pos + _load)] for pos in range(0, len(values), _load))
         _maxes.extend(sublist[-1] for sublist in _lists)
@@ -112,17 +159,22 @@ class SortedList(collections.abc.MutableSequence):
         del _index[:]
 
     def __contains__(self, val):
+        """Check if a value exists in the SortedList."""
         _maxes = self._maxes
         if not _maxes: return False
 
+        # Locate candidate sublist via binary search
         pos = bisect.bisect_left(_maxes, val)
         if pos == len(_maxes): return False
 
+        # Query sublist for presence of element
         _lists = self._lists
         idx = bisect.bisect_left(_lists[pos], val)
         return _lists[pos][idx] == val
 
     def discard(self, val):
+        """Remove a value if it is present in the container."""
+
         _maxes = self._maxes
 
         if not _maxes: return
@@ -135,19 +187,34 @@ class SortedList(collections.abc.MutableSequence):
         if _lists[pos][idx] == val: self._delete(pos, idx)
 
     def remove(self, val):
+        """
+        Remove a value from the container; raises ValueError if not found.
+
+        Args:
+            val: Element to eliminate.
+        """
+
         _maxes = self._maxes
-        if not _maxes: raise ValueError
+        if not _maxes: raise ValueError(f"remove(x): x not in SortedList (list is empty)")
 
         pos = bisect.bisect_left(_maxes, val)
-        if pos == len(_maxes): raise ValueError
+        if pos == len(_maxes): raise ValueError(f"remove(x): x not in SortedList (value exceeds max bound)")
 
         _lists = self._lists
         idx = bisect.bisect_left(_lists[pos], val)
 
         if _lists[pos][idx] == val: self._delete(pos, idx)
-        else: raise ValueError
+        else: raise ValueError(f"remove(x): x not in SortedList")
 
     def _delete(self, pos, idx):
+        """
+        Internal operation to delete an element at a specific sublist coordinates.
+
+        Args:
+            pos: Sublist container index.
+            idx: Local list index element.
+        """
+
         _maxes, _lists, _index = self._maxes, self._lists, self._index
 
         lists_pos = _lists[pos]
@@ -155,10 +222,10 @@ class SortedList(collections.abc.MutableSequence):
 
         self._len -= 1
         len_lists_pos = len(lists_pos)
-
+        # Check if sublist size remains stable within bounds
         if len_lists_pos > self._half:
             _maxes[pos] = lists_pos[-1]
-
+            # Cascade decrements up the positional tree index
             if len(_index) > 0:
                 child = self._offset + pos
 
@@ -168,6 +235,7 @@ class SortedList(collections.abc.MutableSequence):
 
                 _index[0] -= 1
         elif len(_lists) > 1:
+            # Merge shallow sublist with adjacent neighbors to maintain density
             if pos == 0: pos += 1
 
             prev = pos - 1
@@ -186,6 +254,14 @@ class SortedList(collections.abc.MutableSequence):
             del _index[:]
 
     def _loc(self, pos, idx):
+        """
+        Convert a localized (sublist, element) coordinate to a global linear index.
+
+        Args:
+            pos: Sublist target offset.
+            idx: Localized array element position.
+        """
+
         if pos == 0: return idx
 
         _index = self._index
@@ -193,7 +269,7 @@ class SortedList(collections.abc.MutableSequence):
 
         total = 0
         pos += self._offset
-
+        # Traverse upwards through tree structure accumulators
         while pos:
             if not (pos & 1): total += _index[pos - 1]
             pos = (pos - 1) >> 1
@@ -201,21 +277,28 @@ class SortedList(collections.abc.MutableSequence):
         return total + idx
 
     def _pos(self, idx):
-        _len, _lists = self._len, self._lists
+        """
+        Convert a global sequence index into localized (sublist, element) index.
 
+        Args:
+            idx: Global positional index integer.
+        """
+
+        _len, _lists = self._len, self._lists
+        # Standardizing negative indexing parameters
         if idx < 0:
             last_len = len(_lists[-1])
             if (-idx) <= last_len: return len(_lists) - 1, last_len + idx
 
             idx += _len
-            if idx < 0: raise IndexError
-        elif idx >= _len: raise IndexError
-
+            if idx < 0: raise IndexError(f"SortedList index out of range (negative index overflow: {idx - _len})")
+        elif idx >= _len: raise IndexError(f"SortedList index out of range: {idx}")
+        # Short-circuit optimize mapping targets landing in the primary sublist
         if idx < len(_lists[0]): return 0, idx
 
         _index = self._index
         if len(_index) == 0: self._build_index()
-
+        # Binary search downwards through the segmented tracking index
         pos = 0
         len_index = len(_index)
         child = (pos << 1) + 1
@@ -233,6 +316,8 @@ class SortedList(collections.abc.MutableSequence):
         return (pos - self._offset, idx)
 
     def _build_index(self):
+        """Construct the structural indexing tree layout mapping offsets to segment counts."""
+
         row0 = list(map(len, self._lists))
 
         if len(row0) == 1:
@@ -254,7 +339,7 @@ class SortedList(collections.abc.MutableSequence):
         size = 2 ** (int(math.log(len(row1) - 1, 2)) + 1)
         row1.extend(repeat(0, size - len(row1)))
         tree = [row0, row1]
-
+        # Generate aggregated index level structures
         while len(tree[-1]) > 1:
             head = iter(tree[-1])
             tail = iter(head)
@@ -266,8 +351,15 @@ class SortedList(collections.abc.MutableSequence):
         self._offset = size * 2 - 1
 
     def _slice(self, slc):
+        """
+        Normalize Python slicing specifications matching current state limitations.
+
+        Args:
+            slc: Native slice configuration.
+        """
+
         start, stop, step = slc.start, slc.stop, slc.step
-        if step == 0: raise ValueError
+        if step == 0: raise ValueError("slice step cannot be zero")
 
         if step is None: step = 1
 
@@ -296,9 +388,11 @@ class SortedList(collections.abc.MutableSequence):
         return start, stop, step
 
     def __delitem__(self, idx):
+        """Remove element or slice from container at designated reference index."""
+
         if isinstance(idx, slice):
             start, stop, step = self._slice(idx)
-
+            # Heavy structural truncation optimize: rewrite container instead of individual deletes
             if ((step == 1) and (start < stop) and ((stop - start) * 8 >= self._len)):
                 values = self[:start]
                 if stop < self._len: values += self[stop:]
@@ -320,6 +414,8 @@ class SortedList(collections.abc.MutableSequence):
             self._delete(pos, idx)
 
     def __getitem__(self, idx):
+        """Retrieve element or slice segment based on requested index mapping."""
+
         _lists = self._lists
 
         if isinstance(idx, slice):
@@ -335,6 +431,7 @@ class SortedList(collections.abc.MutableSequence):
 
                 if start_pos == stop_pos: return _lists[start_pos][start_idx:stop_idx]
 
+                # Stitch slices traversing boundary lines together
                 prefix = _lists[start_pos][start_idx:]
                 middle = _lists[(start_pos + 1):stop_pos]
 
@@ -355,10 +452,19 @@ class SortedList(collections.abc.MutableSequence):
             return _lists[pos][idx]
 
     def _check_order(self, idx, val):
+        """
+        Verify sorting property guarantees are maintained around a specific index index position.
+
+        Args:
+            idx: Positional index verified.
+            val: Evaluation entity tracking candidates.
+        """
+
         _lists, _len = self._lists, self._len
         pos, loc = self._pos(idx)
         if idx < 0: idx += _len
 
+        # Verify left neighbor relation integrity
         if idx > 0:
             idx_prev = loc - 1
             pos_prev = pos
@@ -367,8 +473,9 @@ class SortedList(collections.abc.MutableSequence):
                 pos_prev -= 1
                 idx_prev = len(_lists[pos_prev]) - 1
 
-            if _lists[pos_prev][idx_prev] > val: raise ValueError
+            if _lists[pos_prev][idx_prev] > val: raise ValueError(f"Order violation: element at index {idx} ({val}) cannot be less than index {idx - 1} ({_lists[pos_prev][idx_prev]})")
 
+        # Verify right neighbor relation integrity
         if idx < (_len - 1):
             idx_next = loc + 1
             pos_next = pos
@@ -377,9 +484,11 @@ class SortedList(collections.abc.MutableSequence):
                 pos_next += 1
                 idx_next = 0
 
-            if _lists[pos_next][idx_next] < val: raise ValueError
+            if _lists[pos_next][idx_next] < val: raise ValueError(f"Order violation: element at index {idx} ({val}) cannot be greater than index {idx + 1} ({_lists[pos_next][idx_next]})")
 
     def __setitem__(self, index, value):
+        """Modify sequence items while strictly maintaining ordering layout rules."""
+
         _maxes, _lists, _pos = self._maxes, self._lists, self._pos
         _check_order = self._check_order
 
@@ -391,11 +500,11 @@ class SortedList(collections.abc.MutableSequence):
                 if not hasattr(value, '__len__'): value = list(value)
 
                 indices = list(indices)
-                if len(value) != len(indices): raise ValueError
+                if len(value) != len(indices): raise ValueError(f"attempt to assign sequence of size {len(value)} to extended slice of size {len(indices)}")
 
                 log = []
                 _append = log.append
-
+                # Stage modification targets transactions
                 for idx, val in zip(indices, value):
                     pos, loc = _pos(idx)
                     _append((idx, _lists[pos][loc], val))
@@ -403,6 +512,7 @@ class SortedList(collections.abc.MutableSequence):
                     _lists[pos][loc] = val
                     if len(_lists[pos]) == (loc + 1): _maxes[pos] = val
 
+                # Rollback operations if monotonic ordering contracts break
                 try:
                     for idx, oldval, newval in log:
                         _check_order(idx, newval)
@@ -415,17 +525,18 @@ class SortedList(collections.abc.MutableSequence):
 
                     raise
             else:
+                # Slice modifications requiring sequence rebuilding properties
                 if not hasattr(value, '__getitem__'): value = list(value)
                 ordered = all(value[pos - 1] <= value[pos] for pos in range(1, len(value)))
-                if not ordered: raise ValueError
+                if not ordered: raise ValueError("Assigned slice values must be sorted monotonically")
 
                 if start == 0 or len(value) == 0: pass
                 else:
-                    if self[start - 1] > value[0]: raise ValueError
+                    if self[start - 1] > value[0]: raise ValueError(f"Slice value start boundary violation: sequence element at {start - 1} ({self[start - 1]}) > new element ({value[0]})")
 
                 if stop == len(self) or len(value) == 0: pass
                 else:
-                    if self[stop] < value[-1]: raise ValueError
+                    if self[stop] < value[-1]: raise ValueError(f"Slice value end boundary violation: sequence element at {stop} ({self[stop]}) < new element ({value[-1]})")
 
                 del self[index]
                 _insert = self.insert
@@ -440,9 +551,13 @@ class SortedList(collections.abc.MutableSequence):
             if len(_lists[pos]) == (loc + 1):  _maxes[pos] = value
 
     def __iter__(self):
+        """Return an iterator over the SortedList."""
+
         return chain.from_iterable(self._lists)
 
     def __reversed__(self):
+        """Return a reverse iterator over the SortedList."""
+
         _lists = self._lists
         start = len(_lists) - 1
 
@@ -450,9 +565,13 @@ class SortedList(collections.abc.MutableSequence):
         return chain.from_iterable(iterable)
 
     def __len__(self):
+        """Return the total number of elements in the SortedList."""
+
         return self._len
 
     def bisect_left(self, val):
+        """Find the index where val should be inserted to maintain sorted order (leftmost)."""
+
         _maxes = self._maxes
         if not _maxes: return 0
 
@@ -463,9 +582,13 @@ class SortedList(collections.abc.MutableSequence):
         return self._loc(pos, idx)
 
     def bisect(self, val):
+        """Alias for bisect_right."""
+
         return self.bisect_right(val)
 
     def bisect_right(self, val):
+        """Find the index where val should be inserted to maintain sorted order (rightmost)."""
+
         _maxes = self._maxes
         if not _maxes: return 0
 
@@ -476,6 +599,8 @@ class SortedList(collections.abc.MutableSequence):
         return self._loc(pos, idx)
 
     def count(self, val):
+        """Return the number of occurrences of a value."""
+
         _maxes = self._maxes
         if not _maxes: return 0
 
@@ -498,12 +623,18 @@ class SortedList(collections.abc.MutableSequence):
         return right - left
 
     def copy(self):
+        """Return a shallow copy of the SortedList."""
+
         return SortedList(self, load=self._load)
 
     def __copy__(self):
+        """Return a shallow copy of the SortedList."""
+
         return self.copy()
 
     def append(self, val):
+        """Append a value; raises ValueError if it breaks sorted order restrictions."""
+
         _maxes, _lists = self._maxes, self._lists
 
         if not _maxes:
@@ -514,7 +645,7 @@ class SortedList(collections.abc.MutableSequence):
             return
 
         pos = len(_lists) - 1
-        if val < _lists[pos][-1]: raise ValueError
+        if val < _lists[pos][-1]: raise ValueError(f"append(x): x ({val}) cannot be less than the largest element ({_lists[pos][-1]})")
 
         _maxes[pos] = val
         _lists[pos].append(val)
@@ -523,19 +654,20 @@ class SortedList(collections.abc.MutableSequence):
         self._expand(pos)
 
     def extend(self, values):
+        """Extend list elements; raises ValueError if incoming data breaks sorted properties."""
+
         _maxes, _lists, _load = self._maxes, self._lists, self._load
 
         if not isinstance(values, list):
             values = list(values)
 
-        if any(values[pos - 1] > values[pos]
-               for pos in range(1, len(values))):
-            raise ValueError
+        if any(values[pos - 1] > values[pos] for pos in range(1, len(values))):
+            raise ValueError("extend(iterable): items in iterable must be sorted monotonically")
 
         offset = 0
 
         if _maxes:
-            if values[0] < _lists[-1][-1]: raise ValueError
+            if values[0] < _lists[-1][-1]: raise ValueError(f"extend(iterable): first item ({values[0]}) cannot be less than the largest container element ({_lists[-1][-1]})")
 
             if len(_lists[-1]) < self._half:
                 _lists[-1].extend(values[:_load])
@@ -567,6 +699,8 @@ class SortedList(collections.abc.MutableSequence):
         self._len += len(values)
 
     def insert(self, idx, val):
+        """Insert a value at a numerical position; raises ValueError if order is compromised."""
+
         _maxes, _lists, _len = self._maxes, self._lists, self._len
 
         if idx < 0: idx += _len
@@ -581,7 +715,7 @@ class SortedList(collections.abc.MutableSequence):
             return
 
         if idx == 0:
-            if val > _lists[0][0]: raise ValueError
+            if val > _lists[0][0]: raise ValueError(f"insert(0, x): x ({val}) cannot be greater than the first element ({_lists[0][0]})")
             else:
                 _lists[0].insert(0, val)
                 self._expand(0)
@@ -592,7 +726,7 @@ class SortedList(collections.abc.MutableSequence):
         if idx == _len:
             pos = len(_lists) - 1
 
-            if _lists[pos][-1] > val: raise ValueError
+            if _lists[pos][-1] > val: raise ValueError(f"insert({_len}, x): x ({val}) cannot be less than the last element ({_lists[pos][-1]})")
             else:
                 _lists[pos].append(val)
                 _maxes[pos] = _lists[pos][-1]
@@ -615,10 +749,12 @@ class SortedList(collections.abc.MutableSequence):
             _lists[pos].insert(idx, val)
             self._expand(pos)
             self._len += 1
-        else: raise ValueError
+        else: raise ValueError(f"insert({idx}, x): x ({val}) violates sorted properties bounds")
 
     def pop(self, idx=-1):
-        if (idx < 0 and -idx > self._len) or (idx >= self._len): raise IndexError
+        """Remove and return item at index (default last element)."""
+
+        if (idx < 0 and -idx > self._len) or (idx >= self._len): raise IndexError(f"pop index out of range: {idx}")
 
         pos, idx = self._pos(idx)
         val = self._lists[pos][idx]
@@ -627,8 +763,10 @@ class SortedList(collections.abc.MutableSequence):
         return val
 
     def index(self, val, start=None, stop=None):
+        """Return first index index occurrence of value within target slice bounds."""
+
         _len, _maxes = self._len, self._maxes
-        if not _maxes: raise ValueError
+        if not _maxes: raise ValueError(f"index(x): x not in SortedList (list is empty)")
 
         if start is None: start = 0
         if start < 0: start += _len
@@ -637,16 +775,16 @@ class SortedList(collections.abc.MutableSequence):
         if stop < 0: stop += _len
         if stop > _len: stop = _len
 
-        if stop <= start: raise ValueError
+        if stop <= start: raise ValueError(f"index(x): valid slice range empty (start={start} >= stop={stop})")
 
         stop -= 1
         pos_left = bisect.bisect_left(_maxes, val)
-        if pos_left == len(_maxes): raise ValueError
+        if pos_left == len(_maxes): raise ValueError(f"index(x): x not in SortedList (exceeds maximum elements)")
 
         _lists = self._lists
         idx_left = bisect.bisect_left(_lists[pos_left], val)
 
-        if _lists[pos_left][idx_left] != val: raise ValueError
+        if _lists[pos_left][idx_left] != val: raise ValueError(f"index(x): x not in SortedList")
         left = self._loc(pos_left, idx_left)
 
         if start <= left:
@@ -655,54 +793,80 @@ class SortedList(collections.abc.MutableSequence):
             right = self.bisect_right(val) - 1
             if start <= right: return start
 
-        raise ValueError
+        raise ValueError(f"index(x): x found at index {left}, but it is out of the specified bounds [{start}:{stop+1}]")
 
     def as_list(self):
+        """Flatten segmented representation returning objects in a single continuous layout list."""
+
         return reduce(operator.iadd, self._lists, [])
 
     def __add__(self, that):
+        """Concatenate SortedList with an external sequence, producing a new SortedList instance."""
+
         values = self.as_list()
         values.extend(that)
 
         return SortedList(values)
 
     def __iadd__(self, that):
+        """Inplace addition expansion sequence updates."""
+
         self.update(that)
         return self
 
     def __mul__(self, that):
+        """Multiply SortedList items generating duplicated sequence sets into a new object instance."""
+
         values = self.as_list() * that
         return SortedList(values)
 
     def __imul__(self, that):
+        """Inplace multiplication allocation update processing."""
+
         values = self.as_list() * that
         self.clear()
         self.update(values)
         return self
 
     def __eq__(self, that):
+        """Check if structural sequence elements are strictly identical."""
+
         return ((self._len == len(that)) and all(lhs == rhs for lhs, rhs in zip(self, that)))
 
     def __ne__(self, that):
+        """Check if structural sequence elements are non-identical."""
+
         return ((self._len != len(that)) or any(lhs != rhs for lhs, rhs in zip(self, that)))
 
     def __lt__(self, that):
+        """Less than inequality comparator checks."""
+
         return ((self._len <= len(that)) and all(lhs < rhs for lhs, rhs in zip(self, that)))
 
     def __le__(self, that):
+        """Less-or-equal inequality comparator checks."""
+
         return ((self._len <= len(that)) and all(lhs <= rhs for lhs, rhs in zip(self, that)))
 
     def __gt__(self, that):
+        """Greater than inequality comparator checks."""
+
         return ((self._len >= len(that)) and all(lhs > rhs for lhs, rhs in zip(self, that)))
 
     def __ge__(self, that):
+        """Greater-or-equal inequality comparator checks."""
+
         return ((self._len >= len(that)) and all(lhs >= rhs for lhs, rhs in zip(self, that)))
 
     @recursive_repr
     def __repr__(self):
+        """Return a string representation of the object."""
+
         return '{0}({1})'.format(self.__class__.__name__, repr(self.as_list()))
 
     def _check(self):
+        """Perform comprehensive integrity checks on the internal state structure of the SortedList."""
+
         try:
             assert self._load >= 4
             assert self._half == (self._load >> 1)
@@ -743,6 +907,7 @@ class SortedList(collections.abc.MutableSequence):
         except:
             import traceback
 
+            # Log execution traceback state logs for analysis
             logger.error(traceback.format_exc())
             logger.debug(self._len, self._load, self._half, self._twice)
             logger.debug(self._index)

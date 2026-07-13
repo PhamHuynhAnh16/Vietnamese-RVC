@@ -23,14 +23,36 @@ def extract_model(
     hps, 
     model_author, 
     vocoder, 
-    energy_use, 
     speakers_id,
     architecture
 ):
+    """
+    Extracts the inference-ready weights from a raw training checkpoint, discards 
+    unnecessary training blocks (like the posterior encoder `enc_q`), packages structural 
+    hyperparameters/metadata, and saves the standalone weights to a targeted disk path.
+
+    Args:
+        ckpt (Dict[str, torch.Tensor]): The raw model state dictionary from training.
+        sr (int): Target audio sampling rate configuration.
+        pitch_guidance (bool): Whether the model uses fundamental frequency (F0) tracking.
+        name (str): The logical name assigned to the model.
+        model_path (str): File destination path to save the compiled model weight file.
+        epoch (int): Total count of epochs processed up to this point.
+        step (int): Total global optimization steps performed.
+        version (str): Model architecture variant or framework version tag.
+        hps (object): Hyperparameters namespace object holding configuration values.
+        model_author (str): The name or tag of the model creator/trainer.
+        vocoder (str): Type of neural vocoder used for synthesis (e.g., HiFi-GAN).
+        speakers_id (int): Dimensional context identifier linked to speaker indexing.
+        architecture (str): Target model core neural network style or configuration flavor.
+    """
+
     try:
         logger.info(translations["savemodel"].format(model_dir=model_path, epoch=epoch, step=step))
+        # Ensure the destination parent folders exist
         os.makedirs(os.path.dirname(model_path), exist_ok=True)
 
+        # Initialize ordered tracking; strip out 'enc_q' since the posterior encoder is only needed for training
         opt = OrderedDict(
             weight={
                 key: (
@@ -41,6 +63,7 @@ def extract_model(
             }
         )
 
+        # Pack internal structural network dimensions needed for instant architecture reconstruction
         opt["config"] = [
             hps.data.filter_length // 2 + 1, 
             hps.train.segment_size // hps.data.hop_length, 
@@ -61,20 +84,24 @@ def extract_model(
             hps.model.gin_channels, 
             hps.data.sample_rate
         ]
+
+        # Inject standard model parameters and historical run tracking tags
         opt["epoch"] = f"{epoch}epoch"
         opt["step"] = step
         opt["sr"] = sr
         opt["f0"] = int(pitch_guidance)
         opt["version"] = version
         opt["creation_date"] = datetime.datetime.now().isoformat()
+        # Create a unique SHA256 integrity hash footprint string bound to this extraction step
         opt["model_hash"] = hashlib.sha256(f"{str(ckpt)} {epoch} {step} {datetime.datetime.now().isoformat()}".encode()).hexdigest()
+        # Append identifying administrative metadata parameters
         opt["model_name"] = name
         opt["author"] = model_author
         opt["vocoder"] = vocoder
-        opt["energy"] = energy_use
         opt["speakers_id"] = speakers_id
         opt["architecture"] = architecture
 
+        # Convert parametrization weight paths back to legacy formats for backward compatibility and save
         torch.save(
             replace_keys_in_dict(
                 replace_keys_in_dict(
@@ -87,4 +114,5 @@ def extract_model(
             model_path
         )
     except Exception as e:
+        # Catch and report formatting or write exceptions through the centralized logging module
         logger.error(f"{translations['extract_model_error']}: {e}")

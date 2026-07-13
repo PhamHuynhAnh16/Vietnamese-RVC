@@ -29,15 +29,27 @@ def load_presets(
     embedders_mix_layers,
     embedders_mix_ratio
 ):
+    """
+    Loads conversion presets from a JSON file. If a key is missing from the file,
+    it falls back to the current UI component values.
+
+    Returns:
+        list: A flat list containing the resolved configurations for UI updates.
+    """
+
+    # Trigger warning if no preset file selection is provided
     if not presets: gr_warning(translations["provide_file_settings"])
     
     file = {}
     if presets:
+        # Resolve path and safely load the target JSON configuration
         with open(os.path.join(configs["presets_path"], presets)) as f:
             file = json.load(f)
 
+        # Notify the user via Gradio UI that loading was successful
         gr_info(translations["load_presets"].format(presets=presets))
 
+    # Return values in the exact positional order expected by Gradio outputs
     return [
         file.get("cleaner", cleaner), 
         file.get("autotune", autotune), 
@@ -92,8 +104,17 @@ def save_presets(
     embedders_mix_layers,
     embedders_mix_ratio
 ):  
+    """
+    Saves the selected conversion features into a JSON preset file based on active checkboxes.
+
+    Returns:
+        dict: Triggers a state refresh for the preset dropdown choices.
+    """
+
+    # Validation: Ensure a valid filename is provided
     if not name: return gr_warning(translations["provide_filename_settings"])
 
+    # Validation: Ensure at least one feature group checkbox is checked
     if not any([
         cleaner_checkbox, 
         autotune_checkbox, 
@@ -109,7 +130,7 @@ def save_presets(
         return gr_warning(translations["choose1"])
 
     settings = {}
-
+    # Dynamically append configurations only if the activation condition is satisfied
     for checkbox, data in [
         (
             cleaner_checkbox, 
@@ -161,6 +182,7 @@ def save_presets(
     ]:
         if checkbox: settings.update(data)
 
+    # Export configuration payload to disk
     with open(os.path.join(configs["presets_path"], name + ".conversion.json"), "w") as f:
         json.dump(settings, f, indent=4)
 
@@ -220,6 +242,14 @@ def audio_effect_load_presets(
     bass_or_treble, 
     fade
 ):
+    """
+    Loads audio DSP effect presets from a dedicated JSON configuration.
+    Falls back to current UI values if parameters are missing from the configuration.
+
+    Returns:
+        list: Structured list used to unpack and update all active UI audio effects.
+    """
+
     if not presets: gr_warning(translations["provide_file_settings"])
     
     file = {}
@@ -229,6 +259,7 @@ def audio_effect_load_presets(
 
         gr_info(translations["load_presets"].format(presets=presets))
 
+    # Collect and map values sequentially for structural assignment in UI
     return [
         file.get("resample_checkbox", resample_checkbox), 
         file.get("audio_effect_resample_sr", audio_effect_resample_sr), 
@@ -335,8 +366,20 @@ def audio_effect_save_presets(
     bass_or_treble, 
     fade
 ):
+    """
+    Saves configured audio FX parameters into an effect preset JSON file.
+
+    Args:
+        name (str): Target filename for export.
+        ... (other args): Audio effect processing chains and metrics configurations.
+
+    Returns:
+        dict: Refreshes drop-down lists dedicated to FX presets.
+    """
+
     if not name: return gr_warning(translations["provide_filename_settings"])
 
+    # Ensure at least one audio processor module or structural pitch modifier is enabled
     if not any([
         resample_checkbox, 
         chorus_check_box, 
@@ -356,7 +399,7 @@ def audio_effect_save_presets(
         return gr_warning(translations["choose1"])
 
     settings = {}
-
+    # Mapping structure for all DSP block parameters depending on structural feature validation
     for checkbox, data in [
         (resample_checkbox, {
             "resample_checkbox": resample_checkbox, 
@@ -439,6 +482,7 @@ def audio_effect_save_presets(
     ]:
         if checkbox: settings.update(data)
 
+    # Save the runtime dictionary into the local path ecosystem
     with open(os.path.join(configs["presets_path"], name + ".effect.json"), "w") as f:
         json.dump(settings, f, indent=4)
 
@@ -473,6 +517,7 @@ def save_realtime_config(
     embedders_mix,
     embedders_mix_layers,
     embedders_mix_ratio,
+    use_phase_vocoder,
     chorus,
     distortion,
     reverb,
@@ -515,8 +560,17 @@ def save_realtime_config(
     phaser_feedback,
     phaser_mix
 ):
+    """
+    Dumps all current interface configurations for low-latency real-time 
+    inference into a customized runtime file.
+
+    Returns:
+        dict: Component update handler for real-time drop-downs.
+    """
+
     if not name: return gr_warning(translations["provide_filename_settings"])
 
+    # Construct the continuous key-value state for low-latency engine parameters
     settings = {
         "exclusive_mode": exclusive_mode,
         "vad_enabled": vad_enabled,
@@ -529,6 +583,7 @@ def save_realtime_config(
         "embedders_mix": embedders_mix,
         "embedders_mix_layers": embedders_mix_layers,
         "embedders_mix_ratio": embedders_mix_ratio,
+        "use_phase_vocoder": use_phase_vocoder,
         "f0_autotune": f0_autotune,
         "proposal_pitch": proposal_pitch,
         "f0_autotune_strength": f0_autotune_strength,
@@ -622,6 +677,7 @@ def load_realtime_config(
     embedders_mix,
     embedders_mix_layers,
     embedders_mix_ratio,
+    use_phase_vocoder,
     chorus,
     distortion,
     reverb,
@@ -664,6 +720,13 @@ def load_realtime_config(
     phaser_feedback,
     phaser_mix
 ):
+    """
+    Parses and processes an active real-time low-latency configuration module layout.
+
+    Returns:
+        list: Extracted data array mirroring interface parameters layout natively.
+    """
+
     if not presets: gr_warning(translations["provide_file_settings"])
     
     file = {}
@@ -673,6 +736,7 @@ def load_realtime_config(
 
         gr_info(translations["load_presets"].format(presets=presets))
 
+    # Compile explicit properties directly from schema mapping rules
     return [
         file.get("exclusive_mode", exclusive_mode),
         file.get("vad_enabled", vad_enabled),
@@ -700,6 +764,7 @@ def load_realtime_config(
         file.get("embedders_mix", embedders_mix),
         file.get("embedders_mix_layers", embedders_mix_layers),
         file.get("embedders_mix_ratio", embedders_mix_ratio),
+        file.get("use_phase_vocoder", use_phase_vocoder),
         file.get("chorus", chorus),
         file.get("distortion", distortion),
         file.get("reverb", reverb),

@@ -14,37 +14,63 @@ from main.app.core.ui import gr_info, gr_warning
 from main.app.variables import python, translations, configs, file_types, logger
 
 def if_done(done, p):
+    """
+    Monitors a subprocess and updates a shared status flag upon completion.
+    """
+
     while 1:
+        # Check if the process is still running (poll returns None if alive)
         if p.poll() is None: time.sleep(0.5)
         else: break
 
+    # Mark the process as completed
     done[0] = True
 
 def log_read(done, name, start_time):
+    """
+    Generator that continuously yields new log entries matching specific keywords.
+
+    Reads from the global 'app.log' file periodically and filters entries by 
+    timestamp and process relevance.
+
+    Yields:
+        str: Concatenated log lines generated since the start_time.
+    """
+
     log_file = os.path.join(configs["logs_path"], "app.log")
 
     def read_logs():
-        logs = []
+        """Helper to scan the log file and filter rows based on conditions."""
 
+        logs = []
+        # Open log safely with UTF-8 encoding
         with open(log_file, "r", encoding="utf-8") as f:
             for line in f:
                 try:
+                    # Skip noise: ignore DEBUG logs, lines without matching keywords, or empty lines
                     if ("DEBUG" in line or not any(n in line for n in name) or line.strip() == ""): continue
+
+                    # Parse log timestamp (assumes format: "YYYY-MM-DD HH:MM:SS.ffffff | LOG_MESSAGE")
                     timestamp = datetime.datetime.strptime(line.split("|")[0].strip(), "%Y-%m-%d %H:%M:%S.%f")
+
+                    # Keep logs generated during or after the current operation
                     if timestamp >= start_time: logs.append(line)
                 except ValueError:
+                    # Gracefully skip lines that do not match the expected timestamp layout
                     continue
 
         return "".join(logs)
 
+    # Main pooling loop for streaming logs
     while 1:
         yield read_logs()
 
         time.sleep(1)
-
+        # Break out if the subprocess has finished tracking
         if done[0]:
             break
 
+    # Yield final logs one last time to capture trailing entries
     yield read_logs()
 
 def create_dataset(
@@ -74,9 +100,20 @@ def create_dataset(
     clean_dataset,
     clean_strength
 ):
-    gr_info(translations["start"].format(start=translations["create"]))
+    """
+    Executes the dataset creation process as an asynchronous external script.
+    Launches a dedicated subprocess to structure audio data, remove silent chunks,
+    isolate vocals/instruments, and clean up audio segments.
+
+    Yields:
+        str: Live execution console text pulled from application logs.
+    """
+
+    # Notify user interface that execution is starting
+    gr_info(translations["start_create_dataset"])
     start_time = datetime.datetime.now()
 
+    # Launch script as an independent detached background task
     p = subprocess.Popen([
         python,
         configs["create_dataset_path"],
@@ -107,10 +144,12 @@ def create_dataset(
         "--clean_strength", str(clean_strength),
     ])
 
+    # Shared thread controller status
     done = [False]
-
+    # Spawn thread to watch over process life cycle
     threading.Thread(target=if_done, args=(done, p)).start()
 
+    # Stream relevant log channels to the UI component
     for log in log_read(done, ["create_dataset", "separate_music", "separator"], start_time):
         yield log
 
@@ -118,7 +157,6 @@ def create_reference(
     audio_path, 
     reference_name, 
     pitch_guidance, 
-    use_energy, 
     version, 
     embedder_model, 
     embedders_mode, 
@@ -135,16 +173,22 @@ def create_reference(
     embedders_mix_layers = 9,
     embedders_mix_ratio = 0.5
 ):
-    gr_info(translations["start"].format(start=translations["create_reference"]))
-    start_time = datetime.datetime.now()
+    """
+    Generates acoustic feature reference vectors from a target audio clip.
 
+    Yields:
+        str: Continuous execution stdout parsed through system logger pipelines.
+    """
+
+    gr_info(translations["start_create_reference"])
+    start_time = datetime.datetime.now()
+    # Fire subprocess executing the reference generator backend
     p = subprocess.Popen([
         python,
         configs["create_reference_path"],
         "--audio_path", audio_path,
         "--reference_name", reference_name,
         "--pitch_guidance", str(pitch_guidance),
-        "--use_energy", str(use_energy),
         "--version", version,
         "--embedder_model", embedder_model,
         "--embedders_mode", embedders_mode,
@@ -183,16 +227,26 @@ def preprocess(
     normalization_mode="none",
     architecture="RVC"
 ):
-    sr = int(float(sample_rate.rstrip("k")) * 1000)
+    """
+    Execute the training data preprocessing process before performing extraction.
 
+    Yields:
+        str: Streaming update content blocks generated from standard output logs.
+    """
+
+    # Strip the string suffix ('k') and convert shorthand (e.g., "40k") to integer frequency (e.g., 40000)
+    sr = int(float(sample_rate.rstrip("k")) * 1000)
+    # Validate that workspace naming context is not empty
     if not model_name: return gr_warning(translations["provide_name"])
 
+    # Optional integrity verification checking if the source dataset contains valid non-empty files
     if configs.get("check_data", False):
         try:
             found = False
             if os.path.exists(dataset):
                 for root, _, files in os.walk(dataset):
                     for f in files:
+                        # Identify match against registered format tables and confirm file size > 0 bytes
                         if f.lower().endswith(tuple(file_types)) and os.path.getsize(os.path.join(root, f)) > 0:
                             found = True
                             break
@@ -204,8 +258,10 @@ def preprocess(
     
     start_time = datetime.datetime.now()
     model_dir = os.path.join(configs["logs_path"], model_name)
+    # Flush existing artifact folders to enforce clean workspace operations
     if os.path.exists(model_dir): shutil.rmtree(model_dir, ignore_errors=True)
 
+    # Initialize backend subprocess executing the audio slicing pipeline script
     p = subprocess.Popen([
         python,
         configs["preprocess_path"],
@@ -226,6 +282,7 @@ def preprocess(
     done = [False]
 
     threading.Thread(target=if_done, args=(done, p)).start()
+    # Pre-create directory layout to hold output data streams safely
     os.makedirs(model_dir, exist_ok=True)
 
     for log in log_read(done, ["preprocess"], start_time):
@@ -247,7 +304,6 @@ def extract(
     f0_autotune, 
     f0_autotune_strength, 
     hybrid_method, 
-    rms_extract, 
     alpha=0.5, 
     include_mutes=2,
     embedders_mix = False,
@@ -255,6 +311,15 @@ def extract(
     embedders_mix_ratio = 0.5,
     architecture = "RVC"
 ):
+    """
+    Extract features and pitch from the previously preprocessed data.
+
+    Yields:
+        str: Continuous execution stdout strings generated during processing runtime.
+    """
+
+    # Choose hybrid method if core choice is flagged as 'hybrid', else map native selection
+    # Do the same validation check for custom embedding models overrides
     f0_method, embedder_model = (
         method if method != "hybrid" else hybrid_method, 
         embedders if embedders != "custom" else custom_embedders
@@ -265,8 +330,10 @@ def extract(
     if not model_name: return gr_warning(translations["provide_name"])
     model_dir = os.path.join(configs["logs_path"], model_name)
 
+    # Workspace directory integrity verification before allowing extraction tasks
     if configs.get("check_data", False):
         try:
+            # Confirm preprocess operations successfully output target slicing maps
             if not any(
                 os.path.isfile(os.path.join(model_dir, "sliced_audios", f)) 
                 for f in os.listdir(os.path.join(model_dir, "sliced_audios"))
@@ -279,7 +346,7 @@ def extract(
             return gr_warning(translations["not_found_data_preprocess"])
         
     start_time = datetime.datetime.now()
-    
+    # Launch feature analysis script as a background process node
     p = subprocess.Popen([
         python,
         configs["extract_path"],
@@ -296,7 +363,6 @@ def extract(
         "--embedders_mode", embedders_mode,
         "--f0_autotune", str(f0_autotune),
         "--f0_autotune_strength", str(f0_autotune_strength),
-        "--rms_extract", str(rms_extract),
         "--alpha", str(alpha),
         "--include_mutes", str(include_mutes),
         "--embedders_mix", str(embedders_mix),
@@ -310,7 +376,7 @@ def extract(
     threading.Thread(target=if_done, args=(done, p)).start()
     os.makedirs(model_dir, exist_ok=True)
 
-    for log in log_read(done, ["extract", "embedding", "feature", "rms"], start_time):
+    for log in log_read(done, ["extract", "embedding", "feature"], start_time):
         yield log
 
 def create_index(
@@ -319,9 +385,17 @@ def create_index(
     index_algorithm,
     nprobe=1
 ):
+    """
+    Builds a vector search index file from extracted audio embeddings.
+
+    Yields:
+        str: Continuous feedback log data streams from index compilation steps.
+    """
+
     if not model_name: return gr_warning(translations["provide_name"])
     model_dir = os.path.join(configs["logs_path"], model_name)
 
+    # Ensure vector source map directories exist and contain valid raw material
     if configs.get("check_data", False):
         try:
             if not any(
@@ -333,7 +407,7 @@ def create_index(
             return gr_warning(translations["not_found_data_extract"])
     
     start_time = datetime.datetime.now()
-
+    # Launch subprocess to index feature vectors
     p = subprocess.Popen([
         python, 
         configs["create_index_path"], 
@@ -376,7 +450,6 @@ def training(
     deterministic, 
     benchmark, 
     optimizer, 
-    energy_use, 
     custom_reference=False, 
     reference_name="", 
     multiscale_mel_loss=False,
@@ -385,17 +458,27 @@ def training(
     cosine_annealing_lr=False,
     architecture="RVC"
 ):
-    if architecture == "SVC":
-        pitch_guidance = True
-        energy_use = False
+    """
+    Initializes and runs the main model training subprocess.
+    Configures pre-trained models, structures file arguments, downloads checkpoints,
+    and runs the optimization script while tracking process status.
+
+    Yields:
+        str: Segmented slice of the application's trailing execution stdout lines.
+    """
+
+    # SVC architecture always requires pitch guidance enabled
+    if architecture == "SVC": pitch_guidance = True
 
     sr = int(float(sample_rate.rstrip("k")) * 1000)
     if not model_name: return gr_warning(translations["provide_name"])
 
     model_dir = os.path.join(configs["logs_path"], model_name)
+    # Remove stale process ID files before launching a new session
     if os.path.exists(os.path.join(model_dir, "train_pid.txt")): 
         os.remove(os.path.join(model_dir, "train_pid.txt"))
 
+    # Verify that the extraction directory contains files before starting training
     if configs.get("check_data", False):
         try:
             if not any(
@@ -406,6 +489,7 @@ def training(
         except:
             return gr_warning(translations["not_found_data_extract"])
     
+    # Pre-trained base models initialization and download logic
     if not not_pretrain:
         if not custom_pretrained: 
             pretrain_dir = (
@@ -414,11 +498,13 @@ def training(
                 configs["pretrained_v1_path"]
             )
 
+            # ROT13 obfuscated URL decoding for the HuggingFace pre-trained models repository
             download_version = codecs.decode(
                 f"uggcf://uhttvatsnpr.pb/NauC/Ivrganzrfr-EIP-Cebwrpg/erfbyir/znva/cergenvarq_", 
                 "rot13"
             ) + f"{rvc_version}/"
 
+            # Selection matrix mapping pitch guidance + sample rate to specific filenames
             pretrained_selector = {
                 True: {
                     24000: ("f0G24k.pth", "f0D24k.pth"), 
@@ -439,7 +525,7 @@ def training(
             pg2, pd2 = "", ""
             pg, pd = pretrained_selector[pitch_guidance][sr]
 
-            if energy_use: pg2, pd2 = pg2 + "ENERGY_", pd2 + "ENERGY_"
+            # Construct targeted pre-trained model filenames based on architectural parameters
             if vocoder != 'Default': pg2, pd2 = pg2 + vocoder + "_", pd2 + vocoder + "_"
             if embedders not in ["hubert_base", "contentvec_base"]: pg2, pd2 = pg2 + embedders + "_", pd2 + embedders + "_"
             if architecture != "RVC": pg2, pd2 = architecture + "_" + pg2, architecture + "_" + pd2
@@ -458,6 +544,7 @@ def training(
                 )
             )
 
+            # Automatically fetch base files from Hugging Face if they are missing locally
             try:
                 if not os.path.exists(pretrained_G):
                     gr_info(translations["download_pretrained"].format(dg="G", rvc_version=rvc_version))
@@ -492,6 +579,7 @@ def training(
                 gr_warning(translations["not_use_pretrain_error_download"])
                 pretrained_G = pretrained_D = None
         else:
+            # Handle localized custom pre-trained models definitions
             if not pretrain_g: 
                 return gr_warning(translations["provide_pretrained"].format(dg="G"))
 
@@ -513,6 +601,7 @@ def training(
         pretrained_G = pretrained_D = None
         gr_warning(translations["not_use_pretrain"])
 
+    # Resolve cross-reference paths if custom referencing mechanisms are toggled
     if custom_reference:
         embedder_model = embedders if embedders != "custom" else custom_embedders
 
@@ -525,9 +614,7 @@ def training(
                 "_", 
                 embedder_model, 
                 "_", 
-                str(pitch_guidance), 
-                "_", 
-                str(energy_use)
+                str(pitch_guidance)
             ])
         )
 
@@ -539,7 +626,7 @@ def training(
     else: reference_path = None
 
     start_time = datetime.datetime.now()
-
+    # Launch core neural network training module script
     p = subprocess.Popen([
         python,
         configs["train_path"],
@@ -564,7 +651,6 @@ def training(
         "--deterministic", str(deterministic),
         "--benchmark", str(benchmark),
         "--optimizer", optimizer,
-        "--energy_use", str(energy_use),
         "--use_custom_reference", str(custom_reference),
         "--reference_path", str(reference_path),
         "--multiscale_mel_loss", str(multiscale_mel_loss),
@@ -580,12 +666,12 @@ def training(
     ])
 
     done = [False]
-
+    # Save active Process ID tracking variable values to a text file for external management controls
     with open(os.path.join(model_dir, "train_pid.txt"), "w") as pid_file:
         pid_file.write(str(p.pid))
 
     threading.Thread(target=if_done, args=(done, p)).start()
-
+    # Capture outputs, formatting long streaming outputs to show only the 50 most recent lines
     for log in log_read(done, ["train", "synthesizers", "extract_model", "utils"], start_time):
         lines = log.splitlines()
 

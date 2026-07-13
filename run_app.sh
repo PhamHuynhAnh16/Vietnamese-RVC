@@ -1,11 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
+clear
+echo "Vietnamese RVC (Linux)"
 
-set -e
-echo "Vietnamese RVC"
-
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
-
-python main/app/app.py --open
+source "./venv/bin/activate"
+python "./main/app/app.py" --open
+deactivate

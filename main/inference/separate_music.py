@@ -11,6 +11,13 @@ from main.library.uvr5_lib.separator import Separator
 from main.app.variables import config, configs, logger, translations, vr_models, demucs_models, mdx_models, karaoke_models, reverb_models, denoise_models
 
 def parse_arguments():
+    """
+    Parses command-line arguments configuring the UVR5 audio separation pipeline.
+
+    Returns:
+        argparse.Namespace: Object containing validated operational configurations.
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--separate_music", action='store_true')
     parser.add_argument("--input_path", type=str, required=True)
@@ -39,6 +46,8 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
+    """Main execution orchestrator routing runtime command-line arguments."""
+
     args = parse_arguments()
 
     (
@@ -138,6 +147,8 @@ def separate(
     separate_backing=False,
     separate_reverb=False
 ):
+    """Orchestrates operational input processing across isolated source audio files or matching folder groups."""
+
     start_time = time.time()
     pid_path = os.path.join("assets", "separate_pid.txt")
 
@@ -146,6 +157,7 @@ def separate(
 
     try:
         input_path = input_path.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
+        # Fixed logic: preserve directory path structures correctly if no target file suffix matches
         output_dirs = os.path.dirname(output_dirs) or output_dirs
 
         log_data = {
@@ -177,12 +189,13 @@ def separate(
             logger.debug(f"{key}: {value}")
 
         output_files = []
-
+        # Distinguish flat file entities instances away from structural folder batch loops setup configurations
         files = [
             os.path.join(input_path, f) 
             for f in os.listdir(input_path)
         ] if os.path.isdir(input_path) else [input_path]
 
+        # Sequentially loop through isolated files tracking execution lists inputs objects layers
         for file in files:
             if os.path.isfile(file):
                 output_files.append(_separate(
@@ -210,14 +223,15 @@ def separate(
                     separate_reverb
                 ))
     except Exception as e:
+        # Capture underlying issues and output formatted execution stack errors data frames smoothly
         logger.error(f"{translations['separator_error']}: {e}")
         import traceback
         logger.debug(traceback.format_exc())
 
+    # Destroy PID context files cleanly when pipeline operations close out normally
     if os.path.exists(pid_path): os.remove(pid_path)
-    elapsed_time = time.time() - start_time
 
-    logger.info(translations["separator_success"].format(elapsed_time=f"{elapsed_time:.2f}"))
+    logger.info(translations["separator_success"].format(elapsed_time=f"{time.time() - start_time:.2f}"))
     return output_files
 
 def _separate(
@@ -244,14 +258,18 @@ def _separate(
     separate_backing=False,
     separate_reverb=False
 ):
-    main_vocals, backing_vocals = None, None
+    """Internal function orchestrating multi-stage structural separation passes sequentially."""
 
+    main_vocals, backing_vocals = None, None
+    # Isolate parent absolute text tokens strings cleanly
     filename, _ = os.path.splitext(os.path.basename(input_path))
     output_dirs = os.path.join(output_dirs, filename)
 
+    # Establish isolated local folders containers dynamically mapping onto specific targets
     os.makedirs(output_dirs, exist_ok=True)
     clean_file(output_dirs, export_format)
 
+    # Route 1: Initial Source Demixing Phase
     if model_name in list(demucs_models.keys()):
         original_vocals, instruments = demucs_main(
             input_path,
@@ -294,6 +312,7 @@ def _separate(
             sample_rate,
         )
     
+    # Route 2: Backing Vocals Isolation (Karaoke Step)
     if separate_backing:
         if karaoke_model.startswith("MDX"):
             main_vocals, backing_vocals = mdx_main(
@@ -328,6 +347,7 @@ def _separate(
                 mode="karaoke"
             )
 
+    # Route 3: Reverb Stripping Processing Layer
     if separate_reverb:
         dereverb = [original_vocals]
         if separate_backing: dereverb.append(main_vocals)
@@ -366,6 +386,7 @@ def _separate(
                     mode="reverb"
                 )
             
+            # Conditionally map updated outputs paths safely over internal tracker targets strings
             if "Original_Vocals" in os.path.basename(no_reverb_vocals): original_vocals = no_reverb_vocals
             else: main_vocals = no_reverb_vocals
     
@@ -388,8 +409,9 @@ def vr_main(
     sample_rate=44100,
     mode="original"
 ):
-    exists_file(input_path, output_dirs)
+    """Handles inference tasks routing through standard UVR5 VR-Architecture models."""
 
+    exists_file(input_path, output_dirs)
     logger.info(f"{translations['separator_process_2']}...")
 
     output_list = separate_main(
@@ -458,6 +480,8 @@ def demucs_main(
     shifts=2,
     sample_rate=44100
 ):
+    """Handles inference structures processing inputs across Meta Demucs architectures."""
+
     exists_file(input_path, output_dirs)
     logger.info(f"{translations['separator_process_2']}...")
 
@@ -494,6 +518,8 @@ def mdx_main(
     sample_rate=44100,
     mode="original"
 ):
+    """Handles inference tasks routing through modern MDX-Net ONNX structures."""
+
     exists_file(input_path, output_dirs)
     logger.info(f"{translations['separator_process_2']}...")
 
@@ -525,9 +551,12 @@ def process_file(
     export_format="wav", 
     mode="original"
 ):
+    """Normalizes output suffix conventions and merges structural multi-stem outputs."""
+
     demucs_inst = []
     reverb_audio, no_reverb_audio = None, None
 
+    # Instantiate rigid static naming conventions assigned back onto file targets
     main_audio, backing_audio = (
         os.path.join(output_dirs, f"Main_Vocals.{export_format}"), 
         os.path.join(output_dirs, f"Backing_Vocals.{export_format}")
@@ -538,11 +567,13 @@ def process_file(
         os.path.join(output_dirs, f"Instruments.{export_format}")
     )
 
+    # Iterate through file elements inside processing generation blocks array
     for file in input_list:
         file_path = os.path.join(output_dirs, file)
         if not os.path.exists(file_path): 
             logger.warning(translations["not_found"].format(name=file_path))
 
+        # Branch processing strategy behaviors dynamically using runtime tags checks
         if mode == "original":
             if "_(Instrumental)_" in file: 
                 os.rename(file_path, instruments_audio)
@@ -576,16 +607,19 @@ def process_file(
             elif "_(Vocals)_" in file: 
                 os.rename(file_path, main_audio)
 
+    # Short-circuit returns mapping specifically onto specialized sub-tasks requirements
     if mode == "reverb": return reverb_audio, no_reverb_audio
     if mode == "karaoke": return main_audio, backing_audio 
 
+    # Composite continuous instrumentals for Demucs 4-stem outputs
     if mode == "4stem":
         demucs_audio = pydub_load(demucs_inst[0])
         for file in demucs_inst[1:]:
             demucs_audio = demucs_audio.overlay(pydub_load(file))
 
+        # Export compiled multi-stem track directly as a uniform full instrumentals file
         demucs_audio.export(instruments_audio, format=export_format)
-
+        # Drop multi-stem components if configuration explicitly blocks tracking residuals storage
         if configs.get("del4stem", True):
             for f in demucs_inst:
                 if os.path.exists(f): os.remove(f)
@@ -593,6 +627,8 @@ def process_file(
     return original_audio, instruments_audio
 
 def exists_file(input_path, output_dirs):
+    """Verifies runtime file system integrity context boundaries."""
+
     if not os.path.exists(input_path): 
         logger.warning(translations["input_not_valid"])
         sys.exit(1)
@@ -602,6 +638,8 @@ def exists_file(input_path, output_dirs):
         sys.exit(1)
 
 def clean_file(output_dirs, export_format):
+    """Cleans up target export extensions inside the target execution folder."""
+
     for f in os.listdir(output_dirs):
         if f.endswith(export_format):
             file_path = os.path.join(output_dirs, f)
@@ -626,12 +664,18 @@ def separate_main(
     high_end_process=False,
     sample_rate=44100
 ):
+    """
+    Directly interfaces with the underlying UVR5 structural Separator object class.
+    Falls back safely onto standardized default parameters upon unexpected failures.
+    """
+
     try:
+        # Initialize primary separator object using specialized hyperparameter mappings
+
         separator = Separator(
             logger=logger, 
             output_dir=output_dir, 
             output_format=export_format, 
-            output_bitrate=None, 
             normalization_threshold=0.9, 
             sample_rate=sample_rate, 
             mdx_params={
@@ -662,12 +706,12 @@ def separate_main(
         return separator.separate(audio_file)
     except:
         logger.debug(translations["default_setting"])
+        # Standardized robust fallback setup block to prevent hard script crashes
 
         separator = Separator(
             logger=logger, 
             output_dir=output_dir, 
             output_format=export_format, 
-            output_bitrate=None, 
             normalization_threshold=0.9, 
             sample_rate=44100, 
             mdx_params={

@@ -55,7 +55,9 @@ Dự án này có thể sẽ không cung cấp bản đóng gói sẳn, chỉ cu
 
 - Tùy Chỉnh Hệ Thống: Thay đổi chế độ Sáng/Tối, ngôn ngữ, chủ đề và phông chữ linh hoạt.
 
-- Hiệu suất: Tùy chọn định dạng tính toán để tối ưu phần cứng: BF16, TF32, FP16, FP32.
+- Hiệu suất: Tùy chọn định dạng tính toán để tối ưu phần cứng: BF16, TF32, FP16, FP32, INT8 (Đối với ONNX).
+
+- Ngôn ngữ: Tiếng Việt và Tiếng Anh.
 
 **📥 Nhóm Tải Xuống**
 
@@ -75,15 +77,15 @@ Dự án này có thể sẽ không cung cấp bản đóng gói sẳn, chỉ cu
 
 **🧠 Mô Hình Trích Xuất Nhúng (20+ Mô Hình)**
 
-- Đa ngôn ngữ: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin, whisper`
+- Đa mô hình: `contentvec_base, hubert_base, vietnamese_hubert_base, japanese_hubert_base, korean_hubert_base, chinese_hubert_base, portuguese_hubert_base, spin`
 
-- Định dạng mô hình được hỗ trợ: `fairseq (.pt)`, `onnx (.onnx)`, `transformers (.bin - .json)`, `spin (.bin - .json)`, `whisper (.pt)`.
+- Định dạng mô hình được hỗ trợ: `fairseq (.pt)`, `onnx (.onnx)`, `transformers (.bin - .json)`, `spin (.bin - .json)`.
 
 ⚠️ Lưu ý quan trọng:
 
-- contentvec_base và hubert_base gần giống nhau và có thể dùng cho nhau, chỉ khác nhau về dung lượng và độ chính xác khi suy luận.
+- contentvec_base và hubert_base là một và có thể dùng thay cho nhau, chỉ khác nhau về dung lượng và độ chính xác khi suy luận.
 
-- Việc thay đổi mô hình nhúng yêu cầu huấn luyện lại mô hình RVC từ đầu. Các mô hình thông dụng hiện nay chủ yếu dùng contentvec_base hoặc hubert_base.
+- Việc thay đổi mô hình nhúng yêu cầu huấn luyện lại mô hình RVC từ đầu. Các mô hình thông dụng hiện nay chủ yếu dùng contentvec_base và hubert_base.
 
 **🔊 Bộ Mã Hóa Giọng Nói (Vocoders)**
 
@@ -99,7 +101,7 @@ Dự án này có thể sẽ không cung cấp bản đóng gói sẳn, chỉ cu
 
 **1. Yêu cầu phần mềm**
 
-- Hệ điều hành: Windows 10/11 hoặc Linux (Ubuntu).
+- Hệ điều hành: Windows 10/11 hoặc Linux.
 
 - Python: Phiên bản 3.10, 3.11 hoặc 3.12.
 
@@ -135,458 +137,6 @@ Lưu trữ: 10GB trống (Nếu chỉ dùng cơ bản) hoặc hơn 120GB trống
 
 **GPU AMD không được đề cập do nếu sử dụng thông qua DIRECTML hoặc OPENCL sẽ cực kỳ chậm chỉ nhanh hơn sử dụng CPU, dùng thông qua Zluda thì thiếu ổn định, thời gian biên dịch lâu và yêu cầu nằm trong danh sách hỗ trợ của AMD. ROCM thì chưa được thử nghiệm và nó không có phiên bản dành cho Windows.**
 
-## Cài Đặt Dự Án
-
-**Trước tiên bạn cần tải mã nguồn về máy, bạn có thể thực hiện nó thông qua hai cách.**
-
-Cách 1. Sử dụng đối với Git:
-- git clone https://github.com/PhamHuynhAnh16/Vietnamese-RVC.git
-- cd Vietnamese-RVC
-
-Cách 2. Tải trực tiếp trên github:
-- Nhấn vào [Vietnamese RVC](https://github.com/PhamHuynhAnh16/Vietnamese-RVC/archive/refs/heads/main.zip) để tải trực tiếp về.
-- Giải nén `Vietnamese-RVC-main.zip`.
-- Vào thư mục Vietnamese-RVC-main, nhấp vào thanh đường dẫn tệp nhập `cmd` và nhấn Enter để mở Terminal.
-
-**Tiếp theo bạn sẽ thực hiến tiếp các bước cài đặt.**
-
-<details>
-<summary style="font-size: 20px;"> Đối Với Hệ Điều Hành Windows </summary>
-
-Cần cài đặt bộ [Visual C++ Redistributable Runtimes](https://www.techpowerup.com/download/visual-c-redistributable-runtime-package-all-in-one/) trước khi tiến hành tiếp.
-
-Cách 1: Bạn có thể chạy trực tiếp tệp `run_install.bat` để cài đặt hoặc làm theo các bước bên dưới.
-
-- Khi chạy `run_install.bat` và bạn sử dụng CUDA thì sẽ được hỏi có cài TensorRT hay không, nếu chọn có bạn sẽ cần cài thêm [TensorRT](https://developer.nvidia.com/tensorrt) từ Nvidia, giải nén và thêm đường dẫn thư mục bin của nó vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
-
-- Khi chạy `run_install.bat` và bạn sử dụng XPU thì sẽ được hỏi chọn phiên bản ONNXRUNTIME, tôi khuyên bạn chọn DIRECTML vì quá trình thử nghiệm của tôi OPENVINO có một số lỗi về kích thước động.
-
-- Khi sử dụng ONNXRUNTIME OPENVINO, bạn cần cài đặt [OpenVino Toolkit](https://storage.openvinotoolkit.org/repositories/openvino/packages/2025.4.1/windows/openvino_toolkit_windows_2025.4.1.20426.82bbf0292c5_x86_64.zip) giải nén và thêm Release từ \runtime\bin\intel64\Release vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
-
-- Sau quá trình cài đặt, bạn có thể xóa thư mục .uv bên trong thư mục assets để giảm nhẹ dung lượng.
-
-Cách 2: Hãy chuẩn bị và cài đặt PYTHON phiên bản 3.10.x, 3.11.x hoặc 3.12.x và tạo môi trường ảo.
-
-**1. Tạo Môi Trường Ảo:**
-
-```
-python -m venv env
-mkdir -p assets/.uv
-set UV_CACHE_DIR="assets/.uv"
-env\Scripts\python.exe -m pip install uv
-env\Scripts\python.exe -m uv pip install six packaging python-dateutil platformdirs pywin32 wget
-env\Scripts\python.exe -c "from main.app.install import install_ffmpeg;install_ffmpeg()"
-```
-
-**2. Cài Đặt Theo Từng Phần Cứng:**
-
-Tiếp tục chạy các lệnh này để tiếp tục cài đặt theo từng phần cứng.
-
-<details>
-<summary>Đối với CPU (Sử dụng CPU)</summary>
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cpu
-env\Scripts\python.exe -m uv pip install onnxruntime
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-```
-
-</details>
-
-
-<details>
-<summary>Đối với CUDA (Sử dụng GPU NVIDIA)</summary>
-
-- Đối với Cuda 11.8 (Dành cho GPU 10-Series trở lên)
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
-env\Scripts\python.exe -m uv pip install torch==2.7.0 torchaudio==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu118
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.20.1
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-```
-
-- Đối với Cuda 12.1 (Dành cho GPU 20-Series đến 30-Series trở lên)
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
-env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu121
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.20.1
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-```
-
-- Đối với Cuda 12.8 (Dành cho GPU 30-Series đến 40-Series trở lên)
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu128
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
-```
-
-- Đối với Cuda 13.0 (Dành cho GPU 50-Series trở lên)
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu130
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
-```
-
-- Nếu bạn muốn sử dụng TensorRT cho ONNXRUNTIME:
-
-  - Cài đặt Runtime [TensorRT](https://developer.nvidia.com/tensorrt) từ Nvidia, giải nén và thêm đường dẫn thư mục bin của nó vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
-
-  - Tiếp theo cài đặt:
-
-  ```
-  env\Scripts\python.exe -m uv pip install tensorrt
-  ```
-
-- Nếu bạn muốn sử dụng Compile để biên dịch mô hình:
-
-  - Cài đặt thư viện:
-  ```
-  env\Scripts\python.exe -m uv pip install triton-windows
-  ```
-
-- Lưu Ý:
-  - Hãy lựa chọn đúng phiên bản đối với GPU của bạn, nếu không nó có thể gây ra lỗi liên quan đến suy luận hoặc huấn luyện.
-  - TensorRT khá là không ổn định nên là không khuyến khích cài đặt và sử dụng.
-  - Compile có thể không thực sự cần thiết, nó chỉ thực sự hữu dụng khi bạn cần suy luận theo lô hoặc suy luận với các đầu vào lớn.
-
-</details>
-
-
-<details>
-<summary>Đối với OPENCL (Sử dụng đối với GPU hỗ trợ OPENCL, có thể là IGPU, AMD, INTEL, NVIDIA)</summary>
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
-env\Scripts\python.exe -m uv pip install torch==2.6.0 torchaudio==2.6.0 torchvision
-env\Scripts\python.exe -m uv pip install https://github.com/artyom-beilis/pytorch_dlprim/releases/download/0.2.0/pytorch_ocl-0.2.0+torch2.6-cp311-none-win_amd64.whl
-env\Scripts\python.exe -m uv pip install onnxruntime-directml
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-```
-
-- Lưu ý: 
-  - Có vẻ như OPENCL đã không còn được hỗ trợ tiếp.
-  - OPENCL không hỗ trợ quá tốt tác vụ đa luồng nên khi chạy trích xuất thường sẽ bị khóa ở 1 luồng.
-  - Chỉ nên cài đặt trên python 3.11 do không có bản biên dịch cho python 3.10 với torch 2.6.0.
-  - Demucs có thể gây quá tải và tràn bộ nhớ đối với GPU (nếu cần sử dụng demucs hãy mở tệp config.json trong main\configs sửa đối số demucs_cpu_mode thành true).
-  - DDP không hỗ trợ huấn luyện đa GPU đối với OPENCL.
-  - Một số thuật toán khác phải chạy trên cpu nên có thể hiệu suất của GPU có thể không sử dụng hết.
-
-</details>
-
-
-<details>
-<summary>Đối với DIRECTML (Sử dụng đối với GPU hỗ trợ DIRECTML, có thể là IGPU, AMD, INTEL, NVIDIA)</summary>
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
-env\Scripts\python.exe -m uv pip install torch==2.4.1 torchaudio==2.4.1 torchvision
-env\Scripts\python.exe -m uv pip install torch-directml==0.2.5.dev240914
-env\Scripts\python.exe -m uv pip install onnxruntime-directml
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-```
-
-- Lưu ý: 
-  - DIRECTML đã ngừng phát triển một khoảng thời gian dài.
-  - DIRECTML không hỗ trợ quá tốt tác vụ đa luồng nên khi chạy trích xuất thường sẽ bị khóa ở 1 luồng.
-  - DIRECTML có hỗ trợ 1 phần fp16 nhưng không được khuyến khích sử dụng vì có thể chỉ nhận được hiệu năng tương đương fp32.
-  - DIRECTML không có hàm để dọn dẹp bộ nhớ, tôi đã tạo 1 hàm đơn giản để dọn dẹp bộ nhớ nhưng có thể sẽ không quá hiệu quả.
-  - DIRECTML được thiết kế để suy luận chứ không phải dùng để huấn luyện mặc dù có thể hoàn toàn chạy được huấn luyện nhưng sẽ không được khuyến khích.
-
-</details>
-
-
-<details>
-<summary>Đối với XPU (Sử dụng đối với GPU INTEL)</summary>
-
-- Trước tiên nếu như bạn muốn sử dụng ONNXRUNTIME OPENVINO hãy cài đặt [OpenVino Toolkit](https://storage.openvinotoolkit.org/repositories/openvino/packages/2025.4.1/windows/openvino_toolkit_windows_2025.4.1.20426.82bbf0292c5_x86_64.zip) giải nén và thêm Release từ \runtime\bin\intel64\Release vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
-
-- Đối với sử dụng ONNXRUNTIME OPENVINO
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/xpu
-env\Scripts\python.exe -m uv pip install openvino==2025.4.1
-env\Scripts\python.exe -m uv pip install triton-windows
-env\Scripts\python.exe -m uv pip install onnxruntime-openvino==1.24.1
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
-```
-
-- Đối với sử dụng ONNXRUNTIME DIRECTML
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/xpu
-env\Scripts\python.exe -m uv pip install triton-windows
-env\Scripts\python.exe -m uv pip install onnxruntime-directml
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
-```
-
-- Lưu ý: 
-  - ONNXRUNTIME OPENVINO gặp lỗi với kích thước động nên là khuyên không sử dụng OPENVINO.
-  - ONNXRUNTIME DIRECTML có thể sẽ chậm hơn cả sử dụng mô hình PYTORCH thuần nên là cũng không quá khuyên sử dụng các mô hình ONNX.
-  - XPU không hỗ trợ DDP, nên là bạn sẽ không thể sử dụng huấn luyện đa GPU.
-  - XPU không hỗ trợ kiểu dữ liệu FP64 nên lớp GradScaler không hoạt động, lớp này đã được điều chỉnh và ép kiểu về FP32 có thể mất một chút chính xác.
-
-</details>
-
-
-<details>
-<summary>Đối với ZLUDA (Sử dụng đối với GPU AMD hỗ trợ ROCm)</summary>
-
-- Kiểm tra GPU của bạn có được hỗ trợ hay không: [ROCM-Requirements](https://rocm.docs.amd.com/projects/install-on-windows/en/develop/reference/system-requirements.html).
-- Tải và cài đặt: [VC++ Runtime](https://aka.ms/vs/17/release/vc_redist.x64.exe) và [HIP-SDK](https://www.amd.com/en/developer/resources/rocm-hub/hip-sdk.html).
-- Thêm thư mục bin từ HIP-SDK vào [PATH](https://www.google.com/search?q=path+environment+variable+windows) hệ thống.
-
-```
-env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-env\Scripts\python.exe -m uv pip install numpy==1.26.4 numba==0.61.0
-env\Scripts\python.exe -m uv pip install torch==2.7.0 torchaudio==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu118
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.20.1
-env\Scripts\python.exe -m uv pip install -r requirements.txt
-```
-
-- Sao chép path-zluda-hipxx.bat (Thay xx theo phiên bản HIP SDK của bạn) và run_app.bat ra thư mục chính thay thế các tệp hiện tại.
-- Chạy tệp path-zluda-hipxx.bat.
-
--Lưu ý:
-  - Zluda hoạt động bằng cách biên dịch mã cuda sang hip sdk và quá trình này diễn ra cực kỳ chậm và trong lúc đó gpu của bạn sẽ không được sử dụng.
-  - Nếu GPU của bạn không nằm trong danh sách hỗ trợ (ví dụ như: gfx803) bạn có thể thử dùng HIP SDK 5.7.0 và ghi đè thư mục library trong ROCm/5.7.0/bin/rocblas từ [ROCmLibs](https://github.com/likelovewant/ROCmLibs-for-gfx1103-AMD780M-APU/releases) (Không Khuyến Khích).
-  - Nếu Onnxruntime không hoạt động, bạn có thể thử đổi sang phiên bản onnxruntime-directml.
-  - Zluda không được thiết kế cho các hệ thống thời gian thực nên chức năng thời gian thực của ứng dụng sẽ bị vô hiệu hóa.
-  - Bạn có thể thử Onnxruntime ROCm nhưng nó chỉ hoạt động trên python 3.10.x hoặc 3.12.x.
-  ```
-  env\Scripts\python.exe -m pip uninstall onnxruntime-gpu
-  env\Scripts\python.exe -m uv pip install onnxruntime-rocm
-  ```
-
-</details>
-</details>
-
-<details>
-<summary style="font-size: 20px;"> Đối Với Hệ Điều Hành Linux </summary>
-
-**1. Thiết Lập Môi Trường Ảo:**
-
-Hãy thay phiên bản PYTHON 3.11.9 thành 3.12.0 nếu như bạn dùng ROCm.
-
-```
-sudo apt update -y
-sudo apt install -y curl git build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-curl https://pyenv.run | bash
-export PATH="$HOME/.pyenv/bin:$PATH"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-source ~/.bashrc
-pyenv local --unset
-pyenv shell --unset
-pyenv install 3.11.9
-pyenv global 3.11.9
-python -m pip install uv
-python -m uv pip install six packaging python-dateutil platformdirs wget
-```
-
-**2. Cài Đặt Theo Từng Phần Cứng:**
-
-Tiếp tục chạy các lệnh này để tiếp tục cài đặt theo từng phần cứng.
-
-<details>
-<summary>Đối với CPU (Sử dụng CPU)</summary>
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch==2.7.0 torchaudio==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cpu
-python -m uv pip install onnxruntime
-python -m uv pip install -r requirements.txt
-```
-
-</details>
-
-
-<details>
-<summary>Đối với CUDA (Sử dụng GPU NVIDIA)</summary>
-
-- Cài đặt Cuda Toolkit.
-
-```
-sudo apt update
-sudo apt install nvidia-cuda-toolkit
-```
-
-- Đối với Cuda 11.8 (Dành cho GPU 10-Series trở lên)
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install numpy==1.26.4 numba==0.61.0
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu118
-python -m uv pip install onnxruntime-gpu==1.20.1
-python -m uv pip install -r requirements.txt
-```
-
-- Đối với Cuda 12.1 (Dành cho GPU 20-Series đến 30-Series trở lên)
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install numpy==1.26.4 numba==0.61.0
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu121
-python -m uv pip install onnxruntime-gpu==1.20.1
-python -m uv pip install -r requirements.txt
-```
-
-- Đối với Cuda 12.8 (Dành cho GPU 30-Series đến 40-Series trở lên)
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu128
-python -m uv pip install onnxruntime-gpu
-python -m uv pip install -r requirements.txt
-python -m uv pip install faiss-cpu==1.13.2
-```
-
-- Đối với Cuda 13.0 (Dành cho GPU 50-Series trở lên)
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu130
-python -m uv pip install onnxruntime-gpu
-python -m uv pip install -r requirements.txt
-python -m uv pip install faiss-cpu==1.13.2
-```
-
-- Nếu bạn muốn sử dụng TensorRT cho ONNXRUNTIME:
-
-  - Cài đặt Runtime [TensorRT](https://developer.nvidia.com/tensorrt) từ Nvidia. Giải nén và đặt biến môi trường:
-  ```
-  tar -xvf TensorRT-*.tar.gz
-  cd TensorRT-*
-
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/lib
-  export PATH=$PATH:$(pwd)/bin
-  ```
-
-  - Tiếp theo cài đặt:
-  ```
-  python -m uv pip install tensorrt
-  ```
-
-- Nếu bạn muốn sử dụng Compile để biên dịch mô hình:
-
-  - Cài đặt thư viện:
-  ```
-  python -m uv pip install triton
-  ```
-
-- Lưu Ý:
-  - Hãy lựa chọn đúng phiên bản đối với GPU của bạn, nếu không nó có thể gây ra lỗi liên quan đến suy luận hoặc huấn luyện.
-  - TensorRT khá là không ổn định nên là không khuyến khích cài đặt và sử dụng.
-  - Compile có thể không thực sự cần thiết, nó chỉ thực sự hữu dụng khi bạn cần suy luận theo lô hoặc suy luận với các đầu vào lớn.
-
-</details>
-
-
-<details>
-<summary>Đối với ROCm (Sử dụng đối với GPU AMD hỗ trợ RDNA)</summary>
-
-- Đối với ROCm 5.7
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install numpy==1.26.4 numba==0.61.0
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm5.7
-python -m uv pip install onnxruntime-rocm
-python -m uv pip install -r requirements.txt
-```
-
-- Đối với ROCm 6.4
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm6.4
-python -m uv pip install onnxruntime-rocm
-python -m uv pip install -r requirements.txt
-python -m uv pip install faiss-cpu==1.13.2
-```
-
-- Đối với ROCm 7.2
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/rocm7.2
-python -m uv pip install onnxruntime-rocm
-python -m uv pip install -r requirements.txt
-python -m uv pip install faiss-cpu==1.13.2
-```
-
-- Lưu Ý:
-  - Sử dụng ROCm trên dự án này không thực sự được khuyến nghị vì tôi chưa thử nghiệm được ROCm.
-  - ROCm cũng khá là kén GPU AMD, nên là hãy chọn cho đúng phiên bản cho GPU của bạn.
-  - Hãy thử nghiệm bằng `python -c "import torch; print(torch.cuda.is_available())"` nếu như trả về False nghĩa là cài đặt thất bại.
-
-</details>
-
-
-<details>
-<summary>Đối với XPU (Sử dụng đối với GPU INTEL)</summary>
-
-- Trước tiên nếu như bạn muốn sử dụng ONNXRUNTIME OPENVINO hãy cài đặt [OpenVino Toolkit](https://storage.openvinotoolkit.org/repositories/openvino/packages/2025.4.1/linux/) giải nén và đặt biến môi trường hoặc chạy `setupvars.sh` trong cùng một phiên.
-
-- Cài đặt môi trường cho GPU Intel:
-
-```
-sudo apt-get update
-sudo apt-get install -y software-properties-common
-sudo add-apt-repository -y ppa:kobuk-team/intel-graphics
-sudo apt-get install -y libze-intel-gpu1 libze1 intel-metrics-discovery intel-opencl-icd clinfo intel-gsc
-sudo apt-get install -y intel-media-va-driver-non-free libmfx-gen1 libvpl2 libvpl-tools libva-glx2 va-driver-all vainfo
-sudo apt-get install -y libze-dev intel-ocloc
-```
-
-- Đối với sử dụng ONNXRUNTIME OPENVINO
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/xpu
-python -m uv pip install openvino==2025.4.1
-python -m uv pip install triton
-python -m uv pip install onnxruntime-openvino==1.24.1
-python -m uv pip install -r requirements.txt
-python -m uv pip install faiss-cpu==1.13.2
-```
-
-- Đối với sử dụng ONNXRUNTIME CPU
-
-```
-python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
-python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/xpu
-python -m uv pip install triton
-python -m uv pip install onnxruntime
-python -m uv pip install -r requirements.txt
-python -m uv pip install faiss-cpu==1.13.2
-```
-
-- Lưu ý: 
-  - ONNXRUNTIME OPENVINO gặp lỗi với kích thước động nên là khuyên không sử dụng OPENVINO.
-  - ONNXRUNTIME CPU khá chậm, cẩn thận với việc sử dụng mô hình ONNX.
-  - XPU không hỗ trợ DDP, nên là bạn sẽ không thể sử dụng huấn luyện đa GPU.
-  - XPU không hỗ trợ kiểu dữ liệu FP64 nên lớp GradScaler không hoạt động, lớp này đã được điều chỉnh và ép kiểu về FP32 có thể mất một chút chính xác.
-
-</details>
-</details>
-
 ## Colab Notebook
 
 **Sử dụng với Google Colab**
@@ -602,69 +152,25 @@ python -m uv pip install faiss-cpu==1.13.2
 - Bước 2: Chạy ô Cài đặt (Ô thứ nhất) và đợi nó hoàn tất.
 - Bước 3: Chạy ô Mở giao diện sử dụng (Khi này giao diện sẽ in ra 3 đường dẫn 1 là đường dẫn đến localtunnel Tensorboard, 2 là 0.0.0.0.7680 và 3 đường dẫn gradio có thể nhấp được, bạn chọn vào đường dẫn nhấp được và nó sẽ đưa bạn đến giao diện).
 
+## Sử Dụng Trên Máy Tính
+
+**Cài đặt:**
+
+- Chạy tệp `run_install.bat` để tự động cài đặt trên Windows (Lưu ý: hãy chắc chắn đã cài Driver và thư viện như `Visual C++ Redistributable Runtimes`)
+
+- Chạy tệp `run_install.sh` để tự động cài đặt trên Linux (Lưu ý: hãy chắc chắn đã cài Driver và các thư viện cần thiết)
+
+- Nếu cần chi tiết hơn, tham khảo [INSTALL](./INSTALL.md)
+
+**Sử dụng:**
+
+- Chạy tệp `run_app.bat` để khởi động giao diện người dùng và `run_tensorboard.bat` để khởi động biểu đồ giám sát khi huấn luyện (Windows)
+
+- Chạy tệp `run_app.sh` để khởi động giao diện người dùng và `run_tensorboard.sh` để khởi động biểu đồ giám sát khi huấn luyện (Windows)
+
 ## Tài Liệu Sử Dụng
 
 **Tài liệu văn bản: [Words](/assets/Vietnamese-RVC-DOCS.pdf)**
-
-## Sử Dụng Trên Máy Tính
-
-**(Windows) Chạy tệp run_app.bat để mở giao diện sử dụng, chạy tệp run_tensorboard.bat để mở biểu đồ kiểm tra huấn luyện. (Lưu ý: không tắt Terminal)**
-```
-run_app.bat / run_tensorboard.bat
-```
-
-**Khởi động giao diện sử dụng. (Thêm `--allow_all_disk` vào lệnh để cho phép gradio truy cập tệp ngoài)**
-```
-env\Scripts\python.exe main\app\app.py --open
-```
-
-**Với trường hợp bạn sử dụng Tensorboard để kiểm tra huấn luyện**
-```
-env\Scripts\python.exe main\app\run_tensorboard.py --open
-```
-
-**Sử dụng bằng cú pháp**
-```
-env\Scripts\python.exe main\app\parser.py --help
-```
-
-**(Linux) Chạy tệp run_app.sh để mở giao diện sử dụng, chạy tệp run_tensorboard.sh để mở biểu đồ kiểm tra huấn luyện. (Lưu ý: không tắt Terminal)**
-```
-run_app.sh / run_tensorboard.sh
-```
-
-**Khởi động giao diện sử dụng.**
-```
-python main/app/app.py --open
-```
-
-**Với trường hợp bạn sử dụng Tensorboard để kiểm tra huấn luyện**
-```
-python main/app/run_tensorboard.py --open
-```
-
-**Sử dụng bằng cú pháp**
-```
-python main/app/parser.py --help
-```
-
-**Các khóa khi gọi giao diện dự án `main\app\app.py`**
-
-`--client`: Khi được thêm vào nó sẽ kích hoạt chế độ Client của giao diện thời gian thực.
-
-`--share`: Khi được thêm vào nó sẽ sử dụng đường dẫn chia sẽ của Gradio thay vì đường dẫn nội bộ.
-
-`--open`: Khi được thêm vào nó sẽ trực tiếp mở giao diện khi khởi động thành công.
-
-`--tensorboard`: Khi được thêm vào nó sẽ gọi trực tiếp Tensorboard trong cùng tiến trình giao diện.
-
-`--allow_all_disk`: Khi được thêm vào, nó sẽ cho phép Gradio truy cập các tệp bên ngoài, giúp tránh lỗi không thể tải các tài nguyên ngoài trong giao diện Gradio.
-
-`--debug`: Khi được thêm vào nó sẽ hiện thị tất cả gỡ lỗi của dự án.
-
-`--no_discord`: Khi được thêm vào nó sẽ không hiển thị discord RPC.
-
-`--tensorrt`: bật chế độ TensorRT cho ONNXRUNTIME.
 
 ## Giải Thích Một Số Thứ
 
@@ -700,7 +206,6 @@ Là kỹ thuật chuyển đổi giọng hát, tập trung vào việc giữ ngu
 - **Các thanh trượt, ô chọn hay hộp thả có thể ẩn hiện theo từng tùy chọn và có thể nó nằm ẩn trong các menu xếp lớp nên hãy kiểm tra**
 - **Hiện tại các bộ mã hóa mới như MRF HIFIGAN, REFINEGAN và BIGVGAN vẫn chưa đầy đủ các bộ huấn luyện trước**
 - **Bộ mã hóa MRF HIFIGAN, REFINEGAN và BIGVGAN không hỗ trợ huấn luyện khi không không huấn luyện cao độ**
-- **Huấn luyện năng lương chỉ thêm lớp học năng lượng nhưng gần như không tăng chất lượng**
 - **Các mô hình trong kho lưu trữ Vietnamese-RVC được thu thập rải rác trên AI Hub, HuggingFace và các các kho lưu trữ khác. Có thể mang các giấy phép bản quyền khác nhau**
 - **Chế độ thời gian thực khi dùng có thể tồn lại cache trên VRAM do nằm trong luồng chính nên việc giải phóng VRAM có thể không được triệt để**
 - **Sử dụng Tăng độ phân giải âm thanh có thể làm tăng thời lượng chuyển đổi tệp âm thanh cực kì khủng kiếp**

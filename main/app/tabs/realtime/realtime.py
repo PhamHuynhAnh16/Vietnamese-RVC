@@ -13,6 +13,7 @@ from main.app.core.realtime import (
 )
 
 from main.app.variables import (
+    config,
     configs, 
     method_f0, 
     model_name, 
@@ -38,7 +39,6 @@ from main.app.core.ui import (
     update_audio_device, 
     index_strength_show, 
     change_models_choices, 
-    change_embedders_mode, 
     update_value_from_json, 
     update_button_from_json, 
     update_dropdowns_from_json, 
@@ -85,6 +85,11 @@ def realtime_tab():
                 label=translations["clear_audio"], 
                 value=False, 
                 interactive=True
+            )
+            use_phase_vocoder = gr.Checkbox(
+                label=translations["phase_vocoder"], 
+                value=not config.device.startswith(("privateuseone", "ocl")), 
+                interactive=not config.device.startswith(("privateuseone", "ocl"))
             )
         with gr.Row():
             with gr.Accordion(
@@ -257,7 +262,7 @@ def realtime_tab():
                 step=0.1, 
                 label=translations["chunk_size"], 
                 info=translations["chunk_size_info"], 
-                value=1024, 
+                value=256, 
                 interactive=True
             )
             pitch = gr.Slider(
@@ -300,7 +305,7 @@ def realtime_tab():
                             info=translations["index_strength_info"], 
                             minimum=0, 
                             maximum=1, 
-                            value=0.5, 
+                            value=0.0, 
                             step=0.01, 
                             interactive=True, 
                             visible=True
@@ -338,7 +343,7 @@ def realtime_tab():
                             predictor_onnx = gr.Checkbox(
                                 label=translations["predictor_onnx"], 
                                 info=translations["predictor_onnx_info"], 
-                                value=False, 
+                                value=configs.get("int8", False), 
                                 interactive=True
                             )
                             unlock_full_method = gr.Checkbox(
@@ -351,7 +356,7 @@ def realtime_tab():
                             label=translations["f0_method"], 
                             info=translations["f0_method_info"], 
                             choices=[m for m in method_f0 if m != "hybrid"], 
-                            value="rmvpe", 
+                            value="fcpe", 
                             interactive=True
                         )
                     hop_length = gr.Slider(
@@ -378,7 +383,7 @@ def realtime_tab():
                     embedder_mode = gr.Radio(
                         label=translations["embed_mode"], 
                         info=translations["embed_mode_info"], 
-                        value="fairseq", 
+                        value="onnx" if configs.get("int8", False) else "fairseq", 
                         choices=embedders_mode, 
                         interactive=True, 
                         visible=True)
@@ -469,7 +474,7 @@ def realtime_tab():
                             maximum=1, 
                             label=translations["protect"], 
                             info=translations["protect_info"], 
-                            value=0.5, 
+                            value=0.33, 
                             step=0.01, 
                             interactive=True
                         )
@@ -499,7 +504,7 @@ def realtime_tab():
                         maximum=-60, 
                         label=translations["silent_threshold_label"], 
                         info=translations["silent_threshold_info"], 
-                        value=-90, 
+                        value=-60, 
                         step=1, 
                         interactive=True
                     )
@@ -508,7 +513,7 @@ def realtime_tab():
                         maximum=5, 
                         label=translations["extra_convert_size_label"], 
                         info=translations["extra_convert_size_info"], 
-                        value=0.5, 
+                        value=0.8, 
                         step=0.1, 
                         interactive=True
                     )
@@ -517,7 +522,7 @@ def realtime_tab():
                         maximum=0.2, 
                         label=translations["cross_fade_overlap_size_label"], 
                         info=translations["cross_fade_overlap_size_info"], 
-                        value=0.1, 
+                        value=0.05, 
                         step=0.01, 
                         interactive=True
                     )
@@ -1155,15 +1160,6 @@ def realtime_tab():
                     hop_length
                 ]
             )
-            embedder_mode.change(
-                fn=change_embedders_mode, 
-                inputs=[
-                    embedder_mode
-                ], 
-                outputs=[
-                    embedders
-                ]
-            )
         with gr.Row():
             embedders.change(
                 fn=lambda embedders: visible(embedders == "custom"), 
@@ -1429,6 +1425,7 @@ def realtime_tab():
                         embedders_mix,
                         embedders_mix_layers,
                         embedders_mix_ratio,
+                        use_phase_vocoder,
                         chorus,
                         distortion,
                         reverb,
@@ -1480,7 +1477,9 @@ def realtime_tab():
                 )
                 stop_realtime.click(
                     fn=realtime_stop,
-                    inputs=[],
+                    inputs=[
+                        stop_realtime
+                    ],
                     outputs=[
                         status, 
                         start_realtime, 
@@ -1544,6 +1543,7 @@ def realtime_tab():
                         embedders_mix,
                         embedders_mix_layers,
                         embedders_mix_ratio,
+                        use_phase_vocoder,
                         chorus,
                         distortion,
                         reverb,
@@ -2207,6 +2207,14 @@ def realtime_tab():
                 ], 
                 outputs=[]
             )
+            use_phase_vocoder.change(
+                js="(value) => window.ChangeConfig(value, 'use_phase_vocoder')" if client_mode else None, 
+                fn=(lambda value: change_config(value, "use_phase_vocoder")) if not client_mode else None, 
+                inputs=[
+                    use_phase_vocoder
+                ], 
+                outputs=[]
+            )
         with gr.Row():
             noise_scale.change(
                 js="(value) => window.ChangeConfig(value, 'noise_scale')" if client_mode else None, 
@@ -2247,6 +2255,7 @@ def realtime_tab():
                     embedders_mix,
                     embedders_mix_layers,
                     embedders_mix_ratio,
+                    use_phase_vocoder,
                     chorus,
                     distortion,
                     reverb,
@@ -2316,6 +2325,7 @@ def realtime_tab():
                     embedders_mix,
                     embedders_mix_layers,
                     embedders_mix_ratio,
+                    use_phase_vocoder,
                     chorus,
                     distortion,
                     reverb,
@@ -2396,6 +2406,7 @@ def realtime_tab():
                     embedders_mix,
                     embedders_mix_layers,
                     embedders_mix_ratio,
+                    use_phase_vocoder,
                     chorus,
                     distortion,
                     reverb,

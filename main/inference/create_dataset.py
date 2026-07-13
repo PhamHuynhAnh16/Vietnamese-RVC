@@ -22,6 +22,13 @@ from main.app.variables import config, logger, translations
 dataset_temp = "dataset_temp"
 
 def parse_arguments():
+    """
+    Parses command-line arguments configuring the dataset pipeline properties.
+
+    Returns:
+        argparse.Namespace: Object containing validated operational configurations.
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--create_dataset", action='store_true')
     parser.add_argument("--input_data", type=str, required=True)
@@ -53,6 +60,8 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
+    """Main execution orchestrator routing runtime command-line arguments."""
+
     args = parse_arguments()
 
     (
@@ -164,6 +173,15 @@ def create_dataset(
     clean_dataset=False,
     clean_strength=0.7
 ):
+    """
+    Executes the comprehensive processing loop to build a normalized dataset.
+    Downloads, cuts, merges, separates, filters, and relocates final audio assets.
+
+    Returns:
+        str: Finalized target directory containing formatted assets.
+    """
+
+    # Map parameters to dictionary layout for localized console visibility debugging
     log_data = {
         translations["audio_path"]: input_data, 
         translations["output_path"]: output_dirs, 
@@ -198,14 +216,17 @@ def create_dataset(
     start_time = time.time()
     inputs_data = input_data.replace(", ", ",").split(",")
 
+    # Log operational Process ID (PID) to track script instances
     pid_path = os.path.join("assets", "create_dataset_pid.txt")
     with open(pid_path, "w") as pid_file:
         pid_file.write(str(os.getpid()))
 
     try:
+        # Re-initialize target workspace folder environment
         if os.path.exists(dataset_temp): shutil.rmtree(dataset_temp, ignore_errors=True)
         else: os.makedirs(dataset_temp, exist_ok=True)
 
+        # Resolve remote URLs down to local audio path files
         audio_path = [
             downloader(
                 url, 
@@ -214,12 +235,14 @@ def create_dataset(
             for url in inputs_data
         ]
         
+        # Trim explicit temporal durations out from sample inputs if required
         if skip_seconds:
             skip_start_audios, skip_end_audios = (
                 skip_start_audios.replace(", ", ",").split(","), 
                 skip_end_audios.replace(", ", ",").split(",")
             )
 
+            # Guard against mismatched trimming arguments relative to target array lengths
             if len(skip_start_audios) < len(audio_path) or len(skip_end_audios) < len(audio_path): 
                 logger.warning(translations["skip<audio"])
                 sys.exit(1)
@@ -240,8 +263,10 @@ def create_dataset(
                     )
                 ]
         
+        # Group and unify short samples up into maximum chunks
         audio_path = merge_audios(audio_path, sample_rate)
                     
+        # Apply Demixing isolation using specialized extraction rules  
         if separate:
             audio_path = [
                 separate_main(
@@ -268,6 +293,7 @@ def create_dataset(
                 for audio in audio_path
             ]
 
+        # Instatiate TorchGate Neural Mask filter instance if noise gating is enabled
         if clean_dataset: 
             from main.library.audio.noisereduce import TorchGate
 
@@ -276,11 +302,14 @@ def create_dataset(
                 prop_decrease=clean_strength
             ).to(config.device)
         
+        # Uniform signal transformation and format export loop
         for audio in audio_path:
             data, sr = read_file(audio)
+            # Enforce strict 1D mono layout configuration profile
             if len(data.shape) > 1: 
                 data = librosa.to_mono(data.T)
 
+            # Resample file if current properties violate target sample definitions
             if sr != sample_rate: 
                 data = librosa.resample(
                     data, 
@@ -289,11 +318,13 @@ def create_dataset(
                     res_type="soxr_vhq"
                 )
 
+            # Run dynamic neural gate masking algorithm
             if clean_dataset: 
                 data = tg(
                     torch.from_numpy(data).unsqueeze(0).to(config.device).float()
                 ).squeeze(0).cpu().detach().numpy()
 
+            # Write temporary normalized waves out to their finalized directory target endpoints
             sf.write(audio, data, sr)
             os.makedirs(output_dirs, exist_ok=True)
             output_path = os.path.join(output_dirs, os.path.basename(audio))
@@ -301,6 +332,7 @@ def create_dataset(
             if os.path.exists(output_path): os.remove(output_path)
             shutil.move(audio, output_path)
 
+        # Clear working caches
         if os.path.exists(dataset_temp): shutil.rmtree(dataset_temp, ignore_errors=True)
     except Exception as e:
         logger.error(f"{translations['create_dataset_error']}: {e}")
@@ -334,6 +366,11 @@ def separate_main(
     enable_post_process=False,
     separate_reverb=False
 ):
+    """
+    Acts as an isolation proxy wrapper tracking output tracks handled 
+    by model inference routines.
+    """
+
     original_vocals, _, _, _ = _separate(
         input_path,
         dataset_temp,
@@ -356,12 +393,15 @@ def separate_main(
         separate_reverb=separate_reverb
     )
 
+    # Rename isolated vocal waveform files to match simple incremental indices
     vocals = os.path.join(dataset_temp, f"dataset_{index}.wav")
     os.rename(original_vocals, vocals)
 
     return vocals
 
 def is_url(path):
+    """Validates if a target input string fits internet URI structures."""
+
     try:
         result = urlparse(path)
         return all([result.scheme, result.netloc])
@@ -372,6 +412,8 @@ def downloader(
     url, 
     name
 ):
+    """Fetches streaming audio distributions via yt_dlp using high-grade WAV encoding extraction."""
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
@@ -398,6 +440,8 @@ def downloader(
     return os.path.join(dataset_temp, f"{name}" + ".wav")
 
 def read_file(file):
+    """Robust multi-backend audio reader falling back to Librosa if Soundfile fails."""
+
     try:
         data, sr = sf.read(file, dtype=np.float32)
     except:
@@ -410,6 +454,8 @@ def skip_duration(
     skip_start_audio,
     skip_end_audio
 ):
+    """Applies consecutive linear temporal trims to both ends of a file path location."""
+
     skip_start(audio, int(skip_start_audio))
     skip_end(audio, int(skip_end_audio))
 
@@ -419,6 +465,8 @@ def skip_start(
     input_file, 
     seconds
 ):
+    """Slices duration segments off the beginning of an audio asset."""
+
     data, sr = read_file(input_file)
     total_duration = len(data) / sr
     
@@ -436,6 +484,8 @@ def skip_end(
     input_file, 
     seconds
 ):
+    """Slices duration segments off the trailing tail end of an audio asset."""
+
     data, sr = read_file(input_file)
     total_duration = len(data) / sr
 
@@ -450,6 +500,11 @@ def skip_end(
         logger.info(translations["skip_end_audio"].format(input_file=input_file))
 
 def merge_audios(audio_paths, sample_rate=48000):
+    """
+    Concatenates collections of separate audio components into sequential master chunks, 
+    guaranteeing that no individual master block exceeds a total duration limit of 600 seconds (10 minutes).
+    """
+
     current_duration = 0
     chunks, current_audio = [], []
 
@@ -468,6 +523,7 @@ def merge_audios(audio_paths, sample_rate=48000):
             )
 
         duration = len(data) / sample_rate
+        # Enforce maximum single file duration chunk allocation limits
         if current_duration + duration > 600:
             merged = np.concatenate(current_audio)
             output = os.path.join(dataset_temp, f"merged_{len(chunks)}.wav")
@@ -481,6 +537,7 @@ def merge_audios(audio_paths, sample_rate=48000):
         current_audio.append(data)
         current_duration += duration
 
+    # Flush out remaining remaining tracking buffer queues
     if current_audio:
         merged = np.concatenate(current_audio)
         output = os.path.join(dataset_temp, f"merged_{len(chunks)}.wav")

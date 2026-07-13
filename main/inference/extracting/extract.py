@@ -9,7 +9,6 @@ import torch.multiprocessing as mp
 sys.path.append(os.getcwd())
 
 from main.library.utils import check_assets, strtobool
-from main.inference.extracting.rms import run_rms_extraction
 from main.inference.extracting.feature import run_pitch_extraction
 from main.app.variables import config, logger, translations, configs
 from main.inference.extracting.embedding import run_embedding_extraction
@@ -21,6 +20,13 @@ if not config.debug_mode:
         logging.getLogger(l).setLevel(logging.ERROR)
 
 def parse_arguments():
+    """
+    Parses command-line arguments for the extraction process.
+
+    Returns:
+        argparse.Namespace: Object containing all parsed command-line arguments.
+    """
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--extract", action='store_true')
     parser.add_argument("--model_name", type=str, required=True)
@@ -36,7 +42,6 @@ def parse_arguments():
     parser.add_argument("--embedders_mode", type=str, default="fairseq")
     parser.add_argument("--f0_autotune", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--f0_autotune_strength", type=float, default=1)
-    parser.add_argument("--rms_extract", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--include_mutes", type=int, default=2)
     parser.add_argument("--embedders_mix", type=lambda x: bool(strtobool(x)), default=False)
@@ -47,8 +52,14 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
-    args = parse_arguments()
+    """
+    Main orchestrator function for the feature extraction pipeline.
+    Validates assets, maps execution devices, handles logging, and runs 
+    the pitch/embedding extractions sequentially.
+    """
 
+    args = parse_arguments()
+    # Unpack and map command-line arguments to descriptive local variables
     (
         f0_method, 
         hop_length, 
@@ -61,7 +72,6 @@ def main():
         embedders_mode, 
         f0_autotune, 
         f0_autotune_strength, 
-        rms_extract, 
         alpha,
         include_mutes,
         embedders_mix,
@@ -81,7 +91,6 @@ def main():
         args.embedders_mode, 
         args.f0_autotune, 
         args.f0_autotune_strength, 
-        args.rms_extract, 
         args.alpha,
         args.include_mutes,
         args.embedders_mix,
@@ -90,10 +99,13 @@ def main():
         args.architecture
     )
 
+    # Step 1: Pre-execution validations (Ensure dependency models/assets exist)
     check_assets(f0_method, embedder_model, predictor_onnx=predictor_onnx, embedders_mode=embedders_mode)
+    # Step 2: Establish paths and resource allocation limits
     exp_dir = os.path.join(configs["logs_path"], args.model_name)
-    num_processes = max(1, num_processes)
+    num_processes = max(1, num_processes) # Ensure at least 1 process runs
 
+    # Step 3: Hardware device mapping based on the system backends (CUDA, Intel XPU, OpenCL, DirectML)
     devices = ["cpu"] if gpus == "-" else [
         (
             f"cuda:{idx}"
@@ -103,6 +115,7 @@ def main():
         for idx in gpus.split("-")
     ]
 
+    # Step 4: Compile configuration parameters for debug logging
     log_data = {
         translations['modelname']: args.model_name, 
         translations['export_process']: exp_dir, 
@@ -116,7 +129,6 @@ def main():
         translations['hubert_model']: embedder_model, 
         translations["predictor_onnx"]: predictor_onnx, 
         translations["embed_mode"]: embedders_mode, 
-        translations["train&energy"]: rms_extract,
         translations["alpha_label"]: alpha,
         translations["include_mutes"]: include_mutes,
         translations["embedders_mix"]: embedders_mix,
@@ -125,14 +137,18 @@ def main():
         translations["architecture"]: architecture
     }
 
+    # Print the operational parameters to the log file/terminal for tracking
     for key, value in log_data.items():
         logger.debug(f"{key}: {value}")
 
+    # Step 5: Save current Process ID (PID) to track/kill execution if needed
     pid_path = os.path.join(exp_dir, "extract_pid.txt")
     with open(pid_path, "w") as pid_file:
         pid_file.write(str(os.getpid()))
     
+    # Step 6: Sequential Execution of Core Feature Extractions
     try:
+        # Extract fundamental frequencies (Pitch tracking)
         run_pitch_extraction(
             exp_dir, 
             f0_method, 
@@ -145,6 +161,7 @@ def main():
             f0_autotune_strength, 
             alpha
         )
+        # Extract content embeddings
         run_embedding_extraction(
             exp_dir, 
             version, 
@@ -157,18 +174,13 @@ def main():
             embedders_mix_layers,
             embedders_mix_ratio
         )
-        run_rms_extraction(
-            exp_dir, 
-            num_processes, 
-            devices, 
-            rms_extract
-        )
+        # Create a training configuration file
         generate_config(
             version, 
             sample_rate, 
-            exp_dir,
-            architecture
+            exp_dir
         )
+        # Generate the formatted dataset path filelist required by the trainer
         generate_filelist(
             pitch_guidance, 
             exp_dir, 
@@ -176,15 +188,17 @@ def main():
             sample_rate, 
             embedders_mode, 
             embedder_model, 
-            rms_extract,
             include_mutes
         )
     except Exception as e:
+        # Log localized error if any processing step crashes
         logger.error(f"{translations['extract_error']}: {e}")
 
+    # Step 7: Post-execution cleanup (Remove PID tracking file)
     if os.path.exists(pid_path): os.remove(pid_path)
     logger.info(f"{translations['extract_success']} {args.model_name}.")
 
 if __name__ == "__main__": 
+    # Force 'spawn' multiprocessing method to guarantee cross-platform stability
     mp.set_start_method("spawn", force=True)
     main()

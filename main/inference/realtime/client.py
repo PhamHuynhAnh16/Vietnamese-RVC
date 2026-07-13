@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import json
 
@@ -21,6 +22,14 @@ DEVICE_SAMPLE_RATE = 48000
 
 @app.websocket("/change-config")
 async def change_config(ws: WebSocket):
+    """
+    Handles hot-reloading and runtime reconfiguration of the voice conversion model parameters 
+    such as crossfade boundaries, VAD modes, audio cleaners, effects, and index paths via a persistent WebSocket.
+
+    Args:
+        ws (WebSocket): The incoming communication handshake instance from the client layer.
+    """
+
     global vc_instance, params
 
     await ws.accept()
@@ -29,18 +38,22 @@ async def change_config(ws: WebSocket):
     text = await ws.receive_text()
     jsons = json.loads(text)
 
+    # Distinguish standard execution settings from extra dictionary keyword arguments (kwargs)
     if jsons["if_kwargs"]:
         params["kwargs"][jsons["key"]] = jsons["value"]
     else:
         params[jsons["key"]] = jsons["value"]
 
+    # Calculate overlapping structure size windows mapped against the target system sample rate
     crossfade_frame = int(params.get("cross_fade_overlap_size", 0.1) * DEVICE_SAMPLE_RATE)
     extra_frame = int(params.get("extra_convert_size", 0.5) * DEVICE_SAMPLE_RATE)
 
+    # Trigger memory reallocation on the underlying core if latency window sizes are altered
     if (
         vc_instance.crossfade_frame != crossfade_frame or
         vc_instance.extra_frame != extra_frame
     ):
+        # Force-release old arrays to prevent internal calculation leaks before reconfiguration
         del (
             vc_instance.fade_in_window,
             vc_instance.fade_out_window,
@@ -55,8 +68,10 @@ async def change_config(ws: WebSocket):
         )
         vc_instance.generate_strength()
 
+    # Convert the dB floor threshold configuration parameter to standard linear amplitude values
     vc_instance.vc_model.input_sensitivity = 10 ** (params.get("silent_threshold", -90) / 20)
 
+    # Voice Activity Detection (VAD) Engine Configuration Block
     vad_enabled = params.get("vad_enabled", True)
     sensitivity_mode = params.get("vad_sensitivity", 3)
     vad_frame_ms = params.get("vad_frame_ms", 30)
@@ -76,6 +91,7 @@ async def change_config(ws: WebSocket):
         vc_instance.vc_model.vad.vad.set_mode(sensitivity_mode)
         vc_instance.vc_model.vad.frame_length = int(vc_instance.vc_model.sample_rate * (vad_frame_ms / 1000.0))
 
+    # Audio Clean Gate (TorchGate Noise Reduction) Block
     clean_audio = params.get("clean_audio", False)
     clean_strength = params.get("clean_strength", 0.5)
 
@@ -94,6 +110,7 @@ async def change_config(ws: WebSocket):
     if vc_instance.vc_model.tg is not None:
         vc_instance.vc_model.tg.prop_decrease = clean_strength
 
+    # Pedalboard Effects Post-Processing Block
     post_process = params.get("post_process", False)
     kwargs = params.get("kwargs", {})
 
@@ -105,6 +122,7 @@ async def change_config(ws: WebSocket):
         vc_instance.vc_model.board = new_board
         vc_instance.vc_model.kwargs = kwargs.copy()
 
+    # Model Weight Reload / Architecture Swap Block
     noise_scale = params.get("noise_scale", 0.35)
     model_pth = params.get("model_path", vc_instance.vc_model.model_path)
     model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
@@ -118,9 +136,8 @@ async def change_config(ws: WebSocket):
         vc_instance.vc_model.pipeline.use_f0 = vc_instance.vc_model.pipeline.vc.use_f0
         vc_instance.vc_model.pipeline.tgt_sr = vc_instance.vc_model.pipeline.vc.tgt_sr
         vc_instance.vc_model.pipeline.version = vc_instance.vc_model.pipeline.vc.version
-        vc_instance.vc_model.pipeline.energy = vc_instance.vc_model.pipeline.vc.energy
-        vc_instance.vc_model.pipeline.rms = vc_instance.vc_model.pipeline.setup_rms() if vc_instance.vc_model.pipeline.vc.energy else None
 
+        # Re-initialize the resampling layer since the target sample rate might have changed
         vc_instance.vc_model.resample_out = tat.Resample(
             orig_freq=vc_instance.vc_model.pipeline.tgt_sr,
             new_freq=vc_instance.vc_model.output_sample_rate,
@@ -137,6 +154,7 @@ async def change_config(ws: WebSocket):
                 ).to(config.device)
             )
 
+    # Speaker Identity ID Configuration
     sid = params.get("sid", vc_instance.vc_model.pipeline.sid)
     if vc_instance.vc_model.pipeline.sid != sid:
         import torch
@@ -144,14 +162,17 @@ async def change_config(ws: WebSocket):
             [sid], device=vc_instance.vc_model.pipeline.device, dtype=torch.int64
         )
 
+    # FAISS Index Tracking Path Search Block
     index_path = params.get("index_path", None)
     if index_path:
         if vc_instance.vc_model.index_path != index_path:
             from main.library.utils import load_faiss_index
 
             nprobe = params.get("nprobe", 1)
+            # Sanitize paths to handle literal quote configurations securely
             index, index_reconstruct = load_faiss_index(
-                index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added")
+                index_path.strip().strip('"').strip("\n").strip('"').strip().replace("trained", "added"),
+                nprobe=nprobe
             )
 
             vc_instance.vc_model.pipeline.index = index
@@ -163,6 +184,7 @@ async def change_config(ws: WebSocket):
         vc_instance.vc_model.pipeline.big_tsr = None
         vc_instance.vc_model.index_path = None
 
+    # Pitch Predictor and Feature Embedder Extraction Block
     f0_method = params.get("f0_method", vc_instance.vc_model.pipeline.f0_method)
     predictor_onnx = params.get("predictor_onnx", vc_instance.vc_model.pipeline.predictor.predictor_onnx)
     embedders = params.get("embedder_model", vc_instance.vc_model.embedder_model)
@@ -170,20 +192,26 @@ async def change_config(ws: WebSocket):
     custom_embedders = params.get("embedder_model_custom", None)
     embedder_model = (embedders if embedders != "custom" else custom_embedders)
 
+    # Ensure files and parameters match required asset types
     from main.library.utils import check_assets
     check_assets(f0_method, embedders, predictor_onnx, embedders_mode)
 
+    # Hot-swap the pitch predictor backend structures if options are updated
     if (
-        vc_instance.vc_model.pipeline.f0_method != f0_method or
-        vc_instance.vc_model.pipeline.predictor.predictor_onnx != predictor_onnx
+        vc_instance.vc_model.pipeline.vc.use_f0 and (
+            vc_instance.vc_model.pipeline.f0_method != f0_method or
+            vc_instance.vc_model.pipeline.predictor.predictor_onnx != predictor_onnx
+        )
     ):
         old_predictor = vc_instance.vc_model.pipeline.predictor
+        del old_predictor.pw, old_predictor.fcpe, old_predictor.djcm, old_predictor.penn, old_predictor.pesto, old_predictor.swift, old_predictor.rmvpe, old_predictor.crepe, old_predictor.mangio_penn, old_predictor.mangio_crepe
         del old_predictor
 
         vc_instance.vc_model.pipeline.predictor = vc_instance.vc_model.pipeline.setup_predictor(PIPELINE_SAMPLE_RATE, params.get("hop_length", vc_instance.vc_model.pipeline.predictor.hop_length), predictor_onnx)
         vc_instance.vc_model.pipeline.f0_method = f0_method
         vc_instance.vc_model.pipeline.predictor.predictor_onnx = predictor_onnx
 
+    # Hot-swap Content Vec or Hubert feature extractors if modified
     if embedder_model:
         if (
             vc_instance.vc_model.embedder_model != embedder_model or
@@ -196,14 +224,25 @@ async def change_config(ws: WebSocket):
             vc_instance.vc_model.embedder_model = embedder_model
             vc_instance.vc_model.embedders_mode = embedders_mode
 
-        if (
-            vc_instance.vc_model.pipeline.vc.architecture == "SVC" and
-            vc_instance.vc_model.pipeline.vc.net_g.noise_scale != noise_scale
-        ): 
-            vc_instance.vc_model.pipeline.vc.net_g.noise_scale = noise_scale
+    if (
+        vc_instance.vc_model.pipeline.vc.architecture == "SVC" and
+        vc_instance.vc_model.pipeline.vc.net_g.noise_scale != noise_scale
+    ): 
+        vc_instance.vc_model.pipeline.vc.net_g.noise_scale = noise_scale
 
 @app.post("/record")
 async def record(request: Request):
+    """
+    HTTP POST route acting as a remote trigger toggle to handle runtime sound recording sequences 
+    of the converted audio streams.
+
+    Args:
+        request (Request): The incoming request payload containing parameters for target path and export format.
+
+    Returns:
+        dict: Operational response packet describing status modifications, info alerts, or warning messages.
+    """
+
     global vc_instance
 
     data = await request.json()
@@ -219,6 +258,7 @@ async def record(request: Request):
             "path": None
         }
 
+    # Evaluate execution parameters depending on toggle switch intent labels
     if record_button == translations["start_record"]:
         if not record_audio_path:
             record_audio_path = os.path.join(configs["audios_path"], "record_audio.wav")
@@ -248,6 +288,14 @@ async def record(request: Request):
 
 @app.websocket("/ws-audio")
 async def websocket_audio(ws: WebSocket):
+    """
+    Main real-time audio pipeline hub handling binary frame ingestion, inference callback triggers, 
+    latency logging metrics, and synthesized sample extraction.
+
+    Args:
+        ws (WebSocket): Continuous binary connection context loop.
+    """
+
     global vc_instance, params
     await ws.accept()
 
@@ -264,18 +312,19 @@ async def websocket_audio(ws: WebSocket):
         model_pth = params["model_pth"]
         model_pth = os.path.join(configs["weights_path"], model_pth) if not os.path.exists(model_pth) else model_pth
 
+        # Structural validity check boundary to reject faulty setups
         if (
             not model_pth or 
             not os.path.exists(model_pth) or 
             os.path.isdir(model_pth) or 
             not model_pth.endswith((".pth", ".onnx"))
         ):
-            logger.warning(translations["provide_file"].format(filename=translations["model"]))
-            await ws.send_text(json.dumps({"type": "warnings", "value": translations["provide_file"].format(filename=translations["model"])}))
+            logger.warning(translations["provide_model"])
+            await ws.send_text(json.dumps({"type": "warnings", "value": translations["provide_model"]}))
             return
         
         logger.info(translations["start_realtime"])
-
+        # Create the continuous VoiceChanger backend pipeline worker instance if not initialized
         if vc_instance is None:
             vc_instance = VoiceChanger(
                 read_chunk_size=read_chunk_size, 
@@ -306,21 +355,14 @@ async def websocket_audio(ws: WebSocket):
                 export_format="wav",
                 **params["kwargs"]
             )
-
-        noise_scale = params["noise_scale"]
-        if (
-            vc_instance is not None and 
-            vc_instance.vc_model.pipeline.vc.architecture == "SVC" and 
-            vc_instance.vc_model.pipeline.vc.net_g.noise_scale != noise_scale
-        ): 
-            vc_instance.vc_model.pipeline.vc.net_g.noise_scale = noise_scale
         
         logger.info(translations["realtime_is_ready"])
-
+        # Continuous listening loop tracking incoming raw binary floating-point stream blocks
         while 1:
             audio = await ws.receive_bytes()
             arr = np.frombuffer(audio, dtype=np.float32)
 
+            # Enforce strict buffer alignment by padding or slicing anomalous incoming frames
             if arr.size != block_frame:
                 arr = (
                     np.pad(arr, (0, block_frame - arr.size)).astype(np.float32) 
@@ -330,6 +372,7 @@ async def websocket_audio(ws: WebSocket):
 
             if vc_instance is None: return
 
+            # Apply gain amplification and forward the block into the pitch shifting & inference pipeline
             audio_output, vol, perf = vc_instance.on_request(
                 arr * (params["input_audio_gain"] / 100.0), 
                 f0_up_key=params["f0_up_key"], 
@@ -344,8 +387,10 @@ async def websocket_audio(ws: WebSocket):
                 embedders_mix=params["embedders_mix"],
                 embedders_mix_layers=params["embedders_mix_layers"],
                 embedders_mix_ratio=params["embedders_mix_ratio"],
+                use_phase_vocoder=params["use_phase_vocoder"]
             )
 
+            # Asynchronously dispatch telemetry diagnostic parameters along with the processed binary chunk
             await ws.send_text(json.dumps({"type": "latency", "value": perf, "volume": vol}))
             await ws.send_bytes(audio_output.tobytes())
     except WebSocketDisconnect:
@@ -356,12 +401,17 @@ async def websocket_audio(ws: WebSocket):
         logger.debug(traceback.format_exc())
         logger.info(translations["error_occurred"].format(e=e))
     finally:
+        # Strict Memory Deallocation and GPU VRAM Cleanup Block
         if vc_instance is not None:
+            del vc_instance.vc_model.pipeline, vc_instance.vc_model
             del vc_instance
             vc_instance = None
 
+        # Force Python's garbage collector to release detached tensors
+        gc.collect()
         clear_gpu_cache()
 
+        # Safely shut down the socket handshake context loop
         try:
             await ws.close()
         except:

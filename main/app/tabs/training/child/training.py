@@ -36,13 +36,10 @@ from main.app.core.ui import (
     shutil_move, 
     get_gpu_info, 
     vocoders_lock, 
-    unlock_version, 
-    unlock_vocoder, 
     hoplength_show, 
     gpu_number_str, 
     pitch_guidance_lock, 
     change_models_choices, 
-    change_embedders_mode, 
     change_reference_choices,
     change_pretrained_choices 
 )
@@ -195,7 +192,7 @@ def training_model_tab():
                             with gr.Row():
                                 predictor_onnx = gr.Checkbox(
                                     label=translations["predictor_onnx"], 
-                                    value=False, 
+                                    value=config.int8, 
                                     interactive=True
                                 )
                                 unlock_full_method = gr.Checkbox(
@@ -268,7 +265,7 @@ def training_model_tab():
                             embedder_mode = gr.Radio(
                                 label=translations["embed_mode"], 
                                 info=translations["embed_mode_info"], 
-                                value="fairseq", 
+                                value="onnx" if config.int8 else "fairseq", 
                                 choices=embedders_mode, 
                                 interactive=True, 
                                 visible=True
@@ -383,12 +380,6 @@ def training_model_tab():
                             label=translations["cache_in_gpu"], 
                             info=translations["cache_in_gpu_info"], 
                             value=True, 
-                            interactive=True
-                        )
-                        energy = gr.Checkbox(
-                            label=translations["train&energy"], 
-                            info=translations["train&energy_info"], 
-                            value=False, 
                             interactive=True
                         )
                         overtraining_detector = gr.Checkbox(
@@ -576,8 +567,7 @@ def training_model_tab():
                                 "AdamW", 
                                 "RAdam", 
                                 "AnyPrecisionAdamW",
-                                "AdaBelief",
-                                "AdaBeliefV2"
+                                "AdaBelief"
                             ], 
                             interactive=True
                         )
@@ -756,26 +746,6 @@ def training_model_tab():
                 dataset_path
             ]
         )
-        rvc_version.change(
-            fn=unlock_vocoder, 
-            inputs=[
-                rvc_version, 
-                vocoders
-            ], 
-            outputs=[
-                vocoders
-            ]
-        )
-        vocoders.change(
-            inputs=[
-                rvc_version, 
-                vocoders
-            ], 
-            fn=unlock_version, 
-            outputs=[
-                rvc_version
-            ]
-        )
     with gr.Row():
         custom_reference.change(
             fn=visible, 
@@ -873,15 +843,6 @@ def training_model_tab():
             ]
         )
     with gr.Row():
-        embedder_mode.change(
-            fn=change_embedders_mode, 
-            inputs=[
-                embedder_mode
-            ], 
-            outputs=[
-                embedders
-            ]
-        )
         embedders.change(
             fn=lambda embedders: visible(embedders == "custom"), 
             inputs=[
@@ -949,7 +910,6 @@ def training_model_tab():
                 autotune,
                 f0_autotune_strength,
                 hybrid_f0method,
-                energy,
                 alpha,
                 include_mutes,
                 embedders_mix,
@@ -1004,7 +964,6 @@ def training_model_tab():
                 deterministic, 
                 benchmark,
                 optimizer,
-                energy,
                 custom_reference,
                 reference_name,
                 multiscale_mel_loss,
