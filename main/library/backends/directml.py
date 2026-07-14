@@ -2,7 +2,7 @@ import os
 import gc
 import sys
 import torch
-import pickle
+import struct
 import ctypes
 
 from ctypes import wintypes
@@ -70,11 +70,13 @@ def unpack_empty_cache():
     # Extract binaries if missing
     if not os.path.exists(empty_cache_dll):
         with open(os.path.join("assets", "binary", "empty_cache.bin"), "rb") as f:
-            data = pickle.load(f)
-        
-        for i in ["dll", "exp", "lib", "obj"]:
-            with open(empty_cache_dll.replace(".dll", "." + i), "wb") as f:
-                f.write(data[i])
+            for ext in ["dll", "exp", "lib", "obj"]:
+                size_bytes = f.read(4)
+                if not size_bytes: break
+
+                content = f.read(struct.unpack("I", size_bytes)[0])
+                with open(empty_cache_dll.replace(".dll", "." + ext), "wb") as f2:
+                    f2.write(content)
     
     # Load DLL and map parameter signatures
     try:

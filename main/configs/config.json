@@ -737,7 +737,7 @@
     "allow_unsafe_fairseq": false,
     "del4stem": true,
     "enable_rmvpe_chunk": false,
-    "rmvpe_chunk_size": 8000,
+    "rmvpe_chunk_size": 32000,
     "int8": false,
     "invert_using_spec": false,
     "gpu_idx": 0

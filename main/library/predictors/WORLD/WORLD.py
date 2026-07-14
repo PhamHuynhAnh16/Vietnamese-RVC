@@ -1,5 +1,5 @@
 import os
-import pickle
+import struct
 import ctypes
 import platform
 
@@ -78,11 +78,26 @@ class PYWORLD:
         self.world_file_path = os.path.join(self.world_path, f"{model_type}{suffix}")
         # Extract compiled binary file from pickle payload if it does not exist locally
         if not os.path.exists(self.world_file_path):
+            target_content = None
+
             with open(model_path, "rb") as f:
-                model = pickle.load(f)
+                while 1:
+                    name_len_bytes = f.read(4)
+                    if not name_len_bytes: break
+
+                    current = f.read(struct.unpack("I", name_len_bytes)[0]).decode('utf-8')
+                    data_len = struct.unpack("I", f.read(4))[0]
+
+                    if current == model_type:
+                        target_content = f.read(data_len)
+                        break
+                    else: f.seek(data_len, 1)
+
+            if target_content is None:
+                raise KeyError(f"World type '{model_type}' not found inside packaged resources.")
 
             with open(self.world_file_path, "wb") as w:
-                w.write(model[model_type])
+                w.write(target_content)
 
         self.idx_dio = 0
         self.idx_harvest = 0

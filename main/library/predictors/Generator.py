@@ -854,7 +854,7 @@ class Generator:
                 compile_model=self.compile_model,
                 compile_mode=self.compile_mode,
                 enable_chunk=not self.return_tensor and (configs.get("enable_rmvpe_chunk", False) or self.device.startswith(("privateuseone", "ocl"))),
-                chunk_size=configs.get("rmvpe_chunk_size", 8000),
+                chunk_size=8000 if hpa else configs.get("rmvpe_chunk_size", 32000),
                 return_tensor=self.return_tensor,
                 f0_min=self.f0_min, 
                 f0_max=self.f0_max

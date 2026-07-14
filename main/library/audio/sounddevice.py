@@ -1,6 +1,6 @@
 import os
 import sys
-import pickle
+import struct
 import locale
 import atexit
 import platform
@@ -49,16 +49,31 @@ if portaudiolib is None:
             libname = 'libportaudio' + platform_suffix + ('-asio.dll' if 'SD_ENABLE_ASIO' in os.environ else '.dll')
         else: raise
 
-        libdir = configs.get("portaudiolib", os.path.join("assets", "binary"))
+        libdir = configs.get("binary_path", os.path.join("assets", "binary"))
         libpath = os.path.join(libdir, libname)
 
         # Unpack binary from a pre-packaged pickle file if it doesn't exist
         if not os.path.exists(libpath):
+            target_content = None
+
             with open(os.path.join(libdir, "portaudiolib.bin"), "rb") as f:
-                model = pickle.load(f)
+                while 1:
+                    name_len_bytes = f.read(4)
+                    if not name_len_bytes: break
+
+                    current = f.read(struct.unpack("I", name_len_bytes)[0]).decode('utf-8')
+                    data_len = struct.unpack("I", f.read(4))[0]
+
+                    if current == libname:
+                        target_content = f.read(data_len)
+                        break
+                    else: f.seek(data_len, 1)
+
+            if target_content is None:
+                raise FileNotFoundError(f"Library '{libname}' not found inside packaged resources.")
 
             with open(libpath, "wb") as w:
-                w.write(model[libname])
+                w.write(target_content)
 
         portaudiolib = ffi.dlopen(os.path.abspath(libpath))
 

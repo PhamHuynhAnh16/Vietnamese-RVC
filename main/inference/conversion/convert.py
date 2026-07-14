@@ -353,6 +353,7 @@ def run_convert_script(
         logger.warning(translations["provide_model"])
         sys.exit(1)
 
+    start_time = time.time()
     # Instantiate the wrapper converter architecture
     cvt = VoiceConverter(pth_path, embedder_model, embedders_mode, sid, noise_scale, checkpointing, hop_length, alpha, predictor_onnx, clean_audio, clean_strength, audio_upscaler)
 
@@ -391,8 +392,6 @@ def run_convert_script(
             embedders_mix_ratio=embedders_mix_ratio,
             nprobe=nprobe
         )
-    
-    start_time = time.time()
 
     if os.path.isdir(input_path):
         # Case A: Batch Processing if the input path points to a Directory

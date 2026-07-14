@@ -1,25 +1,5 @@
 import json
-import pickle
-
-def int_keys(pairs):
-    """
-    Custom object pairs hook for JSON decoding that converts numeric string keys into integers.
-
-    Args:
-        pairs (List[Tuple[Any, Any]]): A list of key-value tuples extracted during JSON parsing.
-
-    Returns:
-        Dict[Any, Any]: A dictionary where string-digit keys are converted to integer keys.
-    """
-
-    result_dict = {}
-
-    for key, value in pairs:
-        # Check if the key is a string containing only digits, then cast it to int
-        if isinstance(key, str) and key.isdigit(): key = int(key)
-        result_dict[key] = value
-
-    return result_dict
+import struct
 
 class ModelParameters(object):
     """
@@ -40,16 +20,31 @@ class ModelParameters(object):
 
         # Determine the file type by checking the extension
         if config_path.endswith(".bin"):
+            target_content = None
             # Load binary configurations using pickle
             with open(config_path, "rb") as f:
-                data = pickle.load(f)
-                # Extract the subset parameters using the specified binary dictionary key
-                self.param = data[key_in_bin]
+                while 1:
+                    key_len_bytes = f.read(4)
+                    if not key_len_bytes: break
+
+                    current = f.read(struct.unpack("I", key_len_bytes)[0]).decode('utf-8')
+                    data_len = struct.unpack("I", f.read(4))[0]
+
+                    if current == key_in_bin:
+                        target_content = f.read(data_len)
+                        break
+                    else:
+                        f.seek(data_len, 1)
+
+            if target_content is None:
+                raise KeyError(f"Configuration key '{key_in_bin}' not found inside safe binary database.")
+
+            self.param = json.loads(target_content.decode('utf-8'))
         else:
             # Load standard textual configurations using json
             with open(config_path, "r", encoding="utf-8") as f:
                 # Use the custom int_keys hook to ensure valid integer key lookups
-                self.param = json.loads(f.read(), object_pairs_hook=int_keys)
+                self.param = json.loads(f.read())
 
         # Ensure essential boolean stereo/processing flags exist; default to False if missing
         for k in ["mid_side", "mid_side_b", "mid_side_b2", "stereo_w", "stereo_n", "reverse"]:
