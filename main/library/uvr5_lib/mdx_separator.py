@@ -114,7 +114,7 @@ class MDXSeparator(CommonSeparator):
 
         if not isinstance(self.primary_source, np.ndarray): self.primary_source = source.T
         if not isinstance(self.secondary_source, np.ndarray):
-            if self.invert_using_spec: self.secondary_source = spec_utils.invert_stem(self.demix(mix, is_match_mix=True), self.primary_source * self.compensate) # Frequency-domain algorithmic inversion matching phase properties
+            if self.invert_using_spec: self.secondary_source = spec_utils.invert_stem(self.demix(mix, is_match_mix=True), source) # Frequency-domain algorithmic inversion matching phase properties
             else: self.secondary_source = (-self.primary_source * self.compensate) + mix.T # Standard time-domain phase subtraction method
 
         # Compose output filenames incorporating track metadata definitions

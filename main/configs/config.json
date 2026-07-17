@@ -739,6 +739,6 @@
     "enable_rmvpe_chunk": false,
     "rmvpe_chunk_size": 32000,
     "int8": false,
-    "invert_using_spec": false,
+    "invert_using_spec": true,
     "gpu_idx": 0
 }
