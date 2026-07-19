@@ -76,6 +76,7 @@ class CREPE:
 
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3 # Suppress verbose warnings
+            if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
             from main.library.predictors.CREPE.model import CREPEE
@@ -90,8 +91,8 @@ class CREPE:
 
         self.model = model
         # Route execution to the correct private inference function based on configuration
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
-        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
+        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
 
     def bins_to_frequency(self, bins):
         """

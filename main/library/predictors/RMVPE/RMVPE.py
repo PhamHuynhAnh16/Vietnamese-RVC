@@ -61,6 +61,7 @@ class RMVPE:
             # Configure basic logging level constraints to suppress verbose initialization logs
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
+            if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
             from main.library.predictors.RMVPE.e2e import E2E
@@ -90,12 +91,12 @@ class RMVPE:
         if return_tensor: self.cents_mapping = torch.as_tensor(self.cents_mapping, dtype=self.dtype, device=device)
 
         # Dynamically map processing handles and dynamic dispatch interfaces based on parameters
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         self.mel2hidden = self._mel2hidden_chunk if enable_chunk else self._mel2hidden
         self.offsets = torch.arange(-4, 5, device=device) if return_tensor else np.arange(-4, 5)
         self.to_local_average_cents = self._to_local_average_cents_tensor if return_tensor else self._to_local_average_cents_array
         # Determine the runtime execution function depending on ONNX/PyTorch and Precision flags
-        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
+        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
 
     def decode(self, hidden, thred=0.03):
         """

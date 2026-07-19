@@ -57,6 +57,7 @@ class PESTO:
             # Configure runtime engine sessions to suppress non-critical logging
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
+            if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
             from main.library.predictors.PESTO.model import PPESTO, Resnet1d
@@ -84,11 +85,11 @@ class PESTO:
         
         self.model = model
         # 1. Establish hardware string values to map execution devices correctly
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         # 2. Select the orchestration strategy based on chunk constraints
         self.compute_f0 = self._compute_f0_chunk if self.chunk_size else self._compute_f0
         # 3. Route structural execution methods based on backend and datatype configurations
-        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
+        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
 
     def _compute_f0_chunk(self, x):
         """Slices incoming waveforms into sequential blocks to manage memory consumption."""

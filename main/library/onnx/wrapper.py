@@ -30,6 +30,7 @@ class ONNXRVC:
         # Configure the Session options to limit log pollution
         sess_options = onnxruntime.SessionOptions()
         sess_options.log_severity_level = log_severity_level
+        if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         # Initialize the actual core ONNX computational runtime session
         self.net_g = onnxruntime.InferenceSession(
             model_path, 
@@ -49,8 +50,8 @@ class ONNXRVC:
         self.rate = np.ones(1, dtype=np.float32)
 
         # Identify execution pipeline (Optimize utilizing direct pointers if backed by CUDA or CPU)
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
-        self.infer = self.infer_io if providers[0][0].startswith(("CUDA", "CPU")) else self.infer_non_io
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
+        self.infer = self.infer_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self.infer_non_io
 
     def get_onnx_argument_pitch(self, feats, p_len, sid, pitch = None, pitchf = None, rate = None):
         """

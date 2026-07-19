@@ -280,7 +280,7 @@ class Config:
 
         if not self.cpu_mode and not self.device.startswith("cpu"):
             # Check and append Nvidia hardware acceleration stacks
-            if "TensorrtExecutionProvider" in ort_providers and self.tensorrt: providers.append(("TensorrtExecutionProvider", self.onnx_device_idx))
+            if "TensorrtExecutionProvider" in ort_providers and self.tensorrt: providers.append(("TensorrtExecutionProvider", {"device_id": self.onnx_device_idx["device_id"], "trt_max_workspace_size": 4294967296, "trt_fp16_enable": True, "trt_engine_cache_enable": True, "trt_engine_cache_path": self.configs.get("tensorrt_cache_dir", "")}))
             if "CUDAExecutionProvider" in ort_providers: providers.append(("CUDAExecutionProvider", self.onnx_device_idx))
             # Check and append AMD ROCm hardware acceleration stacks
             if "ROCMExecutionProvider" in ort_providers: providers.append(("ROCMExecutionProvider", self.onnx_device_idx))

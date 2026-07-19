@@ -406,10 +406,10 @@ def install_requirements_linux():
             install_cpu()
             break
         elif selected in ("2", "CUDA"):
+            run_command(f"apt update && apt install -y nvidia-cuda-toolkit")
             print("\nCác phiên bản CUDA (Lưu ý: Hãy chọn đúng phiên bản nếu như chọn sai có thể gây ra lỗi suy luận hoặc huấn luyện): \n 1. Phiên bản 118 dành cho các GPU GTX 10-Series trở lên. \n 2. Phiên bản 121 dành cho các GPU RTX 20-Series đến 30-Series trở lên. \n 3. Phiên bản 128 dành cho các GPU RTX 30-Series đến RTX 40-Series trở lên. \n 4. Phiên bản 130 dành cho các GPU RTX 50-Series trở lên.")
 
             cuda_selected = None
-            run_command(f"apt update && apt install -y nvidia-cuda-toolkit")
 
             while 1:
                 cuda_selected = str(input("Hãy chọn phiên bản CUDA (Nhập 1-4): ")).strip().upper()

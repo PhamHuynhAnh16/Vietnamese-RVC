@@ -733,6 +733,7 @@
     "compile_cache_dir": "assets/cache",
     "check_data": false,
     "tensorrt": false,
+    "tensorrt_cache_dir": "assets/tensorrt",
     "faiss_cpu": false,
     "allow_unsafe_fairseq": false,
     "del4stem": true,

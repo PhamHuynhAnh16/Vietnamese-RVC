@@ -30,6 +30,7 @@ class HubertModelONNX:
         # Configure session options to minimize logging verbosity (3 = ERROR level)
         sess_options = onnxruntime.SessionOptions()
         sess_options.log_severity_level = 3
+        if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         # Initialize the ONNX Runtime Inference Session
         self.model = onnxruntime.InferenceSession(
             embedder_model_path, 
@@ -40,11 +41,11 @@ class HubertModelONNX:
         self.device = device
         self._final_proj = False # Control which output to return (False: 'feats', True: 'feats_proj')
         # Determine device type string based on the primary execution provider
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         # Optimize performance: use I/O binding if running on CUDA or CPU, else fallback
-        self.extract_features = self.extract_features_io if providers[0][0].startswith(("CUDA", "CPU")) else self.extract_features_non_io
+        self.extract_features = self.extract_features_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self.extract_features_non_io
         # Pre-allocate output_layer buffer based on the execution path (Torch Tensor for I/O binding, NumPy for standard)
-        self.output_layer = torch.zeros((), device=self.device, dtype=torch.int64) if providers[0][0].startswith(("CUDA", "CPU")) else np.empty((), dtype=np.int64)
+        self.output_layer = torch.zeros((), device=self.device, dtype=torch.int64) if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else np.empty((), dtype=np.int64)
 
     def final_proj(self, source):
         """

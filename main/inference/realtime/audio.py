@@ -13,6 +13,8 @@ import main.library.audio.sounddevice as sd
 
 from main.app.variables import logger, translations
 
+input_devices, output_devices = None, None
+
 class ServerAudioDevice:
     """
     A data class representation holding hardware parameters and structural descriptions 
@@ -155,6 +157,8 @@ def audio_device():
         tuple: (input_device_dict, output_device_dict) containing name keys matched to [hardware_index, channels].
     """
 
+    global input_devices, output_devices
+
     try:
         input_devices, output_devices = list_audio_device()
 
@@ -251,15 +255,18 @@ class Audio:
     def get_audio_device(self, input_index = None, output_index = None):
         """Looks up specific input and output devices by index from the verified available device list."""
 
-        audioinput, audiooutput = list_audio_device()
+        global input_devices, output_devices
+
+        if input_devices is None or output_devices is None:
+            input_devices, output_devices = list_audio_device()
 
         inputs, outputs = (
             [
-                x for x in audioinput 
+                x for x in input_devices 
                 if x.index == input_index
             ] if input_index is not None else [],
             [
-                x for x in audiooutput 
+                x for x in output_devices 
                 if x.index == output_index
             ] if output_index is not None else []
         )

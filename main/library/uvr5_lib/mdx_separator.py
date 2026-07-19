@@ -53,10 +53,11 @@ class MDXSeparator(CommonSeparator):
         if self.segment_size == self.dim_t:
             ort_session_options = ort.SessionOptions()
             ort_session_options.log_severity_level = 3 # Keep logging minimal (errors only)
+            if self.onnx_execution_provider[0][0].startswith("Tensorrt"): ort_session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
             # Instantiate the execution session mapping to user hardware targets
             ort_inference_session = ort.InferenceSession(self.model_path, providers=self.onnx_execution_provider, sess_options=ort_session_options)
-            device = "cuda" if self.onnx_execution_provider[0][0].startswith("CUDA") else "cpu"
+            device = "cuda" if self.onnx_execution_provider[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
 
             def run_io(spek):
                 """
@@ -75,7 +76,7 @@ class MDXSeparator(CommonSeparator):
                 return io_binding.get_outputs()[0].numpy()
 
             # Dynamic assignment of the execution lambda depending on hardware compatibility
-            self.model_run = lambda spek: run_io(spek) if self.onnx_execution_provider[0][0].startswith(("CUDA", "CPU")) else ort_inference_session.run(None, {"input": spek.cpu().numpy()})[0]
+            self.model_run = lambda spek: run_io(spek) if self.onnx_execution_provider[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else ort_inference_session.run(None, {"input": spek.cpu().numpy()})[0]
         else:
             # Fallback Pipeline: Convert ONNX graphs to native PyTorch modules for flexible segment window slicing
             self.model_run = onnx2torch.convert(onnx.load(self.model_path)) if platform.system() == 'Windows' else onnx2torch.convert(self.model_path)

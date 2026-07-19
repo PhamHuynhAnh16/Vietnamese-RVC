@@ -422,6 +422,7 @@ class FCPE:
             # Setup configuration optimized execution boundaries for ONNX runtimes
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3
+            if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             # Decrypt parameters safely and initialize session state contexts
             # My FCPE ONNX models previously encountered issues with Hugging Face, so I chose to encode the models to ensure compatibility.
             # I haven't tried it again since then to see if the problem persists.
@@ -464,11 +465,11 @@ class FCPE:
         
         self.model = model
         # Identify standard processing target strings for system contexts
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         # Preallocate memory buffers depending on execution driver features
-        self._threshold = (torch.zeros((), device=self.device, dtype=torch.float32) if providers[0][0].startswith(("CUDA", "CPU")) else np.empty((), dtype=np.float32)) if onnx else None
+        self._threshold = (torch.zeros((), device=self.device, dtype=torch.float32) if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else np.empty((), dtype=np.float32)) if onnx else None
         # Explicitly assign function execution routing pathways to minimize checking costs
-        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
+        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
     
     def compute_f0(self, wav):
         """

@@ -64,6 +64,7 @@ class DJCM:
 
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3 # Disable verbose logs
+            if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         else:
             from main.library.predictors.DJCM.model import DJCMM
@@ -93,9 +94,9 @@ class DJCM:
         self.offsets = torch.arange(-4, 5, device=device) if return_tensor else np.arange(-4, 5)
 
         # Method routers map to corresponding efficient execution branches
-        self._device = "cuda" if providers[0][0].startswith("CUDA") else "cpu"
+        self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         self.to_local_average_cents = self._to_local_average_cents_tensor if return_tensor else self._to_local_average_cents_array
-        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
+        self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
 
     def infer_from_audio(self, audio, thred=0.03):
         """
