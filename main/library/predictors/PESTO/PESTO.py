@@ -144,7 +144,7 @@ class PESTO:
         io_binding.bind_output(name="conf", device_type=self._device, device_id=device_idx)
         self.model.run_with_iobinding(io_binding)
 
-        return torch.tensor(io_binding.get_outputs()[0].numpy(), device=self.device), torch.tensor(io_binding.get_outputs()[1].numpy(), device=self.device)
+        return torch.from_dlpack(io_binding.get_outputs()[0]).to(device=self.device, dtype=torch.float32), torch.from_dlpack(io_binding.get_outputs()[1]).to(device=self.device, dtype=torch.float32)
 
     def _infer_torch_fp32(self, x):
         """Executes native single-precision FP32 PyTorch inference evaluations."""

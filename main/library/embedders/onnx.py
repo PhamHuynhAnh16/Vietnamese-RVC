@@ -1,5 +1,5 @@
 import torch
-import onnxruntime
+import onnxruntime as ort
 
 import numpy as np
 
@@ -28,11 +28,11 @@ class HubertModelONNX:
         """
 
         # Configure session options to minimize logging verbosity (3 = ERROR level)
-        sess_options = onnxruntime.SessionOptions()
+        sess_options = ort.SessionOptions()
         sess_options.log_severity_level = 3
-        if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         # Initialize the ONNX Runtime Inference Session
-        self.model = onnxruntime.InferenceSession(
+        self.model = ort.InferenceSession(
             embedder_model_path, 
             sess_options=sess_options, 
             providers=providers
@@ -126,11 +126,4 @@ class HubertModelONNX:
         # Execute model inference with bindings
         self.model.run_with_iobinding(io_binding)
 
-        # Retrieve outputs and convert back to the desired PyTorch configuration
-        return [
-            torch.as_tensor(
-                io_binding.get_outputs()[int(self._final_proj)].numpy(), 
-                dtype=dtype, 
-                device=self.device
-            )
-        ]
+        return [torch.from_dlpack(io_binding.get_outputs()[int(self._final_proj)]).to(device=self.device, dtype=dtype)]

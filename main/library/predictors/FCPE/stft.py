@@ -85,7 +85,7 @@ class STFT:
                 win_length=self.win_size,
             ).to(pad.device)
 
-        return self.stft.transform(pad, center=center, eps=1e-5)
+        return self.stft.transform(pad, center=center, eps=1e-9)
 
     def _stft_torch(self, pad, center=True):
         """Executes native optimized PyTorch STFT calculations."""
@@ -141,7 +141,7 @@ class Wav2Mel:
         """
 
         # Transfer input data variables onto target computational devices and types
-        audio = audio.to(self.dtype).to(self.device)
+        audio = audio.to(device=self.device, dtype=self.dtype)
         # Extract features and transpose axis format
         mel = self.stft.get_mel(audio).transpose(1, 2)
 

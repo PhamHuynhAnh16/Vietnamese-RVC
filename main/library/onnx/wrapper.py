@@ -1,8 +1,8 @@
 import json
 import torch
-import onnxruntime
 
 import numpy as np
+import onnxruntime as ort
 
 class ONNXRVC:
     """
@@ -28,11 +28,11 @@ class ONNXRVC:
         """
 
         # Configure the Session options to limit log pollution
-        sess_options = onnxruntime.SessionOptions()
+        sess_options = ort.SessionOptions()
         sess_options.log_severity_level = log_severity_level
-        if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        if providers[0][0].startswith("Tensorrt"): sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         # Initialize the actual core ONNX computational runtime session
-        self.net_g = onnxruntime.InferenceSession(
+        self.net_g = ort.InferenceSession(
             model_path, 
             sess_options=sess_options, 
             providers=providers
@@ -167,5 +167,4 @@ class ONNXRVC:
         # Direct zero-copy inference execution step
         self.net_g.run_with_iobinding(io_binding)
 
-        # Collect target array and safely encapsulate inside PyTorch tensor structures
-        return torch.from_numpy(io_binding.get_outputs()[0].numpy()).to(self.device)
+        return torch.from_dlpack(io_binding.get_outputs()[0]).to(device=self.device)

@@ -29,6 +29,7 @@ assets/logs
 assets/models
 assets/weights
 assets/cache
+assets/tensorrt
 assets/.uv
 
 .vscode

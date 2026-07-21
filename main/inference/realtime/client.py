@@ -39,9 +39,9 @@ async def change_config(ws: WebSocket):
     jsons = json.loads(text)
 
     # Distinguish standard execution settings from extra dictionary keyword arguments (kwargs)
-    if jsons["if_kwargs"]:
+    if jsons["if_kwargs"] and jsons["value"] is not None:
         params["kwargs"][jsons["key"]] = jsons["value"]
-    else:
+    elif jsons["value"] is not None:
         params[jsons["key"]] = jsons["value"]
 
     # Calculate overlapping structure size windows mapped against the target system sample rate

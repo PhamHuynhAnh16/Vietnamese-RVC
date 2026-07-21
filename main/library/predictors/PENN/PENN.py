@@ -251,11 +251,7 @@ class PENN:
         io_binding.bind_output(name="f0", device_type=self._device, device_id=device_idx)
         self.model.run_with_iobinding(io_binding)
 
-        return torch.tensor(
-            io_binding.get_outputs()[0].numpy(),
-            device=self.device,
-            dtype=torch.float32
-        )
+        return torch.from_dlpack(io_binding.get_outputs()[0]).to(device=self.device, dtype=torch.float32)
 
     def _infer_torch_fp32(self, frames):
         """Executes standard single-precision FP32 PyTorch forward inference passes."""

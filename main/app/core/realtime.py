@@ -211,9 +211,9 @@ window.getAudioDevices = async function() {
     
     for (const device of devices) {
         if (device.kind === "audioinput") {
-            inputs[device.label] = device.deviceId
+        inputs[device.label + ` (${device.deviceId.slice(0, 10)})`] = device.deviceId;
         } else if (device.kind === "audiooutput") {
-            outputs[device.label] = device.deviceId
+        outputs[device.label + ` (${device.deviceId.slice(0, 10)})`] = device.deviceId;
         }
     }
 
@@ -581,7 +581,11 @@ window.StopAudioStream = async function() {
         if (window.OutputAudioRoute) window.OutputAudioRoute = null;
         if (window.MonitorAudioRoute) window.MonitorAudioRoute = null;
 
-        document.querySelectorAll('audio').forEach(a => a.remove());
+        document.querySelectorAll("audio").forEach((a) => {
+        a.pause();
+        a.srcObject = null;
+        a.remove();
+        });
         setStatus("__REALTIME_HAS_STOP__", false);
 
         return {"start_button": true, "stop_button": false};
@@ -1311,9 +1315,9 @@ def change_config(value, key, if_kwargs=False):
     global callbacks_kwargs
 
     if running and realtime_process is not None and realtime_process.is_alive():
-        if if_kwargs:
+        if if_kwargs and value is not None:
             callbacks_kwargs["kwargs"][key] = value
-        else:
+        elif value is not None:
             callbacks_kwargs[key] = value
 
         # Push mutations directly to the background configuration channel

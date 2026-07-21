@@ -1,6 +1,5 @@
-import onnxruntime
-
 import numpy as np
+import onnxruntime as ort
 
 SAMPLE_RATE, HOP_LENGTH, FRAME_LENGTH = 16000, 256, 1024
 
@@ -37,16 +36,16 @@ class SWIFT:
         self.confidence_threshold = confidence_threshold
 
         # 1. Parameterize runtime execution threads to enforce deterministic serialization benchmarks
-        session_options = onnxruntime.SessionOptions()
+        session_options = ort.SessionOptions()
         session_options.inter_op_num_threads = 1
         session_options.intra_op_num_threads = 1
         session_options.log_severity_level = 3 # Suppress non-critical warning alerts
-        if providers[0][0].startswith("Tensorrt"): session_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        if providers[0][0].startswith("Tensorrt"): session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
         # 2. Track device context variables depending on target hardware strings
         self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         # 3. Compile backend runtime graph engine structures
-        self.model = onnxruntime.InferenceSession(model_path, session_options, providers=providers)
+        self.model = ort.InferenceSession(model_path, session_options, providers=providers)
         # 4. Bind dynamic pointer configurations for execution loops based on device types
         self._extract_pitch_and_confidence = self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io
 

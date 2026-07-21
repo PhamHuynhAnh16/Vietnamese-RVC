@@ -223,11 +223,7 @@ class DJCM:
         io_binding.bind_output(name="f0", device_type=self._device, device_id=device_idx)
         self.model.run_with_iobinding(io_binding)
 
-        return torch.as_tensor(
-            io_binding.get_outputs()[0].numpy(), 
-            device=self.device,
-            dtype=self.dtype
-        )
+        return torch.from_dlpack(io_binding.get_outputs()[0]).to(device=self.device, dtype=self.dtype)
 
     def _to_local_average_cents_array(self, salience, thred=0.05):
         """Decodes pitch tracking salience into smooth cents via NumPy arrays."""

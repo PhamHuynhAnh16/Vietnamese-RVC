@@ -520,11 +520,7 @@ class FCPE:
         io_binding.bind_output(name="pitchf", device_type=self._device, device_id=device_idx)
         self.model.run_with_iobinding(io_binding)
 
-        return torch.as_tensor(
-            io_binding.get_outputs()[0].numpy(), 
-            dtype=torch.float32, 
-            device=self.device
-        ) 
+        return torch.from_dlpack(io_binding.get_outputs()[0]).to(device=self.device, dtype=torch.float32)
 
     def _infer_torch_fp32(self, mel, threshold):
         """Standard PyTorch inference runner using FP32 precision."""

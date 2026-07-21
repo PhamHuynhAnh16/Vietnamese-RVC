@@ -308,7 +308,4 @@ class CREPE:
         io_binding.bind_output(name="f0", device_type=self._device, device_id=device_idx)
         self.model.run_with_iobinding(io_binding)
 
-        return torch.tensor(
-            io_binding.get_outputs()[0].numpy(),
-            device=self.device
-        )
+        return torch.from_dlpack(io_binding.get_outputs()[0]).to(device=self.device)

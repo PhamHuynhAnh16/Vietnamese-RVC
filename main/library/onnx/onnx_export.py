@@ -146,6 +146,7 @@ def onnx_exporter(input_path, output_path, is_half=False, int8_mode=False, devic
     # Switch model to evaluation state, transfer to target device, and assign float precision
     net_g.eval().to(device).to(torch.float16 if is_half else torch.float32)
     net_g.remove_weight_norm()
+    del net_g.enc_q
     # Apply global dynamic casting wrapper if working with float16 targets
     if is_half: net_g = autocast(net_g)
 
