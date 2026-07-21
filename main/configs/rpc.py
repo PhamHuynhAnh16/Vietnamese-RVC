@@ -39,26 +39,56 @@ def create_payload(opcode, payload):
         len(data)
     ) + data
 
+def get_discord_ipc_path():
+    """
+    Locates the active Discord IPC socket path on Linux/macOS.
+
+    Returns:
+        Optional[str]: Full path to the active IPC socket, or None if not found.
+    """
+
+    env_vars = ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"]
+    base_dirs = [os.environ.get(var) for var in env_vars if os.environ.get(var)]
+    base_dirs.append("/tmp")
+
+    for base_dir in base_dirs:
+        for i in range(10):
+            path = os.path.join(base_dir, f"discord-ipc-{i}")
+            if os.path.exists(path): return path
+
+            app_path = os.path.join(base_dir, "app", "com.discordapp.Discord", f"discord-ipc-{i}")
+            if os.path.exists(app_path): return app_path
+
+    return None
+
 def connect_discord_ipc():
     """
     Attempts to establish a connection to the local Discord desktop client 
-    via Windows Named Pipes (IPC slot 0).
+    via Windows Named Pipes or Linux Unix Domain Sockets automatically based on OS.
 
     Returns:
-        Optional[BinaryIO]: A file-like stream object mapped to the pipe if successful, otherwise None.
+        Optional[Union[BinaryIO, socket.socket]]: Connected pipe/socket object if successful, otherwise None.
     """
 
-    try:
-        # Open Discord's default local named pipe in read/write binary mode
-        # Setting buffering=0 ensures unbuffered instantaneous transmission
+    if sys.platform == "win32":
+        for i in range(10):
+            try:
+                return open(f"\\\\?\\pipe\\discord-ipc-{i}", "r+b", buffering=0)
+            except Exception:
+                continue
 
-        return open(
-            r"\\?\pipe\discord-ipc-0", 
-            "r+b", 
-            buffering=0
-        )
+        return None
+
+    import socket
+
+    ipc_path = get_discord_ipc_path()
+    if not ipc_path: return None
+
+    try:
+        client_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client_socket.connect(ipc_path)
+        return client_socket
     except Exception:
-        # Fallback if Discord isn't running or the pipe slot is busy/unavailable
         return None
 
 def send_discord_rpc(pipe):
@@ -67,11 +97,17 @@ def send_discord_rpc(pipe):
     Rich Presence activity update to the connected Discord client stream.
 
     Args:
-        pipe (BinaryIO): Active open binary stream linked to Discord's IPC.
+        pipe (Union[BinaryIO, socket.socket]): Active open binary stream or socket linked to Discord's IPC.
     """
 
+    def write_data(data):
+        pipe.write(data) if hasattr(pipe, "write") else pipe.sendall(data)
+
+    def read_data(length):
+        return pipe.read(length) if hasattr(pipe, "read") else pipe.recv(length)
+
     # Send Opcode 0 (Handshake) along with our application client registration ID
-    pipe.write(
+    write_data(
         create_payload(
             0, {
                 "v": 1, 
@@ -80,19 +116,14 @@ def send_discord_rpc(pipe):
         )
     )
 
-    # Read and discard the incoming response header (first 8 bytes contains Opcode & Length)
-    pipe.read(8)
-    # Dynamically extract and read the remaining body data based on incoming length
-    # Note: original sequential code read header info inline to uncover payload size safely
-    pipe.read(
-        struct.unpack(
-            "<I", 
-            pipe.read(4)
-        )[0]
-    )
+    # Read and process incoming response header (first 8 bytes: Opcode & Length)
+    header = read_data(8)
+    if len(header) == 8:
+        _, length = struct.unpack("<II", header)
+        if length > 0: read_data(length)
 
     # Send Opcode 1 (Frame) passing the SET_ACTIVITY command arguments
-    pipe.write(
+    write_data(
         create_payload(
             1, {
                 "cmd": "SET_ACTIVITY",
