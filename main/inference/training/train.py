@@ -35,7 +35,7 @@ from main.inference.training.data_utils import get_training_dataloader
 from main.inference.training.mel_processing import MultiScaleMelSpectrogramLoss, mel_spectrogram_torch, spec_to_mel_torch
 
 from main.library.algorithm import commons
-from main.inference.training import utils, losses, detector
+from main.inference.training import utils, losses
 
 from main.app.variables import config as main_config
 from main.app.variables import configs as main_configs
@@ -66,8 +66,6 @@ def parse_arguments():
     parser.add_argument("--pitch_guidance", type=lambda x: bool(strtobool(x)), default=True)
     parser.add_argument("--g_pretrained_path", type=str, default="")
     parser.add_argument("--d_pretrained_path", type=str, default="")
-    parser.add_argument("--overtraining_detector", type=lambda x: bool(strtobool(x)), default=False)
-    parser.add_argument("--overtraining_threshold", type=int, default=50)
     parser.add_argument("--cleanup", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--cache_data_in_gpu", type=lambda x: bool(strtobool(x)), default=False)
     parser.add_argument("--model_author", type=str)
@@ -107,8 +105,6 @@ args = parse_arguments()
     save_only_latest, 
     save_every_weights, 
     cache_data_in_gpu, 
-    overtraining_detector, 
-    overtraining_threshold, 
     cleanup, 
     model_author, 
     vocoder, 
@@ -139,8 +135,6 @@ args = parse_arguments()
     args.save_only_latest, 
     args.save_every_weights, 
     args.cache_data_in_gpu, 
-    args.overtraining_detector, 
-    args.overtraining_threshold, 
     args.cleanup, 
     args.model_author, 
     args.vocoder, 
@@ -184,7 +178,6 @@ else:
     custom_save_checkpoint_path = weights_path
 
 # Bind execution file structures based on routing priorities
-training_file_path = os.path.join(experiment_dir, "training_data.json")
 checkpoint_path = experiment_dir if custom_save_checkpoint_path is None else custom_save_checkpoint_path
 config_save_path = config_save_path if custom_training else os.path.join(experiment_dir, "config.json")
 filelist_path = filelist_path if custom_training else os.path.join(experiment_dir, "filelist.txt")
@@ -208,7 +201,6 @@ torch.backends.cudnn.allow_tf32 = main_config.tf32 if backend_supported else Fal
 # Tracker initialization parameters
 global_step = 0
 lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
-loss_gen_history, smoothed_loss_gen_history, loss_disc_history, smoothed_loss_disc_history = [], [], [], []
 
 # Use historical deques to safely track rolling metric configurations
 avg_losses = {
@@ -235,7 +227,7 @@ def main():
     dataset sample rate validation, and launches parallel sub-process pools.
     """
 
-    global smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history, gpus
+    global gpus
 
     # Formulate log dictionary mapped against localized string definitions
     log_data = {
@@ -250,8 +242,6 @@ def main():
         translations["save_only_latest"]: save_only_latest, 
         translations["save_every_weights"]: save_every_weights, 
         translations["cache_in_gpu"]: cache_data_in_gpu, 
-        translations["overtraining_detector"]: overtraining_detector, 
-        translations["threshold"]: overtraining_threshold, 
         translations["cleanup_training"]: cleanup, 
         translations["memory_efficient_training"]: checkpointing, 
         translations["optimizer"]: optimizer_choice, 
@@ -287,8 +277,6 @@ def main():
 
         # Clear historical states if requested
         if cleanup: utils.cleanup_training(experiment_dir)
-        # Restore rolling historical states for early stopping evaluation
-        if overtraining_detector and os.path.exists(training_file_path): smoothed_loss_gen_history, loss_gen_history, loss_disc_history, smoothed_loss_disc_history = detector.continue_overtrain_detector(training_file_path)
 
         def start():
             """Spawns parallel training processes across designated target hardware devices."""
@@ -351,9 +339,8 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
     restores checkpoints, and manages the training loop across epochs.
     """
 
-    global global_step, smoothed_value_gen, smoothed_value_disc
+    global global_step
 
-    smoothed_value_gen, smoothed_value_disc = 0, 0
     # Initialize PyTorch Distributed Process Groups
     dist.init_process_group(
         backend="gloo" if sys.platform == "win32" or device.type not in ["cuda", "xpu"] else ("xccl" if device.type == "xpu" else "nccl"), 
@@ -492,12 +479,9 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
 def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler, train_loader, writer, cache, custom_save_every_weights, custom_total_epoch, device, device_id, reference, fn_mel_loss):
     """Executes step optimizations for both Generator and Discriminator components within an epoch."""
 
-    global global_step, lowest_value, loss_disc, consecutive_increases_gen, consecutive_increases_disc, smoothed_value_gen, smoothed_value_disc
+    global global_step, lowest_value, loss_disc
 
-    if epoch == 1:
-        lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
-        consecutive_increases_gen, consecutive_increases_disc = 0, 0
-
+    if epoch == 1: lowest_value = {"step": 0, "value": float("inf"), "epoch": 0}
     # Align dataloader shuffling tracking with epoch counts for standard setups
     if architecture != "SVC": train_loader.batch_sampler.set_epoch(epoch)
     net_g.train(); net_d.train()
@@ -652,46 +636,11 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
 
             if custom_save_every_weights: model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth"))
 
-        # Monitor divergence characteristics via Automated Early Stopping Checks
-        if overtraining_detector and epoch > 1:
-            current_loss_disc, current_loss_gen = float(loss_disc), float(lowest_value["value"])
-            loss_disc_history.append(current_loss_disc)
-            loss_gen_history.append(current_loss_gen)
-            
-            (
-                smoothed_value_disc, 
-                smoothed_value_gen, 
-                is_overtraining_disc, 
-                is_overtraining_gen, 
-                consecutive_increases_disc, 
-                consecutive_increases_gen
-            ) = detector.overtraining_detector(
-                smoothed_loss_disc_history, 
-                current_loss_disc, 
-                smoothed_loss_gen_history, 
-                current_loss_gen, 
-                overtraining_threshold,
-                consecutive_increases_disc,
-                consecutive_increases_gen
-            )
-
-            if epoch % save_every_epoch == 0: detector.save_to_json(training_file_path, loss_disc_history, smoothed_loss_disc_history, loss_gen_history, smoothed_loss_gen_history)
-            # Check early termination flags based on trend thresholds
-            if is_overtraining_gen and consecutive_increases_gen == overtraining_threshold or is_overtraining_disc and consecutive_increases_disc == (overtraining_threshold * 2):
-                logger.info(translations["overtraining_find"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
-                done = True
-            else:
-                logger.info(translations["best_epoch"].format(epoch=epoch, smoothed_value_gen=f"{smoothed_value_gen:.3f}", smoothed_value_disc=f"{smoothed_value_disc:.3f}"))
-                # Maintain a clean workspace by purging outdated intermediate weight paths
-                for file in glob.glob(os.path.join(weights_path, f"{model_name}_*e_*s_best_epoch.pth")):
-                    model_del.append(file)
-
-                model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s_best_epoch.pth"))
-        
+        lowest_value_rounded = round(lowest_value["value"].detach().item(), 3)
         # Standard workflow completion criteria check
         if epoch >= custom_total_epoch:
             logger.info(translations["success_training"].format(epoch=epoch, global_step=global_step, loss_gen_all=round(loss_gen_all.item(), 3)))
-            logger.info(translations["training_info"].format(lowest_value_rounded=round(float(lowest_value["value"]), 3), lowest_value_epoch=lowest_value['epoch'], lowest_value_step=lowest_value['step']))
+            logger.info(translations["training_info"].format(lowest_value_rounded=lowest_value_rounded, lowest_value_epoch=lowest_value['epoch'], lowest_value_step=lowest_value['step']))
             model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth"))
             done = True
             
@@ -719,27 +668,10 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
                     architecture=architecture
                 )
 
-        lowest_value_rounded = round(float(lowest_value["value"]), 3)
         # Output generalized execution summary statistics depending on tracking contexts
-        if epoch > 1 and overtraining_detector: 
+        if epoch > 1: 
             logger.info(
-                translations["model_training_info"].format(
-                    model_name=model_name, 
-                    epoch=epoch, 
-                    global_step=global_step, 
-                    epoch_recorder=epoch_recorder.record(), 
-                    lowest_value_rounded=lowest_value_rounded, 
-                    lowest_value_epoch=lowest_value['epoch'], 
-                    lowest_value_step=lowest_value['step'], 
-                    remaining_epochs_gen=overtraining_threshold - consecutive_increases_gen, 
-                    remaining_epochs_disc=(overtraining_threshold * 2) - consecutive_increases_disc, 
-                    smoothed_value_gen=f"{smoothed_value_gen:.3f}", 
-                    smoothed_value_disc=f"{smoothed_value_disc:.3f}"
-                )
-            )
-        elif epoch > 1 and not overtraining_detector: 
-            logger.info(
-                translations["model_training_info_2"].format(
+                translations["model_training_info_1"].format(
                     model_name=model_name, 
                     epoch=epoch, 
                     global_step=global_step, 
@@ -749,7 +681,15 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
                     lowest_value_step=lowest_value['step']
                 )
             )
-        else: logger.info(translations["model_training_info_3"].format(model_name=model_name, epoch=epoch, global_step=global_step, epoch_recorder=epoch_recorder.record()))
+        else: 
+            logger.info(
+                translations["model_training_info_2"].format(
+                    model_name=model_name, 
+                    epoch=epoch, 
+                    global_step=global_step, 
+                    epoch_recorder=epoch_recorder.record()
+                )
+            )
 
         logger.debug(f"loss_gen_all: {loss_gen_all} loss_gen: {loss_gen} loss_fm: {loss_fm} loss_mel: {loss_mel} loss_kl: {loss_kl}")
 

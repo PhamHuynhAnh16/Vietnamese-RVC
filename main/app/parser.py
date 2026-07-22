@@ -323,14 +323,10 @@ elif argv_help_is_allows[7] == argv:
             - `--vocoder` (mặc định: `Default`): Bộ mã hóa được sử dụng (`Default`, `MRF-HiFi-GAN`, `RefineGAN`).
             - `--architecture` (mặc định: `RVC`): Kiến trúc của mô hình giọng nói (`RVC`, `SVC`).
 
-        6. Phát hiện huấn luyện quá mức:
-            - `--overtraining_detector` (mặc định: `False`): Bật/tắt chế độ phát hiện huấn luyện quá mức.
-            - `--overtraining_threshold` (mặc định: `50`): Ngưỡng để xác định huấn luyện quá mức.
-
-        7. Xử lí dữ liệu:
+        6. Xử lí dữ liệu:
             - `--cleanup` (mặc định: `False`): Dọn dẹp tệp huấn luyện cũ để tiến hành huấn luyện lại từ đầu.
 
-        8. Tối ưu:
+        7. Tối ưu:
             - `--checkpointing` (mặc định: `False`): Bật/tắt checkpointing để tiết kiệm RAM.
             - `--deterministic` (mặc định: `False`): Khi bật sẽ sử dụng các thuật toán có tính xác định cao, đảm bảo rằng mỗi lần chạy cùng một dữ liệu đầu vào sẽ cho kết quả giống nhau.
             - `--benchmark` (mặc định: `False`): Khi bật sẽ thử nghiệm và chọn thuật toán tối ưu nhất cho phần cứng và kích thước cụ thể.
@@ -338,11 +334,11 @@ elif argv_help_is_allows[7] == argv:
             - `--multiscale_mel_loss` (mặc định: `False`): So sánh phổ Mel của âm thanh thật và âm thanh giả ở nhiều thang độ khác nhau. Giúp mô hình học được chi tiết âm sắc, độ sáng và cấu trúc tần số tốt hơn, từ đó cải thiện chất lượng và độ tự nhiên của giọng nói đầu ra.
             - `--use_cosine_annealing_lr` (mặc định: `False`): Sử dụng phương pháp giảm LR bằng Cosine Annealing có thể giúp cải thiện chất lượng phát âm.
           
-        9. Bộ tham chiếu:
+        8. Bộ tham chiếu:
             - `--use_custom_reference` (mặc định: `False`): Có tùy chỉnh bộ tham chiếu hay không.
             - `--reference_path` (mặc định: `False`): Đường dẫn đến bộ tham chiếu.
         
-        10. Tùy chỉnh nâng cao:
+        9. Tùy chỉnh nâng cao:
             - `--filelist_path` (mặc định: ""): Đường dẫn tệp chứa các đường dẫn tệp âm thanh, F0 và đặc tính âm thanh.
             - `--config_save_path` (mặc định: ""): Đường dẫn tệp cấu hình huấn luyện.
             - `--spec_dir` (mặc định: ""): Đường dẫn lưu trữ và tái sử dụng các tệp phổ.

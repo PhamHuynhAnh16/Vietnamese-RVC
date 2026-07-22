@@ -382,12 +382,6 @@ def training_model_tab():
                             value=True, 
                             interactive=True
                         )
-                        overtraining_detector = gr.Checkbox(
-                            label=translations["overtraining_detector"], 
-                            info=translations["overtraining_detector_info"], 
-                            value=False, 
-                            interactive=True
-                        )
                     with gr.Row():
                         custom_dataset = gr.Checkbox(
                             label=translations["custom_dataset"], 
@@ -462,16 +456,6 @@ def training_model_tab():
                                 info=translations["overlap_length_info"], 
                                 interactive=True
                             )
-                        threshold = gr.Slider(
-                            minimum=1, 
-                            maximum=100, 
-                            value=50, 
-                            step=1, 
-                            label=translations["threshold"], 
-                            info=translations["overtraining_threshold"],
-                            interactive=True, 
-                            visible=False
-                        )
                         with gr.Accordion(
                             translations["setting_cpu_gpu"], 
                             open=False
@@ -714,15 +698,6 @@ def training_model_tab():
                 upload_dataset
             ]
         ) 
-        overtraining_detector.change(
-            fn=visible, 
-            inputs=[
-                overtraining_detector
-            ], 
-            outputs=[
-                threshold
-            ]
-        )
         clean_dataset.change(
             fn=visible, 
             inputs=[
@@ -954,8 +929,6 @@ def training_model_tab():
                 custom_pretrain,
                 pretrained_G,
                 pretrained_D,
-                overtraining_detector,
-                threshold,
                 cleanup_training,
                 cache_in_gpu,
                 model_author,
