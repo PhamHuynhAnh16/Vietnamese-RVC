@@ -127,7 +127,7 @@ def install_cuda(version = "cu118"):
         run_command(f"{python_dir} -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/{version}")
     
     # Install matching CUDA-optimized ONNX Runtime build
-    run_command(f"{python_dir} -m uv pip install onnxruntime-gpu" + ("==1.20.1" if version in ("cu118", "cu121") else "==1.22.0"))
+    run_command(f"{python_dir} -m uv pip install onnxruntime-gpu" + ("==1.20.1" if version in ("cu118", "cu121") else "==1.26.0"))
     run_command(f"{python_dir} -m uv pip install -r requirements.txt")
 
     # Faiss-cpu is required as fallback/index handler for newer CUDA suites

@@ -75,7 +75,7 @@ env\Scripts\python.exe -m uv pip install -r requirements.txt
 ```
 env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
 env\Scripts\python.exe -m uv pip install torch==2.7.1 torchaudio==2.7.1 torchvision --index-url https://download.pytorch.org/whl/cu128
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.22.0
+env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.26.0
 env\Scripts\python.exe -m uv pip install -r requirements.txt
 env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
 ```
@@ -85,7 +85,7 @@ env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
 ```
 env\Scripts\python.exe -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
 env\Scripts\python.exe -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu130
-env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.22.0
+env\Scripts\python.exe -m uv pip install onnxruntime-gpu==1.26.0
 env\Scripts\python.exe -m uv pip install -r requirements.txt
 env\Scripts\python.exe -m uv pip install faiss-cpu==1.13.2
 ```
@@ -318,7 +318,7 @@ python -m uv pip install -r requirements.txt
 ```
 python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
 python -m uv pip install torch==2.7.1 torchaudio==2.7.1 torchvision --index-url https://download.pytorch.org/whl/cu128
-python -m uv pip install onnxruntime-gpu==1.22.0
+python -m uv pip install onnxruntime-gpu==1.26.0
 python -m uv pip install -r requirements.txt
 python -m uv pip install faiss-cpu==1.13.2
 ```
@@ -328,7 +328,7 @@ python -m uv pip install faiss-cpu==1.13.2
 ```
 python -c "from main.app.install import remove_onnxruntime;remove_onnxruntime()"
 python -m uv pip install torch torchaudio torchvision --index-url https://download.pytorch.org/whl/cu130
-python -m uv pip install onnxruntime-gpu==1.22.0
+python -m uv pip install onnxruntime-gpu==1.26.0
 python -m uv pip install -r requirements.txt
 python -m uv pip install faiss-cpu==1.13.2
 ```

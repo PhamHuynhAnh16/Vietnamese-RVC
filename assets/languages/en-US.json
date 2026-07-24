@@ -151,7 +151,7 @@
     "main_convert": "Convert main voice",
     "main_or_backing": "Main voice + Backup voice",
     "voice_or_instruments": "Voice + Instruments",
-    "convert_text": "Convert Text",
+    "convert_text": "Text to Speech",
     "convert_text_markdown": "## Convert Text to Speech",
     "convert_text_markdown_2": "Convert text to speech and read aloud using the trained voice model",
     "input_txt": "Input data from a text file",

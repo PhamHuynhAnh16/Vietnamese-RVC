@@ -65,6 +65,7 @@ class Config:
         # Determine structural support based on current active device
         self.tf32_support = self.device.startswith("cuda") and self.cuda_tf32
         self.bf16_support = self.device.startswith(("cuda", "xpu")) and (self.cuda_bf16 or self.xpu_fp16)
+        if not hasattr(onnxruntime.OrtValue, "__dlpack__"): torch.from_dlpack = lambda value: torch.from_numpy(value.numpy())
         # Apply optimal math precision modes (Bfloat16 / TensorFloat32)
         self.brain = self.configs.get("brain", False) and self.bf16_support and not self.cpu_mode
         self.tf32 = self.configs.get("tf32", False) and self.tf32_support and not self.is_zluda and not self.cpu_mode
