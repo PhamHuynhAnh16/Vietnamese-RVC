@@ -796,5 +796,6 @@
     "realtime_has_terminate": "Process terminated!",
     "int8_warn": "Warning: TensorRT does not support QOperator INT8 models!",
     "phase_vocoder": "Use Phase Vocoder",
-    "stop_pid": "Initiating process stop..."
+    "stop_pid": "Initiating process stop...",
+    "audio_upscaler_warn": "Skipping the audio upscaler due to insufficient VRAM."
 }

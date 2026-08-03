@@ -18,6 +18,7 @@ from scipy.signal import butter, cheby1, cheby2, ellip, bessel, sosfiltfilt, res
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
 from main.library.audio.features import mel
 from main.library.generators.bigvgan import UpSample1d, DownSample1d
 from main.library.algorithm.commons import init_weights, get_padding
@@ -1646,6 +1647,12 @@ class FlashSR:
         self.ddpm.to(dtype)
         self.sr_vocoder.to(dtype)
         self.autoencoder.to(dtype)
+
+        if config.compile_all:
+            self.ddpm = torch.compile(self.ddpm, mode=config.compile_mode)
+            self.sr_vocoder = torch.compile(self.sr_vocoder, mode=config.compile_mode)
+            self.autoencoder = torch.compile(self.autoencoder, mode=config.compile_mode)
+            self.util_mel_spec.stft_torch = torch.compile(self.util_mel_spec.stft_torch, mode=config.compile_mode)
 
     def _upscaler(self, lr_audio, num_steps = 1, lowpass_input = True, lowpass_cutoff_freq = None):
         """Internal worker core executing single window upscaling passes."""

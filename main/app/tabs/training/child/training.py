@@ -96,7 +96,7 @@ def training_model_tab():
                             pitch_guidance = gr.Checkbox(
                                 label=translations["training_pitch"], 
                                 value=True, 
-                                interactive=True
+                                interactive=False
                             )
                         with gr.Row():
                             custom_reference = gr.Checkbox(
@@ -634,24 +634,24 @@ def training_model_tab():
                                 visible=False
                             )
     with gr.Row():
-        vocoders.change(
-            fn=pitch_guidance_lock, 
-            inputs=[
-                vocoders
-            ], 
-            outputs=[
-                pitch_guidance
-            ]
-        )
-        pitch_guidance.change(
-            fn=vocoders_lock, 
-            inputs=[
-                pitch_guidance
-            ], 
-            outputs=[
-                vocoders
-            ]
-        )
+        # vocoders.change(
+        #     fn=pitch_guidance_lock, 
+        #     inputs=[
+        #         vocoders
+        #     ], 
+        #     outputs=[
+        #         pitch_guidance
+        #     ]
+        # )
+        # pitch_guidance.change(
+        #     fn=vocoders_lock, 
+        #     inputs=[
+        #         pitch_guidance
+        #     ], 
+        #     outputs=[
+        #         vocoders
+        #     ]
+        # )
         unlock_full_method.change(
             fn=unlock_f0, 
             inputs=[

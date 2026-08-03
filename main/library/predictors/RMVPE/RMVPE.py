@@ -87,14 +87,15 @@ class RMVPE:
         self.cents_mapping = np.pad(20 * np.arange(N_CLASS) + 1997.3794084376191, (4, 4))
         # Initialize native MelSpectrogram layer module on specified hardware target
         self.mel_extractor = MelSpectrogram(N_MELS, 16000, 1024, 160, 1024, 30, 8000).to(device)
+        if compile_model: self.mel_extractor.forward = torch.compile(self.mel_extractor.forward, mode=compile_mode)
         # If tensor tracking is requested, push tracking weights data array to target hardware execution context
-        if return_tensor: self.cents_mapping = torch.as_tensor(self.cents_mapping, dtype=self.dtype, device=device)
+        if return_tensor: self.cents_mapping = torch.from_numpy(self.cents_mapping).to(dtype=self.dtype, device=device)
 
         # Dynamically map processing handles and dynamic dispatch interfaces based on parameters
         self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
         self.mel2hidden = self._mel2hidden_chunk if enable_chunk else self._mel2hidden
         self.offsets = torch.arange(-4, 5, device=device) if return_tensor else np.arange(-4, 5)
-        self.to_local_average_cents = self._to_local_average_cents_tensor if return_tensor else self._to_local_average_cents_array
+        self.to_local_average_cents = (torch.compile(self._to_local_average_cents_tensor, mode=compile_mode) if compile_model else self._to_local_average_cents_tensor) if return_tensor else self._to_local_average_cents_array
         # Determine the runtime execution function depending on ONNX/PyTorch and Precision flags
         self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
 
@@ -191,13 +192,11 @@ class RMVPE:
         # Convert PyTorch Tensor input layout to native NumPy structures required by standard ONNX bindings
         mel = mel.cpu().numpy().astype(np.float32)
         # Run model session execution mapping arrays back onto standard Torch Tensor objects
-        return torch.as_tensor(
+        return torch.from_numpy(
             self.model.run(
                 ["f0"], {"mel": mel}
-            )[0], 
-            device=self.device,
-            dtype=self.dtype
-        )
+            )[0]
+        ).to(device=self.device, dtype=self.dtype)
 
     def _infer_onnx_io(self, mel):
         """Executes optimized ONNX Runtime inference using low-overhead I/O binding allocations."""

@@ -2,7 +2,6 @@ import os
 import sys
 import torch
 
-import numpy as np
 import torch.nn as nn
 
 sys.path.append(os.getcwd())
@@ -63,7 +62,7 @@ class Spectrogram(nn.Module):
         # Flatten the batch and channel axis down together to fit standard 2D signal entry profiles
         audio = audio.reshape(bs * c, segment_samples)
         # Calculate Short-Time Fourier Transform, transpose time/frequency axis, and floor low signals via clamp
-        mag = self.stftt(audio, center).transpose(1, 2).clamp(self.clamp, np.inf)
+        mag = self.stftt(audio, center).transpose(1, 2).clamp(self.clamp, torch.inf)
         # Unflatten and reconstruct structured dimensions back out to match incoming shapes
         return mag.reshape(bs, c, mag.shape[1], mag.shape[2])
 

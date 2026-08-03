@@ -5,7 +5,7 @@ import torch
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations, logger
+from main.app.variables import translations, logger, config
 
 class IndexWrapper:
     """
@@ -43,6 +43,8 @@ class IndexWrapper:
         self.dtype = torch.float16 if is_half else torch.float32
         # Dynamically map the main search execution routing function path
         self.search = self._search_cpu if faiss_cpu else self._search_gpu
+        self.addmm = torch.compile(torch.addmm, mode=config.compile_mode) if config.compile_all else torch.addmm
+        self.topk = torch.compile(torch.topk, mode=config.compile_mode) if config.compile_all else torch.topk
     
     def read_index(self):
         """
@@ -141,14 +143,14 @@ class IndexWrapper:
 
                 # 2. Perform matrix multiplication trick: distances = beta * ||B||^2 + alpha * (A @ B^T)
                 # Compiles down to a single optimized fused GPU calculation block
-                distances = torch.addmm(self.b_norms, query, self.big_tensor.T, alpha=-2.0, beta=1.0)
+                distances = self.addmm(self.b_norms, query, self.big_tensor.T, alpha=-2.0, beta=1.0)
 
                 # 3. Complete expansion: distances = (||B||^2 - 2AB^T) + ||A||^2
                 distances.add_(q_norm)
                 distances.clamp_(min=self.clamp) # Clamp to handle rounding anomalies
 
                 # 4. Extract smallest elements by utilizing TopK over negative fields
-                scores, indices = torch.topk(-distances, k=k, dim=-1)
+                scores, indices = self.topk(-distances, k=k, dim=-1)
                 return -scores, indices
             except (torch.OutOfMemoryError, RuntimeError):
                 # Gracefully intercept hardware runtime execution errors and trigger CPU routing routines

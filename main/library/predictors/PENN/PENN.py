@@ -8,11 +8,16 @@ import torch.nn.functional as F
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
 from main.library.algorithm.viterbi import viterbi
 from main.library.predictors.PENN.core import bins_to_cents, cents_to_frequency
 from main.library.predictors.PENN.core import PITCH_BINS, CENTS_PER_BIN, frequency_to_bins, entropy, interpolate
 
 SAMPLE_RATE, WINDOW_SIZE = 16000, 1024
+
+if config.compile_all:
+    viterbi = torch.compile(viterbi, mode=config.compile_mode)
+    interpolate = torch.compile(interpolate, mode=config.compile_mode)
 
 class Viterbi:
     """

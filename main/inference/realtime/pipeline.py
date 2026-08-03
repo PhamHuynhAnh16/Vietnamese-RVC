@@ -312,7 +312,7 @@ class Pipeline:
             feats0 = feats.detach().clone() if protect < 0.5 and self.use_f0 else None
 
             # Retrieve target vector traits from index to enhance accent/timbre fidelity
-            if self.index is not None and self.big_tsr  is not None and index_rate != 0:
+            if self.index is not None and self.big_tsr is not None and index_rate != 0:
                 try:
                     skip_offset = skip_head // 2
                     # Perform FAISS KNN query lookup on feature representations
@@ -337,11 +337,7 @@ class Pipeline:
                 pitchff[pitchf < 1] = protect
                 pitchff = pitchff.unsqueeze(-1)
 
-                feats0 = F.interpolate(
-                    feats0.permute(0, 2, 1), 
-                    scale_factor=2
-                ).permute(0, 2, 1)[:, :p_len, :]
-
+                feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)[:, :p_len, :]
                 feats = (feats * pitchff + feats0 * (1 - pitchff)).to(feats0.dtype)
 
             if self.use_f0: pitchf = pitchf.to(self.dtype)
@@ -380,12 +376,11 @@ class Pipeline:
 
             # Apply custom internal audio master board effects if present
             if board is not None: 
-                out_audio = torch.as_tensor(
+                out_audio = torch.from_numpy(
                     board(
                         out_audio.cpu().numpy(), 
                         self.tgt_sr
-                    ), 
-                    device=config.device
-                )
+                    )
+                ).to(config.device)
 
             return out_audio.float()

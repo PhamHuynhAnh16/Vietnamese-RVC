@@ -85,11 +85,9 @@ class HubertModelONNX:
 
         # Convert the chosen output back to a PyTorch tensor on the destination device
         return [
-            torch.as_tensor(
-                logits[int(self._final_proj)], 
-                dtype=dtype, 
-                device=self.device
-            )
+            torch.from_numpy(
+                logits[int(self._final_proj)]
+            ).to(dtype=dtype, device=self.device)
         ]
 
     def extract_features_io(self, source, output_layer = None):

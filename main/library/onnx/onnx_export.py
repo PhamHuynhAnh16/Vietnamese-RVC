@@ -94,7 +94,8 @@ def onnx_exporter(input_path, output_path, is_half=False, int8_mode=False, devic
     (
         model_name, 
         model_author, 
-        epochs, steps, 
+        epochs, 
+        steps, 
         version, 
         f0, 
         model_hash, 

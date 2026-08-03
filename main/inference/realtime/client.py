@@ -98,6 +98,8 @@ async def change_config(ws: WebSocket):
     if clean_audio is False:
         vc_instance.vc_model.tg = None
     elif clean_audio and vc_instance.vc_model.tg is None:
+        import torch
+
         from main.library.audio.noisereduce import TorchGate
 
         vc_instance.vc_model.tg = (
@@ -106,6 +108,8 @@ async def change_config(ws: WebSocket):
                 prop_decrease=clean_strength,
             ).to(config.device)
         )
+
+        if config.compile_all: vc_instance.vc_model.tg = torch.compile(vc_instance.vc_model.tg, mode=config.compile_mode)
 
     if vc_instance.vc_model.tg is not None:
         vc_instance.vc_model.tg.prop_decrease = clean_strength
@@ -143,16 +147,6 @@ async def change_config(ws: WebSocket):
             new_freq=vc_instance.vc_model.output_sample_rate,
             dtype=torch.float32
         ).to(config.device)
-
-        if clean_audio:
-            from main.library.audio.noisereduce import TorchGate
-
-            vc_instance.vc_model.tg = (
-                TorchGate(
-                    vc_instance.vc_model.pipeline.tgt_sr,
-                    prop_decrease=clean_strength,
-                ).to(config.device)
-            )
 
     # Speaker Identity ID Configuration
     sid = params.get("sid", vc_instance.vc_model.pipeline.sid)

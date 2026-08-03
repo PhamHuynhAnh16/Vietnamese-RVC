@@ -8,7 +8,11 @@ import numpy as np
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
 from main.library.algorithm.viterbi import viterbi
+
+if config.compile_all:
+    viterbi = torch.compile(viterbi, mode=config.compile_mode)
 
 CENTS_PER_BIN, PITCH_BINS, SAMPLE_RATE, WINDOW_SIZE = 20, 360, 16000, 1024
 
@@ -232,6 +236,7 @@ class CREPE:
         """
 
         probabilities = probabilities.detach()
+        if config.compile_all: probabilities = probabilities.clone()
         # Suppress predictions out of the configured valid F0 boundaries
         probabilities[:, :self.f0_min_bin] = -float('inf')
         probabilities[:, self.f0_max_bin:] = -float('inf')

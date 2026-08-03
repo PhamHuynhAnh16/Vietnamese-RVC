@@ -799,6 +799,8 @@ def realtime_worker(queue_out, config_queue, callbacks_kwargs, audio_manager_kwa
                     if clean_audio is False:
                         callbacks.vc.vc_model.tg = None
                     elif clean_audio and callbacks.vc.vc_model.tg is None:
+                        import torch
+
                         from main.library.audio.noisereduce import TorchGate
 
                         callbacks.vc.vc_model.tg = (
@@ -807,6 +809,8 @@ def realtime_worker(queue_out, config_queue, callbacks_kwargs, audio_manager_kwa
                                 prop_decrease=clean_strength,
                             ).to(config.device)
                         )
+
+                        if config.compile_all: callbacks.vc.vc_model.tg = torch.compile(callbacks.vc.vc_model.tg, mode=config.compile_mode)
 
                     if callbacks.vc.vc_model.tg is not None:
                         callbacks.vc.vc_model.tg.prop_decrease = clean_strength
@@ -868,16 +872,6 @@ def realtime_worker(queue_out, config_queue, callbacks_kwargs, audio_manager_kwa
                             new_freq=callbacks.vc.vc_model.output_sample_rate,
                             dtype=torch.float32
                         ).to(config.device)
-
-                        if clean_audio:
-                            from main.library.audio.noisereduce import TorchGate
-
-                            callbacks.vc.vc_model.tg = (
-                                TorchGate(
-                                    callbacks.vc.vc_model.pipeline.tgt_sr,
-                                    prop_decrease=clean_strength,
-                                ).to(config.device)
-                            )
 
                     # Speaker Identity ID Configuration
                     sid = callbacks_kwargs.get("sid", callbacks.vc.vc_model.pipeline.sid)

@@ -22,7 +22,7 @@ from main.inference.conversion.pipeline import Pipeline
 from main.library.audio.audio import load_audio, cut, restore
 from main.app.variables import config, logger, translations, file_types
 from main.library.audio.audio_processing import preprocess, postprocess
-from main.library.utils import check_assets, check_upscaler, load_embedders_model, load_model, strtobool, load_faiss_index
+from main.library.utils import check_assets, check_upscaler, load_embedders_model, load_model, strtobool, load_faiss_index, clear_gpu_cache
 
 if not config.debug_mode:
     warnings.filterwarnings("ignore")
@@ -417,6 +417,7 @@ def run_convert_script(
             logger.info(f"{translations['convert_audio']} '{audio_path}'...")
             if os.path.exists(output_audio): os.remove(output_audio)
 
+            if audio_upscaler: cvt.reinitialize()
             convert_audio(audio_path, output_audio)
 
         logger.info(
@@ -487,17 +488,28 @@ class VoiceConverter:
             audio_upscaler (bool): Flags ultra-high super-resolution networks execution. Defaults to False.
         """
 
+        self.embedder_model = embedder_model
+        self.embedders_mode = embedders_mode
+        self.clean_strength = clean_strength
+        self.checkpointing = checkpointing
+        self.clean_audio = clean_audio
+        self.noise_scale = noise_scale
+        self.model_path = model_path
+        self.sid = sid
+
         self.vc = None
         self.index = None
         self.net_g = None 
         self.tgt_sr = None 
         self.big_tsr = None
+        self.flash_sr = None
         self.hubert_model = None
         self.f0_generator = None
 
         self.alpha = alpha
         self.sample_rate = 16000
         self.hop_length = hop_length
+        self.audio_upscaler = audio_upscaler
         self.predictor_onnx = predictor_onnx
         # Decide floating point mode based on configuration settings (FP16 or FP32)
         self.dtype = torch.float16 if config.is_half else torch.float32
@@ -508,8 +520,6 @@ class VoiceConverter:
         self.setup_vc(model_path, sid, checkpointing, noise_scale)
         # Step 3: Conditional setup for noise gating modules
         self.tg = TorchGate(self.tgt_sr, prop_decrease=clean_strength).to(config.device) if clean_audio else None
-        # Step 4: Conditional setup for audio super-resolution models
-        self.flash_sr = FlashSR(os.path.join("assets", "models", "upscalers", "upscalers.pth"), device=config.device, is_half=config.is_half) if audio_upscaler else None
 
     def convert_audio(
         self, 
@@ -647,10 +657,22 @@ class VoiceConverter:
                 # Polyphase resampling filter alignment if length mismatches are observed
                 if len(audio_output) != target_len: audio_output = signal.resample_poly(audio_output, target_len, len(audio_output))
 
+                # Conditional setup for audio super-resolution models
+                if self.audio_upscaler and self.flash_sr is None:
+                    self.cleanup()
+                    self.flash_sr = FlashSR(
+                        os.path.join("assets", "models", "upscalers", "upscalers.pth"), 
+                        device=config.device, 
+                        is_half=config.is_half
+                    )
+
                 # Handle upscaling super-resolution routines or standard resampling
                 if self.flash_sr is not None:
-                    audio_output_resample = self.flash_sr.upscaler(audio_output, sample_rate=self.tgt_sr, pbar=pbar)
-                    self.tgt_sr = 192000 # FlashSR outputs ultra-high fidelity audio
+                    try:
+                        audio_output_resample = self.flash_sr.upscaler(audio_output, sample_rate=self.tgt_sr, pbar=pbar)
+                        self.tgt_sr = 192000 # FlashSR outputs ultra-high fidelity audio
+                    except torch.cuda.OutOfMemoryError:
+                        logger.warning(translations["audio_upscaler_warn"])
                 elif self.tgt_sr != resample_sr and resample_sr > 0: 
                     audio_output_resample = librosa.resample(audio_output, orig_sr=self.tgt_sr, target_sr=resample_sr, res_type="soxr_vhq")
                     self.tgt_sr = resample_sr
@@ -682,6 +704,24 @@ class VoiceConverter:
 
             logger.debug(traceback.format_exc())
             logger.error(translations["error_convert"].format(e=e))
+
+    def cleanup(self):
+        del self.vc, self.index, self.net_g, self.big_tsr, self.flash_sr, self.hubert_model, self.f0_generator
+        clear_gpu_cache()
+
+        self.f0_generator = None
+        self.hubert_model = None
+        self.flash_sr = None
+        self.big_tsr = None
+        self.net_g = None 
+        self.index = None
+        self.vc = None
+
+    def reinitialize(self):
+        self.cleanup()
+        self.setup_hubert(self.embedder_model, self.embedders_mode)
+        self.setup_vc(self.model_path, self.sid, self.checkpointing, self.noise_scale)
+        self.tg = TorchGate(self.tgt_sr, prop_decrease=self.clean_strength).to(config.device) if self.clean_audio else None
     
     def setup_hubert(self, embedder_model, embedders_mode):
         """Loads and optimizes the discrete feature representation model."""

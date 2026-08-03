@@ -1,6 +1,12 @@
+import os
+import sys
 import torch
 
 import torch.nn.functional as F
+
+sys.path.append(os.getcwd())
+
+from main.app.variables import config
 
 def frame(x, frame_length, hop_length, axis = -1):
     """
@@ -49,13 +55,15 @@ def rms(
         device (str, optional): Target device for computation. Defaults to "cpu".
     """
     # Convert input to tensor and move to target device/dtype
-    y = y.to(device=device, dtype=dtype) if torch.is_tensor(y) else torch.from_numpy(y.copy()).to(device=device, dtype=dtype)
+    y = y.to(device=device, dtype=dtype)
 
     return frame(
         torch.nn.functional.pad(y, (frame_length // 2, frame_length // 2), mode=pad_mode) if center else y, # Pad signal so frames are centered
         frame_length=frame_length, 
         hop_length=hop_length
     ).square().mean(dim=-1, keepdim=True).sqrt().mT # Compute mean square energy per frame and convert power to RMS
+
+_rms = torch.compile(rms, mode=config.compile_mode) if config.compile_all else rms
 
 def change_rms(
     source_audio, 
@@ -79,11 +87,12 @@ def change_rms(
     """
 
     # Convert NumPy input to a float tensor if necessary.
+    if not torch.is_tensor(source_audio): source_audio = torch.from_numpy(source_audio).to(device=device, dtype=torch.float32)
     if not torch.is_tensor(target_audio): target_audio = torch.from_numpy(target_audio).to(device=device, dtype=torch.float32)
 
     # Compute and upsample the target RMS envelope.
     rms2 = F.interpolate(
-        rms(
+        _rms(
             y=target_audio, 
             frame_length=target_rate // 2 * 2, 
             hop_length=target_rate // 2,
@@ -96,7 +105,7 @@ def change_rms(
     # Scale the target audio using the blended RMS ratio.
     return target_audio * (
         F.interpolate(
-            rms(
+            _rms(
                 y=source_audio, 
                 frame_length=source_rate // 2 * 2, 
                 hop_length=source_rate // 2,

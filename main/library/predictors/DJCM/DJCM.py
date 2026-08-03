@@ -89,13 +89,14 @@ class DJCM:
         # Cents mapping vector definition along with safety pads for local group window boundaries
         self.cents_mapping = np.pad(20 * np.arange(N_CLASS) + 1997.3794084376191, (4, 4))
         self.spec_extractor = Spectrogram(int(SAMPLE_RATE // 100), window_length).to(device)
+        if compile_model: self.spec_extractor.stftt = torch.compile(self.spec_extractor.stftt, mode=compile_mode)
         # Structure data types according to backend pipeline specifications (Tensor vs NumPy Array)
-        if return_tensor: self.cents_mapping = torch.as_tensor(self.cents_mapping, dtype=self.dtype, device=device)
+        if return_tensor: self.cents_mapping = torch.from_numpy(self.cents_mapping).to(dtype=self.dtype, device=device)
         self.offsets = torch.arange(-4, 5, device=device) if return_tensor else np.arange(-4, 5)
 
         # Method routers map to corresponding efficient execution branches
         self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
-        self.to_local_average_cents = self._to_local_average_cents_tensor if return_tensor else self._to_local_average_cents_array
+        self.to_local_average_cents = (torch.compile(self._to_local_average_cents_tensor, mode=compile_mode) if compile_model else self._to_local_average_cents_tensor) if return_tensor else self._to_local_average_cents_array
         self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
 
     def infer_from_audio(self, audio, thred=0.03):
@@ -202,13 +203,11 @@ class DJCM:
 
         spec = spec.cpu().numpy().astype(np.float32)
 
-        return torch.as_tensor(
+        return torch.from_numpy(
             self.model.run(
                 ["f0"], {"spec": spec}
-            )[0], 
-            device=self.device,
-            dtype=self.dtype
-        )
+            )[0]
+        ).to(device=self.device, dtype=self.dtype)
 
     def _infer_onnx_io(self, spec):
         """Executes zero-copy optimized ONNX runtime inference via strict explicit I/O allocation."""

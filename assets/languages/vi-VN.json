@@ -796,5 +796,6 @@
     "realtime_has_terminate": "Đã chấm dứt tiến trình!",
     "int8_warn": "Cảnh báo, TensorRT không hỗ trợ các mô hình INT8 kiểu QOperator!",
     "phase_vocoder": "Sử dụng bộ mã hóa pha",
-    "stop_pid": "Bắt đầu dừng tiến trình..."
+    "stop_pid": "Bắt đầu dừng tiến trình...",
+    "audio_upscaler_warn": "Bỏ qua tăng độ phân giải của âm thanh do không đủ bộ nhớ để thực hiện."
 }

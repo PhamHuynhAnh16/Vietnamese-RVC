@@ -5,8 +5,10 @@ import torch
 import numpy as np
 import torch.nn as nn
 import onnxruntime as ort
+import torch.nn.utils.parametrize as parametrize
 
 from einops import rearrange
+from torch.nn.utils import remove_weight_norm
 from torch.nn.utils.parametrizations import weight_norm
 
 sys.path.append(os.getcwd())
@@ -259,6 +261,12 @@ class CFNaiveMelPE(nn.Module):
         # Adapt decoding strategy dynamically according to hardware limitations
         self.latent2cents_local_decoder = latent2cents_local_decoder_cpu if config.device.startswith("privateuseone") else latent2cents_local_decoder
 
+    def remove_weight_norm(self):
+        """Removes weight normalization configurations across all internal layers."""
+
+        if hasattr(self.output_proj, "parametrizations") and "weight" in self.output_proj.parametrizations: parametrize.remove_parametrizations(self.output_proj, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.output_proj)
+
     def forward(self, mel, threshold = 0.006):
         """
         Infers F0 tracks natively given extracted Mel spectrogram vectors.
@@ -359,6 +367,12 @@ class CFNaiveMelPE_LEGACY(nn.Module):
         # Dynamic strategy alignment for target device backends
         self.cents_local_decoder = cents_local_decoder_cpu if config.device.startswith("privateuseone") else cents_local_decoder
 
+    def remove_weight_norm(self):
+        """Removes weight normalization configurations across all internal layers."""
+
+        if hasattr(self.dense_out, "parametrizations") and "weight" in self.dense_out.parametrizations: parametrize.remove_parametrizations(self.dense_out, "weight", leave_parametrized=True)
+        else: remove_weight_norm(self.dense_out)
+
     def forward(self, mel, threshold=0.05):
         """Infers F0 tracks via the legacy model forward routine pipeline."""
 
@@ -417,6 +431,7 @@ class FCPE:
         self.device = device
         self.threshold = threshold
         self.wav2mel = Wav2Mel(device=self.device, dtype=torch.float32)
+        if compile_model: self.wav2mel.stft.get_mel = torch.compile(self.wav2mel.stft.get_mel, mode=compile_mode)
 
         if onnx:
             # Setup configuration optimized execution boundaries for ONNX runtimes
@@ -440,7 +455,12 @@ class FCPE:
             )
 
             model.load_state_dict(ckpt["model"])
-            if compile_model: model.decoder, model.stack = torch.compile(model.decoder, mode=compile_mode), torch.compile(model.stack, mode=compile_mode)
+            model.remove_weight_norm()
+
+            if compile_model: 
+                model.cents_local_decoder = torch.compile(model.cents_local_decoder, mode=compile_mode)
+                model = torch.compile(model, mode=compile_mode)
+
             model = model.to(self.device).eval()
             if is_half: model = model.half()
         else:
@@ -459,7 +479,12 @@ class FCPE:
             )
 
             model.load_state_dict(ckpt["model"])
-            if compile_model: model.net, model.input_stack = torch.compile(model.net, mode=compile_mode), torch.compile(model.input_stack, mode=compile_mode)
+            model.remove_weight_norm()
+
+            if compile_model: 
+                model.latent2cents_local_decoder = torch.compile(model.latent2cents_local_decoder, mode=compile_mode)
+                model = torch.compile(model, mode=compile_mode)
+
             model = model.to(self.device).eval()
             if is_half: model = model.half()
         
@@ -497,13 +522,11 @@ class FCPE:
 
         self._threshold.fill(threshold)
 
-        return torch.as_tensor(
+        return torch.from_numpy(
             self.model.run(
                 ["pitchf"], {"mel": mel.detach().cpu().numpy(), "threshold": self._threshold}
-            )[0], 
-            dtype=torch.float32, 
-            device=self.device
-        ) 
+            )[0]
+        ).to(dtype=torch.float32, device=self.device)
 
     def _infer_onnx_io(self, mel, threshold):
         """High-performance ONNX Inference using device IO-Binding to avoid CPU host copies."""

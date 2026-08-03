@@ -33,7 +33,7 @@ def create_reference_tab():
         pitch_guidance = gr.Checkbox(
             label=translations["training_pitch"], 
             value=True, 
-            interactive=True
+            interactive=False
         )
         f0_autotune = gr.Checkbox(
             label=translations["autotune"], 

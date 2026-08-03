@@ -38,6 +38,7 @@ class PPESTO(torch.nn.Module):
         self.reduction = reduction
         # Register a persistent baseline pitch-shift parameter buffer tracking equivariant translations
         self.register_buffer('shift', torch.zeros((), dtype=torch.float), persistent=True)
+        self.shifts = (self.shift * self.preprocessor.hcqt_kwargs["bins_per_semitone"]).round().int().item()
 
     def forward(self, audio_waveforms, sr = 16000, convert_to_freq = True, return_activations = False):
         """
@@ -76,7 +77,7 @@ class PPESTO(torch.nn.Module):
             vol = vol.view(batch_size, -1)
 
         # 5. Compensate for pitch-shift variations by rolling the activation tensors along the semitone bins
-        activations = activations.roll(-(self.shift * self.preprocessor.hcqt_kwargs["bins_per_semitone"]).round().int().item(), -1)
+        activations = activations.roll(-self.shifts, -1)
         # 6. Fallback fallback paths onto host memory space for unmapped custom hardware structures
         preds = self.reduce_activations(activations.cpu()).to(activations.device) if activations.device.type.startswith(("ocl", "privateuseone")) else self.reduce_activations(activations)
         # 7. Convert continuous pitch states back into standard linear frequency targets

@@ -360,7 +360,7 @@ class Generator:
         self.onnx_mode = '.onnx' if self.predictor_onnx else '.pt'
         self.resize = configs.get("turn_on_resize_f0_for_all", False)
         self.int8_mode = "-int8" if config.int8 and self.predictor_onnx else ""
-        self.resize_f0 = self._resize_tensor_f0 if self.return_tensor else self._resize_array_f0
+        self.resize_f0 = (torch.compile(self._resize_tensor_f0, mode=self.compile_mode) if self.compile_model else self._resize_tensor_f0) if self.return_tensor else self._resize_array_f0
         self.resize_dtype = torch.float64 if self.device.startswith(("cpu", "cuda")) else torch.float32
         self.quantile_audio = self._easy_quantile_audio if self.device.startswith(("ocl", "privateuseone")) else self._quantile_audio
 
@@ -484,7 +484,7 @@ class Generator:
         if not torch.is_tensor(x): x = torch.from_numpy(x).to(self.device)
         if not resize or len(x) == target_len: return x
 
-        source = torch.as_tensor(x, dtype=self.resize_dtype, device=self.device).clone()
+        source = x.to(dtype=self.resize_dtype, device=self.device).clone()
         source[source < 0.001] = torch.nan
         n = source.shape[0]
 

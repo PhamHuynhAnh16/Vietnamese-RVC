@@ -13,6 +13,9 @@ from main.app.variables import config
 from main.inference.realtime.pipeline import Pipeline
 from main.library.utils import circular_write, check_assets, phase_vocoder
 
+if config.compile_all:
+    phase_vocoder = torch.compile(phase_vocoder, mode=config.compile_mode)
+
 class Realtime:
     """
     Handles real-time audio block resampling, buffering, VAD, and model inference.
@@ -129,6 +132,8 @@ class Realtime:
                 self.pipeline.tgt_sr, 
                 prop_decrease=self.clean_strength
             ).to(config.device)
+
+            if config.compile_all: self.tg = torch.compile(self.tg, mode=config.compile_mode)
         else: self.tg = None
 
         # Define resampling modules for streaming IO
@@ -390,11 +395,9 @@ class Realtime:
 
         # Resample incoming audio chunk to the pipeline's expected 16kHz processing rate
         audio_in_16k = self.resample_in(
-            torch.as_tensor(
-                audio_in, 
-                dtype=torch.float32, 
-                device=config.device
-            )
+            torch.from_numpy(
+                audio_in
+            ).to(dtype=torch.float32, device=config.device)
         ).to(self.dtype)
 
         # Enqueue new audio values safely inside the sliding circular storage ring
@@ -406,8 +409,10 @@ class Realtime:
         tg = self.tg
         board = self.board
 
-        def inference_with_silent():
-            """Helper to execute silent/dummy inference pass to update internal model memory states."""
+        # Handle system buffering warmup blocks sequentially without generating audio
+        if self.warmup_blocks > 0:
+            self.warmup_blocks -= 1
+            circular_write(audio_in_16k, self.convert_buffer)
 
             self.pipeline.inference(
                 self.convert_buffer,
@@ -435,19 +440,65 @@ class Realtime:
 
             return None, vol
 
-        # Handle system buffering warmup blocks sequentially without generating audio
-        if self.warmup_blocks > 0:
-            self.warmup_blocks -= 1
-            circular_write(audio_in_16k, self.convert_buffer)
-            return inference_with_silent()
-
         # Check Voice Activity Detection to bypass calculation during silent intervals
         if self.vad is not None:
             is_speech = self.vad.is_speech(audio_in_16k.cpu().numpy().copy())
-            if not is_speech: return inference_with_silent()
+
+            if not is_speech:
+                self.pipeline.inference(
+                    self.convert_buffer,
+                    self.pitch_buffer,
+                    self.pitchf_buffer,
+                    f0_up_key,
+                    index_rate,
+                    self.convert_feature_size_16k,
+                    self.skip_head,
+                    self.return_length,
+                    protect,
+                    filter_radius,
+                    rms_mix_rate,
+                    f0_autotune, 
+                    f0_autotune_strength, 
+                    proposal_pitch, 
+                    proposal_pitch_threshold,
+                    tg,
+                    board,
+                    embedders_mix,
+                    embedders_mix_layers,
+                    embedders_mix_ratio,
+                    block_size_16k=self.block_frame_16k
+                )
+
+                return None, vol
 
         # Gate processing if block volume falls below ambient gate floor sensitivity parameters
-        if vol < self.input_sensitivity: return inference_with_silent()
+        if vol < self.input_sensitivity:
+            self.pipeline.inference(
+                self.convert_buffer,
+                self.pitch_buffer,
+                self.pitchf_buffer,
+                f0_up_key,
+                index_rate,
+                self.convert_feature_size_16k,
+                self.skip_head,
+                self.return_length,
+                protect,
+                filter_radius,
+                rms_mix_rate,
+                f0_autotune, 
+                f0_autotune_strength, 
+                proposal_pitch, 
+                proposal_pitch_threshold,
+                tg,
+                board,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio,
+                block_size_16k=self.block_frame_16k
+            )
+
+            return None, vol
+
         # Update historical conversion tracking buffer
         circular_write(audio_in_16k, self.convert_buffer)
 
@@ -554,6 +605,7 @@ class VoiceChanger:
             nprobe,
             **kwargs
         )
+        self.phase_vocoder_support = not config.device.startswith(("privateuseone", "ocl"))
         # IO configuration details for local session capture
         self.record_audio = record_audio
         self.record_audio_path = record_audio_path
@@ -685,7 +737,7 @@ class VoiceChanger:
         audio = audio[sola_offset:]
 
         # Execute window merging routines depending on current execution paths
-        if use_phase_vocoder and not config.device.startswith(("privateuseone", "ocl")):
+        if use_phase_vocoder and self.phase_vocoder_support:
             # Resolve boundary phase discontinuities explicitly using STFT Phase Vocoder processing
             audio[: self.crossfade_frame] = phase_vocoder(
                 self.sola_buffer,
