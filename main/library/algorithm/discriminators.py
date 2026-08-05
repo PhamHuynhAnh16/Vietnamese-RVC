@@ -213,7 +213,7 @@ class DiscriminatorR(torch.nn.Module):
 
         # 2D Convolutions utilizing horizontal contextual kernels for time-frequency feature extraction
         self.convs = torch.nn.ModuleList([
-            norm_f(torch.nn.Conv2d( 1, 32, (3, 9), padding=(1, 4))), 
+            norm_f(torch.nn.Conv2d(1, 32, (3, 9), padding=(1, 4))), 
             norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
             norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
             norm_f(torch.nn.Conv2d(32, 32, (3, 9), stride=(1, 2), padding=(1, 4))), 
@@ -232,7 +232,7 @@ class DiscriminatorR(torch.nn.Module):
 
         fmap = []
         # Calculate Magnitude Spectrogram and append a dummy channel index
-        x = self.spectrogram(x).unsqueeze(1)
+        x = self.spectrogram(x.float()).unsqueeze(1).to(x.dtype)
         
         for layer in self.convs:
             x = F.leaky_relu(layer(x), self.lrelu_slope)
