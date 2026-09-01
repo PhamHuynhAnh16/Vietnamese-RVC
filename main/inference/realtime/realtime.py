@@ -178,7 +178,7 @@ class Realtime:
         # Initialize base chain with a Highpass filter to eliminate low-end rumble
         board = Pedalboard([HighpassFilter()])
 
-        if kwargs["chorus"]:
+        if kwargs.get("chorus", False):
             board.append(
                 Chorus(
                     depth=kwargs["chorus_depth"], 
@@ -189,14 +189,14 @@ class Realtime:
                 )
             )
         
-        if kwargs["distortion"]:
+        if kwargs.get("distortion", False):
             board.append(
                 Distortion(
                     drive_db=kwargs["distortion_gain"]
                 )
             )
 
-        if kwargs["reverb"]:
+        if kwargs.get("reverb", False):
             board.append(
                 Reverb(
                     room_size=kwargs["reverb_room_size"],
@@ -208,14 +208,14 @@ class Realtime:
                 )
             )
 
-        if kwargs["pitch_shift"]:
+        if kwargs.get("pitch_shift", False):
             board.append(
                 PitchShift(
                     semitones=kwargs["pitch_shift_semitones"]
                 )
             )
 
-        if kwargs["delay"]:
+        if kwargs.get("delay", False):
             board.append(
                 Delay(
                     delay_seconds=kwargs["delay_seconds"],
@@ -224,7 +224,7 @@ class Realtime:
                 )
             )
 
-        if kwargs["compressor"]:
+        if kwargs.get("compressor", False):
             board.append(
                 Compressor(
                     threshold_db=kwargs["compressor_threshold"],
@@ -234,7 +234,7 @@ class Realtime:
                 )
             )
 
-        if kwargs["limiter"]:
+        if kwargs.get("limiter", False):
             board.append(
                 Limiter(
                     threshold_db=kwargs["limiter_threshold"],
@@ -242,28 +242,28 @@ class Realtime:
                 )
             )
 
-        if kwargs["gain"]:
+        if kwargs.get("gain", False):
             board.append(
                 Gain(
                     gain_db=kwargs["gain_db"]
                 )
             )
 
-        if kwargs["bitcrush"]:
+        if kwargs.get("bitcrush", False):
             board.append(
                 Bitcrush(
                     bit_depth=kwargs["bitcrush_bit_depth"]
                 )
             )
 
-        if kwargs["clipping"]:
+        if kwargs.get("clipping", False):
             board.append(
                 Clipping(
                     threshold_db=kwargs["clipping_threshold"]
                 )
             )
 
-        if kwargs["phaser"]: 
+        if kwargs.get("phaser", False): 
             board.append(
                 Phaser(
                     rate_hz=kwargs["phaser_rate_hz"], 

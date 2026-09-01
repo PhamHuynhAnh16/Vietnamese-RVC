@@ -234,7 +234,6 @@ def plot_spectrogram_to_numpy(spectrogram):
     plt.ylabel("Channels")
     plt.tight_layout()
     fig.canvas.draw()
-    plt.close(fig)
 
     # Attempt to extract raw buffer as RGB array; fallback if canvas rendering differs
     try:
@@ -253,6 +252,7 @@ def plot_spectrogram_to_numpy(spectrogram):
             fig.canvas.get_width_height()[::-1] + (3,)
         )
 
+    plt.close(fig)
     return data
 
 def load_wav_to_torch(full_path):

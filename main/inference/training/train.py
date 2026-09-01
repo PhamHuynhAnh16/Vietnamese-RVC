@@ -197,6 +197,7 @@ torch.backends.cudnn.deterministic = args.deterministic if backend_supported els
 torch.backends.cudnn.benchmark = args.benchmark if backend_supported else False
 torch.backends.cuda.matmul.allow_tf32 = main_config.tf32 if backend_supported else False
 torch.backends.cudnn.allow_tf32 = main_config.tf32 if backend_supported else False
+if main_config.tf32 and backend_supported: torch.set_float32_matmul_precision("high")
 
 # Tracker initialization parameters
 global_step = 0
@@ -442,8 +443,8 @@ def run(rank, n_gpus, pretrainG, pretrainD, pitch_guidance, custom_total_epoch, 
                 if rank == 0: logger.info(translations["import_pretrain"].format(dg="G", pretrain=pretrainG))
 
                 ckptG = torch.load(pretrainG, map_location="cpu", weights_only=True)["model"]
-                # Handle SVC speaker embed logic
-                if architecture == "SVC" and "emb_g.weight" not in ckptG: ckptG["emb_g.weight"] = net_g.module.emb_g.weight if hasattr(net_g, "module") else net_g.emb_g.weight
+                ckptG["emb_g.weight"] = (net_g.module.emb_g.weight if hasattr(net_g, "module") else net_g.emb_g.weight).detach().clone()
+
                 net_g.module.load_state_dict(ckptG, strict=strict) if hasattr(net_g, "module") else net_g.load_state_dict(ckptG, strict=strict)
                 del ckptG
 

@@ -314,7 +314,7 @@ def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
         # Generate outer product mapping matrix arguments
         args = timesteps[:, None].float() * freqs[None]
         # Concat paired sine and cosine coordinates projections
-        embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+        embedding = torch.cat([args.cos(), args.sin()], dim=-1)
 
         # Pad with zeros along boundaries if dimension counts are odd numbers
         if dim % 2: embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
