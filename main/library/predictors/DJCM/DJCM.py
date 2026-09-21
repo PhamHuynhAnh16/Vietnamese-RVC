@@ -1,12 +1,19 @@
 import os
 import sys
 import torch
+import librosa
+import torchaudio
 
 import numpy as np
 
 sys.path.append(os.getcwd())
 
+from main.app.variables import config
+from main.library.algorithm.viterbi import viterbi
 from main.library.predictors.DJCM.spec import Spectrogram
+
+if config.compile_all:
+    viterbi = torch.compile(viterbi, mode=config.compile_mode)
 
 SAMPLE_RATE, N_CLASS = 16000, 360
 
@@ -33,7 +40,9 @@ class DJCM:
         compile_mode = None,
         return_tensor = False,
         f0_min=50, 
-        f0_max=1100
+        f0_max=1100,
+        viterbi_decoder = False,
+        high_register = False
     ):
         """
         Initializes the DJCM prediction engine.
@@ -52,6 +61,8 @@ class DJCM:
             return_tensor (bool): Determines if decoding returns PyTorch Tensors or NumPy arrays. Default is False.
             f0_min (float): Frequency floor in Hz for filtering predictions. Default is 50.
             f0_max (float): Frequency ceiling in Hz for filtering predictions. Default is 1100.
+            viterbi_decoder (bool, default=False): Using the viterbi decoding method.
+            high_register (bool, default=False): opt high-register corrector.
         """
 
         super(DJCM, self).__init__()
@@ -82,9 +93,24 @@ class DJCM:
         self.f0_max = f0_max
         self.device = device
         self.batch_size = batch_size
+        self.return_tensor = return_tensor
         self.seg_len = int(segment_len * SAMPLE_RATE)
         self.dtype = torch.float16 if is_half else torch.float32
         self.seg_frames = int(self.seg_len // int(SAMPLE_RATE // 100))
+
+        self.resample = None
+        if high_register and return_tensor:
+            self.resample = torchaudio.transforms.Resample(orig_freq=16000, new_freq=32000, dtype=torch.float32).to(device)
+
+        self.transition = None
+        self.idx = None
+
+        if viterbi_decoder:
+            self.idx = torch.arange(360, device=self.device, dtype=self.dtype)
+            # Create a symmetric penalty matrix based on absolute distance between bins
+            transition = (12 - (self.idx[:, None] - self.idx[None, :]).abs()).clamp(min=0)
+            # Normalize to form valid probability distribution per row
+            self.transition = transition / transition.sum(dim=1, keepdim=True)
 
         # Cents mapping vector definition along with safety pads for local group window boundaries
         self.cents_mapping = np.pad(20 * np.arange(N_CLASS) + 1997.3794084376191, (4, 4))
@@ -96,8 +122,128 @@ class DJCM:
 
         # Method routers map to corresponding efficient execution branches
         self._device = "cuda" if providers[0][0].startswith(("Tensorrt", "CUDA")) else "cpu"
-        self.to_local_average_cents = (torch.compile(self._to_local_average_cents_tensor, mode=compile_mode) if compile_model else self._to_local_average_cents_tensor) if return_tensor else self._to_local_average_cents_array
+        self.to_local_average_cents = (
+            (torch.compile(self._to_viterbi_cents_tensor, mode=compile_mode) if compile_model else self._to_viterbi_cents_tensor) if return_tensor else self._to_viterbi_cents_array
+        ) if viterbi_decoder else (
+            (torch.compile(self._to_local_average_cents_tensor, mode=compile_mode) if compile_model else self._to_local_average_cents_tensor) if return_tensor else self._to_local_average_cents_array
+        )
         self.infer = (self._infer_onnx_io if providers[0][0].startswith(("Tensorrt", "CUDA", "CPU")) else self._infer_onnx_non_io) if onnx else (self._infer_torch_fp16 if is_half else self._infer_torch_fp32)
+
+    def _fix_high_register(self, x, normal, thred, gate=150.0, mode = "true_pitch"):
+        # rmvpe.pt cannot track fundamentals above ~1040 Hz: its training data
+        # (vocal pitch corpora) tops out near C6, so for higher notes the
+        # salience net confidently reports f/2 or f/3 instead. A second rmvpe
+        # pass on octave-down-resampled audio reads those registers correctly;
+        # it is used only to fix the octave class of the normal pass, keeping
+        # the normal 10 ms contour wherever it already agrees.
+        # Mode "true_pitch" (default) writes the true pitch, capped at f0_ceil
+        # (default 1250 Hz) because RVC models trained on stock rmvpe labels
+        # cannot synthesize above that and collapse; above the ceiling stock's
+        # octave-down drive is kept (the vocoder folds its harmonics back up).
+        # Mode "fold" is a compatibility mode for such models: it fixes only
+        # wrong-pitch-class frames, using half the true pitch so every drive
+        # stays in the model's trained register.
+
+        guide = self._half_speed_guide(x, len(normal), thred)
+
+        if self.return_tensor:
+            out = normal.clone()
+            nv, gv = normal > 0, guide > 0
+            both = nv & gv
+
+            c_keep = torch.full_like(normal, float("inf"))
+            c_double = torch.full_like(normal, float("inf"))
+            c_keep[both] = (1200.0 * (normal[both] / guide[both]).log2()).abs()
+            c_double[both] = (1200.0 * (2.0 * normal[both] / guide[both]).log2()).abs()
+
+            agree = both & (c_keep < gate)
+            cand_dbl = both & ~agree & (c_double < gate)
+
+            if mode == "fold":
+                fold_other = (both & ~agree & ~cand_dbl) & (guide >= 990.0)
+                fold_fill = (~nv) & gv & (guide >= 900.0)
+                out[fold_other] = guide[fold_other] / 2.0
+                out[fold_fill] = guide[fold_fill] / 2.0
+                return out
+
+            dbl = cand_dbl & (guide >= 460.0) & (2.0 * normal <= 1250.0)
+            other = (both & ~agree & ~cand_dbl) & (guide >= 990.0) & (guide <= 1250.0)
+            filled = (~nv) & gv & (guide >= 460.0) & (guide <= 1250.0)
+
+            out[dbl] = 2.0 * normal[dbl]
+            out[other] = guide[other]
+            out[filled] = guide[filled]
+
+            return out
+
+        out = normal.copy()
+        nv, gv = normal > 0, guide > 0
+        both = nv & gv
+
+        c_keep = np.full(len(normal), 1e9)
+        c_double = np.full(len(normal), 1e9)
+        c_keep[both] = np.abs(1200.0 * np.log2(normal[both] / guide[both]))
+        c_double[both] = np.abs(1200.0 * np.log2(2.0 * normal[both] / guide[both]))
+
+        agree = both & (c_keep < gate)
+        cand_dbl = both & ~agree & (c_double < gate)
+
+        if mode == "fold":
+            fold_other = (both & ~agree & ~cand_dbl) & (guide >= 990.0)
+            fold_fill = (~nv) & gv & (guide >= 900.0)
+            out[fold_other] = guide[fold_other] / 2.0
+            out[fold_fill] = guide[fold_fill] / 2.0
+            return out
+
+        dbl = cand_dbl & (guide >= 460.0) & (2.0 * normal <= 1250.0)
+        other = (both & ~agree & ~cand_dbl) & (guide >= 990.0) & (guide <= 1250.0)
+        filled = (~nv) & gv & (guide >= 460.0) & (guide <= 1250.0)
+
+        out[dbl] = 2.0 * normal[dbl]
+        out[other] = guide[other]
+        out[filled] = guide[filled]
+
+        return out
+
+    def _half_speed_guide(self, x, n_target, thred):
+        if self.return_tensor:
+            y2 = self.resample(x.to(dtype=torch.float32).unsqueeze(0)).squeeze(0)
+            f0h = self.infer_from_audio(y2, thred=thred)
+
+            f0h = f0h.to(device=x.device, dtype=torch.float32)
+            n_f0 = f0h.shape[0]
+
+            pos = torch.arange(n_target, device=f0h.device, dtype=torch.float32) * 2.0
+
+            j0 = pos.floor().long()
+            j0 = j0.clamp(max=n_f0 - 1)
+
+            j1 = (j0 + 1).clamp(max=n_f0 - 1)
+            w = pos - pos.floor()
+
+            f0_0 = f0h[j0]
+            f0_1 = f0h[j1]
+
+            v0, v1 = f0_0 > 0, f0_1 > 0
+            voiced = torch.where(w == 0, v0, v0 & v1)
+
+            lg = (1.0 - w) * torch.where(v0, f0_0, torch.ones_like(f0_0)).log2() + w * torch.where(v1, f0_1, torch.ones_like(f0_1)).log2()
+            return torch.where(voiced, 2.0 ** (lg + 1.0), torch.zeros_like(lg))
+            
+        y = np.asarray(x, dtype=np.float32)
+        y2 = librosa.resample(y, orig_sr=16000, target_sr=32000, res_type="soxr_vhq")
+        f0h = self.infer_from_audio(y2, thred=thred)
+
+        pos = np.arange(n_target) * 2.0
+        j0 = np.minimum(np.floor(pos).astype(int), len(f0h) - 1)
+        j1 = np.minimum(j0 + 1, len(f0h) - 1)
+
+        w = pos - np.floor(pos)
+        v0, v1 = f0h[j0] > 0, f0h[j1] > 0
+        voiced = np.where(w == 0, v0, v0 & v1)
+
+        lg = (1 - w) * np.log2(np.where(f0h[j0] > 0, f0h[j0], 1.0)) + w * np.log2(np.where(f0h[j1] > 0, f0h[j1], 1.0))
+        return np.where(voiced, 2.0 ** (lg + 1.0), 0.0)
 
     def infer_from_audio(self, audio, thred=0.03):
         """
@@ -261,3 +407,23 @@ class DJCM:
         devided = torch.where(salience.max(dim=1).values <= thred, torch.zeros_like(devided), devided)
 
         return devided
+
+    def _to_viterbi_cents_tensor(self, salience, thred=0.05):
+        """Pitch decoding using the GPU-based Viterbi algorithm."""
+
+        idx = self.idx.unsqueeze(0)
+        prob = salience.T
+
+        center = viterbi(prob / prob.sum(axis=0), self.transition).unsqueeze(1)
+        salience = salience.unsqueeze(0)
+
+        weights = salience * ((idx >= (center - 4).clip(min=0)) & (idx < (center + 5).clip(max=N_CLASS)))
+        weight_sum = weights.sum(dim=2)
+
+        cents = ((weights * (idx * 20 + 1997.3794084376191)).sum(dim=2) / (weight_sum + (weight_sum == 0))) * ~(salience.max(dim=2)[0] < thred)
+        return cents.squeeze(0)
+
+    def _to_viterbi_cents_array(self, salience, thred=0.05):
+        """Use Viterbi but return a NumPy array."""
+
+        return self._to_viterbi_cents_tensor(salience, thred).cpu().numpy()

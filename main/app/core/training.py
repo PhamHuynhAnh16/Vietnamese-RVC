@@ -337,10 +337,11 @@ def extract(
             if not any(
                 os.path.isfile(os.path.join(model_dir, "sliced_audios", f)) 
                 for f in os.listdir(os.path.join(model_dir, "sliced_audios"))
-            ) or not any(
-                os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f)) 
-                for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k"))
             ): 
+            # or not any(
+            #     os.path.isfile(os.path.join(model_dir, "sliced_audios_16k", f)) 
+            #     for f in os.listdir(os.path.join(model_dir, "sliced_audios_16k"))
+            # ): 
                 return gr_warning(translations["not_found_data_preprocess"])
         except:
             return gr_warning(translations["not_found_data_preprocess"])
@@ -656,7 +657,7 @@ def training(
         "--config_save_path", "None",
         "--spec_dir", "None",
         "--eval_dir", "None",
-        "--cache_spectrogram", str(True),
+        "--cache_spectrogram", str(False),
         "--save_the_pid", str(True),
         "--custom_training", str(False)
     ])

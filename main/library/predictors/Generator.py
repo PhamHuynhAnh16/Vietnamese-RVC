@@ -586,7 +586,9 @@ class Generator:
                 hpa="hpa" in self.cache_flags,
                 previous="previous" in self.cache_flags,
                 mix="mix" in self.cache_flags,
-                v4="v4" in self.cache_flags
+                v4="v4" in self.cache_flags,
+                viterbi_mode="viterbi" in self.cache_flags,
+                high_register="highreg" in self.cache_flags
             )
         elif self.cache_args[0] in {"yin", "pyin", "piptrack"}:
             f0 = self.get_f0_librosa(
@@ -621,7 +623,9 @@ class Generator:
                 p_len, 
                 clipping="clipping" in self.cache_flags, 
                 svs="svs" in self.cache_flags, 
-                filter_radius=filter_radius
+                filter_radius=filter_radius,
+                viterbi_mode="viterbi" in self.cache_flags,
+                high_register="highreg" in self.cache_flags
             )
         elif "pesto" in self.cache_flags:
             f0 = self.get_f0_pesto(
@@ -823,7 +827,7 @@ class Generator:
         f0 = self.fcpe.compute_f0(x)
         return self.resize_f0(f0, p_len, self.resize)
     
-    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False, v4=False):
+    def get_f0_rmvpe(self, x, p_len, clipping=False, filter_radius=3, hpa=False, previous=False, mix=False, v4=False, viterbi_mode=False, high_register=False):
         """Extracts pitch sequences via Robust Minimum Variance Pitch Estimation (RMVPE) networks."""
 
         if self.rmvpe is None:
@@ -857,12 +861,16 @@ class Generator:
                 chunk_size=8000 if hpa else configs.get("rmvpe_chunk_size", 32000),
                 return_tensor=self.return_tensor,
                 f0_min=self.f0_min, 
-                f0_max=self.f0_max
+                f0_max=self.f0_max,
+                viterbi_decoder=viterbi_mode,
+                high_register=high_register
             )
             # Route method call hooks to custom alternative routines if clipping flags are set
             if clipping: self.rmvpe.infer_from_audio = self.rmvpe.infer_from_audio_with_pitch
 
         f0 = self.rmvpe.infer_from_audio(x, thred=filter_radius / 100)
+        if high_register: f0 = self.rmvpe._fix_high_register(x, f0, filter_radius / 100)
+
         return self.resize_f0(f0, p_len, self.resize)
     
     def get_f0_pyworld(self, x, p_len, filter_radius, model="harvest", use_stonemask=True):
@@ -1028,7 +1036,7 @@ class Generator:
 
         return self.resize_f0(f0, p_len, True)
 
-    def get_f0_djcm(self, x, p_len, clipping=False, svs=False, filter_radius=3):
+    def get_f0_djcm(self, x, p_len, clipping=False, svs=False, filter_radius=3, viterbi_mode=False, high_register=False):
         """Extracts tracking sequences using Deep Joint Creak and Melody (DJCM) models."""
 
         if self.djcm is None:
@@ -1052,11 +1060,15 @@ class Generator:
                 compile_mode=self.compile_mode,
                 return_tensor=self.return_tensor,
                 f0_min=self.f0_min, 
-                f0_max=self.f0_max
+                f0_max=self.f0_max,
+                viterbi_decoder=viterbi_mode,
+                high_register=high_register
             )
             if clipping: self.djcm.infer_from_audio = self.djcm.infer_from_audio_with_pitch
             
         f0 = self.djcm.infer_from_audio(x, thred=filter_radius / 10)
+        if high_register: f0 = self.djcm._fix_high_register(x, f0, filter_radius / 10)
+
         return self.resize_f0(f0, p_len, self.resize)
     
     def get_f0_swift(self, x, p_len, filter_radius=3):

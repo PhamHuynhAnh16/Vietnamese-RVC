@@ -1,6 +1,8 @@
 import os
 import sys
+import torch
 import librosa
+import torchaudio
 
 import numpy as np
 import soundfile as sf
@@ -114,12 +116,14 @@ def load_audio(
         # Resample only when necessary.
         # soxr_vhq provides very high-quality sinc resampling.
         if sr is not None and sr != sample_rate: 
-            audio = librosa.resample(
-                audio, 
-                orig_sr=sr, 
-                target_sr=sample_rate, 
-                res_type=res_type
-            )
+            # audio = librosa.resample(
+            #     audio, 
+            #     orig_sr=sr, 
+            #     target_sr=sample_rate, 
+            #     res_type=res_type
+            # )
+            transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=sample_rate, lowpass_filter_width=128)
+            audio = transform(torch.from_numpy(audio).float().unsqueeze(0)).squeeze(0).contiguous().numpy()
             sr = sample_rate
 
         if formant_shifting:

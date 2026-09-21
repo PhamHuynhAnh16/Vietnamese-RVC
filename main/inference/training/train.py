@@ -524,6 +524,7 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
                     grad_norm_d = grad_norm_optim(net_d.parameters())
                     optim_d.step()
 
+            net_d.requires_grad_(False)
             # GENERATOR BACKWARD & LOSSES OPTIMIZATION STEP
             with autocasts:
                 y_d_hat_r, y_d_hat_g, fmap_r, fmap_g = net_d(wave, y_hat)
@@ -541,7 +542,7 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
 
             # Update historical global low bounds
-            if loss_gen_all < lowest_value["value"]:  lowest_value = {"step": global_step, "value": loss_gen_all, "epoch": epoch}
+            if loss_gen_all.item() < lowest_value["value"]: lowest_value = {"step": global_step, "value": loss_gen_all.item(), "epoch": epoch}
 
             optim_g.zero_grad()
             if autocast_enabled:
@@ -555,6 +556,7 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
                 grad_norm_g = grad_norm_optim(net_g.parameters())
                 optim_g.step()
 
+            net_d.requires_grad_(True)
             global_step += 1
             # Append calculated step parameters to history tracking arrays
             avg_losses["grad_d_50"].append(grad_norm_d)
@@ -637,7 +639,7 @@ def train_and_evaluate(rank, epoch, hps, net_g, net_d, optim_g, optim_d, scaler,
 
             if custom_save_every_weights: model_add.append(os.path.join(weights_path, f"{model_name}_{epoch}e_{global_step}s.pth"))
 
-        lowest_value_rounded = round(lowest_value["value"].detach().item(), 3)
+        lowest_value_rounded = round(lowest_value["value"], 3)
         # Standard workflow completion criteria check
         if epoch >= custom_total_epoch:
             logger.info(translations["success_training"].format(epoch=epoch, global_step=global_step, loss_gen_all=round(loss_gen_all.item(), 3)))

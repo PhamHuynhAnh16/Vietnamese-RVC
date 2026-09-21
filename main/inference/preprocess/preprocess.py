@@ -99,9 +99,9 @@ class PreProcess:
         self.device = config.device if not config.device.startswith(("ocl", "privateuseone")) else "cpu"
         # Set up processing output locations for source audio rate and downsampled 16kHz tracks
         self.gt_wavs_dir = os.path.join(exp_dir, "sliced_audios")
-        self.wavs16k_dir = os.path.join(exp_dir, "sliced_audios_16k")
+        # self.wavs16k_dir = os.path.join(exp_dir, "sliced_audios_16k")
         os.makedirs(self.gt_wavs_dir, exist_ok=True)
-        os.makedirs(self.wavs16k_dir, exist_ok=True)
+        # os.makedirs(self.wavs16k_dir, exist_ok=True)
 
     def _normalize_audio(self, audio):
         """
@@ -145,16 +145,16 @@ class PreProcess:
             normalized_audio.astype(np.float32)
         )
         # Resample utilizing SoX high-quality algorithm and save down to a standard 16kHz structure
-        wavfile.write(
-            os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{idx1}.wav"), 
-            SAMPLE_RATE_16K, 
-            librosa.resample(
-                normalized_audio, 
-                orig_sr=self.sr, 
-                target_sr=SAMPLE_RATE_16K, 
-                res_type="soxr_vhq"
-            ).astype(np.float32)
-        )
+        # wavfile.write(
+        #     os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{idx1}.wav"), 
+        #     SAMPLE_RATE_16K, 
+        #     librosa.resample(
+        #         normalized_audio, 
+        #         orig_sr=self.sr, 
+        #         target_sr=SAMPLE_RATE_16K, 
+        #         res_type="soxr_vhq"
+        #     ).astype(np.float32)
+        # )
 
     def simple_cut(
         self, 
@@ -192,16 +192,16 @@ class PreProcess:
                     chunk.astype(np.float32)
                 )
 
-                wavfile.write(
-                    os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{i // (chunk_length - overlap_length)}.wav"), 
-                    SAMPLE_RATE_16K, 
-                    librosa.resample(
-                        chunk, 
-                        orig_sr=self.sr, 
-                        target_sr=SAMPLE_RATE_16K, 
-                        res_type="soxr_vhq"
-                    ).astype(np.float32)
-                )
+                # wavfile.write(
+                #     os.path.join(self.wavs16k_dir, f"{sid}_{idx0}_{i // (chunk_length - overlap_length)}.wav"), 
+                #     SAMPLE_RATE_16K, 
+                #     librosa.resample(
+                #         chunk, 
+                #         orig_sr=self.sr, 
+                #         target_sr=SAMPLE_RATE_16K, 
+                #         res_type="soxr_vhq"
+                #     ).astype(np.float32)
+                # )
 
             i += chunk_length - overlap_length
 

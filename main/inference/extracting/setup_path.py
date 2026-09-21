@@ -17,7 +17,7 @@ def setup_paths(exp_dir, version = None):
     """
 
     # Define the common absolute folder holding standard 16kHz downsampled audio chunks
-    wav_path = os.path.join(exp_dir, "sliced_audios_16k")
+    wav_path = os.path.join(exp_dir, "sliced_audios") # , "sliced_audios_16k")
 
     if version:
         # Branch A: Setup workspace infrastructure for embedding extraction (e.g., v2_extracted)
