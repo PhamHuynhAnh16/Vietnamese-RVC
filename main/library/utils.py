@@ -127,7 +127,7 @@ def check_assets(f0_method, hubert, predictor_onnx=False, embedders_mode="fairse
         elif "pesto" in f0_method:
             modelname = "pesto"
         elif "swift" in f0_method:
-            modelname = "swift"
+            modelname = "swift3" if "v3" in f0_method else "swift"
             suffix = ("-int8.onnx" if config.int8 else ".onnx")
         else:
             return None

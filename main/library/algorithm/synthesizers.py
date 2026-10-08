@@ -66,22 +66,22 @@ class Synthesizer(torch.nn.Module):
         # Dynamic mapping setup for targeted Audio Waveform Generators (Vocoders)
         if use_f0:
             if vocoder == "RefineGAN": 
-                from main.library.generators.refinegan import RefineGANGenerator
+                from main.library.generators.nsf_refinegan import RefineGANNSFGenerator
 
                 logger.info(translations["use_vocoders"].format(name="REFINEGAN"))
 
-                self.dec = RefineGANGenerator(
+                self.dec = RefineGANNSFGenerator(
                     sample_rate=sr, 
                     upsample_rates=upsample_rates, 
                     num_mels=inter_channels, 
                     checkpointing=checkpointing
                 )
             elif vocoder == "BigVGAN":
-                from main.library.generators.bigvgan import BigVGANGenerator
+                from main.library.generators.nsf_bigvgan import BigVGANNSFGenerator
 
                 logger.info(translations["use_vocoders"].format(name="BIGVGAN"))
 
-                self.dec = BigVGANGenerator(
+                self.dec = BigVGANNSFGenerator(
                     in_channel=inter_channels,
                     upsample_initial_channel=upsample_initial_channel,
                     upsample_rates=upsample_rates,
@@ -93,11 +93,11 @@ class Synthesizer(torch.nn.Module):
                     harmonic_num=0, 
                 )
             elif vocoder in ["MRF-HiFi-GAN", "MRF HiFi-GAN"]: 
-                from main.library.generators.mrf_hifigan import HiFiGANMRFGenerator
+                from main.library.generators.nmrf_hifigan import HiFiGANNMRFGenerator
 
                 logger.info(translations["use_vocoders"].format(name="MRF-HIFIGAN"))
 
-                self.dec = HiFiGANMRFGenerator(
+                self.dec = HiFiGANNMRFGenerator(
                     in_channel=inter_channels, 
                     upsample_initial_channel=upsample_initial_channel, 
                     upsample_rates=upsample_rates, 
@@ -127,19 +127,59 @@ class Synthesizer(torch.nn.Module):
                     harmonic_num=0
                 )
         else: 
-            from main.library.generators.hifigan import HiFiGANGenerator
+            if vocoder == "RefineGAN": 
+                from main.library.generators.refinegan import RefineGANGenerator
 
-            logger.info(translations["use_vocoders"].format(name="HIFIGAN"))
+                logger.info(translations["use_vocoders"].format(name="REFINEGAN"))
 
-            self.dec = HiFiGANGenerator(
-                inter_channels, 
-                resblock_kernel_sizes, 
-                resblock_dilation_sizes, 
-                upsample_rates, 
-                upsample_initial_channel, 
-                upsample_kernel_sizes, 
-                gin_channels=gin_channels
-            )
+                self.dec = RefineGANGenerator(
+                    upsample_rates=upsample_rates, 
+                    num_mels=inter_channels, 
+                    checkpointing=checkpointing
+                )
+            elif vocoder == "BigVGAN":
+                from main.library.generators.bigvgan import BigVGANGenerator
+
+                logger.info(translations["use_vocoders"].format(name="BIGVGAN"))
+
+                self.dec = BigVGANGenerator(
+                    in_channel=inter_channels,
+                    upsample_initial_channel=upsample_initial_channel,
+                    upsample_rates=upsample_rates,
+                    upsample_kernel_sizes=upsample_kernel_sizes,
+                    resblock_kernel_sizes=resblock_kernel_sizes,
+                    resblock_dilations=resblock_dilation_sizes,
+                    gin_channels=gin_channels
+                )
+            elif vocoder in ["MRF-HiFi-GAN", "MRF HiFi-GAN"]: 
+                from main.library.generators.mrf_hifigan import HiFiGANMRFGenerator
+
+                logger.info(translations["use_vocoders"].format(name="MRF-HIFIGAN"))
+
+                self.dec = HiFiGANMRFGenerator(
+                    in_channel=inter_channels, 
+                    upsample_initial_channel=upsample_initial_channel, 
+                    upsample_rates=upsample_rates, 
+                    upsample_kernel_sizes=upsample_kernel_sizes, 
+                    resblock_kernel_sizes=resblock_kernel_sizes, 
+                    resblock_dilations=resblock_dilation_sizes, 
+                    gin_channels=gin_channels, 
+                    checkpointing=checkpointing
+                )
+            else:
+                from main.library.generators.hifigan import HiFiGANGenerator
+
+                logger.info(translations["use_vocoders"].format(name="HIFIGAN"))
+
+                self.dec = HiFiGANGenerator(
+                    inter_channels, 
+                    resblock_kernel_sizes, 
+                    resblock_dilation_sizes, 
+                    upsample_rates, 
+                    upsample_initial_channel, 
+                    upsample_kernel_sizes, 
+                    gin_channels=gin_channels
+                )
 
         # Posterior Encoder extracts latent traits from target linear spectrograms during training
         self.enc_q = PosteriorEncoder(spec_channels, inter_channels, hidden_channels, 5, 1, 16, gin_channels=gin_channels)

@@ -397,7 +397,152 @@ class AMPBlock(nn.Module):
         for layer in self.layers:
             layer.remove_weight_norm()
 
-class BigVGANGenerator(nn.Module):
+class SineGen(nn.Module):
+    """
+    Sine wave generator for Neural Source Filter (NSF) models.
+    Generates excitation signals based on Fundamental Frequency (F0).
+    """
+
+    def __init__(
+        self,
+        sampling_rate,
+        harmonic_num=0,
+        sine_amp=0.1,
+        noise_std=0.003,
+        voiced_threshold=0,
+        flag_for_pulse=False,
+    ):
+        """
+        Args:
+            sampling_rate (int): Sampling rate of the target audio.
+            harmonic_num (int): Number of harmonics to generate. Default: 0.
+            sine_amp (float): Amplitude of sine waves. Default: 0.1.
+            noise_std (float): Standard deviation of unvoiced noise. Default: 0.003.
+            voiced_threshold (float): F0 threshold to determine voiced/unvoiced frames. Default: 0.
+            flag_for_pulse (bool): Unused flag preserved for compatibility. Default: False.
+        """
+
+        super(SineGen, self).__init__()
+        self.sine_amp = sine_amp
+        self.noise_std = noise_std
+        self.harmonic_num = harmonic_num
+        self.dim = self.harmonic_num + 1
+        self.sampling_rate = sampling_rate
+        self.voiced_threshold = voiced_threshold
+        self.flag_for_pulse = flag_for_pulse
+
+    def _f02uv(self, f0):
+        """Calculates Voiced/Unvoiced (U/V) mask based on threshold."""
+
+        return (f0 > self.voiced_threshold).float()
+
+    def _f02sine(self, f0_values):
+        """
+        Converts continuous F0 trajectories into phase-continuous sine waves.
+        
+        Args:
+            f0_values (Tensor): F0 values for harmonics.
+
+        Returns:
+            Tensor: Generated sine wave matrix.
+        """
+
+        # Calculate phase increment per sample step
+        rad_values = (f0_values / self.sampling_rate) % 1
+        rand_ini = torch.rand(f0_values.shape[0], f0_values.shape[2], dtype=f0_values.dtype, device=f0_values.device)
+
+        # Set first time-step initial phase
+        rand_ini[:, 0] = 0
+        rad_values[:, 0, :] = rad_values[:, 0, :] + rand_ini
+
+        # Handle phase wrapping logic over multiple periods
+        tmp_over_one = torch.cumsum(rad_values, 1) % 1
+        tmp_over_one_idx = (tmp_over_one[:, 1:, :] - tmp_over_one[:, :-1, :]) < 0
+
+        cumsum_shift = torch.zeros_like(rad_values)
+        cumsum_shift[:, 1:, :] = tmp_over_one_idx * -1.0
+
+        # Compute continuous sine trajectories
+        return (torch.cumsum(rad_values + cumsum_shift, dim=1) * 2 * np.pi).sin()
+
+    def forward(self, f0):
+        """
+        Args:
+            f0 (Tensor): F0 tensor.
+
+        Returns:
+            Tensor: Sine waves mixed with noise excitation.
+        """
+
+        with torch.no_grad():
+            # Initialize array to contain fundamental frequency and its harmonics
+            f0_buf = torch.zeros(f0.shape[0], f0.shape[1], self.dim, dtype=f0.dtype, device=f0.device)
+            f0_buf[:, :, 0] = f0[:, :, 0]
+
+            # Compute harmonic frequencies (F0 * 2, F0 * 3, ...)
+            for idx in np.arange(self.harmonic_num):
+                f0_buf[:, :, idx + 1] = f0_buf[:, :, 0] * (idx + 2)
+
+            # Generate pure sine waves
+            # The input must be kept as a float; otherwise, the output is prone to becoming NaN.
+            sine_waves = self._f02sine(f0_buf.float()) * self.sine_amp
+            uv = self._f02uv(f0)
+
+            # Blend sine waves with Gaussian noise for voiced sections, or pure noise for unvoiced sections
+            sine_waves = sine_waves * uv + ((uv * self.noise_std + (1 - uv) * self.sine_amp / 3) * torch.randn_like(sine_waves))
+
+        return sine_waves
+
+class SourceModuleHnNSF(nn.Module):
+    """
+    Source Module for Harmonic-plus-Noise NSF architecture.
+    Refines raw excitation signals through linear mixing and non-linear squashing.
+    """
+
+    def __init__(
+        self,
+        sampling_rate,
+        harmonic_num=0,
+        sine_amp=0.1,
+        add_noise_std=0.003,
+        voiced_threshod=0.0,
+    ):
+        """
+        Args:
+            sampling_rate (int): Audio sampling rate.
+            harmonic_num (int): Number of harmonics. Default: 0.
+            sine_amp (float): Sine amplitude. Default: 0.1.
+            add_noise_std (float): Noise standard deviation. Default: 0.003.
+            voiced_threshod (float): Threshold for voiced frames. Default: 0.0.
+        """
+
+        super(SourceModuleHnNSF, self).__init__()
+        self.sine_amp = sine_amp
+        self.noise_std = add_noise_std
+        self.l_sin_gen = SineGen(sampling_rate, harmonic_num, sine_amp, add_noise_std, voiced_threshod)
+        # Merge multi-harmonic signals into a mono channel excitation
+        self.l_linear = nn.Linear(harmonic_num + 1, 1)
+        self.l_tanh = nn.Tanh()
+
+    def forward(self, x):
+        """
+        Args:
+            x (Tensor): F0 input tensor.
+
+        Returns:
+            Tensor: Blended mono source excitation tensor.
+        """
+
+        # Generate, project, and squash excitation through Tanh
+        sine_merge = self.l_tanh(
+            self.l_linear(
+                self.l_sin_gen(x).to(dtype=self.l_linear.weight.dtype)
+            )
+        )
+
+        return sine_merge
+
+class BigVGANNSFGenerator(nn.Module):
     """
     BigVGAN Generator incorporating Anti-Aliased Multi-Period Blocks (AMP) 
     and Neural Source Filter (NSF) excitation signals for high-fidelity vocoding.
@@ -411,7 +556,9 @@ class BigVGANGenerator(nn.Module):
         upsample_kernel_sizes,
         resblock_kernel_sizes,
         resblock_dilations,
-        gin_channels
+        gin_channels,
+        sample_rate,
+        harmonic_num,
     ):
         """
         Args:
@@ -422,11 +569,17 @@ class BigVGANGenerator(nn.Module):
             resblock_kernel_sizes (list of int): Kernel sizes for AMP Blocks.
             resblock_dilations (list of list of int): Dilations for layers inside AMP Blocks.
             gin_channels (int): Global conditioning channels (0 if disabled).
+            sample_rate (int): Sampling rate for NSF module.
+            harmonic_num (int): Harmonic number for NSF module.
         """
 
         super().__init__()
         self.num_kernels = len(resblock_kernel_sizes)
         self.num_upsamples = len(upsample_rates)
+
+        # Temporal upsampling for F0 sequence to match audio resolution
+        self.f0_upsample = nn.Upsample(scale_factor=np.prod(upsample_rates))
+        self.m_source = SourceModuleHnNSF(sample_rate, harmonic_num)
 
         # Initial preprocessing convolution
         self.conv_pre = weight_norm(
@@ -441,6 +594,13 @@ class BigVGANGenerator(nn.Module):
 
         self.amps = nn.ModuleList()
         self.upsamples = nn.ModuleList()
+        self.noise_convs = nn.ModuleList()
+
+        # Compute internal downsampling strides for multi-scale source conditioning
+        stride_f0s = [
+            math.prod(upsample_rates[i + 1 :]) if i + 1 < self.num_upsamples else 1 
+            for i in range(self.num_upsamples)
+        ]
 
         # Construct upsampling layers and corresponding noise downsamplers
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
@@ -456,6 +616,21 @@ class BigVGANGenerator(nn.Module):
                         padding=padding,
                         output_padding=u % 2,
                     )
+                )
+            )
+
+            # Match source excitation resolution down to the specific upsampling scale
+            stride = stride_f0s[i]
+            kernel = (1 if stride == 1 else stride * 2 - stride % 2)
+            padding = (0 if stride == 1 else (kernel - stride) // 2)
+            
+            self.noise_convs.append(
+                nn.Conv1d(
+                    1,
+                    upsample_initial_channel // (2 ** (i + 1)),
+                    kernel_size=kernel,
+                    stride=stride,
+                    padding=padding,
                 )
             )
 
@@ -494,20 +669,24 @@ class BigVGANGenerator(nn.Module):
         """
         Args:
             x (Tensor): Mel-spectrogram features of shape (B, in_channels, T_mel).
-            f0 (Tensor): Unused fundamental frequency tensor (maintained for API compatibility).
+            f0 (Tensor): Fundamental frequency trajectory of shape (B, T_mel).
             g (Tensor, optional): Global conditioning feature of shape (B, gin_channels, 1).
         Returns:
             Tensor: Synthesized audio waveform of shape (B, 1, T_audio).
         """
 
+        # Generate full-resolution harmonic excitation source
+        har_source = self.m_source(self.f0_upsample(f0[:, None, :]).transpose(-1, -2)).transpose(-1, -2)
         # Initial transformation
         x = self.conv_pre(x)
         if g is not None: x += self.cond(g)  
         
         # Iterative upsampling combined with AMP block refinement
-        for up, amp in zip(self.upsamples, self.amps):
+        for up, amp, noise_conv in zip(self.upsamples, self.amps, self.noise_convs):
             xs = 0
+
             x = up(x) # Scale feature maps up
+            x += noise_conv(har_source) # Inject multi-scale source excitation
 
             # Process through parallel multi-kernel AMP layers
             for layer in amp:

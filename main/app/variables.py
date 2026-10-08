@@ -216,6 +216,7 @@ method_f0_full = [
     "djcm-svs-viterbi-highreg", 
     "djcm-svs-viterbi-highreg-medfilt",
     "swift", 
+    "swift-v3", 
     "fcpe", 
     "fcpe-previous", 
     "fcpe-legacy", 

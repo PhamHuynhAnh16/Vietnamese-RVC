@@ -344,6 +344,7 @@ class Generator:
         self.swift = None
         self.rmvpe = None
         self.crepe = None
+        self.swift3 = None
         self.mangio_penn = None
         self.mangio_crepe = None
         # Method cache trackers to optimize parsing lookups
@@ -363,6 +364,19 @@ class Generator:
         self.resize_f0 = (torch.compile(self._resize_tensor_f0, mode=self.compile_mode) if self.compile_model else self._resize_tensor_f0) if self.return_tensor else self._resize_array_f0
         self.resize_dtype = torch.float64 if self.device.startswith(("cpu", "cuda")) else torch.float32
         self.quantile_audio = self._easy_quantile_audio if self.device.startswith(("ocl", "privateuseone")) else self._quantile_audio
+
+    def cleanup(self):
+        self.pw = None
+        self.fcpe = None
+        self.djcm = None
+        self.penn = None
+        self.pesto = None
+        self.swift = None
+        self.rmvpe = None
+        self.crepe = None
+        self.swift3 = None
+        self.mangio_penn = None
+        self.mangio_crepe = None
 
     def calculator(
         self, 
@@ -633,11 +647,7 @@ class Generator:
                 p_len
             )
         elif "swift" in self.cache_flags:
-            f0 = self.get_f0_swift(
-                x, 
-                p_len, 
-                filter_radius=filter_radius
-            )
+            f0 = self.get_f0_swift3(x, p_len) if "v3" in self.cache_flags else self.get_f0_swift(x, p_len, filter_radius=filter_radius)
         else:
             raise ValueError(translations["option_not_valid"])
         
@@ -658,6 +668,8 @@ class Generator:
         f0_stack = []
 
         for method in methods: # Gather estimation tracks from all designated sub-algorithms
+            self.cleanup()
+
             f0_stack.append(
                 self.resize_f0(
                     self.compute_f0(
@@ -1088,10 +1100,34 @@ class Generator:
                 providers=self.providers
             )
         
-        if torch.is_tensor(x): x = x.cpu().numpy()
+        if torch.is_tensor(x): x = x.detach().cpu().numpy()
 
         pitch_hz, _, _ = self.swift.detect_from_array(x)
         return self.resize_f0(pitch_hz, p_len, True)
+    
+    def get_f0_swift3(self, x, p_len):
+        """Runs pitch estimation with high-efficiency SWIFT3 ONNX runtimes."""
+
+        if self.swift3 is None:
+            from main.library.predictors.SWIFT.SWIFT3 import SWIFT
+
+            self.swift3 = SWIFT(
+                os.path.join(
+                    configs["predictors_path"], 
+                    "swift3-int8.onnx" if self.int8_mode else "swift3.onnx"
+                ), 
+                providers=self.providers
+            )
+        
+        if torch.is_tensor(x): x = x.detach().cpu().numpy()
+
+        _, pitch_hz, confidence, _ = self.swift3.detect(x, self.sample_rate, fmin=self.f0_min, fmax=self.f0_max)
+        pitch, repaired = self.swift3._repair_subharmonics(pitch_hz, confidence, 0.016)
+
+        repaired &= (pitch >= self.f0_min) & (pitch <= self.f0_max)
+        pitch = np.where(repaired, pitch, pitch_hz)
+
+        return self.resize_f0(pitch, p_len, True)
 
     def get_f0_pesto(self, x, p_len):
         """Infers pitch using PESTO neural estimators."""
