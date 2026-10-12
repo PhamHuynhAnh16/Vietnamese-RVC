@@ -50,7 +50,7 @@ def create_sin_embedding(
     phase = pos / (
         max_period ** ((
             adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)
-        ) if str(device).startswith("ocl") else ( # Edge-case handling for OpenCL (ocl) targets requiring explicit casting to fp32
+        ) if str(device).startswith(("ocl", "mps")) else ( # Edge-case handling for OpenCL (ocl) targets requiring explicit casting to fp32
             adim / (half_dim - 1)
         ))
     )
@@ -170,7 +170,7 @@ def create_sin_embedding_cape(
     phase = pos / (
         max_period ** ((
             adim.to(torch.float32) / torch.tensor(half_dim - 1, dtype=torch.float32, device=device)
-        ) if str(device).startswith("ocl") else ( # Process phase steps tracking architectural targets
+        ) if str(device).startswith(("ocl", "mps")) else ( # Process phase steps tracking architectural targets
             adim / (half_dim - 1)
         ))
     )

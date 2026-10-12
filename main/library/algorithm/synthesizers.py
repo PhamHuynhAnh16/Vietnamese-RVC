@@ -237,7 +237,7 @@ class Synthesizer(torch.nn.Module):
 
         if rate is not None:
             # Adjusts speech speed/tempo offset allocations
-            head = int(z_p.shape[2] * (1.0 - rate.item()))
+            head = int(z_p.shape[2] * (1.0 - rate))
             z_p, x_mask = z_p[:, :, head:], x_mask[:, :, head:]
             if self.use_f0: nsff0 = nsff0[:, head:]
 
@@ -434,7 +434,7 @@ class SynthesizerSVC(torch.nn.Module):
         z_p, _, _, c_mask = self.enc_p(x, x_mask, f0=pitch, noise_scale=self.noise_scale)
 
         if rate is not None:
-            head = int(z_p.shape[2] * (1.0 - rate.item()))
+            head = int(z_p.shape[2] * (1.0 - rate))
             z_p, c_mask, nsff0 = z_p[:, :, head:], c_mask[:, :, head:], nsff0[:, head:]
 
         # Convert priors to singer latents through the Inverse Flow block

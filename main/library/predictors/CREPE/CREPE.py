@@ -110,7 +110,7 @@ class CREPE:
         """
 
         # Ensure compatibility with specialized hardware accelerators
-        if str(bins.device).startswith(("ocl", "privateuseone")): bins = bins.to(torch.float32)
+        if str(bins.device).startswith(("ocl", "privateuseone", "mps")): bins = bins.to(torch.float32)
 
         # Reconstruct pitch in cents from bins and add triangular noise for quantization smoothing
         cents = CENTS_PER_BIN * bins + 1997.3794084376191
@@ -200,7 +200,7 @@ class CREPE:
                 stride=(1, hop_length)
             ).transpose(1, 2)
             
-            if self.device.startswith(("ocl", "privateuseone")): frames = frames.contiguous()
+            if self.device.startswith(("ocl", "privateuseone", "mps")): frames = frames.contiguous()
             frames = frames.reshape(-1, WINDOW_SIZE).to(self.device)
             # Z-score Standardization (Zero mean, unit variance normalization per frame)
             frames -= frames.mean(dim=1, keepdim=True)

@@ -11,6 +11,9 @@ from main.library.audio.features import change_rms
 from main.app.variables import config, logger, translations, configs
 from main.library.utils import load_embedders_model, extract_features, load_faiss_index, load_model
 
+class CudaGraphCaptureError(RuntimeError):
+    """The service must restart before it can safely use eager CUDA inference."""
+
 class RealtimeVoiceConverter:
     """
     Handles loading, setting up, and running inference for Retrieval-based Voice Conversion (RVC) 
@@ -188,6 +191,11 @@ class Pipeline:
         self.p_len = torch.zeros(1, device=self.device, dtype=torch.int64)
         self.rate = torch.zeros(1, device=self.device, dtype=self.dtype)
         self.torch_sid = torch.tensor([sid], device=self.device, dtype=torch.int64)
+
+        self._graph_cache = None
+        self._graph_failed = False
+        self._graph_supported = config.cuda_graph and config.device.startswith("cuda") and "NVIDIA" in torch.cuda.get_device_name(config.pytorch_device_idx) and not config.is_zluda
+        self.inference = self._cuda_graph_inference if self._graph_supported else self._inference
     
     def setup_predictor(self, sample_rate, hop_length, predictor_onnx = False):
         """
@@ -231,7 +239,7 @@ class Pipeline:
 
         return embedder
     
-    def inference(
+    def _inference(
         self, 
         audio, 
         pitch = None, 
@@ -267,6 +275,11 @@ class Pipeline:
             f0_frame = (block_size_16k + 800 if block_size_16k else skip_head * self.predictor.window + 800)
             # Adjust RMVPE frame block dimensions dynamically to match algorithm alignment constraints
             if "rmvpe" in self.f0_method: f0_frame = 5120 * ((f0_frame - 1) // 5120 + 1) - self.predictor.window
+            elif "fcpe" in self.f0_method:
+                # Chunk duration should control latency, not pitch quality.
+                # Keep the default 250ms block's 300ms analysis history even
+                # when streaming much smaller blocks; no lookahead is added.
+                f0_frame = max(f0_frame, 4800)
 
             if self.use_f0:
                 # Evaluate pitch tracking using the calculated optimal audio slice window length
@@ -384,3 +397,216 @@ class Pipeline:
                 ).to(config.device)
 
             return out_audio.float()
+
+    def _cuda_graph_inference(
+        self,
+        audio,
+        pitch=None,
+        pitchf=None,
+        f0_up_key=0,
+        index_rate=0.5,
+        p_len=0,
+        skip_head=None,
+        return_length=None,
+        protect=0.5,
+        filter_radius=3,
+        rms_mix_rate=1,
+        f0_autotune=False,
+        f0_autotune_strength=1,
+        proposal_pitch=False,
+        proposal_pitch_threshold=255.0,
+        torchgate=None,
+        board=None,
+        embedders_mix=False,
+        embedders_mix_layers=9,
+        embedders_mix_ratio=0.5,
+        block_size_16k=None,
+    ):
+        # Eager inference for unsupported environments or special processing.
+        if (not self._graph_supported or self._graph_failed or board is not None):
+            self._graph_cache = None
+
+            return self._inference(
+                audio,
+                pitch,
+                pitchf,
+                f0_up_key,
+                index_rate,
+                p_len,
+                skip_head,
+                return_length,
+                protect,
+                filter_radius,
+                rms_mix_rate,
+                f0_autotune,
+                f0_autotune_strength,
+                proposal_pitch,
+                proposal_pitch_threshold,
+                torchgate,
+                board,
+                embedders_mix,
+                embedders_mix_layers,
+                embedders_mix_ratio,
+                block_size_16k,
+            )
+
+        def tensor_signature(tensor):
+            if tensor is None: return None
+            if not isinstance(tensor, torch.Tensor): return (type(tensor), id(tensor))
+
+            return (tensor.data_ptr(), tuple(tensor.shape), tuple(tensor.stride()), tensor.dtype, tensor.device, tensor.layout,)
+
+        # Graph replay requires stable tensor addresses.
+        key = (
+            tensor_signature(audio),
+            tensor_signature(pitch),
+            tensor_signature(pitchf),
+            f0_up_key,
+            index_rate,
+            p_len,
+            skip_head,
+            return_length,
+            protect,
+            filter_radius,
+            rms_mix_rate,
+            f0_autotune,
+            f0_autotune_strength,
+            proposal_pitch,
+            proposal_pitch_threshold,
+            id(torchgate) if torchgate is not None else None,
+            embedders_mix,
+            embedders_mix_layers,
+            embedders_mix_ratio,
+            block_size_16k,
+        )
+
+        # A cache hit is valid only for the same captured inputs/configuration.
+        if self._graph_cache is not None:
+            if self._graph_cache[0] != key:
+                self._graph_cache = None
+
+        if self._graph_cache is None:
+            saved_pitch = pitch.clone() if pitch is not None else None
+            saved_pitchf = pitchf.clone() if pitchf is not None else None
+
+            original_stream = torch.cuda.current_stream(self.device)
+
+            try:
+                # Warm up CUDA kernels before graph capture.
+                for _ in range(3):
+                    self._inference(
+                        audio,
+                        pitch,
+                        pitchf,
+                        f0_up_key,
+                        index_rate,
+                        p_len,
+                        skip_head,
+                        return_length,
+                        protect,
+                        filter_radius,
+                        rms_mix_rate,
+                        f0_autotune,
+                        f0_autotune_strength,
+                        proposal_pitch,
+                        proposal_pitch_threshold,
+                        torchgate,
+                        board,
+                        embedders_mix,
+                        embedders_mix_layers,
+                        embedders_mix_ratio,
+                        block_size_16k,
+                    )
+
+                # Restore inputs that warm-up may have modified.
+                if pitch is not None:
+                    pitch.copy_(saved_pitch)
+
+                if pitchf is not None:
+                    pitchf.copy_(saved_pitchf)
+
+                # Use a side stream to capture after warm-up.
+                capture_stream = torch.cuda.Stream(device=self.device)
+                capture_stream.wait_stream(original_stream)
+
+                with torch.cuda.stream(capture_stream):
+                    graph = torch.cuda.CUDAGraph()
+
+                    with torch.cuda.graph(graph, stream=capture_stream):
+                        output = self._inference(
+                            audio,
+                            pitch,
+                            pitchf,
+                            f0_up_key,
+                            index_rate,
+                            p_len,
+                            skip_head,
+                            return_length,
+                            protect,
+                            filter_radius,
+                            rms_mix_rate,
+                            f0_autotune,
+                            f0_autotune_strength,
+                            proposal_pitch,
+                            proposal_pitch_threshold,
+                            torchgate,
+                            board,
+                            embedders_mix,
+                            embedders_mix_layers,
+                            embedders_mix_ratio,
+                            block_size_16k,
+                        )
+
+                original_stream.wait_stream(capture_stream)
+                self._graph_cache = (key, graph, output)
+            except (RuntimeError, torch.OutOfMemoryError) as error:
+                self._graph_cache = None
+                self._graph_failed = True
+
+                # A failed capture may have modified pitch inputs.
+                if pitch is not None and saved_pitch is not None:
+                    pitch.copy_(saved_pitch)
+
+                if pitchf is not None and saved_pitchf is not None:
+                    pitchf.copy_(saved_pitchf)
+
+                # Fall back to eager execution instead of repeatedly capturing.
+                try:
+                    torch.cuda.synchronize(self.device)
+                except RuntimeError:
+                    pass
+
+                torch.cuda.set_stream(original_stream)
+
+                return self._inference(
+                    audio,
+                    pitch,
+                    pitchf,
+                    f0_up_key,
+                    index_rate,
+                    p_len,
+                    skip_head,
+                    return_length,
+                    protect,
+                    filter_radius,
+                    rms_mix_rate,
+                    f0_autotune,
+                    f0_autotune_strength,
+                    proposal_pitch,
+                    proposal_pitch_threshold,
+                    torchgate,
+                    board,
+                    embedders_mix,
+                    embedders_mix_layers,
+                    embedders_mix_ratio,
+                    block_size_16k,
+                )
+            finally:
+                torch.cuda.set_stream(original_stream)
+
+        # Replay the captured graph.
+        graph = self._graph_cache[1]
+        output = self._graph_cache[2]
+
+        graph.replay()
+        return output

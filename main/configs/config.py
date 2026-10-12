@@ -8,6 +8,10 @@ sys.path.append(os.getcwd())
 
 from main.library.backends import directml, opencl, xpu, zluda
 
+if sys.platform == "darwin":
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
 def singleton(cls):
     """
     A decorator to implement the Singleton pattern for a class.
@@ -72,6 +76,7 @@ class Config:
         # Configure model quantization and compiler variables
         self.is_half = self.is_fp16()
         self.int8 = self.configs.get("int8", False)
+        self.cuda_graph = False
         self.compile_all = self.device.startswith("cuda") and self.configs.get("compile_all", False)
         self.compile_mode = self.configs.get("compile_mode", None)
         self.allow_is_half = not self.device.startswith(("cpu", "mps", "ocl", "privateuseone")) or self.configs.get("allow_fp16_all_backend", False)
@@ -190,6 +195,10 @@ class Config:
         Returns:
             tuple: Contains (x_pad, x_query, x_center, x_max) parameter thresholds.
         """
+
+        if self.device == "mps":
+            # Metal shares system memory; bound long-file feature activations.
+            return (1, 5, 30, 32)
 
         # Lower processing parameters for low-end VRAM profiles (<= 4GB)
         if self.gpu_mem is not None and self.gpu_mem <= 4: 
@@ -348,6 +357,9 @@ class Config:
                 for i in range(ngpu) 
                 if self.device.startswith("ocl") or ngpu != 0
             ]
+        elif self.device.startswith("mps"):
+            ngpu = 1
+            gpu_infos = ["Apple Silicon GPU (MPS)"]
         else:
             ngpu = 0
             gpu_infos = []

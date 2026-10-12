@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 sys.path.append(os.getcwd())
 
-from main.app.variables import translations
+from main.app.variables import translations, config as main_config
 from main.inference.training.mel_processing import spectrogram_torch
 from main.inference.training.utils import load_filepaths_and_text, load_wav_to_torch
 
@@ -389,9 +389,9 @@ def get_training_dataloader(config, spec_dir, cache_spectrogram, pitch_guidance 
 
     train_loader = DataLoader(
         train_dataset, 
-        num_workers=4, 
+        num_workers=2 if main_config.device.startswith("mps") else 4, 
         shuffle=False, 
-        pin_memory=True, 
+        pin_memory=not main_config.device.startswith("mps"), 
         batch_size=1 if architecture != "SVC" else batch_size,
         collate_fn=TextAudioCollate(pitch_guidance=pitch_guidance), 
         batch_sampler=DistributedBucketSampler(
@@ -403,7 +403,7 @@ def get_training_dataloader(config, spec_dir, cache_spectrogram, pitch_guidance 
             shuffle=True
         ) if architecture != "SVC" else None, 
         persistent_workers=True, 
-        prefetch_factor=8
+        prefetch_factor=2 if main_config.device.startswith("mps") else 8
     )
 
     return train_loader

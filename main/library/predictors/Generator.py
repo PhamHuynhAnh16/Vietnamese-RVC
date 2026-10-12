@@ -139,6 +139,66 @@ def autotune_f0(note_dict, f0, f0_autotune_strength):
     # Linearly interpolate between raw pitch and nearest note frequencies using the strength factor
     return f0 + (nearest - f0) * f0_autotune_strength
 
+@torch.no_grad()
+def extract_median_f0_tensor(f0):
+    """
+    Tensor-only equivalent of extract_median_f0.
+    Supports CPU/CUDA and CUDA Graph capture for fixed-shape inputs.
+
+    Args:
+        f0: 1D floating-point tensor, with unvoiced frames represented by 0.
+
+    Returns:
+        Scalar tensor containing the interpolated median F0.
+        All-unvoiced input returns 0.
+    """
+
+    if f0.ndim != 1: raise ValueError("f0 must be a 1D tensor")
+    if f0.numel() == 0: return f0.new_zeros(())
+
+    n = f0.shape[0]
+    valid = f0 > 0
+
+    # Find nearest valid frame on the left and right.
+    # cummax/cummin retain the original tensor length.
+    idx = torch.arange(n, device=f0.device, dtype=torch.long)
+
+    left_idx = torch.where(valid, idx, -1).cummax(dim=0).values
+    right_idx = torch.where(valid, idx, n).flip(0).cummin(dim=0).values.flip(0)
+
+    # Clamp to the endpoints: equivalent to np.interp boundary behavior.
+    left_idx = left_idx.clamp(0, n - 1)
+    right_idx = right_idx.clamp(0, n - 1)
+
+    left_f0 = f0[left_idx]
+    right_f0 = f0[right_idx]
+
+    # Match np.median: average the middle pair for even sequence lengths.
+    sorted_f0 = torch.where(valid, f0, left_f0 + ((idx - left_idx).to(f0.dtype) / (right_idx - left_idx).clamp_min(1).to(f0.dtype)) * (right_f0 - left_f0)).sort().values
+    mid = n // 2
+
+    median = sorted_f0[mid] if n % 2 else (sorted_f0[mid - 1] + sorted_f0[mid]) * 0.5
+    # Handle all-unvoiced input without a CPU synchronization.
+    return torch.where(valid.any(), median, median.new_zeros(()))
+
+
+@torch.no_grad()
+def proposal_f0_up_key_tensor(f0, target_f0 = 155.0, limit = 12):
+    """
+    CUDA/Tensor-only pitch key estimation.
+
+    Returns:
+        Scalar int64 tensor on the same device as f0.
+        No .cpu(), .numpy(), .item(), or Python conversion of tensor values.
+    """
+
+    median_f0 = extract_median_f0_tensor(f0)
+    safe_f0 = median_f0.clamp_min(torch.finfo(f0.dtype).tiny)
+    target = torch.as_tensor(target_f0, device=f0.device, dtype=f0.dtype)
+
+    key = (12.0 * (target / safe_f0).log2()).round().clamp(-limit, limit).to(torch.int64)
+    return torch.where(f0.gt(0).any(), key, torch.zeros_like(key))
+
 def extract_median_f0(f0):
     """
     Calculates the global median frequency of an F0 sequence, excluding unvoiced frames (0 Hz).
@@ -178,7 +238,11 @@ def proposal_f0_up_key(f0, target_f0 = 155.0, limit = 12):
         The computed integer value representing the pitch key change.
     """
 
-    if torch.is_tensor(f0): f0 = f0.cpu().numpy()
+    if torch.is_tensor(f0):
+        try:
+            return proposal_f0_up_key_tensor(f0, target_f0, limit)
+        except:
+            return 0
 
     try:
         # Clamp shift amount to within range [-limit, limit]
